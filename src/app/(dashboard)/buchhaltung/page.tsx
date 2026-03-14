@@ -1,38 +1,62 @@
-export default function BuchhaltungPage() {
-  return (
-    <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Buchhaltung</h1>
-          <p className="text-slate-500 mt-1">Freigegebene Rechnungen</p>
-        </div>
-        <button className="px-4 py-2 text-sm bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors">
-          CSV Export
-        </button>
-      </div>
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getBenutzerProfil } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { BuchhaltungClient } from "@/components/buchhaltung-client";
 
-      <div className="mt-6 bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 text-left text-slate-500">
-              <th className="px-4 py-3 font-medium">Bestellnr.</th>
-              <th className="px-4 py-3 font-medium">Händler</th>
-              <th className="px-4 py-3 font-medium">Betrag</th>
-              <th className="px-4 py-3 font-medium">Freigegeben von</th>
-              <th className="px-4 py-3 font-medium">Freigegeben am</th>
-              <th className="px-4 py-3 font-medium">Fällig</th>
-              <th className="px-4 py-3 font-medium">PDF</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
-                Noch keine freigegebenen Rechnungen.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+export default async function BuchhaltungPage() {
+  const profil = await getBenutzerProfil();
+  if (!profil) redirect("/login");
+
+  const supabase = await createServerSupabaseClient();
+
+  // Freigegebene Bestellungen mit Freigabe-Details laden
+  const { data: bestellungen } = await supabase
+    .from("bestellungen")
+    .select("*")
+    .eq("status", "freigegeben")
+    .order("updated_at", { ascending: false });
+
+  // Freigaben laden
+  const bestellIds = (bestellungen || []).map((b) => b.id);
+  const { data: freigaben } = bestellIds.length
+    ? await supabase
+        .from("freigaben")
+        .select("*")
+        .in("bestellung_id", bestellIds)
+    : { data: [] };
+
+  // Rechnungs-Dokumente laden (für Fälligkeitsdatum + PDF-Download)
+  const { data: rechnungen } = bestellIds.length
+    ? await supabase
+        .from("dokumente")
+        .select("*")
+        .in("bestellung_id", bestellIds)
+        .eq("typ", "rechnung")
+    : { data: [] };
+
+  // Daten zusammenführen
+  const freigabenMap = new Map(
+    (freigaben || []).map((f) => [f.bestellung_id, f])
   );
+  const rechnungenMap = new Map(
+    (rechnungen || []).map((r) => [r.bestellung_id, r])
+  );
+
+  const rows = (bestellungen || []).map((b) => {
+    const freigabe = freigabenMap.get(b.id);
+    const rechnung = rechnungenMap.get(b.id);
+    return {
+      id: b.id,
+      bestellnummer: b.bestellnummer,
+      haendler_name: b.haendler_name,
+      betrag: b.betrag,
+      waehrung: b.waehrung || "EUR",
+      freigegeben_von: freigabe?.freigegeben_von_name || "–",
+      freigegeben_am: freigabe?.freigegeben_am || null,
+      faelligkeitsdatum: rechnung?.faelligkeitsdatum || null,
+      rechnung_id: rechnung?.id || null,
+    };
+  });
+
+  return <BuchhaltungClient rows={rows} />;
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { createBrowserSupabaseClient } from "@/lib/supabase";
 import type { BenutzerProfil } from "@/lib/auth";
 
 const NAV_ITEMS = {
@@ -21,7 +22,14 @@ const NAV_ITEMS = {
 
 export function Sidebar({ profil }: { profil: BenutzerProfil }) {
   const pathname = usePathname();
+  const router = useRouter();
   const items = NAV_ITEMS[profil.rolle] || [];
+
+  async function handleLogout() {
+    const supabase = createBrowserSupabaseClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   return (
     <aside className="w-64 bg-[#1E4D8C] text-white flex flex-col">
@@ -59,6 +67,15 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
             <p className="text-sm font-medium truncate">{profil.name}</p>
             <p className="text-xs text-white/50 capitalize">{profil.rolle}</p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="text-white/50 hover:text-white transition-colors"
+            title="Abmelden"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
       </div>
     </aside>
