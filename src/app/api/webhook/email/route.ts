@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien } from "@/lib/openai";
+import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel } from "@/lib/openai";
 import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
@@ -381,6 +381,84 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         logError("/api/webhook/email", "Preisanomalie-Prüfung fehlgeschlagen", err);
+      }
+    }
+
+    // === FEATURE: Duplikat-Erkennung ===
+    if (aktuelleArtikel.length > 0) {
+      try {
+        const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: aehnliche } = await supabase
+          .from("bestellungen")
+          .select("id, bestellnummer, haendler_name, betrag, created_at")
+          .eq("haendler_name", haendler?.name || haendlerDomain)
+          .neq("id", bestellungId)
+          .gte("created_at", siebenTageZurueck)
+          .limit(10);
+
+        if (aehnliche && aehnliche.length > 0) {
+          const aehnlicheIds = aehnliche.map((b) => b.id);
+          const { data: aehnlicheDoks } = await supabase
+            .from("dokumente")
+            .select("bestellung_id, artikel")
+            .in("bestellung_id", aehnlicheIds)
+            .not("artikel", "is", null);
+
+          const artikelMap = new Map<string, { name: string; menge: number; einzelpreis: number }[]>();
+          for (const dok of aehnlicheDoks || []) {
+            const art = dok.artikel as { name: string; menge: number; einzelpreis: number }[] | null;
+            if (art) {
+              const existing = artikelMap.get(dok.bestellung_id) || [];
+              artikelMap.set(dok.bestellung_id, [...existing, ...art]);
+            }
+          }
+
+          const existierendeBestellungen = aehnliche.map((b) => ({
+            bestellnummer: b.bestellnummer || "Ohne Nr.",
+            haendler: b.haendler_name || "–",
+            betrag: Number(b.betrag) || null,
+            artikel: artikelMap.get(b.id) || [],
+            datum: new Date(b.created_at).toLocaleDateString("de-DE"),
+          }));
+
+          const duplikat = await pruefeDuplikat(
+            {
+              haendler: haendler?.name || haendlerDomain,
+              betrag: ergebnisse[0]?.analyse.gesamtbetrag ?? null,
+              artikel: aktuelleArtikel,
+            },
+            existierendeBestellungen
+          );
+
+          if (duplikat.ist_duplikat && duplikat.konfidenz >= 0.7) {
+            await supabase.from("kommentare").insert({
+              bestellung_id: bestellungId,
+              autor_kuerzel: "KI",
+              autor_name: "KI-Duplikat-Erkennung",
+              text: `⚠ Mögliches Duplikat: ${duplikat.begruendung}`,
+            });
+            logInfo("/api/webhook/email", "Duplikat erkannt", { bestellungId, duplikat_von: duplikat.duplikat_von, konfidenz: duplikat.konfidenz });
+          }
+        }
+      } catch (err) {
+        logError("/api/webhook/email", "Duplikat-Prüfung fehlgeschlagen", err);
+      }
+    }
+
+    // === FEATURE: Automatische Artikel-Kategorisierung ===
+    if (aktuelleArtikel.length > 0) {
+      try {
+        const kategorisierung = await kategorisiereArtikel(aktuelleArtikel);
+        if (kategorisierung.kategorien.length > 0) {
+          // Kategorien als JSONB in der Bestellung speichern
+          await supabase
+            .from("bestellungen")
+            .update({ artikel_kategorien: kategorisierung.zusammenfassung })
+            .eq("id", bestellungId);
+          logInfo("/api/webhook/email", "Artikel kategorisiert", { bestellungId, kategorien: kategorisierung.zusammenfassung });
+        }
+      } catch (err) {
+        logError("/api/webhook/email", "Kategorisierung fehlgeschlagen", err);
       }
     }
 

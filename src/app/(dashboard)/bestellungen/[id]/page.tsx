@@ -85,7 +85,7 @@ export default async function BestellungDetailPage({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         <SummaryCard label="Betrag" value={bestellung.betrag ? `${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"} />
         <SummaryCard label="Händler" value={bestellung.haendler_name || "–"} />
         <SummaryCard label="Besteller" value={bestellung.besteller_name} />
@@ -99,6 +99,18 @@ export default async function BestellungDetailPage({
           }
         />
       </div>
+
+      {/* Artikel-Kategorien (wenn vorhanden) */}
+      {bestellung.artikel_kategorien && Object.keys(bestellung.artikel_kategorien).length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {Object.entries(bestellung.artikel_kategorien as Record<string, number>).map(([kat, anzahl]) => (
+            <span key={kat} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+              {kat}
+              <span className="bg-indigo-100 text-indigo-600 rounded-full px-1.5 py-0.5 text-[10px] font-bold">{anzahl}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Split View */}
       <BestelldetailClient

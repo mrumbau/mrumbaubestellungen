@@ -420,7 +420,185 @@ ${stats.abweichende_bestellungen.length > 0
   return JSON.parse(jsonMatch ? jsonMatch[0] : text);
 }
 
-// 6. Kommentar-Zusammenfassung für eine Bestellung
+// 6. Duplikat-Erkennung
+export interface DuplikatErgebnis {
+  ist_duplikat: boolean;
+  konfidenz: number;
+  duplikat_von: string | null;
+  begruendung: string;
+}
+
+export async function pruefeDuplikat(
+  neueBestellung: { haendler: string; betrag: number | null; artikel: { name: string; menge: number; einzelpreis: number }[] },
+  existierendeBestellungen: { bestellnummer: string; haendler: string; betrag: number | null; artikel: { name: string; menge: number; einzelpreis: number }[]; datum: string }[]
+): Promise<DuplikatErgebnis> {
+  if (existierendeBestellungen.length === 0) {
+    return { ist_duplikat: false, konfidenz: 1, duplikat_von: null, begruendung: "Keine vergleichbaren Bestellungen vorhanden." };
+  }
+
+  const response = await withRetry(() => openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: `Du bist ein Duplikat-Erkennungsassistent für eine deutsche Baufirma.
+Prüfe ob die neue Bestellung ein Duplikat einer existierenden Bestellung ist.
+Eine Bestellung ist ein Duplikat wenn: gleicher Händler, sehr ähnliche/identische Artikel, ähnlicher Betrag.
+Leichte Preisunterschiede (z.B. durch MwSt-Rundung) sind KEIN Duplikat.
+
+Gib NUR ein JSON-Objekt zurück:
+{
+  "ist_duplikat": true,
+  "konfidenz": 0.95,
+  "duplikat_von": "#45231",
+  "begruendung": "Identische Artikel und Betrag wie Bestellung #45231 vom 12.03."
+}
+
+Falls kein Duplikat: ist_duplikat false, duplikat_von null.`,
+      },
+      {
+        role: "user",
+        content: `Neue Bestellung:
+Händler: ${neueBestellung.haendler}
+Betrag: ${neueBestellung.betrag ?? "unbekannt"}€
+Artikel: ${JSON.stringify(neueBestellung.artikel)}
+
+Existierende Bestellungen (letzte 7 Tage, gleicher Händler):
+${existierendeBestellungen.map((b) => `- ${b.bestellnummer} (${b.datum}): ${b.betrag}€, Artikel: ${JSON.stringify(b.artikel)}`).join("\n")}`,
+      },
+    ],
+    max_tokens: 500,
+    temperature: 0.1,
+  }));
+
+  const text = response.choices[0]?.message?.content || "{}";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+}
+
+// 7. Automatische Artikel-Kategorisierung
+export interface KategorisierungErgebnis {
+  kategorien: {
+    artikel: string;
+    kategorie: string;
+  }[];
+  zusammenfassung: Record<string, number>;
+}
+
+export async function kategorisiereArtikel(
+  artikel: { name: string; menge: number; einzelpreis: number }[]
+): Promise<KategorisierungErgebnis> {
+  const response = await withRetry(() => openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: `Du bist ein Kategorisierungsassistent für eine deutsche Baufirma.
+Ordne jeden Artikel einer passenden Kategorie zu.
+
+Verwende NUR diese Kategorien:
+- Werkzeug
+- Baumaterial
+- Befestigungstechnik
+- Verbrauchsmaterial
+- Elektro
+- Sanitär
+- Arbeitsschutz
+- Sonstiges
+
+Gib NUR ein JSON-Objekt zurück:
+{
+  "kategorien": [
+    { "artikel": "Bosch Bohrmaschine", "kategorie": "Werkzeug" },
+    { "artikel": "Fischer Dübel 8mm 100St", "kategorie": "Befestigungstechnik" }
+  ],
+  "zusammenfassung": { "Werkzeug": 1, "Befestigungstechnik": 1 }
+}`,
+      },
+      {
+        role: "user",
+        content: `Artikel:\n${artikel.map((a) => `- ${a.name} (${a.menge}x, ${a.einzelpreis}€)`).join("\n")}`,
+      },
+    ],
+    max_tokens: 1000,
+    temperature: 0.1,
+  }));
+
+  const text = response.choices[0]?.message?.content || "{}";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+}
+
+// 8. Fälligkeits-Priorisierung
+export interface PriorisierungErgebnis {
+  bestellungen: {
+    bestellnummer: string;
+    prioritaet: "hoch" | "mittel" | "niedrig";
+    score: number;
+    grund: string;
+  }[];
+  zusammenfassung: string;
+}
+
+export async function priorisiereBestellungen(
+  bestellungen: {
+    bestellnummer: string;
+    haendler: string;
+    status: string;
+    betrag: number | null;
+    tage_alt: number;
+    hat_rechnung: boolean;
+    hat_lieferschein: boolean;
+    faelligkeitsdatum: string | null;
+  }[]
+): Promise<PriorisierungErgebnis> {
+  const response = await withRetry(() => openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: `Du bist ein Priorisierungsassistent für eine deutsche Baufirma.
+Bewerte welche offenen Bestellungen am dringendsten bearbeitet werden müssen.
+
+Kriterien (Gewichtung):
+- Hoher Betrag = dringender
+- Nahe/überschrittene Fälligkeit = sehr dringend
+- Abweichung-Status = dringend (muss geprüft werden)
+- Alter der Bestellung = je älter desto dringender
+- Fehlende Dokumente = relevant
+
+Gib NUR ein JSON-Objekt zurück:
+{
+  "bestellungen": [
+    {
+      "bestellnummer": "#45231",
+      "prioritaet": "hoch",
+      "score": 92,
+      "grund": "Rechnung überfällig seit 3 Tagen, Betrag 2.450€"
+    }
+  ],
+  "zusammenfassung": "3 Bestellungen mit hoher Priorität."
+}
+
+Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
+      },
+      {
+        role: "user",
+        content: `Offene Bestellungen:\n${bestellungen.map((b) =>
+          `- ${b.bestellnummer} bei ${b.haendler}: Status=${b.status}, Betrag=${b.betrag ?? "?"}€, ${b.tage_alt} Tage alt, Fällig=${b.faelligkeitsdatum || "unbekannt"}, Rechnung=${b.hat_rechnung ? "ja" : "nein"}, LS=${b.hat_lieferschein ? "ja" : "nein"}`
+        ).join("\n")}`,
+      },
+    ],
+    max_tokens: 1500,
+    temperature: 0.2,
+  }));
+
+  const text = response.choices[0]?.message?.content || "{}";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+}
+
+// 9. Kommentar-Zusammenfassung für eine Bestellung
 export async function fasseBestellungZusammen(
   bestellung: { bestellnummer: string; haendler: string; status: string; betrag: number },
   abweichungen: { feld: string; artikel?: string; erwartet: string | number; gefunden: string | number }[],

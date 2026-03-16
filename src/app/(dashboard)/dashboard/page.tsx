@@ -3,6 +3,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
+import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 
@@ -153,6 +154,11 @@ export default async function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* KI-Priorisierung */}
+      <div className="mt-6">
+        <DashboardPriorisierung />
       </div>
 
       {/* Besteller-Übersicht */}

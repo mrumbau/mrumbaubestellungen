@@ -78,6 +78,10 @@ export function BestelldetailClient({
   const [kiLoading, setKiLoading] = useState(false);
   const [showFreigabeDialog, setShowFreigabeDialog] = useState(false);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
+  const [duplikatResult, setDuplikatResult] = useState<{ ist_duplikat: boolean; konfidenz: number; duplikat_von: string | null; begruendung: string } | null>(null);
+  const [duplikatLoading, setDuplikatLoading] = useState(false);
+  const [katResult, setKatResult] = useState<{ kategorien: { artikel: string; kategorie: string }[]; zusammenfassung: Record<string, number> } | null>(null);
+  const [katLoading, setKatLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,6 +135,36 @@ export function BestelldetailClient({
       // Fehler ignorieren
     } finally {
       setKiLoading(false);
+    }
+  }
+
+  async function handleDuplikatCheck() {
+    setDuplikatLoading(true);
+    try {
+      const res = await fetch("/api/ki/duplikat-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_id: bestellung.id }),
+      });
+      const data = await res.json();
+      if (res.ok) setDuplikatResult(data);
+    } catch { /* ignore */ } finally {
+      setDuplikatLoading(false);
+    }
+  }
+
+  async function handleKategorisierung() {
+    setKatLoading(true);
+    try {
+      const res = await fetch("/api/ki/kategorisierung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_id: bestellung.id }),
+      });
+      const data = await res.json();
+      if (res.ok) setKatResult(data);
+    } catch { /* ignore */ } finally {
+      setKatLoading(false);
     }
   }
 
@@ -409,6 +443,62 @@ export function BestelldetailClient({
             <p className="text-xs text-slate-400">
               Klicke auf &quot;Generieren&quot; für eine KI-Zusammenfassung dieser Bestellung.
             </p>
+          )}
+        </div>
+
+        {/* Duplikat-Check + Kategorisierung */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <h3 className="text-sm font-semibold text-slate-900 mb-3">KI-Analyse</h3>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={handleDuplikatCheck}
+              disabled={duplikatLoading}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50"
+            >
+              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.5a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+              </svg>
+              {duplikatLoading ? "Prüft..." : "Duplikat?"}
+            </button>
+            <button
+              onClick={handleKategorisierung}
+              disabled={katLoading}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-50"
+            >
+              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
+              </svg>
+              {katLoading ? "Lädt..." : "Kategorien"}
+            </button>
+          </div>
+
+          {/* Duplikat-Ergebnis */}
+          {duplikatResult && (
+            <div className={`rounded-lg p-2.5 text-xs mb-2 ${duplikatResult.ist_duplikat ? "bg-red-50" : "bg-green-50"}`}>
+              <span className={`font-semibold ${duplikatResult.ist_duplikat ? "text-red-700" : "text-green-700"}`}>
+                {duplikatResult.ist_duplikat ? "Mögliches Duplikat!" : "Kein Duplikat"}
+              </span>
+              <p className={`mt-1 ${duplikatResult.ist_duplikat ? "text-red-600" : "text-green-600"}`}>
+                {duplikatResult.begruendung}
+              </p>
+            </div>
+          )}
+
+          {/* Kategorisierung-Ergebnis */}
+          {katResult && katResult.kategorien.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(katResult.zusammenfassung).map(([kat, anzahl]) => (
+                  <span key={kat} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700">
+                    {kat} ({anzahl})
+                  </span>
+                ))}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {katResult.kategorien.map((k) => `${k.artikel}: ${k.kategorie}`).join(" · ")}
+              </div>
+            </div>
           )}
         </div>
 
