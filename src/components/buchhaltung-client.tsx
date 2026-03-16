@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface BuchhaltungRow {
   id: string;
@@ -42,8 +43,20 @@ function isUeberfaellig(datum: string | null) {
   return new Date(datum).getTime() < Date.now();
 }
 
-export function BuchhaltungClient({ rows }: { rows: BuchhaltungRow[] }) {
+export function BuchhaltungClient({
+  rows,
+  currentPage,
+  totalPages,
+  totalCount,
+}: {
+  rows: BuchhaltungRow[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+}) {
   const [suche, setSuche] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const gefiltert = rows.filter((r) => {
     if (!suche) return true;
@@ -69,6 +82,12 @@ export function BuchhaltungClient({ rows }: { rows: BuchhaltungRow[] }) {
   const naechsteFaellig = rows
     .filter((r) => r.faelligkeitsdatum && new Date(r.faelligkeitsdatum).getTime() >= Date.now())
     .sort((a, b) => new Date(a.faelligkeitsdatum!).getTime() - new Date(b.faelligkeitsdatum!).getTime())[0];
+
+  function goToPage(page: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", page.toString());
+    router.push(`/buchhaltung?${params.toString()}`);
+  }
 
   function exportCSV() {
     const header = "Bestellnr.;Händler;Betrag;Währung;Freigegeben von;Freigegeben am;Fällig\n";
@@ -217,17 +236,40 @@ export function BuchhaltungClient({ rows }: { rows: BuchhaltungRow[] }) {
         </table>
       </div>
 
-      {/* Summenzeile */}
-      {gefiltert.length > 0 && (
-        <div className="mt-3 flex justify-between items-center text-sm text-slate-500 px-1">
-          <span>{gefiltert.length} Rechnung{gefiltert.length !== 1 ? "en" : ""}</span>
-          <span className="font-semibold text-slate-900">
-            Gesamt: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
-              gefiltert.reduce((sum, r) => sum + (r.betrag || 0), 0)
-            )}
-          </span>
-        </div>
-      )}
+      {/* Summenzeile + Paginierung */}
+      <div className="mt-3 flex items-center justify-between text-sm text-slate-500 px-1">
+        <span>
+          {totalCount} Rechnung{totalCount !== 1 ? "en" : ""} gesamt
+          {gefiltert.length > 0 && (
+            <span className="ml-2 font-semibold text-slate-900">
+              Summe: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
+                gefiltert.reduce((sum, r) => sum + (r.betrag || 0), 0)
+              )}
+            </span>
+          )}
+        </span>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Vorherige
+            </button>
+            <span className="text-slate-700 font-medium px-2">
+              Seite {currentPage} von {totalPages}
+            </span>
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Nächste
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

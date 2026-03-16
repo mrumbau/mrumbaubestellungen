@@ -98,11 +98,10 @@ export function BestelldetailClient({
     e.preventDefault();
     if (!kommentarText.trim()) return;
     setLoading(true);
-    // Kommentar über Service Route wäre besser, aber für jetzt direkt
-    const res = await fetch(`/api/bestellungen/${bestellung.id}`, {
+    const res = await fetch("/api/kommentare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: kommentarText }),
+      body: JSON.stringify({ bestellung_id: bestellung.id, text: kommentarText }),
     });
     if (res.ok) {
       setKommentarText("");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -8,6 +9,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -38,13 +40,15 @@ export default function LoginPage() {
         .eq("user_id", user.id)
         .single();
 
+      let ziel = "/bestellungen";
       if (profil?.rolle === "buchhaltung") {
-        window.location.href = "/buchhaltung";
+        ziel = "/buchhaltung";
       } else if (profil?.rolle === "admin") {
-        window.location.href = "/dashboard";
-      } else {
-        window.location.href = "/bestellungen";
+        ziel = "/dashboard";
       }
+
+      router.refresh();
+      router.push(ziel);
     }
   }
 

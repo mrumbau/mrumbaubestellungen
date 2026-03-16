@@ -3,18 +3,40 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BuchhaltungClient } from "@/components/buchhaltung-client";
 
-export default async function BuchhaltungPage() {
+const PAGE_SIZE = 20;
+
+export default async function BuchhaltungPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 
   const supabase = await createServerSupabaseClient();
+  const { page: pageStr } = await searchParams;
+  const page = Math.max(1, parseInt(pageStr || "1", 10) || 1);
 
-  // Freigegebene Bestellungen mit Freigabe-Details laden
+  // Gesamtanzahl ermitteln
+  const { count } = await supabase
+    .from("bestellungen")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "freigegeben");
+
+  const total = count || 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+
+  // Paginierte freigegebene Bestellungen laden
+  const from = (currentPage - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
   const { data: bestellungen } = await supabase
     .from("bestellungen")
     .select("*")
     .eq("status", "freigegeben")
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .range(from, to);
 
   // Freigaben laden
   const bestellIds = (bestellungen || []).map((b) => b.id);
@@ -58,5 +80,12 @@ export default async function BuchhaltungPage() {
     };
   });
 
-  return <BuchhaltungClient rows={rows} />;
+  return (
+    <BuchhaltungClient
+      rows={rows}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      totalCount={total}
+    />
+  );
 }

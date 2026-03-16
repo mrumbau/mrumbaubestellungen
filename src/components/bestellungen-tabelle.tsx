@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface Bestellung {
   id: string;
@@ -84,11 +85,19 @@ function formatBetrag(betrag: number | null, waehrung: string) {
 
 export function BestellungenTabelle({
   bestellungen,
+  currentPage,
+  totalPages,
+  totalCount,
 }: {
   bestellungen: Bestellung[];
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
 }) {
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const gefiltert = bestellungen.filter((b) => {
     const suchMatch =
@@ -101,6 +110,12 @@ export function BestellungenTabelle({
 
     return suchMatch && statusMatch;
   });
+
+  function goToPage(page: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", page.toString());
+    router.push(`/bestellungen?${params.toString()}`);
+  }
 
   return (
     <>
@@ -219,6 +234,34 @@ export function BestellungenTabelle({
           </tbody>
         </table>
       </div>
+
+      {/* Paginierung */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="text-slate-500">
+            {totalCount} Bestellung{totalCount !== 1 ? "en" : ""} gesamt
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Vorherige
+            </button>
+            <span className="text-slate-700 font-medium px-2">
+              Seite {currentPage} von {totalPages}
+            </span>
+            <button
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Nächste
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
