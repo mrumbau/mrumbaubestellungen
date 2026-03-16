@@ -1,0 +1,106 @@
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+interface ErkennungPayload {
+  url: string;
+  title: string;
+  text: string;
+  secret: string;
+  kuerzel: string;
+}
+
+// POST /api/extension/erkennung – KI analysiert ob eine Seite eine Bestellbestätigung ist
+export async function POST(request: NextRequest) {
+  try {
+    // Rate-Limiting: max 10 Requests/Minute pro IP (Hybrid-Filter reduziert Calls auf ~5%)
+    const rlKey = getRateLimitKey(request, "extension-erkennung");
+    const rl = checkRateLimit(rlKey, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Zu viele Anfragen" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
+    const body: ErkennungPayload = await request.json();
+    const { url, title, text, secret, kuerzel } = body;
+
+    if (secret !== process.env.EXTENSION_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!url || !kuerzel) {
+      return NextResponse.json({ error: "url und kuerzel erforderlich" }, { status: 400 });
+    }
+
+    // Seitentext auf max 1500 Zeichen begrenzen (Kosten sparen)
+    const kurzText = (text || "").slice(0, 1500);
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0,
+      max_tokens: 200,
+      messages: [
+        {
+          role: "system",
+          content: `Du bist ein Erkennungssystem für Bestellbestätigungsseiten in Online-Shops.
+Analysiere die gegebenen Seitendaten und entscheide ob es sich um eine Bestellbestätigung/Auftragsbestätigung handelt.
+
+Antworte NUR mit einem JSON-Objekt, kein Text davor oder danach:
+{
+  "ist_bestellung": true/false,
+  "haendler_name": "Name des Shops/Händlers" oder null,
+  "haendler_domain": "domain.de" oder null,
+  "bestellnummer": "erkannte Bestellnummer" oder null,
+  "konfidenz": 0.0-1.0
+}
+
+Wichtig:
+- ist_bestellung = true NUR wenn die Seite klar eine ABGESCHLOSSENE Bestellung/Kauf bestätigt
+- NICHT bei: Warenkorb, Checkout-Formular, Produktseiten, Registrierung, Newsletter-Bestätigung, Kontaktformular
+- haendler_domain: nur die Root-Domain (z.B. "bauhaus.de"), keine Subdomains
+- konfidenz: wie sicher du dir bist (0.0 = unsicher, 1.0 = absolut sicher)`,
+        },
+        {
+          role: "user",
+          content: `URL: ${url}
+Seitentitel: ${title || "(kein Titel)"}
+Seiteninhalt (Auszug): ${kurzText || "(kein Text)"}`,
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    if (!content) {
+      return NextResponse.json({ ist_bestellung: false });
+    }
+
+    // JSON aus Antwort extrahieren (manchmal in Markdown-Codeblock)
+    let jsonStr = content;
+    const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim();
+    }
+
+    const ergebnis = JSON.parse(jsonStr);
+
+    // Nur bei hoher Konfidenz als Bestellung werten
+    if (ergebnis.ist_bestellung && ergebnis.konfidenz >= 0.7) {
+      return NextResponse.json({
+        ist_bestellung: true,
+        haendler_name: ergebnis.haendler_name || null,
+        haendler_domain: ergebnis.haendler_domain || null,
+        bestellnummer: ergebnis.bestellnummer || null,
+        konfidenz: ergebnis.konfidenz,
+      });
+    }
+
+    return NextResponse.json({ ist_bestellung: false });
+  } catch (err) {
+    console.error("[Extension/Erkennung] Fehler:", err);
+    return NextResponse.json({ ist_bestellung: false });
+  }
+}

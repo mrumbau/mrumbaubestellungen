@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceClient } from "@/lib/supabase";
+import { isValidUUID, isValidKuerzel } from "@/lib/validation";
+
+// POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen (nur Admin)
+export async function POST(request: NextRequest) {
+  try {
+    const supabaseAuth = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+
+    // Rolle prüfen (nur Admin)
+    const { data: profil } = await supabaseAuth
+      .from("benutzer_rollen")
+      .select("rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    if (profil?.rolle !== "admin") {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { bestellung_id, besteller_kuerzel } = body;
+
+    if (!bestellung_id || !isValidUUID(bestellung_id)) {
+      return NextResponse.json({ error: "Ungültige Bestellungs-ID" }, { status: 400 });
+    }
+
+    if (!besteller_kuerzel || !isValidKuerzel(besteller_kuerzel)) {
+      return NextResponse.json({ error: "Ungültiges Kürzel" }, { status: 400 });
+    }
+
+    const supabase = createServiceClient();
+
+    // Besteller-Name holen
+    const { data: benutzer } = await supabase
+      .from("benutzer_rollen")
+      .select("name, kuerzel")
+      .eq("kuerzel", besteller_kuerzel)
+      .single();
+
+    if (!benutzer) {
+      return NextResponse.json({ error: "Besteller nicht gefunden" }, { status: 404 });
+    }
+
+    // Bestellung aktualisieren
+    const { error } = await supabase
+      .from("bestellungen")
+      .update({
+        besteller_kuerzel: benutzer.kuerzel,
+        besteller_name: benutzer.name,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", bestellung_id);
+
+    if (error) {
+      return NextResponse.json({ error: "Zuordnung fehlgeschlagen" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+  }
+}

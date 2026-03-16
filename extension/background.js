@@ -1,11 +1,18 @@
 // MR Umbau Bestellerkennung – Background Service Worker (Manifest V3)
 
-// Badge kurz anzeigen wenn eine Bestellung erkannt wurde
+// Badge-Farben nach Erkennungsquelle
+var BADGE_COLORS = {
+  bekannt: "#570006",      // Corporate Rot – bekannter Händler
+  lokal_score: "#2563eb",  // Blau – lokaler Score
+  ki: "#d97706",           // Orange – KI-bestätigt
+};
+
 chrome.runtime.onMessage.addListener(function (message) {
   if (message.type === "bestellung_erkannt") {
-    // Badge auf "1" setzen für 5 Sekunden
+    var badgeColor = BADGE_COLORS[message.quelle] || "#570006";
+
     chrome.action.setBadgeText({ text: "1" });
-    chrome.action.setBadgeBackgroundColor({ color: "#1E4D8C" });
+    chrome.action.setBadgeBackgroundColor({ color: badgeColor });
 
     setTimeout(function () {
       chrome.action.setBadgeText({ text: "" });

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
+import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 
@@ -42,6 +43,17 @@ export default async function DashboardPage() {
   const aktionenNoetig = alle.filter(
     (b) => b.status === "abweichung" || b.status === "ls_fehlt" || b.status === "vollstaendig"
   );
+
+  // Nicht zugeordnete Bestellungen (nur für Admin)
+  const unzugeordnet = alle.filter((b) => b.besteller_kuerzel === "UNBEKANNT");
+  let bestellerListe: { kuerzel: string; name: string }[] = [];
+  if (profil.rolle === "admin" && unzugeordnet.length > 0) {
+    const { data: besteller } = await supabase
+      .from("benutzer_rollen")
+      .select("kuerzel, name")
+      .eq("rolle", "besteller");
+    bestellerListe = besteller || [];
+  }
 
   return (
     <div>
@@ -82,6 +94,13 @@ export default async function DashboardPage() {
           <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2">{formatBetrag(freigegebenBetrag)}</p>
         </div>
       </div>
+
+      {/* Nicht zugeordnete Bestellungen – nur für Admin */}
+      {profil.rolle === "admin" && unzugeordnet.length > 0 && (
+        <div className="mt-6">
+          <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div className="card p-5 border-l-[3px] border-l-[#dc2626] corner-marks">

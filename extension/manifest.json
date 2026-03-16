@@ -8,19 +8,15 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://cloud.mrumbau.de/*"
+    "https://cloud.mrumbau.de/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": [
-        "*://*.bauhaus.de/*",
-        "*://*.obi.de/*",
-        "*://*.amazon.de/*",
-        "*://*.wuerth.de/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["config.js", "content.js"],
       "run_at": "document_idle"
     }

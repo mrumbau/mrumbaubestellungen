@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { kuerzel, haendler_domain, zeitstempel, secret } = body;
+    const { kuerzel, haendler_domain, zeitstempel, secret, erkennung, bestellnummer } = body;
 
     // Secret prüfen
     if (secret !== process.env.EXTENSION_SECRET) {
@@ -74,12 +74,36 @@ export async function POST(request: NextRequest) {
 
     // Bestellung mit Status "erwartet" anlegen
     await supabase.from("bestellungen").insert({
+      bestellnummer: bestellnummer || null,
       haendler_id: haendler?.id || null,
       haendler_name: haendler?.name || haendler_domain,
       besteller_kuerzel: kuerzel,
       besteller_name: benutzer?.name || kuerzel,
       status: "erwartet",
     });
+
+    // Bei KI-Erkennung: Händler automatisch in DB anlegen falls neu
+    if (erkennung === "ki" && !haendler) {
+      const { data: existing } = await supabase
+        .from("haendler")
+        .select("id")
+        .eq("domain", haendler_domain)
+        .limit(1);
+
+      if (!existing || existing.length === 0) {
+        await supabase.from("haendler").insert({
+          name: haendler_domain,
+          domain: haendler_domain,
+          email_absender: [],
+          url_muster: [],
+        });
+        console.log(`[Webhook] Neuer Händler via KI angelegt: ${haendler_domain}`);
+      }
+    }
+
+    if (erkennung && erkennung !== "bekannt") {
+      console.log(`[Webhook] Händler erkannt via ${erkennung}: ${haendler_domain} (${kuerzel})`);
+    }
 
     return NextResponse.json({ success: true, signal_id: data.id });
   } catch {
