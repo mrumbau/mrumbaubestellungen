@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import type { BenutzerProfil } from "@/lib/auth";
 
@@ -56,6 +57,7 @@ const NAV_ITEMS = {
 export function Sidebar({ profil }: { profil: BenutzerProfil }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const items = NAV_ITEMS[profil.rolle] || [];
 
   async function handleLogout() {
@@ -64,11 +66,25 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
     router.push("/login");
   }
 
-  return (
-    <aside className="w-64 bg-[#1E4D8C] text-white flex flex-col">
+  const sidebarContent = (
+    <>
       <div className="p-6 border-b border-white/10">
-        <h1 className="text-lg font-bold">MR Umbau</h1>
-        <p className="text-sm text-white/60">Bestellmanagement</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold">MR Umbau</h1>
+            <p className="text-sm text-white/60">Bestellmanagement</p>
+          </div>
+          {/* Schließen-Button nur auf Mobile */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden text-white/60 hover:text-white"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -78,6 +94,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                 active
                   ? "bg-white/20 text-white font-medium"
@@ -101,6 +118,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
             <p className="text-xs text-white/50 capitalize">{profil.rolle}</p>
           </div>
           <button
+            type="button"
             onClick={handleLogout}
             className="text-white/50 hover:text-white transition-colors"
             title="Abmelden"
@@ -111,6 +129,41 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile: Hamburger-Button (fixed top-left) */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-40 p-2 bg-[#1E4D8C] text-white rounded-lg shadow-lg"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+
+      {/* Mobile: Overlay + Sidebar */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/50"
+          onClick={() => setMobileOpen(false)}
+        >
+          <aside
+            className="w-64 h-full bg-[#1E4D8C] text-white flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop: Feste Sidebar */}
+      <aside className="hidden md:flex w-64 bg-[#1E4D8C] text-white flex-col shrink-0">
+        {sidebarContent}
+      </aside>
+    </>
   );
 }

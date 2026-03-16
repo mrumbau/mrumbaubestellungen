@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
+import { isValidUUID, sanitizeFilename } from "@/lib/validation";
 
 // GET /api/pdfs/[id] – PDF/Bild aus Supabase Storage abrufen
 export async function GET(
@@ -9,6 +10,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+    }
+
     const supabaseAuth = await createServerSupabaseClient();
 
     const {
@@ -44,10 +50,13 @@ export async function GET(
       ? "application/pdf"
       : "image/jpeg";
 
+    const rawFilename = dokument.storage_pfad.split("/").pop() || "dokument";
+    const safeFilename = sanitizeFilename(rawFilename);
+
     return new NextResponse(data, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${dokument.storage_pfad.split("/").pop()}"`,
+        "Content-Disposition": `inline; filename="${safeFilename}"`,
       },
     });
   } catch {

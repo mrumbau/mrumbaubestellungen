@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { BenutzerProfil } from "@/lib/auth";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface Dokument {
   id: string;
@@ -75,6 +76,8 @@ export function BestelldetailClient({
   const [scanError, setScanError] = useState<string | null>(null);
   const [kiZusammenfassung, setKiZusammenfassung] = useState<string | null>(null);
   const [kiLoading, setKiLoading] = useState(false);
+  const [showFreigabeDialog, setShowFreigabeDialog] = useState(false);
+  const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,7 +88,7 @@ export function BestelldetailClient({
     (profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel);
 
   async function handleFreigabe() {
-    if (!confirm("Rechnung wirklich freigeben?")) return;
+    setShowFreigabeDialog(false);
     setLoading(true);
     await fetch(`/api/bestellungen/${bestellung.id}/freigeben`, {
       method: "POST",
@@ -134,9 +137,10 @@ export function BestelldetailClient({
   async function handleScan(file: File) {
     // Max 4MB prüfen (Vercel Body-Limit)
     if (file.size > 4 * 1024 * 1024) {
-      alert("Datei ist zu groß (max. 4 MB). Bitte eine kleinere Datei verwenden.");
+      setFileSizeError("Datei ist zu groß (max. 4 MB). Bitte eine kleinere Datei verwenden.");
       return;
     }
+    setFileSizeError(null);
 
     setScanLoading(true);
     setScanError(null);
@@ -170,7 +174,7 @@ export function BestelldetailClient({
   }
 
   return (
-    <div className="flex gap-5 flex-1 min-h-0">
+    <div className="flex flex-col md:flex-row gap-5 flex-1 min-h-0">
       {/* Links: PDF-Viewer */}
       <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col overflow-hidden">
         <div className="flex gap-2 p-3 bg-slate-50/80 border-b border-slate-200">
@@ -241,7 +245,7 @@ export function BestelldetailClient({
       </div>
 
       {/* Rechts: KI-Abgleich + Scan + Freigabe + Kommentare */}
-      <div className="w-80 flex flex-col gap-4 overflow-auto">
+      <div className="w-full md:w-80 flex flex-col gap-4 overflow-auto">
         {/* KI-Abgleich */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className={`flex items-center justify-between px-4 py-3 ${
@@ -327,6 +331,9 @@ export function BestelldetailClient({
           {scanError && (
             <p className="text-xs text-red-600 mt-2 font-medium">{scanError}</p>
           )}
+          {fileSizeError && (
+            <p className="text-xs text-red-600 mt-2 font-medium">{fileSizeError}</p>
+          )}
           <input
             ref={cameraInputRef}
             type="file"
@@ -356,16 +363,27 @@ export function BestelldetailClient({
             )}
           </div>
         ) : kannFreigeben ? (
-          <button
-            onClick={handleFreigabe}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-[#1E4D8C] text-white rounded-xl font-semibold text-sm hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            Rechnung freigeben
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setShowFreigabeDialog(true)}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-[#1E4D8C] text-white rounded-xl font-semibold text-sm hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Rechnung freigeben
+            </button>
+            <ConfirmDialog
+              open={showFreigabeDialog}
+              title="Rechnung freigeben"
+              message="Soll diese Rechnung wirklich freigegeben werden? Sie wird danach für die Buchhaltung sichtbar."
+              confirmLabel="Freigeben"
+              onConfirm={handleFreigabe}
+              onCancel={() => setShowFreigabeDialog(false)}
+            />
+          </>
         ) : null}
 
         {/* KI-Zusammenfassung */}

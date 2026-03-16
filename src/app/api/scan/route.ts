@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { analysiereDokument, fuehreAbgleichDurch } from "@/lib/openai";
+import { isValidUUID, isAllowedMimeType, isFileSizeOk, sanitizeFilename } from "@/lib/validation";
 
 // POST /api/scan – Foto/PDF hochladen und per GPT-4o analysieren
 export async function POST(request: NextRequest) {
@@ -26,7 +27,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Input-Validierung
+    if (!isValidUUID(bestellung_id)) {
+      return NextResponse.json({ error: "Ungültiges bestellung_id Format" }, { status: 400 });
+    }
+
+    if (!isAllowedMimeType(mime_type)) {
+      return NextResponse.json(
+        { error: "Nur PDF, JPEG, PNG und WebP Dateien erlaubt" },
+        { status: 400 }
+      );
+    }
+
+    if (!isFileSizeOk(base64)) {
+      return NextResponse.json(
+        { error: "Datei zu groß (max. 4 MB)" },
+        { status: 413 }
+      );
+    }
+
     const supabase = createServiceClient();
+
+    // Besitzer-Prüfung: Nur eigene Bestellungen oder Admin
+    const { data: profil } = await supabaseAuth
+      .from("benutzer_rollen")
+      .select("kuerzel, rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profil) {
+      return NextResponse.json({ error: "Kein Profil" }, { status: 403 });
+    }
+
+    const { data: bestellungCheck } = await supabase
+      .from("bestellungen")
+      .select("besteller_kuerzel")
+      .eq("id", bestellung_id)
+      .single();
+
+    if (!bestellungCheck) {
+      return NextResponse.json({ error: "Bestellung nicht gefunden" }, { status: 404 });
+    }
+
+    if (profil.rolle !== "admin" && bestellungCheck.besteller_kuerzel !== profil.kuerzel) {
+      return NextResponse.json({ error: "Keine Berechtigung für diese Bestellung" }, { status: 403 });
+    }
 
     // GPT-4o Analyse
     let analyse;
@@ -40,8 +85,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Datei in Storage hochladen
-    const storagePfad = `${bestellung_id}/scan_${Date.now()}_${datei_name || "dokument"}`;
+    // Datei in Storage hochladen (Dateinamen sanitizen)
+    const safeName = sanitizeFilename(datei_name || "dokument");
+    const storagePfad = `${bestellung_id}/scan_${Date.now()}_${safeName}`;
     const buffer = Buffer.from(base64, "base64");
     const { error: uploadError } = await supabase.storage
       .from("dokumente")
@@ -75,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     if (dokError) {
       console.error("Dokument DB-Fehler:", dokError);
-      return NextResponse.json({ error: dokError.message }, { status: 500 });
+      return NextResponse.json({ error: "Dokument konnte nicht gespeichert werden" }, { status: 500 });
     }
 
     // Bestellung aktualisieren
@@ -142,7 +188,6 @@ export async function POST(request: NextRequest) {
           .eq("id", bestellung_id);
       } catch (err) {
         console.error("KI-Abgleich Fehler:", err);
-        // Dokument wurde trotzdem gespeichert, Abgleich kann später nachgeholt werden
       }
     }
 
@@ -151,15 +196,9 @@ export async function POST(request: NextRequest) {
       dokument_id: dokument.id,
       analyse,
     });
-  } catch (err) {
-    console.error("Scan error:", err);
+  } catch {
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "Interner Serverfehler",
-      },
+      { error: "Interner Serverfehler" },
       { status: 500 }
     );
   }

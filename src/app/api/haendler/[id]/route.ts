@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidUUID, isValidDomain, validateTextLength } from "@/lib/validation";
 
 // PUT /api/haendler/[id] – Händler aktualisieren
 export async function PUT(
@@ -28,8 +29,20 @@ export async function PUT(
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+    }
+
     const body = await request.json();
     const { name, domain, url_muster, email_absender } = body;
+
+    if (name && !validateTextLength(name, 200)) {
+      return NextResponse.json({ error: "Name zu lang (max. 200 Zeichen)" }, { status: 400 });
+    }
+
+    if (domain && !isValidDomain(domain)) {
+      return NextResponse.json({ error: "Ungültige Domain" }, { status: 400 });
+    }
 
     const { data, error } = await supabase
       .from("haendler")
@@ -44,7 +57,8 @@ export async function PUT(
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Händler Fehler:", error);
+      return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
     return NextResponse.json({ haendler: data });
@@ -80,10 +94,15 @@ export async function DELETE(
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+    }
+
     const { error } = await supabase.from("haendler").delete().eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Händler Fehler:", error);
+      return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

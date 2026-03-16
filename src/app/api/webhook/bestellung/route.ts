@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
+import { isValidKuerzel, isValidDomain, validateTextLength } from "@/lib/validation";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 // POST /api/webhook/bestellung – Empfängt Signal von Chrome Extension
 export async function POST(request: NextRequest) {
   try {
+    // Rate-Limiting: max 10 Requests/Minute pro IP
+    const rlKey = getRateLimitKey(request, "webhook-bestellung");
+    const rl = checkRateLimit(rlKey, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Zu viele Anfragen. Bitte warten." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const body = await request.json();
     const { kuerzel, haendler_domain, zeitstempel, secret } = body;
 
@@ -17,6 +29,15 @@ export async function POST(request: NextRequest) {
         { error: "kuerzel und haendler_domain sind erforderlich" },
         { status: 400 }
       );
+    }
+
+    // Input-Validierung
+    if (!isValidKuerzel(kuerzel)) {
+      return NextResponse.json({ error: "Ungültiges Kürzel" }, { status: 400 });
+    }
+
+    if (!isValidDomain(haendler_domain) || !validateTextLength(haendler_domain, 253)) {
+      return NextResponse.json({ error: "Ungültige Domain" }, { status: 400 });
     }
 
     const supabase = createServiceClient();
@@ -33,7 +54,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Signal-Speichern Fehler:", error);
+      return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
     // Besteller-Name aus benutzer_rollen holen

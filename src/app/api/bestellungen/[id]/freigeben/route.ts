@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidUUID } from "@/lib/validation";
 
 // POST /api/bestellungen/[id]/freigeben – Rechnung freigeben
 export async function POST(
@@ -8,6 +9,11 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const supabase = await createServerSupabaseClient();
 
@@ -58,7 +64,8 @@ export async function POST(
     });
 
     if (freigabeError) {
-      return NextResponse.json({ error: freigabeError.message }, { status: 500 });
+      console.error("Freigabe Fehler:", freigabeError);
+      return NextResponse.json({ error: "Freigabe konnte nicht gespeichert werden" }, { status: 500 });
     }
 
     // Status auf freigegeben setzen

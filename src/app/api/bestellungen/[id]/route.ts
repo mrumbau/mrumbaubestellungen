@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidUUID } from "@/lib/validation";
 
 // GET /api/bestellungen/[id] – Details + Dokumente + Abgleich
 export async function GET(
@@ -8,6 +9,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+    }
+
     const supabase = await createServerSupabaseClient();
 
     const {

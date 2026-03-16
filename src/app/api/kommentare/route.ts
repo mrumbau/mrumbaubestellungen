@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidUUID, validateTextLength } from "@/lib/validation";
 
 // POST /api/kommentare – Kommentar zu einer Bestellung hinzufügen
 export async function POST(request: NextRequest) {
@@ -34,6 +35,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!isValidUUID(bestellung_id)) {
+      return NextResponse.json({ error: "Ungültiges bestellung_id Format" }, { status: 400 });
+    }
+
+    if (!validateTextLength(text.trim(), 2000)) {
+      return NextResponse.json({ error: "Kommentar zu lang (max. 2000 Zeichen)" }, { status: 400 });
+    }
+
     const { error } = await supabase.from("kommentare").insert({
       bestellung_id,
       autor_kuerzel: profil.kuerzel,
@@ -42,7 +51,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Kommentar Fehler:", error);
+      return NextResponse.json({ error: "Kommentar konnte nicht gespeichert werden" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

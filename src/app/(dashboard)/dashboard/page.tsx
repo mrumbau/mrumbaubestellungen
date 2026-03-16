@@ -3,6 +3,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
+import { getStatusConfig } from "@/lib/status-config";
+import { formatDatum, formatBetrag } from "@/lib/formatters";
 
 export default async function DashboardPage() {
   const profil = await getBenutzerProfil();
@@ -74,7 +76,7 @@ export default async function DashboardPage() {
         <div className="rounded-xl p-5 bg-white border border-slate-200">
           <p className="text-xs font-semibold text-slate-500 tracking-wide">Freigegebenes Volumen</p>
           <p className="text-xl font-bold text-slate-900 mt-1">
-            {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(freigegebenBetrag)}
+            {formatBetrag(freigegebenBetrag)}
           </p>
         </div>
       </div>
@@ -100,7 +102,7 @@ export default async function DashboardPage() {
                         {b.bestellnummer || "Ohne Nr."} – {b.haendler_name || "–"}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {b.besteller_name} · {new Date(b.created_at).toLocaleDateString("de-DE")}
+                        {b.besteller_name} · {formatDatum(b.created_at)}
                       </p>
                     </div>
                   </div>
@@ -134,13 +136,13 @@ export default async function DashboardPage() {
                       {b.bestellnummer || "Ohne Nr."} – {b.haendler_name || "–"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {b.besteller_name} · {new Date(b.created_at).toLocaleDateString("de-DE")}
+                      {b.besteller_name} · {formatDatum(b.created_at)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     {b.betrag && (
                       <span className="text-sm font-semibold text-slate-700">
-                        {new Intl.NumberFormat("de-DE", { style: "currency", currency: b.waehrung || "EUR" }).format(b.betrag)}
+                        {formatBetrag(b.betrag, b.waehrung || "EUR")}
                       </span>
                     )}
                     <StatusBadgeMini status={b.status} />
@@ -185,15 +187,7 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 }
 
 function StatusBadgeMini({ status }: { status: string }) {
-  const config: Record<string, { label: string; bg: string; text: string }> = {
-    erwartet: { label: "Erwartet", bg: "bg-slate-100", text: "text-slate-600" },
-    offen: { label: "Offen", bg: "bg-blue-50", text: "text-blue-700" },
-    vollstaendig: { label: "Vollständig", bg: "bg-green-50", text: "text-green-700" },
-    abweichung: { label: "Abweichung", bg: "bg-red-50", text: "text-red-700" },
-    ls_fehlt: { label: "LS fehlt", bg: "bg-yellow-50", text: "text-yellow-700" },
-    freigegeben: { label: "Freigegeben", bg: "bg-emerald-50", text: "text-emerald-700" },
-  };
-  const s = config[status] || config.offen;
+  const s = getStatusConfig(status);
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${s.bg} ${s.text}`}>
       {s.label}

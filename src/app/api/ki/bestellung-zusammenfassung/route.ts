@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { fasseBestellungZusammen } from "@/lib/openai";
+import { isValidUUID } from "@/lib/validation";
 
 // POST /api/ki/bestellung-zusammenfassung – KI-Zusammenfassung einer Bestellung
 export async function POST(request: NextRequest) {
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
     const { bestellung_id } = await request.json();
     if (!bestellung_id) {
       return NextResponse.json({ error: "bestellung_id erforderlich" }, { status: 400 });
+    }
+
+    if (!isValidUUID(bestellung_id)) {
+      return NextResponse.json({ error: "Ungültiges bestellung_id Format" }, { status: 400 });
     }
 
     // Bestelldaten laden

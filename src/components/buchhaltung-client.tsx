@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { formatDatum, formatBetrag } from "@/lib/formatters";
 
 interface BuchhaltungRow {
   id: string;
@@ -13,23 +14,6 @@ interface BuchhaltungRow {
   freigegeben_am: string | null;
   faelligkeitsdatum: string | null;
   rechnung_id: string | null;
-}
-
-function formatBetrag(betrag: number | null, waehrung: string) {
-  if (betrag == null) return "–";
-  return new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: waehrung || "EUR",
-  }).format(betrag);
-}
-
-function formatDatum(iso: string | null) {
-  if (!iso) return "–";
-  return new Date(iso).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
 }
 
 function isFaelligBald(datum: string | null) {
@@ -132,7 +116,7 @@ export function BuchhaltungClient({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <p className="text-xs font-semibold text-slate-500 tracking-wide">Offene Rechnungen</p>
           <p className="text-lg font-bold text-slate-900 mt-1">

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-
-const TESTDATEN_TAG = "__testdaten__";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 const TESTBESTELLUNGEN = [
   {
@@ -116,17 +115,40 @@ const TEST_ARTIKEL = [
 ];
 
 export async function POST(request: NextRequest) {
-  const supabase = createServiceClient();
+  try {
+    // Admin-Check
+    const supabaseAuth = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabaseAuth.auth.getUser();
 
-  // Admin-Check via Header oder einfach Service Role
-  const body = await request.json();
-  if (body.action === "create") {
+    if (!user) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+
+    const { data: profil } = await supabaseAuth
+      .from("benutzer_rollen")
+      .select("rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profil || profil.rolle !== "admin") {
+      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+    }
+
+    const supabase = createServiceClient();
+    const body = await request.json();
+
+    if (body.action === "create") {
     return createTestdaten(supabase);
   } else if (body.action === "delete") {
     return deleteTestdaten(supabase);
   }
 
   return NextResponse.json({ error: "Ungültige Aktion" }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+  }
 }
 
 async function createTestdaten(supabase: ReturnType<typeof createServiceClient>) {

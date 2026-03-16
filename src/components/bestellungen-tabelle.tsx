@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getStatusConfig } from "@/lib/status-config";
+import { formatDatum, formatBetrag } from "@/lib/formatters";
 
 interface Bestellung {
   id: string;
@@ -18,26 +20,6 @@ interface Bestellung {
   hat_rechnung: boolean;
   created_at: string;
 }
-
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; bg: string; text: string }
-> = {
-  erwartet: { label: "Erwartet", bg: "bg-slate-100", text: "text-slate-600" },
-  offen: { label: "Offen", bg: "bg-blue-50", text: "text-blue-700" },
-  vollstaendig: {
-    label: "Vollständig",
-    bg: "bg-green-50",
-    text: "text-green-700",
-  },
-  abweichung: { label: "Abweichung", bg: "bg-red-50", text: "text-red-700" },
-  ls_fehlt: { label: "LS fehlt", bg: "bg-yellow-50", text: "text-yellow-700" },
-  freigegeben: {
-    label: "Freigegeben",
-    bg: "bg-emerald-50",
-    text: "text-emerald-700",
-  },
-};
 
 function DokumentIcon({ vorhanden }: { vorhanden: boolean }) {
   return vorhanden ? (
@@ -65,22 +47,6 @@ function DokumentIcon({ vorhanden }: { vorhanden: boolean }) {
       <circle cx="12" cy="12" r="9" />
     </svg>
   );
-}
-
-function formatDatum(iso: string) {
-  return new Date(iso).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatBetrag(betrag: number | null, waehrung: string) {
-  if (betrag == null) return "–";
-  return new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: waehrung || "EUR",
-  }).format(betrag);
 }
 
 export function BestellungenTabelle({
@@ -188,7 +154,7 @@ export function BestellungenTabelle({
               </tr>
             ) : (
               gefiltert.map((b) => {
-                const status = STATUS_CONFIG[b.status] || STATUS_CONFIG.offen;
+                const status = getStatusConfig(b.status);
                 return (
                   <tr
                     key={b.id}

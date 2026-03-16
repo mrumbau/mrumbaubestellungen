@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidDomain, validateTextLength } from "@/lib/validation";
 
 // GET /api/haendler – Alle Händler laden
 export async function GET() {
@@ -30,7 +31,8 @@ export async function GET() {
       .order("name", { ascending: true });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Händler Fehler:", error);
+      return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
     return NextResponse.json({ haendler: haendler || [] });
@@ -69,6 +71,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name und Domain sind Pflichtfelder" }, { status: 400 });
     }
 
+    if (!validateTextLength(name, 200)) {
+      return NextResponse.json({ error: "Name zu lang (max. 200 Zeichen)" }, { status: 400 });
+    }
+
+    if (!isValidDomain(domain)) {
+      return NextResponse.json({ error: "Ungültige Domain" }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("haendler")
       .insert({
@@ -81,7 +91,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Händler Fehler:", error);
+      return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
     return NextResponse.json({ haendler: data });

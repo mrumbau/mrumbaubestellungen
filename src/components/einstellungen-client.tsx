@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface Haendler {
   id: string;
@@ -35,6 +36,8 @@ export function EinstellungenClient({
   const [testdatenLoading, setTestdatenLoading] = useState(false);
   const [testdatenMsg, setTestdatenMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [hatTestdaten, setHatTestdaten] = useState(initialHatTestdaten);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [testdatenConfirm, setTestdatenConfirm] = useState<"create" | "delete" | null>(null);
 
   // Formular-State
   const [formName, setFormName] = useState("");
@@ -120,9 +123,8 @@ export function EinstellungenClient({
     }
   }
 
-  async function handleDelete(id: string, name: string) {
-    if (!confirm(`Händler "${name}" wirklich löschen?`)) return;
-
+  async function handleDelete(id: string) {
+    setDeleteConfirm(null);
     setLoading(true);
     try {
       const res = await fetch(`/api/haendler/${id}`, { method: "DELETE" });
@@ -137,12 +139,7 @@ export function EinstellungenClient({
   }
 
   async function handleTestdaten(action: "create" | "delete") {
-    const confirmMsg =
-      action === "create"
-        ? "8 Testbestellungen mit Dokumenten, Abgleichen und Kommentaren anlegen?"
-        : "Alle Testdaten unwiderruflich löschen?";
-    if (!confirm(confirmMsg)) return;
-
+    setTestdatenConfirm(null);
     setTestdatenLoading(true);
     setTestdatenMsg(null);
     try {
@@ -300,7 +297,8 @@ export function EinstellungenClient({
                       </svg>
                     </button>
                     <button
-                      onClick={() => handleDelete(h.id, h.name)}
+                      type="button"
+                      onClick={() => setDeleteConfirm({ id: h.id, name: h.name })}
                       className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
                       title="Löschen"
                     >
@@ -379,7 +377,8 @@ export function EinstellungenClient({
         <div className="flex gap-3">
           {!hatTestdaten ? (
             <button
-              onClick={() => handleTestdaten("create")}
+              type="button"
+              onClick={() => setTestdatenConfirm("create")}
               disabled={testdatenLoading}
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
             >
@@ -390,7 +389,8 @@ export function EinstellungenClient({
             </button>
           ) : (
             <button
-              onClick={() => handleTestdaten("delete")}
+              type="button"
+              onClick={() => setTestdatenConfirm("delete")}
               disabled={testdatenLoading}
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
             >
@@ -402,6 +402,34 @@ export function EinstellungenClient({
           )}
         </div>
       </div>
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        title="Händler löschen"
+        message={`Soll der Händler "${deleteConfirm?.name}" wirklich gelöscht werden?`}
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm.id)}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+      <ConfirmDialog
+        open={testdatenConfirm === "create"}
+        title="Testdaten anlegen"
+        message="8 Testbestellungen mit Dokumenten, Abgleichen und Kommentaren anlegen?"
+        confirmLabel="Anlegen"
+        onConfirm={() => handleTestdaten("create")}
+        onCancel={() => setTestdatenConfirm(null)}
+      />
+      <ConfirmDialog
+        open={testdatenConfirm === "delete"}
+        title="Testdaten löschen"
+        message="Alle Testdaten unwiderruflich löschen?"
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={() => handleTestdaten("delete")}
+        onCancel={() => setTestdatenConfirm(null)}
+      />
     </div>
   );
 }

@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien } from "@/lib/openai";
+import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 // POST /api/webhook/email – Empfängt E-Mail-Daten von Make.com
 export async function POST(request: NextRequest) {
   try {
+    // Rate-Limiting: max 20 Requests/Minute pro IP
+    const rlKey = getRateLimitKey(request, "webhook-email");
+    const rl = checkRateLimit(rlKey, 20, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Zu viele Anfragen. Bitte warten." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+      );
+    }
+
     const body = await request.json();
     const { email_betreff, email_absender, email_datum, anhaenge, secret } =
       body;
@@ -12,6 +24,28 @@ export async function POST(request: NextRequest) {
     // Secret prüfen
     if (secret !== process.env.MAKE_WEBHOOK_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Input-Validierung
+    if (email_betreff && !validateTextLength(email_betreff, 500)) {
+      return NextResponse.json({ error: "Betreff zu lang (max. 500 Zeichen)" }, { status: 400 });
+    }
+
+    if (anhaenge && Array.isArray(anhaenge)) {
+      for (const anhang of anhaenge) {
+        if (anhang.mime_type && !isAllowedMimeType(anhang.mime_type)) {
+          return NextResponse.json(
+            { error: `MIME-Typ nicht erlaubt: ${anhang.mime_type}` },
+            { status: 400 }
+          );
+        }
+        if (anhang.base64 && !isFileSizeOk(anhang.base64)) {
+          return NextResponse.json(
+            { error: "Anhang zu groß (max. 4 MB)" },
+            { status: 413 }
+          );
+        }
+      }
     }
 
     const supabase = createServiceClient();
