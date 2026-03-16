@@ -30,17 +30,7 @@ export interface AbgleichErgebnis {
   zusammenfassung: string;
 }
 
-// PDF/Bild analysieren mit GPT-4o
-export async function analysiereDokument(
-  base64: string,
-  mimeType: string
-): Promise<DokumentAnalyse> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma analysiert.
+const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma analysiert.
 Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück, kein Text davor oder danach.
 
 Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, oder rechnung.
@@ -63,24 +53,44 @@ Gib folgende Struktur zurück:
   "konfidenz": 0.95
 }
 
-Falls ein Feld nicht erkennbar ist, setze null.`,
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: { url: `data:${mimeType};base64,${base64}` },
+Falls ein Feld nicht erkennbar ist, setze null.`;
+
+// PDF/Bild analysieren mit GPT-4o
+export async function analysiereDokument(
+  base64: string,
+  mimeType: string
+): Promise<DokumentAnalyse> {
+  // PDFs werden als file-Content gesendet, Bilder als image_url
+  const isPdf = mimeType === "application/pdf";
+
+  const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = isPdf
+    ? [
+        {
+          type: "file",
+          file: {
+            filename: "dokument.pdf",
+            file_data: `data:application/pdf;base64,${base64}`,
           },
-        ],
-      },
+        } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart,
+      ]
+    : [
+        {
+          type: "image_url",
+          image_url: { url: `data:${mimeType};base64,${base64}` },
+        },
+      ];
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: ANALYSE_PROMPT },
+      { role: "user", content: userContent },
     ],
     max_tokens: 2000,
     temperature: 0.1,
   });
 
   const text = response.choices[0]?.message?.content || "{}";
-  // JSON aus der Antwort extrahieren (falls in ```json...``` gewrappt)
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   return JSON.parse(jsonMatch ? jsonMatch[0] : text);
 }
