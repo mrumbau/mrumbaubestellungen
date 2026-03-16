@@ -92,9 +92,9 @@ export default async function BestellungDetailPage({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-        <SummaryCard label="Betrag" value={bestellung.betrag ? `${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"} mono />
-        <SummaryCard label="Händler" value={bestellung.haendler_name || "–"} />
-        <SummaryCard label="Besteller" value={bestellung.besteller_name} />
+        <SummaryCard label="Betrag" value={bestellung.betrag ? `${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"} mono color="#570006" />
+        <SummaryCard label="Händler" value={bestellung.haendler_name || "–"} color="#1a1a1a" />
+        <SummaryCard label="Besteller" value={bestellung.besteller_name} color="#2563eb" />
         <SummaryCard
           label="Dokumente"
           value={`${[bestellung.hat_bestellbestaetigung, bestellung.hat_lieferschein, bestellung.hat_rechnung].filter(Boolean).length} / 3`}
@@ -104,6 +104,7 @@ export default async function BestellungDetailPage({
               : "text-amber-600"
           }
           mono
+          color={bestellung.hat_bestellbestaetigung && bestellung.hat_lieferschein && bestellung.hat_rechnung ? "#16a34a" : "#d97706"}
         />
       </div>
 
@@ -132,11 +133,14 @@ export default async function BestellungDetailPage({
   );
 }
 
-function SummaryCard({ label, value, valueColor, mono }: { label: string; value: string; valueColor?: string; mono?: boolean }) {
+function SummaryCard({ label, value, valueColor, mono, color }: { label: string; value: string; valueColor?: string; mono?: boolean; color?: string }) {
   return (
-    <div className="card p-4">
-      <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">{label}</p>
-      <p className={`text-lg font-bold mt-1 ${mono ? "font-mono-amount" : ""} ${valueColor || "text-[#1a1a1a]"}`}>{value}</p>
+    <div className="card card-hover p-4 relative overflow-hidden" style={color ? { borderTop: `3px solid ${color}` } : undefined}>
+      {color && (
+        <div className="absolute top-0 left-0 right-0 h-6 opacity-[0.06]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
+      )}
+      <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">{label}</p>
+      <p className={`text-xl font-bold mt-1.5 relative ${mono ? "font-mono-amount" : ""} ${valueColor || "text-[#1a1a1a]"}`}>{value}</p>
     </div>
   );
 }

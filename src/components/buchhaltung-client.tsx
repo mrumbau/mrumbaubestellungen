@@ -116,21 +116,24 @@ export function BuchhaltungClient({
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card p-5" style={{ borderTop: "3px solid #570006" }}>
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Offene Rechnungen</p>
-          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2">
+        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #570006" }}>
+          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #570006, transparent)" }} />
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Offene Rechnungen</p>
+          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeOffen)}
           </p>
         </div>
-        <div className="card p-5" style={{ borderTop: "3px solid #059669" }}>
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Diesen Monat</p>
-          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2">
+        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
+          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Diesen Monat</p>
+          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}
           </p>
         </div>
-        <div className="card p-5" style={{ borderTop: "3px solid #d97706" }}>
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Nächste Fällig</p>
-          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2">
+        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #d97706" }}>
+          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #d97706, transparent)" }} />
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Nächste Fällig</p>
+          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
             {naechsteFaellig ? formatDatum(naechsteFaellig.faelligkeitsdatum) : "–"}
           </p>
         </div>
@@ -154,7 +157,7 @@ export function BuchhaltungClient({
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler</th>
               <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>

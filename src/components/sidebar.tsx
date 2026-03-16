@@ -145,6 +145,11 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
           </button>
         </div>
       </div>
+
+      {/* Branding footer */}
+      <div className="px-5 py-3 border-t border-white/[0.06]">
+        <p className="text-[9px] text-white/15 tracking-[0.15em] uppercase font-mono-amount text-center">cloud.mrumbau.de</p>
+      </div>
     </>
   );
 

@@ -288,7 +288,9 @@ export function BestelldetailClient({
       {/* Rechts: KI-Abgleich + Scan + Freigabe + Kommentare */}
       <div className="w-full md:w-80 flex flex-col gap-4 overflow-auto">
         {/* KI-Abgleich */}
-        <div className="card overflow-hidden">
+        <div className={`card overflow-hidden ${
+          abgleich?.status === "ok" ? "border-l-[3px] border-l-green-600" : abgleich?.status === "abweichung" ? "border-l-[3px] border-l-red-600" : ""
+        }`}>
           <div className={`flex items-center justify-between px-4 py-3 ${
             abgleich?.status === "ok" ? "bg-green-50" : abgleich?.status === "abweichung" ? "bg-red-50" : "bg-[#fafaf9]"
           }`}>

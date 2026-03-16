@@ -49,7 +49,7 @@ export default async function BestellungenPage({
           <span className="text-[10px] text-[#c4c2bf] uppercase tracking-wide">Gesamt</span>
         </div>
       </div>
-      <div className="red-accent-line" />
+      <div className="industrial-line" />
 
       <BestellungenTabelle
         bestellungen={bestellungen || []}

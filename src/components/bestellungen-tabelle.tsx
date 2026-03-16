@@ -100,7 +100,7 @@ export function BestellungenTabelle({
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Datum</th>

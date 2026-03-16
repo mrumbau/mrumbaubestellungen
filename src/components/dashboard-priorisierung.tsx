@@ -120,8 +120,11 @@ export function DashboardPriorisierung() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-white/60 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${s.bar}`}
-                      style={{ width: `${b.score}%` }}
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${b.score}%`,
+                        background: `linear-gradient(90deg, #570006, #7a1a1f)`,
+                      }}
                     />
                   </div>
                   <span className="font-mono-amount text-xs font-medium text-[#9a9a9a] w-8 text-right">{b.score}</span>

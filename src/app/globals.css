@@ -307,3 +307,57 @@ dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
 }
+
+/* ============================================
+   Industrial Micro-Details – inner pages
+   ============================================ */
+
+/* Geometric dot grid – subtle background texture */
+.bg-dot-grid {
+  background-image: radial-gradient(circle, rgba(87, 0, 6, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Angled line accent – industrial separator with red center */
+.industrial-line {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(87, 0, 6, 0.08) 20%,
+    rgba(87, 0, 6, 0.2) 48%,
+    rgba(87, 0, 6, 0.2) 52%,
+    rgba(87, 0, 6, 0.08) 80%,
+    transparent
+  );
+}
+
+/* Corner tick marks – industrial ornament */
+.corner-marks {
+  position: relative;
+}
+.corner-marks::before,
+.corner-marks::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.1;
+}
+.corner-marks::before {
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  border-top: 2px solid var(--mr-red);
+  border-right: 2px solid var(--mr-red);
+  border-radius: 0 var(--radius-lg) 0 0;
+}
+.corner-marks::after {
+  bottom: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  border-bottom: 2px solid var(--mr-red);
+  border-left: 2px solid var(--mr-red);
+  border-radius: 0 0 0 var(--radius-lg);
+}

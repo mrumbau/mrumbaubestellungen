@@ -45,9 +45,20 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Dashboard</h1>
-        <p className="text-[#9a9a9a] text-sm mt-1">Willkommen, {profil.name}.</p>
+      <div className="mb-8 flex items-end justify-between">
+        <div>
+          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Dashboard</h1>
+          <p className="text-[#9a9a9a] text-sm mt-1">Willkommen, {profil.name}.</p>
+        </div>
+        {/* Industrial corner ornament */}
+        <div className="hidden md:block">
+          <svg width="48" height="32" viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.08]">
+            <line x1="0" y1="31" x2="48" y2="31" stroke="#570006" strokeWidth="1" />
+            <line x1="47" y1="0" x2="47" y2="32" stroke="#570006" strokeWidth="1" />
+            <line x1="40" y1="31" x2="48" y2="23" stroke="#570006" strokeWidth="0.75" />
+            <rect x="44" y="28" width="3" height="3" fill="#570006" opacity="0.5" />
+          </svg>
+        </div>
       </div>
 
       <DashboardKIZusammenfassung />
@@ -59,8 +70,8 @@ export default async function DashboardPage() {
         <StatCard label="Freigegeben" value={freigegeben} color="#059669" />
       </div>
 
-      {/* Dünne rote Akzentlinie – industrielles Detail */}
-      <div className="red-accent-line my-4" />
+      {/* Industrielle Akzentlinie */}
+      <div className="industrial-line my-4" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Erwartet" value={erwartet} color="#8b8b8b" />
@@ -73,7 +84,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="card p-5 border-l-[3px] border-l-[#dc2626]">
+        <div className="card p-5 border-l-[3px] border-l-[#dc2626] corner-marks">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Aktion erforderlich</h2>
             {aktionenNoetig.length > 0 && (
@@ -176,7 +187,7 @@ function StatCard({ label, value, color, alert }: { label: string; value: number
   return (
     <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: `3px solid ${color}` }}>
       {/* Dezenter Gradient-Schimmer oben */}
-      <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.03]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
+      <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
       <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">{label}</p>
       <div className="flex items-end justify-between mt-2 relative">
         <p className={`font-mono-amount text-3xl font-bold text-[#1a1a1a] ${alert ? "text-red-600" : ""}`}>{value}</p>
