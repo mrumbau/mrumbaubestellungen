@@ -72,6 +72,7 @@ export function BestelldetailClient({
   const [kommentarText, setKommentarText] = useState("");
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,22 +112,39 @@ export function BestelldetailClient({
   }
 
   async function handleScan(file: File) {
+    // Max 4MB prüfen (Vercel Body-Limit)
+    if (file.size > 4 * 1024 * 1024) {
+      alert("Datei ist zu groß (max. 4 MB). Bitte eine kleinere Datei verwenden.");
+      return;
+    }
+
     setScanLoading(true);
+    setScanError(null);
     const reader = new FileReader();
     reader.onload = async () => {
-      const base64 = (reader.result as string).split(",")[1];
-      await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bestellung_id: bestellung.id,
-          base64,
-          mime_type: file.type,
-          datei_name: file.name,
-        }),
-      });
-      setScanLoading(false);
-      router.refresh();
+      try {
+        const base64 = (reader.result as string).split(",")[1];
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bestellung_id: bestellung.id,
+            base64,
+            mime_type: file.type,
+            datei_name: file.name,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setScanError(data.error || "Upload fehlgeschlagen");
+        } else {
+          router.refresh();
+        }
+      } catch {
+        setScanError("Netzwerkfehler beim Upload");
+      } finally {
+        setScanLoading(false);
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -285,6 +303,9 @@ export function BestelldetailClient({
           </div>
           {scanLoading && (
             <p className="text-xs text-[#1E4D8C] mt-2 font-medium">Wird analysiert...</p>
+          )}
+          {scanError && (
+            <p className="text-xs text-red-600 mt-2 font-medium">{scanError}</p>
           )}
           <input
             ref={cameraInputRef}

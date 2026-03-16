@@ -6,6 +6,7 @@ import { analysiereDokument, fuehreAbgleichDurch } from "@/lib/openai";
 // POST /api/scan – Foto/PDF hochladen und per GPT-4o analysieren
 export async function POST(request: NextRequest) {
   try {
+    // Auth-Check
     const supabaseAuth = await createServerSupabaseClient();
     const {
       data: { user },
@@ -28,14 +29,28 @@ export async function POST(request: NextRequest) {
     const supabase = createServiceClient();
 
     // GPT-4o Analyse
-    const analyse = await analysiereDokument(base64, mime_type);
+    let analyse;
+    try {
+      analyse = await analysiereDokument(base64, mime_type);
+    } catch (err) {
+      console.error("OpenAI Analyse-Fehler:", err);
+      return NextResponse.json(
+        { error: "KI-Analyse fehlgeschlagen. Bitte erneut versuchen." },
+        { status: 502 }
+      );
+    }
 
     // Datei in Storage hochladen
     const storagePfad = `${bestellung_id}/scan_${Date.now()}_${datei_name || "dokument"}`;
     const buffer = Buffer.from(base64, "base64");
-    await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("dokumente")
-      .upload(storagePfad, buffer, { contentType: mime_type });
+      .upload(storagePfad, buffer, { contentType: mime_type, upsert: true });
+
+    if (uploadError) {
+      console.error("Storage Upload-Fehler:", uploadError);
+      // Weiter ohne Storage – Dokument trotzdem in DB speichern
+    }
 
     // Dokument in DB speichern
     const { data: dokument, error: dokError } = await supabase
@@ -44,7 +59,7 @@ export async function POST(request: NextRequest) {
         bestellung_id,
         typ: analyse.typ,
         quelle: mime_type.startsWith("image/") ? "scan_foto" : "scan_upload",
-        storage_pfad: storagePfad,
+        storage_pfad: uploadError ? null : storagePfad,
         ki_roh_daten: analyse,
         bestellnummer_erkannt: analyse.bestellnummer,
         artikel: analyse.artikel,
@@ -59,6 +74,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (dokError) {
+      console.error("Dokument DB-Fehler:", dokError);
       return NextResponse.json({ error: dokError.message }, { status: 500 });
     }
 
@@ -93,37 +109,41 @@ export async function POST(request: NextRequest) {
       bestellung?.hat_lieferschein &&
       bestellung?.hat_rechnung
     ) {
-      // Alle Dokumente laden für Abgleich
-      const { data: alleDokumente } = await supabase
-        .from("dokumente")
-        .select("typ, ki_roh_daten")
-        .eq("bestellung_id", bestellung_id);
+      try {
+        const { data: alleDokumente } = await supabase
+          .from("dokumente")
+          .select("typ, ki_roh_daten")
+          .eq("bestellung_id", bestellung_id);
 
-      const bb = alleDokumente?.find(
-        (d) => d.typ === "bestellbestaetigung"
-      )?.ki_roh_daten;
-      const ls = alleDokumente?.find(
-        (d) => d.typ === "lieferschein"
-      )?.ki_roh_daten;
-      const re = alleDokumente?.find(
-        (d) => d.typ === "rechnung"
-      )?.ki_roh_daten;
+        const bb = alleDokumente?.find(
+          (d) => d.typ === "bestellbestaetigung"
+        )?.ki_roh_daten;
+        const ls = alleDokumente?.find(
+          (d) => d.typ === "lieferschein"
+        )?.ki_roh_daten;
+        const re = alleDokumente?.find(
+          (d) => d.typ === "rechnung"
+        )?.ki_roh_daten;
 
-      const abgleich = await fuehreAbgleichDurch(bb, ls, re);
+        const abgleich = await fuehreAbgleichDurch(bb, ls, re);
 
-      await supabase.from("abgleiche").insert({
-        bestellung_id,
-        status: abgleich.status,
-        abweichungen: abgleich.abweichungen,
-        ki_zusammenfassung: abgleich.zusammenfassung,
-      });
+        await supabase.from("abgleiche").insert({
+          bestellung_id,
+          status: abgleich.status,
+          abweichungen: abgleich.abweichungen,
+          ki_zusammenfassung: abgleich.zusammenfassung,
+        });
 
-      const neuerStatus =
-        abgleich.status === "ok" ? "vollstaendig" : "abweichung";
-      await supabase
-        .from("bestellungen")
-        .update({ status: neuerStatus })
-        .eq("id", bestellung_id);
+        const neuerStatus =
+          abgleich.status === "ok" ? "vollstaendig" : "abweichung";
+        await supabase
+          .from("bestellungen")
+          .update({ status: neuerStatus })
+          .eq("id", bestellung_id);
+      } catch (err) {
+        console.error("KI-Abgleich Fehler:", err);
+        // Dokument wurde trotzdem gespeichert, Abgleich kann später nachgeholt werden
+      }
     }
 
     return NextResponse.json({
@@ -134,7 +154,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Scan error:", err);
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Interner Serverfehler",
+      },
       { status: 500 }
     );
   }
