@@ -28,7 +28,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Rolle holen und weiterleiten
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -53,17 +52,74 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-full max-w-sm">
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-[#1E4D8C]">MR Umbau</h1>
-            <p className="text-sm text-slate-500 mt-1">Bestellmanagement</p>
+    <div className="min-h-screen flex">
+      {/* Left: Brand Panel */}
+      <div className="hidden lg:flex lg:w-[45%] bg-mr-gradient bg-grid-pattern relative overflow-hidden flex-col justify-between p-12">
+        <div className="absolute inset-0 bg-diagonal-lines" />
+
+        {/* Geometric corner accent */}
+        <div className="absolute top-0 right-0 w-64 h-64 opacity-10">
+          <svg viewBox="0 0 200 200" fill="none">
+            <line x1="0" y1="0" x2="200" y2="200" stroke="white" strokeWidth="0.5" />
+            <line x1="50" y1="0" x2="200" y2="150" stroke="white" strokeWidth="0.5" />
+            <line x1="100" y1="0" x2="200" y2="100" stroke="white" strokeWidth="0.5" />
+            <line x1="0" y1="50" x2="150" y2="200" stroke="white" strokeWidth="0.5" />
+            <line x1="0" y1="100" x2="100" y2="200" stroke="white" strokeWidth="0.5" />
+          </svg>
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center">
+              <span className="font-headline text-2xl text-white font-bold tracking-tight">MR</span>
+            </div>
+            <div>
+              <h1 className="font-headline text-3xl text-white tracking-tight">UMBAU</h1>
+              <div className="h-px w-16 bg-white/30 mt-1" />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-md">
+          <h2 className="font-headline text-5xl text-white leading-tight tracking-tight">
+            Digitales
+            <br />
+            Bestell<span className="text-white/50">management</span>
+          </h2>
+          <p className="text-white/40 mt-6 text-sm leading-relaxed max-w-xs">
+            Automatische Dokumentenerkennung. KI-gestützter Abgleich.
+            Vollständige Kontrolle über jeden Bestellprozess.
+          </p>
+        </div>
+
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-white/20 text-xs tracking-widest uppercase">MR Umbau GmbH</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+      </div>
+
+      {/* Right: Login Form */}
+      <div className="flex-1 flex items-center justify-center p-8 bg-[#f5f4f2]">
+        <div className="w-full max-w-sm">
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-3 mb-12">
+            <div className="w-10 h-10 bg-[#570006] rounded-lg flex items-center justify-center">
+              <span className="font-headline text-lg text-white font-bold">MR</span>
+            </div>
+            <span className="font-headline text-xl text-[#1a1a1a] tracking-tight">UMBAU</span>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <h2 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Anmelden</h2>
+            <p className="text-sm text-[#9a9a9a] mt-2">
+              Melde dich mit deinem Firmenkonto an.
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="mt-8 space-y-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-[#6b6b6b] mb-2 tracking-wide uppercase">
                 E-Mail
               </label>
               <input
@@ -71,13 +127,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+                className="w-full px-4 py-3 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors"
                 placeholder="name@mrumbau.de"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-xs font-medium text-[#6b6b6b] mb-2 tracking-wide uppercase">
                 Passwort
               </label>
               <input
@@ -85,24 +141,42 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+                className="w-full px-4 py-3 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors"
+                placeholder="Passwort eingeben"
               />
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                {error}
-              </p>
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-[#1E4D8C] text-white rounded-lg font-medium hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
+              className="w-full py-3.5 bg-[#570006] text-white rounded-lg font-semibold text-sm hover:bg-[#7a1a1f] transition-all disabled:opacity-50 active:scale-[0.98]"
             >
-              {loading ? "Wird angemeldet..." : "Anmelden"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 spinner" />
+                  Wird angemeldet...
+                </span>
+              ) : (
+                "Anmelden"
+              )}
             </button>
           </form>
+
+          <div className="mt-12 flex items-center gap-3">
+            <div className="h-px flex-1 bg-[#e8e6e3]" />
+            <span className="text-[10px] text-[#c4c2bf] tracking-widest uppercase">cloud.mrumbau.de</span>
+            <div className="h-px flex-1 bg-[#e8e6e3]" />
+          </div>
         </div>
       </div>
     </div>

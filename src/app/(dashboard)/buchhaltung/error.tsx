@@ -13,13 +13,13 @@ export default function BuchhaltungError({
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
       </div>
-      <h2 className="text-lg font-bold text-slate-900 mb-1">Buchhaltung konnte nicht geladen werden</h2>
-      <p className="text-sm text-slate-500 mb-6">
+      <h2 className="font-headline text-lg text-[#1a1a1a] mb-1">Buchhaltung konnte nicht geladen werden</h2>
+      <p className="text-sm text-[#9a9a9a] mb-6">
         Beim Laden der Rechnungen ist ein Fehler aufgetreten. Bitte versuche es erneut.
       </p>
       <button
         onClick={reset}
-        className="px-5 py-2.5 text-sm font-medium bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors"
+        className="px-5 py-2.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors"
       >
         Neu laden
       </button>

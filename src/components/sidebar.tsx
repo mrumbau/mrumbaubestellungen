@@ -68,18 +68,23 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
 
   const sidebarContent = (
     <>
-      <div className="p-6 border-b border-white/10">
+      {/* Logo */}
+      <div className="px-5 py-6 border-b border-white/[0.06]">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold">MR Umbau</h1>
-            <p className="text-sm text-white/60">Bestellmanagement</p>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[#570006] rounded-lg flex items-center justify-center">
+              <span className="font-headline text-sm text-white font-bold tracking-tight">MR</span>
+            </div>
+            <div>
+              <p className="font-headline text-[15px] text-white tracking-tight leading-none">UMBAU</p>
+              <p className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Bestellungen</p>
+            </div>
           </div>
-          {/* Schließen-Button nur auf Mobile */}
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Menü schließen"
-            className="md:hidden text-white/60 hover:text-white"
+            className="md:hidden text-white/40 hover:text-white transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -88,7 +93,8 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 sidebar-scroll overflow-auto">
         {items.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
@@ -96,36 +102,44 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all ${
                 active
-                  ? "bg-white/20 text-white font-medium"
-                  : "text-white/70 hover:bg-white/10 hover:text-white"
+                  ? "bg-white/[0.07] text-white font-medium"
+                  : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
               }`}
             >
-              <item.Icon className="w-5 h-5" />
+              {/* Active indicator - left bar */}
+              {active && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#570006] rounded-r-full" />
+              )}
+              <item.Icon className="w-[18px] h-[18px]" />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
+      {/* Thin separator */}
+      <div className="mx-5 h-px bg-white/[0.06]" />
+
+      {/* User */}
+      <div className="px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-medium">
+          <div className="w-8 h-8 rounded-lg bg-[#570006] flex items-center justify-center text-[11px] font-bold text-white">
             {profil.kuerzel}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{profil.name}</p>
-            <p className="text-xs text-white/50 capitalize">{profil.rolle}</p>
+            <p className="text-[13px] font-medium text-white/90 truncate">{profil.name}</p>
+            <p className="text-[10px] text-white/30 capitalize tracking-wide">{profil.rolle}</p>
           </div>
           <button
             type="button"
             onClick={handleLogout}
-            className="text-white/50 hover:text-white transition-colors"
+            className="p-1.5 text-white/30 hover:text-white/70 hover:bg-white/[0.06] rounded-md transition-all"
             title="Abmelden"
             aria-label="Abmelden"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
           </button>
@@ -136,26 +150,26 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
 
   return (
     <>
-      {/* Mobile: Hamburger-Button (fixed top-left) */}
+      {/* Mobile Hamburger */}
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
         aria-label="Menü öffnen"
-        className="md:hidden fixed top-4 left-4 z-40 p-2 bg-[#1E4D8C] text-white rounded-lg shadow-lg"
+        className="md:hidden fixed top-4 left-4 z-40 p-2.5 bg-[#141414] text-white/80 rounded-lg shadow-lg border border-white/[0.06]"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
         </svg>
       </button>
 
-      {/* Mobile: Overlay + Sidebar */}
+      {/* Mobile Overlay */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 z-50 bg-black/50"
+          className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
         >
           <aside
-            className="w-64 h-full bg-[#1E4D8C] text-white flex flex-col"
+            className="w-64 h-full bg-[#141414] text-white flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {sidebarContent}
@@ -163,8 +177,8 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         </div>
       )}
 
-      {/* Desktop: Feste Sidebar */}
-      <aside className="hidden md:flex w-64 bg-[#1E4D8C] text-white flex-col shrink-0">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-60 bg-[#141414] text-white flex-col shrink-0 border-r border-white/[0.06]">
         {sidebarContent}
       </aside>
     </>

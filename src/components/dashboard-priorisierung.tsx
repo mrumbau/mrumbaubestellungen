@@ -16,9 +16,9 @@ interface PriorisierungErgebnis {
 }
 
 const PRIO_STYLES = {
-  hoch: { bg: "bg-red-50", text: "text-red-700", badge: "bg-red-100 text-red-700", bar: "bg-red-400" },
-  mittel: { bg: "bg-yellow-50", text: "text-yellow-700", badge: "bg-yellow-100 text-yellow-700", bar: "bg-yellow-400" },
-  niedrig: { bg: "bg-green-50", text: "text-green-700", badge: "bg-green-100 text-green-700", bar: "bg-green-400" },
+  hoch: { bg: "bg-red-50", text: "text-red-700", badge: "bg-red-50 text-red-700", bar: "bg-red-500" },
+  mittel: { bg: "bg-amber-50", text: "text-amber-700", badge: "bg-amber-50 text-amber-700", bar: "bg-amber-500" },
+  niedrig: { bg: "bg-green-50", text: "text-green-700", badge: "bg-green-50 text-green-700", bar: "bg-green-500" },
 };
 
 export function DashboardPriorisierung() {
@@ -46,16 +46,16 @@ export function DashboardPriorisierung() {
 
   if (!data && !loading && !error) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="card p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-slate-900">KI-Priorisierung</h2>
+          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">KI-Priorisierung</h2>
         </div>
-        <p className="text-xs text-slate-400 mb-3">
+        <p className="text-xs text-[#c4c2bf] mb-3">
           KI bewertet welche Bestellungen am dringendsten bearbeitet werden müssen.
         </p>
         <button
           onClick={laden}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-gradient-to-r from-[#1E4D8C] to-[#2E6BAD] text-white rounded-lg hover:opacity-90 transition-opacity"
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
@@ -68,10 +68,10 @@ export function DashboardPriorisierung() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="card p-5">
         <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-[#1E4D8C] border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-slate-500">KI priorisiert Bestellungen...</span>
+          <div className="spinner w-5 h-5" />
+          <span className="text-sm text-[#9a9a9a]">KI priorisiert Bestellungen...</span>
         </div>
       </div>
     );
@@ -91,18 +91,18 @@ export function DashboardPriorisierung() {
   if (!data) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="card p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold text-slate-900">KI-Priorisierung</h2>
-        <button onClick={laden} className="text-xs text-[#1E4D8C] hover:underline">
+        <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">KI-Priorisierung</h2>
+        <button onClick={laden} className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors">
           Aktualisieren
         </button>
       </div>
 
-      <p className="text-xs text-slate-600 mb-4 leading-relaxed">{data.zusammenfassung}</p>
+      <p className="text-xs text-[#6b6b6b] mb-4 leading-relaxed">{data.zusammenfassung}</p>
 
       {data.bestellungen.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-3">Keine offenen Bestellungen.</p>
+        <p className="text-xs text-[#c4c2bf] text-center py-3">Keine offenen Bestellungen.</p>
       ) : (
         <div className="space-y-2">
           {data.bestellungen.map((b, i) => {
@@ -110,20 +110,21 @@ export function DashboardPriorisierung() {
             return (
               <div key={i} className={`${s.bg} rounded-lg p-3`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-slate-900">{b.bestellnummer}</span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s.badge}`}>
+                  <span className="font-mono-amount text-xs font-semibold text-[#1a1a1a]">{b.bestellnummer}</span>
+                  <span className={`status-tag ${s.badge}`}>
+                    <span className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm ${s.bar}`} />
                     {b.prioritaet}
                   </span>
                 </div>
-                <p className="text-xs text-slate-600 mb-2">{b.grund}</p>
+                <p className="text-xs text-[#6b6b6b] mb-2">{b.grund}</p>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-white/60 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${s.bar}`}
                       style={{ width: `${b.score}%` }}
                     />
                   </div>
-                  <span className="text-xs font-medium text-slate-500 w-8 text-right">{b.score}</span>
+                  <span className="font-mono-amount text-xs font-medium text-[#9a9a9a] w-8 text-right">{b.score}</span>
                 </div>
               </div>
             );

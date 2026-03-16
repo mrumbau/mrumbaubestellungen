@@ -33,7 +33,7 @@ export function DashboardKIZusammenfassung() {
       <div className="mb-6">
         <button
           onClick={laden}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-gradient-to-r from-[#1E4D8C] to-[#2E6BAD] text-white rounded-xl hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
@@ -46,10 +46,10 @@ export function DashboardKIZusammenfassung() {
 
   if (loading) {
     return (
-      <div className="mb-6 bg-white rounded-xl border border-slate-200 p-5">
+      <div className="mb-6 card p-5">
         <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-[#1E4D8C] border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-slate-500">KI analysiert aktuelle Daten...</span>
+          <div className="spinner w-5 h-5" />
+          <span className="text-sm text-[#9a9a9a]">KI analysiert aktuelle Daten...</span>
         </div>
       </div>
     );
@@ -69,27 +69,27 @@ export function DashboardKIZusammenfassung() {
   if (!data) return null;
 
   return (
-    <div className="mb-6 bg-gradient-to-r from-slate-50 to-blue-50/50 rounded-xl border border-slate-200 p-5">
+    <div className="mb-6 card p-5 border-l-[3px] border-l-[#570006]">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-[#1E4D8C]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-5 h-5 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
           </svg>
-          <h3 className="text-sm font-bold text-slate-900">KI-Zusammenfassung</h3>
+          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight">KI-Zusammenfassung</h3>
         </div>
         <button
           onClick={laden}
-          className="text-xs text-[#1E4D8C] hover:underline"
+          className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors"
         >
           Aktualisieren
         </button>
       </div>
 
-      <p className="text-sm text-slate-700 leading-relaxed mb-3">{data.zusammenfassung}</p>
+      <p className="text-sm text-[#6b6b6b] leading-relaxed mb-3">{data.zusammenfassung}</p>
 
       {data.dringend.length > 0 && (
         <div className="mb-3">
-          <p className="text-xs font-semibold text-red-700 mb-1">Dringend:</p>
+          <p className="text-[10px] font-semibold text-red-700 tracking-widest uppercase mb-1">Dringend:</p>
           <ul className="space-y-1">
             {data.dringend.map((d, i) => (
               <li key={i} className="flex items-start gap-2 text-xs text-red-600">
@@ -103,7 +103,7 @@ export function DashboardKIZusammenfassung() {
 
       {data.highlights.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-green-700 mb-1">Highlights:</p>
+          <p className="text-[10px] font-semibold text-green-700 tracking-widest uppercase mb-1">Highlights:</p>
           <ul className="space-y-1">
             {data.highlights.map((h, i) => (
               <li key={i} className="flex items-start gap-2 text-xs text-green-600">

@@ -39,7 +39,6 @@ export function EinstellungenClient({
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [testdatenConfirm, setTestdatenConfirm] = useState<"create" | "delete" | null>(null);
 
-  // Formular-State
   const [formName, setFormName] = useState("");
   const [formDomain, setFormDomain] = useState("");
   const [formUrlMuster, setFormUrlMuster] = useState("");
@@ -164,9 +163,9 @@ export function EinstellungenClient({
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Einstellungen</h1>
-        <p className="text-slate-500 mt-1">Händler, Benutzer & Testdaten</p>
+      <div className="mb-8">
+        <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Einstellungen</h1>
+        <p className="text-[#9a9a9a] text-sm mt-1">Händler, Benutzer & Testdaten</p>
       </div>
 
       {error && (
@@ -177,14 +176,14 @@ export function EinstellungenClient({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Händlerliste */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900">
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">
               Händler ({haendler.length})
             </h2>
             <button
               onClick={startNew}
-              className="px-3 py-1.5 text-sm bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors"
             >
               + Hinzufügen
             </button>
@@ -192,63 +191,63 @@ export function EinstellungenClient({
 
           {/* Formular */}
           {showForm && (
-            <form onSubmit={handleSubmit} className="mb-4 p-4 bg-slate-50 rounded-lg space-y-3">
+            <form onSubmit={handleSubmit} className="mb-4 p-4 bg-[#fafaf9] rounded-lg border border-[#e8e6e3] space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Name *</label>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Name *</label>
                 <input
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="z.B. Bauhaus"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Domain *</label>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Domain *</label>
                 <input
                   type="text"
                   value={formDomain}
                   onChange={(e) => setFormDomain(e.target.value)}
                   placeholder="z.B. bauhaus.de"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  URL-Muster <span className="font-normal text-slate-400">(kommagetrennt)</span>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">
+                  URL-Muster <span className="font-normal text-[#c4c2bf] normal-case tracking-normal">(kommagetrennt)</span>
                 </label>
                 <input
                   type="text"
                   value={formUrlMuster}
                   onChange={(e) => setFormUrlMuster(e.target.value)}
                   placeholder="/checkout/confirmation, /bestellbestaetigung"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  E-Mail-Absender <span className="font-normal text-slate-400">(kommagetrennt)</span>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">
+                  E-Mail-Absender <span className="font-normal text-[#c4c2bf] normal-case tracking-normal">(kommagetrennt)</span>
                 </label>
                 <input
                   type="text"
                   value={formEmailAbsender}
                   onChange={(e) => setFormEmailAbsender(e.target.value)}
                   placeholder="bestellung@bauhaus.de, noreply@bauhaus.de"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-4 py-2 text-sm bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors disabled:opacity-50"
                 >
                   {loading ? "Speichern..." : editId ? "Aktualisieren" : "Anlegen"}
                 </button>
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 py-2 text-sm bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                  className="px-4 py-2 text-sm font-medium bg-[#f5f4f2] text-[#6b6b6b] border border-[#e8e6e3] rounded-lg hover:bg-[#ebe9e6] transition-colors"
                 >
                   Abbrechen
                 </button>
@@ -258,7 +257,7 @@ export function EinstellungenClient({
 
           {/* Händler-Liste */}
           {haendler.length === 0 ? (
-            <p className="text-sm text-slate-400 py-4 text-center">
+            <p className="text-sm text-[#c4c2bf] py-4 text-center">
               Noch keine Händler konfiguriert.
             </p>
           ) : (
@@ -266,22 +265,22 @@ export function EinstellungenClient({
               {haendler.map((h) => (
                 <div
                   key={h.id}
-                  className="flex items-start justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors"
+                  className="flex items-start justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900">{h.name}</p>
-                      <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
+                      <p className="text-sm font-semibold text-[#1a1a1a]">{h.name}</p>
+                      <span className="text-[10px] px-2 py-0.5 bg-[#f5f4f2] text-[#9a9a9a] rounded font-mono-amount">
                         {h.domain}
                       </span>
                     </div>
                     {h.url_muster.length > 0 && (
-                      <p className="text-xs text-slate-400 mt-1 truncate">
+                      <p className="text-[11px] text-[#c4c2bf] mt-1 truncate">
                         URLs: {h.url_muster.join(", ")}
                       </p>
                     )}
                     {h.email_absender.length > 0 && (
-                      <p className="text-xs text-slate-400 truncate">
+                      <p className="text-[11px] text-[#c4c2bf] truncate">
                         E-Mails: {h.email_absender.join(", ")}
                       </p>
                     )}
@@ -289,7 +288,7 @@ export function EinstellungenClient({
                   <div className="flex items-center gap-1 ml-2 shrink-0">
                     <button
                       onClick={() => startEdit(h)}
-                      className="p-1.5 text-slate-400 hover:text-[#1E4D8C] transition-colors"
+                      className="p-1.5 text-[#c4c2bf] hover:text-[#570006] transition-colors"
                       title="Bearbeiten"
                       aria-label={`${h.name} bearbeiten`}
                     >
@@ -300,7 +299,7 @@ export function EinstellungenClient({
                     <button
                       type="button"
                       onClick={() => setDeleteConfirm({ id: h.id, name: h.name })}
-                      className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                      className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors"
                       title="Löschen"
                       aria-label={`${h.name} löschen`}
                     >
@@ -316,34 +315,41 @@ export function EinstellungenClient({
         </div>
 
         {/* Benutzerverwaltung */}
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="font-semibold text-slate-900 mb-4">
+        <div className="card p-6">
+          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-4">
             Benutzer ({benutzer.length})
           </h2>
           <div className="space-y-2">
             {benutzer.map((user) => (
               <div
                 key={user.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-slate-100"
+                className="flex items-center justify-between p-3 rounded-lg border border-[#f0eeeb]"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#1E4D8C] text-white flex items-center justify-center text-xs font-bold">
+                  <div className="w-9 h-9 rounded-lg bg-[#570006] text-white flex items-center justify-center text-[11px] font-bold">
                     {user.kuerzel}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{user.name}</p>
-                    <p className="text-xs text-slate-400">{user.email}</p>
+                    <p className="text-sm font-medium text-[#1a1a1a]">{user.name}</p>
+                    <p className="text-[11px] text-[#c4c2bf]">{user.email}</p>
                   </div>
                 </div>
                 <span
-                  className={`text-xs px-2.5 py-1 rounded-full font-semibold capitalize ${
+                  className={`status-tag ${
                     user.rolle === "admin"
-                      ? "bg-indigo-50 text-indigo-700"
+                      ? "bg-[#570006]/5 text-[#570006]"
                       : user.rolle === "buchhaltung"
                       ? "bg-emerald-50 text-emerald-700"
                       : "bg-blue-50 text-blue-700"
                   }`}
                 >
+                  <span className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm ${
+                    user.rolle === "admin"
+                      ? "bg-[#570006]"
+                      : user.rolle === "buchhaltung"
+                      ? "bg-emerald-600"
+                      : "bg-blue-600"
+                  }`} />
                   {user.rolle}
                 </span>
               </div>
@@ -353,14 +359,16 @@ export function EinstellungenClient({
       </div>
 
       {/* Testdaten */}
-      <div className="mt-6 bg-white rounded-xl border border-amber-200 p-6">
+      <div className="mt-6 card border-amber-200 p-6">
         <div className="flex items-center gap-3 mb-3">
-          <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          <h2 className="font-semibold text-slate-900">Testdaten</h2>
+          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Testdaten</h2>
         </div>
-        <p className="text-sm text-slate-500 mb-4">
+        <p className="text-sm text-[#9a9a9a] mb-4">
           Testbestellungen anlegen um die Webapp zu testen. Testdaten sind an der Bestellnummer erkennbar (TEST-...) und können jederzeit vollständig entfernt werden.
         </p>
 
@@ -382,7 +390,7 @@ export function EinstellungenClient({
               type="button"
               onClick={() => setTestdatenConfirm("create")}
               disabled={testdatenLoading}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors disabled:opacity-50"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

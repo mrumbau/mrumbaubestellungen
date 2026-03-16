@@ -19,7 +19,7 @@ interface BuchhaltungRow {
 function isFaelligBald(datum: string | null) {
   if (!datum) return false;
   const diff = new Date(datum).getTime() - Date.now();
-  return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000; // innerhalb 7 Tage
+  return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000;
 }
 
 function isUeberfaellig(datum: string | null) {
@@ -52,7 +52,6 @@ export function BuchhaltungClient({
     );
   });
 
-  // Summen berechnen
   const summeOffen = rows.reduce((sum, r) => sum + (r.betrag || 0), 0);
   const summeMonat = rows
     .filter((r) => {
@@ -99,14 +98,14 @@ export function BuchhaltungClient({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Buchhaltung</h1>
-          <p className="text-slate-500 mt-1">Freigegebene Rechnungen</p>
+          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Buchhaltung</h1>
+          <p className="text-[#9a9a9a] text-sm mt-1">Freigegebene Rechnungen</p>
         </div>
         <button
           onClick={exportCSV}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-2 border-[#570006] text-[#570006] rounded-lg hover:bg-[#570006] hover:text-white transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -116,93 +115,100 @@ export function BuchhaltungClient({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-semibold text-slate-500 tracking-wide">Offene Rechnungen</p>
-          <p className="text-lg font-bold text-slate-900 mt-1">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card p-5" style={{ borderTop: "3px solid #570006" }}>
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Offene Rechnungen</p>
+          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeOffen)}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-semibold text-slate-500 tracking-wide">Diesen Monat</p>
-          <p className="text-lg font-bold text-slate-900 mt-1">
+        <div className="card p-5" style={{ borderTop: "3px solid #059669" }}>
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Diesen Monat</p>
+          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-semibold text-slate-500 tracking-wide">Nächste Fällig</p>
-          <p className="text-lg font-bold text-slate-900 mt-1">
+        <div className="card p-5" style={{ borderTop: "3px solid #d97706" }}>
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Nächste Fällig</p>
+          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2">
             {naechsteFaellig ? formatDatum(naechsteFaellig.faelligkeitsdatum) : "–"}
           </p>
         </div>
       </div>
 
       {/* Suche */}
-      <div className="mt-6">
+      <div className="mt-6 relative max-w-sm">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
         <input
           type="text"
           value={suche}
           onChange={(e) => setSuche(e.target.value)}
           placeholder="Suche nach Bestellnummer, Händler..."
-          className="w-full max-w-sm px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1E4D8C] focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
         />
       </div>
 
       {/* Tabelle */}
-      <div className="mt-4 bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50/80 text-left">
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">Bestellnr.</th>
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">Händler</th>
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">Betrag</th>
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">Freigegeben von</th>
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">Freigegeben am</th>
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">Fällig</th>
-              <th className="px-4 py-3 font-semibold text-xs text-slate-500 tracking-wide">PDF</th>
+            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler</th>
+              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben von</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben am</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Fällig</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">PDF</th>
             </tr>
           </thead>
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-[#9a9a9a]">
                   {rows.length === 0
                     ? "Noch keine freigegebenen Rechnungen."
                     : "Keine Rechnungen gefunden."}
                 </td>
               </tr>
             ) : (
-              gefiltert.map((r) => (
-                <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3.5 font-semibold text-slate-900">
-                    {r.bestellnummer || "–"}
+              gefiltert.map((r, i) => (
+                <tr key={r.id} className={`table-row-hover border-b border-[#f0eeeb] ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""}`}>
+                  <td className="px-4 py-3.5">
+                    <span className="font-mono-amount font-semibold text-[#570006]">
+                      {r.bestellnummer || "–"}
+                    </span>
                   </td>
-                  <td className="px-4 py-3.5 text-slate-900">{r.haendler_name || "–"}</td>
-                  <td className="px-4 py-3.5 font-semibold text-slate-900">
-                    {formatBetrag(r.betrag, r.waehrung)}
+                  <td className="px-4 py-3.5 text-[#1a1a1a]">{r.haendler_name || "–"}</td>
+                  <td className="px-4 py-3.5 text-right">
+                    <span className="font-mono-amount font-semibold text-[#1a1a1a]">
+                      {formatBetrag(r.betrag, r.waehrung)}
+                    </span>
                   </td>
-                  <td className="px-4 py-3.5 text-slate-700">{r.freigegeben_von}</td>
-                  <td className="px-4 py-3.5 text-slate-500">{formatDatum(r.freigegeben_am)}</td>
+                  <td className="px-4 py-3.5 text-[#6b6b6b]">{r.freigegeben_von}</td>
+                  <td className="px-4 py-3.5 text-[#9a9a9a] text-xs">{formatDatum(r.freigegeben_am)}</td>
                   <td className="px-4 py-3.5">
                     <span
                       className={
                         isUeberfaellig(r.faelligkeitsdatum)
-                          ? "text-red-600 font-semibold"
+                          ? "text-red-600 font-semibold font-mono-amount text-xs"
                           : isFaelligBald(r.faelligkeitsdatum)
-                          ? "text-amber-600 font-semibold"
-                          : "text-slate-500"
+                          ? "text-amber-600 font-semibold font-mono-amount text-xs"
+                          : "text-[#9a9a9a] text-xs"
                       }
                     >
                       {formatDatum(r.faelligkeitsdatum)}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5">
+                  <td className="px-4 py-3.5 text-center">
                     {r.rechnung_id ? (
                       <a
                         href={`/api/pdfs/${r.rechnung_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#1E4D8C] hover:text-[#2E6BAD] transition-colors"
+                        className="inline-flex items-center justify-center text-[#570006] hover:text-[#7a1a1f] transition-colors"
                         title="PDF herunterladen"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -210,7 +216,7 @@ export function BuchhaltungClient({
                         </svg>
                       </a>
                     ) : (
-                      <span className="text-slate-300">–</span>
+                      <span className="text-[#d4d1cc]">–</span>
                     )}
                   </td>
                 </tr>
@@ -221,11 +227,11 @@ export function BuchhaltungClient({
       </div>
 
       {/* Summenzeile + Paginierung */}
-      <div className="mt-3 flex items-center justify-between text-sm text-slate-500 px-1">
-        <span>
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <span className="text-[#9a9a9a]">
           {totalCount} Rechnung{totalCount !== 1 ? "en" : ""} gesamt
           {gefiltert.length > 0 && (
-            <span className="ml-2 font-semibold text-slate-900">
+            <span className="ml-2 font-mono-amount font-semibold text-[#1a1a1a]">
               Summe: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
                 gefiltert.reduce((sum, r) => sum + (r.betrag || 0), 0)
               )}
@@ -237,17 +243,17 @@ export function BuchhaltungClient({
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage <= 1}
-              className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Vorherige
             </button>
-            <span className="text-slate-700 font-medium px-2">
-              Seite {currentPage} von {totalPages}
+            <span className="text-[#6b6b6b] font-medium px-2 font-mono-amount text-xs">
+              {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage >= totalPages}
-              className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Nächste
             </button>
