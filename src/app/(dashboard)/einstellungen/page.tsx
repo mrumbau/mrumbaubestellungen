@@ -20,10 +20,17 @@ export default async function EinstellungenPage() {
     .select("id, email, name, kuerzel, rolle")
     .order("name", { ascending: true });
 
+  const { data: testCheck } = await supabase
+    .from("bestellungen")
+    .select("id")
+    .like("bestellnummer", "TEST-%")
+    .limit(1);
+
   return (
     <EinstellungenClient
       haendler={haendler || []}
       benutzer={benutzer || []}
+      hatTestdaten={!!testCheck && testCheck.length > 0}
     />
   );
 }

@@ -21,15 +21,20 @@ interface Benutzer {
 export function EinstellungenClient({
   haendler: initialHaendler,
   benutzer,
+  hatTestdaten: initialHatTestdaten,
 }: {
   haendler: Haendler[];
   benutzer: Benutzer[];
+  hatTestdaten: boolean;
 }) {
   const [haendler, setHaendler] = useState(initialHaendler);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testdatenLoading, setTestdatenLoading] = useState(false);
+  const [testdatenMsg, setTestdatenMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [hatTestdaten, setHatTestdaten] = useState(initialHatTestdaten);
 
   // Formular-State
   const [formName, setFormName] = useState("");
@@ -131,11 +136,40 @@ export function EinstellungenClient({
     }
   }
 
+  async function handleTestdaten(action: "create" | "delete") {
+    const confirmMsg =
+      action === "create"
+        ? "8 Testbestellungen mit Dokumenten, Abgleichen und Kommentaren anlegen?"
+        : "Alle Testdaten unwiderruflich löschen?";
+    if (!confirm(confirmMsg)) return;
+
+    setTestdatenLoading(true);
+    setTestdatenMsg(null);
+    try {
+      const res = await fetch("/api/testdaten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTestdatenMsg({ type: "success", text: data.message });
+      setHatTestdaten(action === "create");
+    } catch (err) {
+      setTestdatenMsg({
+        type: "error",
+        text: err instanceof Error ? err.message : "Fehler",
+      });
+    } finally {
+      setTestdatenLoading(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Einstellungen</h1>
-        <p className="text-slate-500 mt-1">Händler & Benutzerverwaltung</p>
+        <p className="text-slate-500 mt-1">Händler, Benutzer & Testdaten</p>
       </div>
 
       {error && (
@@ -315,6 +349,57 @@ export function EinstellungenClient({
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Testdaten */}
+      <div className="mt-6 bg-white rounded-xl border border-amber-200 p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <h2 className="font-semibold text-slate-900">Testdaten</h2>
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          Testbestellungen anlegen um die Webapp zu testen. Testdaten sind an der Bestellnummer erkennbar (TEST-...) und können jederzeit vollständig entfernt werden.
+        </p>
+
+        {testdatenMsg && (
+          <div
+            className={`mb-4 p-3 rounded-lg text-sm font-medium ${
+              testdatenMsg.type === "success"
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}
+          >
+            {testdatenMsg.text}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          {!hatTestdaten ? (
+            <button
+              onClick={() => handleTestdaten("create")}
+              disabled={testdatenLoading}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-[#1E4D8C] text-white rounded-lg hover:bg-[#2E6BAD] transition-colors disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              {testdatenLoading ? "Wird angelegt..." : "Testdaten anlegen"}
+            </button>
+          ) : (
+            <button
+              onClick={() => handleTestdaten("delete")}
+              disabled={testdatenLoading}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              {testdatenLoading ? "Wird gelöscht..." : "Alle Testdaten löschen"}
+            </button>
+          )}
         </div>
       </div>
     </div>

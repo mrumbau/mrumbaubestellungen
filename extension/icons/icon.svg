@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#1E4D8C"/>
+  <text x="64" y="52" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="36" fill="white">MR</text>
+  <text x="64" y="86" text-anchor="middle" font-family="Arial,sans-serif" font-weight="500" font-size="18" fill="rgba(255,255,255,0.8)">Umbau</text>
+</svg>
