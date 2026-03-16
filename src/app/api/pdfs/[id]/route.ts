@@ -57,6 +57,8 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${safeFilename}"`,
+        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "frame-ancestors 'self'",
       },
     });
   } catch {
