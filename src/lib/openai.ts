@@ -2,6 +2,27 @@ import OpenAI from "openai";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+/** Retry-Wrapper mit exponential backoff für OpenAI-Calls */
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const isRetryable =
+        err instanceof Error &&
+        (err.message.includes("429") ||
+          err.message.includes("timeout") ||
+          err.message.includes("ECONNRESET") ||
+          err.message.includes("500") ||
+          err.message.includes("503"));
+
+      if (!isRetryable || attempt === maxRetries - 1) throw err;
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+  throw new Error("Max retries reached");
+}
+
 export interface DokumentAnalyse {
   typ: "bestellbestaetigung" | "lieferschein" | "rechnung";
   bestellnummer: string | null;
@@ -104,15 +125,17 @@ export async function analysiereDokument(
         },
       ];
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: ANALYSE_PROMPT },
-      { role: "user", content: userContent },
-    ],
-    max_tokens: 2000,
-    temperature: 0.1,
-  });
+  const response = await withRetry(() =>
+    openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: ANALYSE_PROMPT },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 2000,
+      temperature: 0.1,
+    })
+  );
 
   const text = response.choices[0]?.message?.content || "{}";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -125,12 +148,13 @@ export async function fuehreAbgleichDurch(
   lieferschein: DokumentAnalyse | null,
   rechnung: DokumentAnalyse | null
 ): Promise<AbgleichErgebnis> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `Du bist ein Prüfassistent für eine deutsche Baufirma.
+  const response = await withRetry(() =>
+    openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `Du bist ein Prüfassistent für eine deutsche Baufirma.
 Vergleiche die folgenden Dokumente einer Bestellung und prüfe ob alles übereinstimmt.
 
 Gib NUR ein JSON-Objekt zurück:
@@ -148,17 +172,18 @@ Gib NUR ein JSON-Objekt zurück:
   ],
   "zusammenfassung": "Alles stimmt überein." | "Abweichung gefunden: ..."
 }`,
-      },
-      {
-        role: "user",
-        content: `Bestellbestätigung: ${JSON.stringify(bestellbestaetigung)}
+        },
+        {
+          role: "user",
+          content: `Bestellbestätigung: ${JSON.stringify(bestellbestaetigung)}
 Lieferschein: ${JSON.stringify(lieferschein)}
 Rechnung: ${JSON.stringify(rechnung)}`,
-      },
-    ],
-    max_tokens: 2000,
-    temperature: 0.1,
-  });
+        },
+      ],
+      max_tokens: 2000,
+      temperature: 0.1,
+    })
+  );
 
   const text = response.choices[0]?.message?.content || "{}";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -173,7 +198,8 @@ export async function erkenneBestellerIntelligent(
   haendlerName: string,
   bestellerHistorie: { kuerzel: string; name: string; artikel_namen: string[]; haendler: string[] }[]
 ): Promise<BestellerErkennungErgebnis> {
-  const response = await openai.chat.completions.create({
+  const response = await withRetry(() =>
+    openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -201,7 +227,8 @@ ${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.arti
     ],
     max_tokens: 500,
     temperature: 0.1,
-  });
+  })
+  );
 
   const text = response.choices[0]?.message?.content || "{}";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -212,7 +239,7 @@ ${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.arti
 export async function generiereErinnerungsmail(
   bestellungen: { bestellnummer: string; haendler: string; besteller: string; tage_alt: number; betrag: number }[]
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
+  const response = await withRetry(() => openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -230,7 +257,7 @@ ${bestellungen.map((b) => `- ${b.bestellnummer} bei ${b.haendler} (${b.tage_alt}
     ],
     max_tokens: 500,
     temperature: 0.5,
-  });
+  }));
 
   return response.choices[0]?.message?.content || "";
 }
@@ -240,7 +267,7 @@ export async function pruefePreisanomalien(
   aktuelleArtikel: { name: string; einzelpreis: number; menge: number }[],
   historischePreise: { name: string; preise: number[] }[]
 ): Promise<PreisAnomalieErgebnis> {
-  const response = await openai.chat.completions.create({
+  const response = await withRetry(() => openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -277,7 +304,7 @@ ${historischePreise.map((h) => `${h.name}: ${h.preise.map((p) => p.toFixed(2) + 
     ],
     max_tokens: 1000,
     temperature: 0.1,
-  });
+  }));
 
   const text = response.choices[0]?.message?.content || "{}";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -290,7 +317,7 @@ export async function erkenneHaendlerAusEmail(
   emailBetreff: string,
   erkannterHaendlerName: string | null
 ): Promise<{ name: string; domain: string; email_muster: string } | null> {
-  const response = await openai.chat.completions.create({
+  const response = await withRetry(() => openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -316,7 +343,7 @@ Erkannter Händlername aus Dokument: ${erkannterHaendlerName || "nicht erkannt"}
     ],
     max_tokens: 300,
     temperature: 0.1,
-  });
+  }));
 
   const text = response.choices[0]?.message?.content || "null";
   if (text.trim() === "null") return null;
@@ -344,7 +371,7 @@ export async function generiereWochenzusammenfassung(
     abweichende_bestellungen: { bestellnummer: string; haendler: string; problem: string }[];
   }
 ): Promise<WochenzusammenfassungErgebnis> {
-  const response = await openai.chat.completions.create({
+  const response = await withRetry(() => openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -386,7 +413,7 @@ ${stats.abweichende_bestellungen.length > 0
     ],
     max_tokens: 800,
     temperature: 0.3,
-  });
+  }));
 
   const text = response.choices[0]?.message?.content || "{}";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -399,7 +426,7 @@ export async function fasseBestellungZusammen(
   abweichungen: { feld: string; artikel?: string; erwartet: string | number; gefunden: string | number }[],
   kommentare: { autor: string; text: string; datum: string }[]
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
+  const response = await withRetry(() => openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
       {
@@ -427,7 +454,7 @@ ${kommentare.length > 0
     ],
     max_tokens: 300,
     temperature: 0.3,
-  });
+  }));
 
   return response.choices[0]?.message?.content || "Zusammenfassung konnte nicht erstellt werden.";
 }

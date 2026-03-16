@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID, validateTextLength } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 
 // POST /api/kommentare – Kommentar zu einer Bestellung hinzufügen
 export async function POST(request: NextRequest) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
+    }
+
     const supabase = await createServerSupabaseClient();
 
     const {
@@ -12,7 +19,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { data: profil } = await supabase
@@ -22,7 +29,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!profil) {
-      return NextResponse.json({ error: "Kein Profil" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 403 });
     }
 
     const body = await request.json();
@@ -51,14 +58,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error("Kommentar Fehler:", error);
+      logError("/api/kommentare", "Kommentar Fehler", error);
       return NextResponse.json({ error: "Kommentar konnte nicht gespeichert werden" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logError("/api/kommentare", "Unerwarteter Fehler", err);
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
     );
   }

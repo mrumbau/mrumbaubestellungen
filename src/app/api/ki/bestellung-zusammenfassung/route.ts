@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { fasseBestellungZusammen } from "@/lib/openai";
 import { isValidUUID } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
 
 // POST /api/ki/bestellung-zusammenfassung – KI-Zusammenfassung einer Bestellung
 export async function POST(request: NextRequest) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
     const supabase = await createServerSupabaseClient();
 
     const {

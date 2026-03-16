@@ -12,11 +12,12 @@ export default async function DashboardPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  // Alle Bestellungen laden
+  // Neueste 100 Bestellungen laden (Performance-Limit)
   const { data: bestellungen } = await supabase
     .from("bestellungen")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(100);
 
   const alle = bestellungen || [];
 

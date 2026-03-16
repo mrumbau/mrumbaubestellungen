@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { checkCsrf } from "@/lib/csrf";
 
 const TESTBESTELLUNGEN = [
   {
@@ -116,6 +117,10 @@ const TEST_ARTIKEL = [
 
 export async function POST(request: NextRequest) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
     // Admin-Check
     const supabaseAuth = await createServerSupabaseClient();
     const {

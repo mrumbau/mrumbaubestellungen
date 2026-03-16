@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID, isValidDomain, validateTextLength } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
 
 // PUT /api/haendler/[id] – Händler aktualisieren
 export async function PUT(
@@ -8,6 +9,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
     const { id } = await params;
     const supabase = await createServerSupabaseClient();
 
@@ -69,10 +74,14 @@ export async function PUT(
 
 // DELETE /api/haendler/[id] – Händler löschen
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
     const { id } = await params;
     const supabase = await createServerSupabaseClient();
 

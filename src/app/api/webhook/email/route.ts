@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase";
 import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien } from "@/lib/openai";
 import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { updateBestellungStatus } from "@/lib/bestellung-utils";
+import { logError, logInfo } from "@/lib/logger";
 
 // POST /api/webhook/email – Empfängt E-Mail-Daten von Make.com
 export async function POST(request: NextRequest) {
@@ -147,11 +149,11 @@ export async function POST(request: NextRequest) {
 
           if (erkennung.kuerzel !== "UNBEKANNT" && erkennung.konfidenz >= 0.5) {
             bestellerKuerzel = erkennung.kuerzel;
-            console.log(`KI-Besteller-Erkennung: ${erkennung.kuerzel} (${erkennung.konfidenz}) – ${erkennung.begruendung}`);
+            logInfo("/api/webhook/email", `KI-Besteller-Erkennung: ${erkennung.kuerzel} (${erkennung.konfidenz})`, { begruendung: erkennung.begruendung });
           }
         }
       } catch (err) {
-        console.error("KI-Besteller-Erkennung fehlgeschlagen:", err);
+        logError("/api/webhook/email", "KI-Besteller-Erkennung fehlgeschlagen", err);
       }
     }
 
@@ -192,32 +194,37 @@ export async function POST(request: NextRequest) {
               email_absender: [neuerHaendler.email_muster],
               url_muster: [],
             });
-            console.log(`Neuer Händler automatisch erkannt: ${neuerHaendler.name} (${neuerHaendler.domain})`);
+            logInfo("/api/webhook/email", `Neuer Händler erkannt: ${neuerHaendler.name}`, { domain: neuerHaendler.domain });
           }
         }
       } catch (err) {
-        console.error("Automatische Händler-Erkennung fehlgeschlagen:", err);
+        logError("/api/webhook/email", "Händler-Erkennung fehlgeschlagen", err);
       }
     }
 
-    // Bestehende Bestellung suchen oder neue anlegen
+    // Bestehende Bestellung suchen oder neue anlegen (Race-Condition-sicher)
     let bestellungId: string;
 
     const erkannteBestellnummer = ergebnisse.find(
       (e) => e.analyse.bestellnummer
     )?.analyse.bestellnummer;
 
-    const { data: existierendeBestellung } = erkannteBestellnummer
-      ? await supabase
-          .from("bestellungen")
-          .select("id")
-          .eq("bestellnummer", erkannteBestellnummer)
-          .single()
-      : { data: null };
+    // 1. Suche per Bestellnummer
+    let existierendeBestellung = null;
+    if (erkannteBestellnummer) {
+      const { data } = await supabase
+        .from("bestellungen")
+        .select("id")
+        .eq("bestellnummer", erkannteBestellnummer)
+        .limit(1)
+        .single();
+      existierendeBestellung = data;
+    }
 
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
     } else {
+      // 2. Suche per Signal (erwartet-Status)
       const { data: erwartet } = signal
         ? await supabase
             .from("bestellungen")
@@ -235,7 +242,8 @@ export async function POST(request: NextRequest) {
       if (erwartet?.[0]) {
         bestellungId = erwartet[0].id;
       } else {
-        const { data: neue } = await supabase
+        // 3. Neue Bestellung anlegen – bei Bestellnummer-Konflikt existierende verwenden
+        const { data: neue, error: insertError } = await supabase
           .from("bestellungen")
           .insert({
             bestellnummer: erkannteBestellnummer,
@@ -247,7 +255,25 @@ export async function POST(request: NextRequest) {
           })
           .select()
           .single();
-        bestellungId = neue!.id;
+
+        if (insertError && erkannteBestellnummer) {
+          // Duplikat erkannt – existierende Bestellung verwenden
+          const { data: fallback } = await supabase
+            .from("bestellungen")
+            .select("id")
+            .eq("bestellnummer", erkannteBestellnummer)
+            .limit(1)
+            .single();
+          if (fallback) {
+            bestellungId = fallback.id;
+          } else {
+            throw new Error("Bestellung konnte weder angelegt noch gefunden werden");
+          }
+        } else if (!neue) {
+          throw new Error("Bestellung konnte nicht angelegt werden");
+        } else {
+          bestellungId = neue.id;
+        }
       }
     }
 
@@ -350,34 +376,16 @@ export async function POST(request: NextRequest) {
               autor_name: "KI-Preisüberwachung",
               text: `Preiswarnung: ${anomalien.zusammenfassung}`,
             });
-            console.log(`Preisanomalie erkannt bei ${bestellungId}: ${anomalien.zusammenfassung}`);
+            logInfo("/api/webhook/email", `Preisanomalie erkannt`, { bestellungId, zusammenfassung: anomalien.zusammenfassung });
           }
         }
       } catch (err) {
-        console.error("Preisanomalie-Prüfung fehlgeschlagen:", err);
+        logError("/api/webhook/email", "Preisanomalie-Prüfung fehlgeschlagen", err);
       }
     }
 
-    // Status aktualisieren
-    const { data: bestellung } = await supabase
-      .from("bestellungen")
-      .select("hat_bestellbestaetigung, hat_lieferschein, hat_rechnung")
-      .eq("id", bestellungId)
-      .single();
-
-    let neuerStatus = "offen";
-    if (
-      bestellung?.hat_bestellbestaetigung &&
-      bestellung?.hat_lieferschein &&
-      bestellung?.hat_rechnung
-    ) {
-      neuerStatus = "vollstaendig";
-    }
-
-    await supabase
-      .from("bestellungen")
-      .update({ status: neuerStatus })
-      .eq("id", bestellungId);
+    // Status aktualisieren (zentralisiert)
+    await updateBestellungStatus(supabase, bestellungId);
 
     // Signal als verarbeitet markieren
     if (signal) {
@@ -389,7 +397,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, bestellung_id: bestellungId });
   } catch (err) {
-    console.error("Webhook email error:", err);
+    logError("/api/webhook/email", "Webhook Fehler", err);
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }
@@ -400,4 +408,14 @@ export async function POST(request: NextRequest) {
 function extractDomain(email: string): string {
   const match = email?.match(/@([^>]+)/);
   return match ? match[1] : "unbekannt";
+}
+
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return hash;
 }

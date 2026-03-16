@@ -78,6 +78,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
+            aria-label="Menü schließen"
             className="md:hidden text-white/60 hover:text-white"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -122,6 +123,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
             onClick={handleLogout}
             className="text-white/50 hover:text-white transition-colors"
             title="Abmelden"
+            aria-label="Abmelden"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -138,6 +140,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
+        aria-label="Menü öffnen"
         className="md:hidden fixed top-4 left-4 z-40 p-2 bg-[#1E4D8C] text-white rounded-lg shadow-lg"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

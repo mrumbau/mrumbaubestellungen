@@ -3,10 +3,17 @@ import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { analysiereDokument, fuehreAbgleichDurch } from "@/lib/openai";
 import { isValidUUID, isAllowedMimeType, isFileSizeOk, sanitizeFilename } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 
 // POST /api/scan – Foto/PDF hochladen und per GPT-4o analysieren
 export async function POST(request: NextRequest) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
+    }
+
     // Auth-Check
     const supabaseAuth = await createServerSupabaseClient();
     const {
@@ -14,7 +21,7 @@ export async function POST(request: NextRequest) {
     } = await supabaseAuth.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const body = await request.json();
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!profil) {
-      return NextResponse.json({ error: "Kein Profil" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 403 });
     }
 
     const { data: bestellungCheck } = await supabase
@@ -78,7 +85,7 @@ export async function POST(request: NextRequest) {
     try {
       analyse = await analysiereDokument(base64, mime_type);
     } catch (err) {
-      console.error("OpenAI Analyse-Fehler:", err);
+      logError("/api/scan", "OpenAI Analyse-Fehler", err);
       return NextResponse.json(
         { error: "KI-Analyse fehlgeschlagen. Bitte erneut versuchen." },
         { status: 502 }
@@ -94,7 +101,7 @@ export async function POST(request: NextRequest) {
       .upload(storagePfad, buffer, { contentType: mime_type, upsert: true });
 
     if (uploadError) {
-      console.error("Storage Upload-Fehler:", uploadError);
+      logError("/api/scan", "Storage Upload-Fehler", uploadError);
       // Weiter ohne Storage – Dokument trotzdem in DB speichern
     }
 
@@ -120,7 +127,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (dokError) {
-      console.error("Dokument DB-Fehler:", dokError);
+      logError("/api/scan", "Dokument DB-Fehler", dokError);
       return NextResponse.json({ error: "Dokument konnte nicht gespeichert werden" }, { status: 500 });
     }
 
@@ -187,7 +194,7 @@ export async function POST(request: NextRequest) {
           .update({ status: neuerStatus })
           .eq("id", bestellung_id);
       } catch (err) {
-        console.error("KI-Abgleich Fehler:", err);
+        logError("/api/scan", "KI-Abgleich Fehler", err);
       }
     }
 
@@ -196,9 +203,10 @@ export async function POST(request: NextRequest) {
       dokument_id: dokument.id,
       analyse,
     });
-  } catch {
+  } catch (err) {
+    logError("/api/scan", "Unerwarteter Fehler", err);
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
     );
   }

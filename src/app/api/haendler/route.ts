@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidDomain, validateTextLength } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
 
 // GET /api/haendler – Alle Händler laden
 export async function GET() {
@@ -44,6 +45,10 @@ export async function GET() {
 // POST /api/haendler – Neuen Händler anlegen
 export async function POST(request: NextRequest) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
     const supabase = await createServerSupabaseClient();
 
     const {

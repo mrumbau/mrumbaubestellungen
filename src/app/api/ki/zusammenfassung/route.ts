@@ -14,11 +14,12 @@ export async function GET() {
       return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
     }
 
-    // Alle Bestellungen laden
+    // Neueste 50 Bestellungen laden (Performance-Limit)
     const { data: bestellungen } = await supabase
       .from("bestellungen")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     const alle = bestellungen || [];
 
@@ -56,26 +57,29 @@ export async function GET() {
       }
     }
 
-    // Abweichende Bestellungen mit Details
+    // Abweichende Bestellungen mit Details (Batch-Query statt N+1)
     const abweichendeBestellungen = alle
       .filter((b) => b.status === "abweichung")
       .slice(0, 5);
 
-    const abweichendeMitDetails: { bestellnummer: string; haendler: string; problem: string }[] = [];
-    for (const b of abweichendeBestellungen) {
-      const { data: abgleich } = await supabase
-        .from("abgleiche")
-        .select("ki_zusammenfassung")
-        .eq("bestellung_id", b.id)
-        .limit(1)
-        .single();
+    const abweichendeIds = abweichendeBestellungen.map((b) => b.id);
+    const { data: alleAbgleiche } = abweichendeIds.length > 0
+      ? await supabase
+          .from("abgleiche")
+          .select("bestellung_id, ki_zusammenfassung")
+          .in("bestellung_id", abweichendeIds)
+          .order("erstellt_am", { ascending: false })
+      : { data: [] };
 
-      abweichendeMitDetails.push({
-        bestellnummer: b.bestellnummer || "Ohne Nr.",
-        haendler: b.haendler_name || "–",
-        problem: abgleich?.ki_zusammenfassung || "Abweichung erkannt",
-      });
-    }
+    const abgleichMap = new Map(
+      (alleAbgleiche || []).map((a) => [a.bestellung_id, a.ki_zusammenfassung])
+    );
+
+    const abweichendeMitDetails = abweichendeBestellungen.map((b) => ({
+      bestellnummer: b.bestellnummer || "Ohne Nr.",
+      haendler: b.haendler_name || "–",
+      problem: abgleichMap.get(b.id) || "Abweichung erkannt",
+    }));
 
     const zusammenfassung = await generiereWochenzusammenfassung({
       gesamt: alle.length,
