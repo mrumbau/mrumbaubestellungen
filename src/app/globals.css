@@ -156,16 +156,21 @@ body {
 }
 
 /* ============================================
-   Table Row Hover
+   Table Row Hover – aggressive, auffällig
    ============================================ */
 
 .table-row-hover {
-  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: all 0.15s ease;
+  cursor: pointer;
 }
 
 .table-row-hover:hover {
-  background-color: #faf9f7;
-  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  background-color: #faf9f7 !important;
+  box-shadow:
+    inset 3px 0 0 0 var(--mr-red),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
 }
 
 /* ============================================
@@ -181,13 +186,13 @@ body {
 }
 
 /* ============================================
-   Patterns
+   Patterns – industrielle SVG-Texturen
    ============================================ */
 
 .bg-grid-pattern {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -199,6 +204,62 @@ body {
     rgba(255, 255, 255, 0.02) 20px,
     rgba(255, 255, 255, 0.02) 21px
   );
+}
+
+/* Isometric grid – für Login + spezielle Panels */
+.bg-iso-grid {
+  background-image:
+    linear-gradient(30deg, rgba(255, 255, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(255, 255, 255, 0.03) 87.5%, rgba(255, 255, 255, 0.03)),
+    linear-gradient(150deg, rgba(255, 255, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(255, 255, 255, 0.03) 87.5%, rgba(255, 255, 255, 0.03)),
+    linear-gradient(30deg, rgba(255, 255, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(255, 255, 255, 0.03) 87.5%, rgba(255, 255, 255, 0.03)),
+    linear-gradient(150deg, rgba(255, 255, 255, 0.03) 12%, transparent 12.5%, transparent 87%, rgba(255, 255, 255, 0.03) 87.5%, rgba(255, 255, 255, 0.03)),
+    linear-gradient(60deg, rgba(255, 255, 255, 0.02) 25%, transparent 25.5%, transparent 75%, rgba(255, 255, 255, 0.02) 75%, rgba(255, 255, 255, 0.02)),
+    linear-gradient(60deg, rgba(255, 255, 255, 0.02) 25%, transparent 25.5%, transparent 75%, rgba(255, 255, 255, 0.02) 75%, rgba(255, 255, 255, 0.02));
+  background-size: 80px 140px;
+  background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
+}
+
+/* Dünne rote Akzentlinie – dekorative Trennung */
+.red-accent-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(87, 0, 6, 0.15), transparent);
+}
+
+/* ============================================
+   Button Gradient Hover (Freigabe etc.)
+   ============================================ */
+
+.btn-primary {
+  background: var(--mr-red);
+  color: white;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 50%, rgba(0,0,0,0.08) 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--mr-red-light);
+  box-shadow: 0 4px 16px rgba(87, 0, 6, 0.3), 0 2px 4px rgba(87, 0, 6, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-primary:hover::before {
+  opacity: 1;
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(87, 0, 6, 0.2);
 }
 
 /* ============================================
@@ -223,6 +284,19 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Pulse Glow – für dringende Fälligkeiten
+   ============================================ */
+
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-urgent {
+  animation: pulse-red 2s ease-in-out infinite;
 }
 
 /* ============================================

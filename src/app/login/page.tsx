@@ -54,20 +54,44 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left: Brand Panel */}
-      <div className="hidden lg:flex lg:w-[45%] bg-mr-gradient bg-grid-pattern relative overflow-hidden flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-[45%] bg-mr-gradient relative overflow-hidden flex-col justify-between p-12">
+        {/* Layered patterns for depth */}
+        <div className="absolute inset-0 bg-grid-pattern" />
         <div className="absolute inset-0 bg-diagonal-lines" />
+        <div className="absolute inset-0 bg-iso-grid" />
 
-        {/* Geometric corner accent */}
-        <div className="absolute top-0 right-0 w-64 h-64 opacity-10">
-          <svg viewBox="0 0 200 200" fill="none">
-            <line x1="0" y1="0" x2="200" y2="200" stroke="white" strokeWidth="0.5" />
-            <line x1="50" y1="0" x2="200" y2="150" stroke="white" strokeWidth="0.5" />
-            <line x1="100" y1="0" x2="200" y2="100" stroke="white" strokeWidth="0.5" />
-            <line x1="0" y1="50" x2="150" y2="200" stroke="white" strokeWidth="0.5" />
-            <line x1="0" y1="100" x2="100" y2="200" stroke="white" strokeWidth="0.5" />
+        {/* Geometric corner accent – industrielle Winkel-Linien */}
+        <div className="absolute top-0 right-0 w-80 h-80 opacity-[0.07]">
+          <svg viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="80" y1="0" x2="320" y2="240" stroke="white" strokeWidth="0.75" />
+            <line x1="120" y1="0" x2="320" y2="200" stroke="white" strokeWidth="0.75" />
+            <line x1="160" y1="0" x2="320" y2="160" stroke="white" strokeWidth="0.75" />
+            <line x1="200" y1="0" x2="320" y2="120" stroke="white" strokeWidth="0.75" />
+            <line x1="240" y1="0" x2="320" y2="80" stroke="white" strokeWidth="0.75" />
+            <line x1="320" y1="80" x2="80" y2="320" stroke="white" strokeWidth="0.5" />
+            <line x1="320" y1="160" x2="160" y2="320" stroke="white" strokeWidth="0.5" />
+            <line x1="320" y1="240" x2="240" y2="320" stroke="white" strokeWidth="0.5" />
+            <rect x="280" y="0" width="40" height="3" fill="white" opacity="0.4" />
+            <rect x="317" y="0" width="3" height="40" fill="white" opacity="0.4" />
           </svg>
         </div>
 
+        {/* Untere linke Ecke – spiegelverkehrt */}
+        <div className="absolute bottom-0 left-0 w-48 h-48 opacity-[0.05]">
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="0" y1="200" x2="200" y2="0" stroke="white" strokeWidth="0.75" />
+            <line x1="0" y1="160" x2="160" y2="0" stroke="white" strokeWidth="0.75" />
+            <line x1="0" y1="120" x2="120" y2="0" stroke="white" strokeWidth="0.75" />
+            <rect x="0" y="197" width="30" height="3" fill="white" opacity="0.4" />
+            <rect x="0" y="170" width="3" height="30" fill="white" opacity="0.4" />
+          </svg>
+        </div>
+
+        {/* Horizontale Akzentlinien – subtile Tiefe */}
+        <div className="absolute top-1/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+        <div className="absolute top-2/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
+
+        {/* Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center">
@@ -75,27 +99,56 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="font-headline text-3xl text-white tracking-tight">UMBAU</h1>
-              <div className="h-px w-16 bg-white/30 mt-1" />
+              <div className="flex items-center gap-2 mt-1">
+                <div className="h-px w-8 bg-white/40" />
+                <span className="text-[9px] text-white/40 tracking-[0.2em] uppercase">GmbH</span>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Haupttext + Motto */}
         <div className="relative z-10 max-w-md">
-          <h2 className="font-headline text-5xl text-white leading-tight tracking-tight">
+          <h2 className="font-headline text-5xl text-white leading-[1.1] tracking-tight">
             Digitales
             <br />
-            Bestell<span className="text-white/50">management</span>
+            Bestell<span className="text-white/40">management</span>
           </h2>
-          <p className="text-white/40 mt-6 text-sm leading-relaxed max-w-xs">
+
+          {/* Dünne rote Trennlinie */}
+          <div className="w-16 h-[2px] bg-white/20 mt-6 mb-5" />
+
+          {/* Firmenmotto */}
+          <p className="font-headline text-lg text-white/60 tracking-tight">
+            Präzise. Robust. Digital.
+          </p>
+          <p className="text-white/30 mt-3 text-sm leading-relaxed max-w-xs">
             Automatische Dokumentenerkennung. KI-gestützter Abgleich.
             Vollständige Kontrolle über jeden Bestellprozess.
           </p>
+
+          {/* Feature-Punkte mit Winkel-Markierungen */}
+          <div className="mt-8 space-y-2.5">
+            {["Bestellbestätigung", "Lieferschein", "Rechnung"].map((label, i) => (
+              <div key={label} className="flex items-center gap-3">
+                <div className="w-5 h-5 border border-white/20 rounded flex items-center justify-center">
+                  <span className="font-mono-amount text-[9px] text-white/50">{String(i + 1).padStart(2, "0")}</span>
+                </div>
+                <span className="text-white/40 text-xs tracking-wide">{label}</span>
+                <div className="flex-1 h-px bg-white/[0.06]" />
+                <svg className="w-3 h-3 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            ))}
+          </div>
         </div>
 
+        {/* Footer */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="h-px flex-1 bg-white/10" />
-          <span className="text-white/20 text-xs tracking-widest uppercase">MR Umbau GmbH</span>
-          <div className="h-px flex-1 bg-white/10" />
+          <div className="h-px flex-1 bg-white/[0.06]" />
+          <span className="text-white/20 text-[10px] tracking-[0.15em] uppercase font-mono-amount">MR Umbau GmbH · 2026</span>
+          <div className="h-px flex-1 bg-white/[0.06]" />
         </div>
       </div>
 
@@ -107,7 +160,10 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-[#570006] rounded-lg flex items-center justify-center">
               <span className="font-headline text-lg text-white font-bold">MR</span>
             </div>
-            <span className="font-headline text-xl text-[#1a1a1a] tracking-tight">UMBAU</span>
+            <div>
+              <span className="font-headline text-xl text-[#1a1a1a] tracking-tight">UMBAU</span>
+              <p className="text-[9px] text-[#9a9a9a] tracking-[0.15em] uppercase">Bestellmanagement</p>
+            </div>
           </div>
 
           <div>
@@ -119,7 +175,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="mt-8 space-y-5">
             <div>
-              <label className="block text-xs font-medium text-[#6b6b6b] mb-2 tracking-wide uppercase">
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] mb-2 tracking-widest uppercase">
                 E-Mail
               </label>
               <input
@@ -133,7 +189,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[#6b6b6b] mb-2 tracking-wide uppercase">
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] mb-2 tracking-widest uppercase">
                 Passwort
               </label>
               <input
@@ -159,11 +215,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-[#570006] text-white rounded-lg font-semibold text-sm hover:bg-[#7a1a1f] transition-all disabled:opacity-50 active:scale-[0.98]"
+              className="btn-primary w-full py-3.5 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98]"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 spinner" />
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Wird angemeldet...
                 </span>
               ) : (
@@ -172,10 +228,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-12 flex items-center gap-3">
-            <div className="h-px flex-1 bg-[#e8e6e3]" />
-            <span className="text-[10px] text-[#c4c2bf] tracking-widest uppercase">cloud.mrumbau.de</span>
-            <div className="h-px flex-1 bg-[#e8e6e3]" />
+          {/* Dünne rote Akzentlinie */}
+          <div className="red-accent-line mt-10 mb-4" />
+
+          <div className="flex items-center justify-center">
+            <span className="text-[10px] text-[#c4c2bf] tracking-widest uppercase font-mono-amount">cloud.mrumbau.de</span>
           </div>
         </div>
       </div>

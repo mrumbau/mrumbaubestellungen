@@ -35,16 +35,21 @@ export default async function BestellungenPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Bestellungen</h1>
-          <p className="text-slate-500 mt-1">
+          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Bestellungen</h1>
+          <p className="text-[#9a9a9a] text-sm mt-1">
             {profil?.rolle === "admin"
               ? "Alle Bestellungen"
               : "Deine Bestellungen"}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono-amount text-xs text-[#9a9a9a]">{total}</span>
+          <span className="text-[10px] text-[#c4c2bf] uppercase tracking-wide">Gesamt</span>
+        </div>
       </div>
+      <div className="red-accent-line" />
 
       <BestellungenTabelle
         bestellungen={bestellungen || []}

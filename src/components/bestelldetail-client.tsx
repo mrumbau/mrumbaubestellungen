@@ -415,7 +415,7 @@ export function BestelldetailClient({
               type="button"
               onClick={() => setShowFreigabeDialog(true)}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-[#570006] text-white rounded-xl font-semibold text-sm hover:bg-[#7a1a1f] transition-colors disabled:opacity-50"
+              className="btn-primary w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm disabled:opacity-50"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

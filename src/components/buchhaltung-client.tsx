@@ -193,7 +193,7 @@ export function BuchhaltungClient({
                     <span
                       className={
                         isUeberfaellig(r.faelligkeitsdatum)
-                          ? "text-red-600 font-semibold font-mono-amount text-xs"
+                          ? "text-red-600 font-semibold font-mono-amount text-xs pulse-urgent"
                           : isFaelligBald(r.faelligkeitsdatum)
                           ? "text-amber-600 font-semibold font-mono-amount text-xs"
                           : "text-[#9a9a9a] text-xs"
