@@ -1,19 +1,18 @@
 // MR Umbau Bestellerkennung – Content Script (Hybrid-Ansatz)
 //
-// Dreistufige Erkennung:
-// STUFE 1: Bekannte Händler → sofort Signal (0ms, 0 API-Calls)
+// Dreistufige Erkennung mit dynamischer Config vom Server:
+// STUFE 1: Bekannte Händler (hardcoded + gelernt) → sofort Signal
 // STUFE 2: Lokaler Score → URL + Titel + DOM + Inhalt bewerten
-//          ≥6 Punkte → sofort Signal (0 API-Calls)
-//          3-5 Punkte → STUFE 3
-//          <3 Punkte → ignorieren
-// STUFE 3: KI-Bestätigung → GPT-4o-mini entscheidet (nur ~5% der Seiten)
+// STUFE 3: KI-Bestätigung → GPT-4o-mini (nur ~5% der Seiten)
 
 (function () {
   var hostname = window.location.hostname;
   var pathname = window.location.pathname.toLowerCase();
   var fullUrl = window.location.href;
 
-  // --- VORFILTER ---
+  if (!fullUrl.startsWith("http")) return;
+
+  // --- VORFILTER (hardcoded, sofort verfügbar) ---
 
   var isIgnored = IGNORED_DOMAINS.some(function (domain) {
     return hostname === domain || hostname.endsWith("." + domain);
@@ -24,8 +23,6 @@
     return pathname.startsWith(p);
   });
   if (isIgnoredPath) return;
-
-  if (!fullUrl.startsWith("http")) return;
 
   function extractRootDomain(host) {
     var parts = host.split(".");
@@ -40,64 +37,105 @@
   if (sessionStorage.getItem(signalKey)) return;
 
   // ===================================================================
-  // STUFE 1: Bekannte Händler (sofort)
+  // STUFE 1: Hardcoded Händler (sofort, ohne async)
   // ===================================================================
 
-  var treffer = HAENDLER_PATTERNS.find(function (haendler) {
-    var domainMatch =
-      hostname === haendler.domain ||
-      hostname.endsWith("." + haendler.domain);
-    if (!domainMatch) return false;
-    return haendler.patterns.some(function (pattern) {
-      return pathname.includes(pattern);
+  function pruefeHaendlerListe(liste) {
+    return liste.find(function (haendler) {
+      var domainMatch =
+        hostname === haendler.domain ||
+        hostname.endsWith("." + haendler.domain);
+      if (!domainMatch) return false;
+      return haendler.patterns.some(function (pattern) {
+        return pathname.includes(pattern);
+      });
     });
-  });
+  }
 
+  var treffer = pruefeHaendlerListe(HAENDLER_PATTERNS);
   if (treffer) {
     sendeSignal(treffer.domain, "bekannt", null);
     return;
   }
 
   // ===================================================================
-  // STUFE 2: Lokaler Score (nach kurzer Wartezeit für DOM)
+  // Dynamische Config laden, dann Stufe 1b + 2 + 3
   // ===================================================================
 
-  setTimeout(function () {
-    var score = berechneScore();
-
-    if (score >= SCORE_SICHER) {
-      // Hoher Score → sofort senden, kein KI nötig
-      console.log("[MR Umbau] Lokaler Score:", score, "→ Signal senden");
-      sendeSignal(rootDomain, "lokal_score", extractBestellnummer());
-    } else if (score >= SCORE_VIELLEICHT) {
-      // Mittlerer Score → KI fragen
-      console.log("[MR Umbau] Lokaler Score:", score, "→ KI-Bestätigung");
-      kiBestaetigung();
+  chrome.runtime.sendMessage({ type: "get_config" }, function (response) {
+    if (chrome.runtime.lastError) {
+      starteStufe2(null);
+      return;
     }
-    // score < SCORE_VIELLEICHT → ignorieren (kein Log, kein Call)
-  }, 1500);
+
+    var serverConfig = (response && response.config) || null;
+
+    // Stufe 1b: Gelernte Händler vom Server prüfen
+    if (serverConfig && serverConfig.haendler) {
+      // Auch dynamische Ignored-Domains prüfen
+      if (serverConfig.ignored_domains) {
+        var dynIgnored = serverConfig.ignored_domains.some(function (domain) {
+          return hostname === domain || hostname.endsWith("." + domain);
+        });
+        if (dynIgnored) return;
+      }
+
+      var gelernterTreffer = pruefeHaendlerListe(serverConfig.haendler);
+      if (gelernterTreffer) {
+        console.log("[MR Umbau] Gelernt erkannt:", gelernterTreffer.domain);
+        sendeSignal(gelernterTreffer.domain, "bekannt", extractBestellnummer(serverConfig));
+        return;
+      }
+    }
+
+    starteStufe2(serverConfig);
+  });
 
   // ===================================================================
-  // Score-Berechnung
+  // STUFE 2: Lokaler Score
   // ===================================================================
 
-  function berechneScore() {
+  function starteStufe2(serverConfig) {
+    setTimeout(function () {
+      var score = berechneScore(serverConfig);
+
+      var schwelle_sicher = (serverConfig && serverConfig.score_sicher) || SCORE_SICHER;
+      var schwelle_vielleicht = (serverConfig && serverConfig.score_vielleicht) || SCORE_VIELLEICHT;
+
+      if (score >= schwelle_sicher) {
+        console.log("[MR Umbau] Lokaler Score:", score, "→ Signal senden");
+        sendeSignal(rootDomain, "lokal_score", extractBestellnummer(serverConfig));
+      } else if (score >= schwelle_vielleicht) {
+        console.log("[MR Umbau] Lokaler Score:", score, "→ KI-Bestätigung");
+        kiBestaetigung();
+      }
+    }, 1500);
+  }
+
+  // ===================================================================
+  // Score-Berechnung (dynamische oder hardcoded Keywords)
+  // ===================================================================
+
+  function berechneScore(cfg) {
     var score = 0;
 
     // URL-Patterns (+3 pro Treffer)
-    SCORE_URL_PATTERNS.forEach(function (pattern) {
+    var urlPatterns = (cfg && cfg.score_url_patterns) || SCORE_URL_PATTERNS;
+    urlPatterns.forEach(function (pattern) {
       if (pathname.includes(pattern)) score += 3;
     });
 
     // Titel-Keywords (+2 pro Treffer)
     var title = document.title.toLowerCase();
-    SCORE_TITLE_KEYWORDS.forEach(function (keyword) {
+    var titleKeywords = (cfg && cfg.score_title_keywords) || SCORE_TITLE_KEYWORDS;
+    titleKeywords.forEach(function (keyword) {
       if (title.includes(keyword)) score += 2;
     });
 
     // DOM-Selektoren (+2 pro Treffer, max 6)
     var domScore = 0;
-    SCORE_DOM_SELECTORS.forEach(function (selector) {
+    var domSelectors = (cfg && cfg.score_dom_selectors) || SCORE_DOM_SELECTORS;
+    domSelectors.forEach(function (selector) {
       try {
         if (domScore < 6 && document.querySelector(selector)) domScore += 2;
       } catch (e) { /* ungültiger Selektor */ }
@@ -107,7 +145,8 @@
     // Seiteninhalt-Keywords (+1 pro Treffer, max 5)
     var bodyText = extractCompactText();
     var contentScore = 0;
-    SCORE_CONTENT_KEYWORDS.forEach(function (keyword) {
+    var contentKeywords = (cfg && cfg.score_content_keywords) || SCORE_CONTENT_KEYWORDS;
+    contentKeywords.forEach(function (keyword) {
       if (contentScore < 5 && bodyText.includes(keyword)) contentScore += 1;
     });
     score += contentScore;
@@ -116,7 +155,7 @@
   }
 
   // ===================================================================
-  // Kompakter Text aus Seiteninhalt (für Score + KI)
+  // Kompakter Text aus Seiteninhalt
   // ===================================================================
 
   function extractCompactText() {
@@ -158,13 +197,12 @@
   }
 
   // ===================================================================
-  // Bestellnummer aus Seite extrahieren (lokal, kein API)
+  // Bestellnummer extrahieren
   // ===================================================================
 
   function extractBestellnummer() {
     var bodyText = extractCompactText();
 
-    // Gängige Muster für Bestellnummern
     var patterns = [
       /bestellnummer[:\s#]*([A-Z0-9\-]{3,20})/i,
       /order\s*(?:number|no|nr|#)[:\s#]*([A-Z0-9\-]{3,20})/i,
@@ -183,7 +221,7 @@
   }
 
   // ===================================================================
-  // STUFE 3: KI-Bestätigung (nur bei Score 3-5)
+  // STUFE 3: KI-Bestätigung
   // ===================================================================
 
   function kiBestaetigung() {
@@ -215,10 +253,8 @@
           var domain = data.haendler_domain || rootDomain;
           sendeSignal(domain, "ki", data.bestellnummer);
           console.log(
-            "[MR Umbau] KI bestätigt: Bestellung bei",
-            domain,
-            "Konfidenz:",
-            data.konfidenz
+            "[MR Umbau] KI bestätigt:", domain,
+            "Konfidenz:", data.konfidenz
           );
         })
         .catch(function (err) {
@@ -245,6 +281,7 @@
         zeitstempel: new Date().toISOString(),
         secret: EXTENSION_SECRET,
         erkennung: quelle,
+        seiten_url: fullUrl,
       };
 
       if (bestellnummer) {
@@ -267,6 +304,7 @@
               type: "bestellung_erkannt",
               domain: domain,
               quelle: quelle,
+              bestellnummer: bestellnummer,
             });
           }
         })

@@ -5,89 +5,209 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 280px;
+      width: 320px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 13px;
-      color: #1e293b;
-      background: #fff;
+      color: #1a1a1a;
+      background: #faf9f7;
     }
+
+    /* Header */
     .header {
-      background: #1E4D8C;
+      background: #570006;
       color: #fff;
       padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .header h1 {
-      font-size: 14px;
-      font-weight: 700;
+    .header h1 { font-size: 14px; font-weight: 700; letter-spacing: -0.3px; }
+    .header p { font-size: 10px; opacity: 0.6; margin-top: 1px; }
+    .header .version {
+      font-size: 9px;
+      opacity: 0.4;
+      background: rgba(255,255,255,0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
     }
-    .header p {
-      font-size: 11px;
-      opacity: 0.7;
-      margin-top: 2px;
-    }
-    .body {
-      padding: 16px;
-    }
+
+    /* Body */
+    .body { padding: 14px 16px; }
+
+    /* Kürzel */
     label {
       display: block;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
-      color: #64748b;
+      color: #9a9a9a;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
+      letter-spacing: 0.8px;
+      margin-bottom: 5px;
     }
     select {
       width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #e2e8f0;
+      padding: 7px 10px;
+      border: 1px solid #e8e6e3;
       border-radius: 6px;
       font-size: 13px;
       background: #fff;
-      color: #1e293b;
+      color: #1a1a1a;
       cursor: pointer;
     }
     select:focus {
       outline: none;
-      border-color: #1E4D8C;
-      box-shadow: 0 0 0 2px rgba(30, 77, 140, 0.15);
+      border-color: #570006;
+      box-shadow: 0 0 0 2px rgba(87, 0, 6, 0.1);
     }
-    .status {
-      margin-top: 12px;
-      padding: 8px 10px;
-      border-radius: 6px;
-      font-size: 12px;
+
+    /* Status */
+    .status-bar {
+      margin-top: 10px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 11px;
       font-weight: 500;
       display: none;
     }
-    .status.success {
+    .status-bar.success {
       display: block;
       background: #f0fdf4;
       color: #16a34a;
       border: 1px solid #bbf7d0;
     }
-    .status.warning {
+    .status-bar.warning {
       display: block;
       background: #fefce8;
       color: #ca8a04;
       border: 1px solid #fef08a;
     }
-    .info {
-      margin-top: 14px;
-      padding-top: 14px;
-      border-top: 1px solid #f1f5f9;
-      font-size: 11px;
-      color: #94a3b8;
-      line-height: 1.5;
+    .status-bar.info {
+      display: block;
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
     }
+    .status-bar.error {
+      display: block;
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: #e8e6e3;
+      margin: 14px 0;
+    }
+
+    /* Manuelles Signal */
+    .manual-btn {
+      width: 100%;
+      padding: 9px 12px;
+      background: #570006;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .manual-btn:hover { background: #7a1a1f; }
+    .manual-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .manual-btn svg { width: 14px; height: 14px; }
+    .manual-hint {
+      font-size: 10px;
+      color: #9a9a9a;
+      margin-top: 5px;
+      text-align: center;
+    }
+
+    /* History */
+    .history-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: #9a9a9a;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+    .history-empty {
+      font-size: 11px;
+      color: #c4c2bf;
+      text-align: center;
+      padding: 12px 0;
+    }
+    .history-list {
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f0eeeb;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .history-dot.bekannt { background: #570006; }
+    .history-dot.lokal_score { background: #2563eb; }
+    .history-dot.ki { background: #d97706; }
+    .history-dot.manuell { background: #7c3aed; }
+    .history-info { flex: 1; min-width: 0; }
+    .history-domain {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .history-meta {
+      font-size: 10px;
+      color: #9a9a9a;
+      display: flex;
+      gap: 6px;
+    }
+    .history-tag {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .history-tag.bekannt { background: #fce4e6; color: #570006; }
+    .history-tag.lokal_score { background: #dbeafe; color: #2563eb; }
+    .history-tag.ki { background: #fef3c7; color: #d97706; }
+    .history-tag.manuell { background: #ede9fe; color: #7c3aed; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>MR Umbau</h1>
-    <p>Bestellerkennung</p>
+    <div>
+      <h1>MR Umbau</h1>
+      <p>Bestellerkennung</p>
+    </div>
+    <span class="version">v1.1</span>
   </div>
+
   <div class="body">
+    <!-- Kürzel-Auswahl -->
     <label for="kuerzel">Benutzer</label>
     <select id="kuerzel">
       <option value="">-- Bitte wählen --</option>
@@ -95,11 +215,30 @@
       <option value="CR">Carsten Reuter (CR)</option>
       <option value="MH">Mohammed Hawrami (MH)</option>
     </select>
-    <div id="status" class="status"></div>
-    <div class="info">
-      Bestellungen bei Bauhaus, OBI, Amazon und Würth werden automatisch erkannt und an cloud.mrumbau.de gemeldet.
+    <div id="status" class="status-bar"></div>
+
+    <div class="divider"></div>
+
+    <!-- Manuelles Signal -->
+    <button id="manualBtn" class="manual-btn" disabled>
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+      Diese Seite ist eine Bestellung
+    </button>
+    <p class="manual-hint">Fallback wenn die automatische Erkennung nicht greift</p>
+
+    <div id="manualStatus" class="status-bar" style="margin-top: 8px;"></div>
+
+    <div class="divider"></div>
+
+    <!-- Erkennungs-History -->
+    <div class="history-title">Letzte Erkennungen</div>
+    <div id="historyContainer">
+      <p class="history-empty">Wird geladen...</p>
     </div>
   </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

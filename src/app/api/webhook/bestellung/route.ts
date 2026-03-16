@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { kuerzel, haendler_domain, zeitstempel, secret, erkennung, bestellnummer } = body;
+    const { kuerzel, haendler_domain, zeitstempel, secret, erkennung, bestellnummer, seiten_url } = body;
 
     // Secret prüfen
     if (secret !== process.env.EXTENSION_SECRET) {
@@ -82,22 +82,65 @@ export async function POST(request: NextRequest) {
       status: "erwartet",
     });
 
-    // Bei KI-Erkennung: Händler automatisch in DB anlegen falls neu
-    if (erkennung === "ki" && !haendler) {
-      const { data: existing } = await supabase
-        .from("haendler")
-        .select("id")
-        .eq("domain", haendler_domain)
-        .limit(1);
+    // Bei KI- oder Score-Erkennung: URL-Pattern lernen
+    if (erkennung && erkennung !== "bekannt" && seiten_url) {
+      try {
+        const urlPath = new URL(seiten_url).pathname;
+        // Pattern generalisieren: /order/12345 → /order/
+        const pattern = urlPath
+          .replace(/\/\d{3,}(?=[\/\?]|$)/g, "") // Bestellnummern entfernen
+          .replace(/\/[a-f0-9-]{20,}(?=[\/\?]|$)/g, "") // UUIDs entfernen
+          .replace(/\/+$/, "") // Trailing Slashes entfernen
+          || "/";
 
-      if (!existing || existing.length === 0) {
-        await supabase.from("haendler").insert({
-          name: haendler_domain,
-          domain: haendler_domain,
-          email_absender: [],
-          url_muster: [],
-        });
-        console.log(`[Webhook] Neuer Händler via KI angelegt: ${haendler_domain}`);
+        if (pattern.length >= 4) { // Mindestens sinnvoller Pfad
+          if (haendler) {
+            // Bestehendem Händler URL-Pattern hinzufügen (falls noch nicht vorhanden)
+            const { data: existing } = await supabase
+              .from("haendler")
+              .select("url_muster")
+              .eq("id", haendler.id)
+              .single();
+
+            const muster: string[] = existing?.url_muster || [];
+            if (!muster.includes(pattern)) {
+              await supabase
+                .from("haendler")
+                .update({ url_muster: [...muster, pattern] })
+                .eq("id", haendler.id);
+              console.log(`[Webhook] Neues URL-Pattern gelernt: ${haendler_domain} → ${pattern}`);
+            }
+          } else {
+            // Neuen Händler mit URL-Pattern anlegen
+            const { data: existingH } = await supabase
+              .from("haendler")
+              .select("id, url_muster")
+              .eq("domain", haendler_domain)
+              .limit(1);
+
+            if (!existingH || existingH.length === 0) {
+              await supabase.from("haendler").insert({
+                name: haendler_domain,
+                domain: haendler_domain,
+                email_absender: [],
+                url_muster: [pattern],
+              });
+              console.log(`[Webhook] Neuer Händler via ${erkennung} angelegt: ${haendler_domain} (${pattern})`);
+            } else {
+              // Händler existiert, Pattern hinzufügen
+              const muster: string[] = existingH[0].url_muster || [];
+              if (!muster.includes(pattern)) {
+                await supabase
+                  .from("haendler")
+                  .update({ url_muster: [...muster, pattern] })
+                  .eq("id", existingH[0].id);
+                console.log(`[Webhook] URL-Pattern gelernt: ${haendler_domain} → ${pattern}`);
+              }
+            }
+          }
+        }
+      } catch {
+        // URL-Parsing fehlgeschlagen — kein Problem, Pattern-Lernen ist optional
       }
     }
 
