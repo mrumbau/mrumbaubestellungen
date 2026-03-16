@@ -274,9 +274,9 @@ export function BestelldetailClient({
 
         {/* Scan */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <h3 className="text-sm font-semibold text-slate-900 mb-2">Lieferschein scannen</h3>
+          <h3 className="text-sm font-semibold text-slate-900 mb-2">Dokument hochladen</h3>
           <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-            Physischen Lieferschein per Kamera oder Datei-Upload hochladen.
+            Rechnung, Lieferschein oder Bestellbestätigung manuell hochladen. Der Dokumenttyp wird automatisch erkannt.
           </p>
           <div className="flex gap-2">
             <button
