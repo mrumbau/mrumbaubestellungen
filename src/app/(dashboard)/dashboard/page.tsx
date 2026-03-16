@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 
 export default async function DashboardPage() {
   const profil = await getBenutzerProfil();
@@ -53,6 +54,9 @@ export default async function DashboardPage() {
           Willkommen, {profil.name}. Hier ist deine Übersicht.
         </p>
       </div>
+
+      {/* KI-Zusammenfassung */}
+      <DashboardKIZusammenfassung />
 
       {/* Statistik-Karten */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -73,6 +73,8 @@ export function BestelldetailClient({
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [kiZusammenfassung, setKiZusammenfassung] = useState<string | null>(null);
+  const [kiLoading, setKiLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,6 +110,25 @@ export function BestelldetailClient({
       router.refresh();
     }
     setLoading(false);
+  }
+
+  async function handleKiZusammenfassung() {
+    setKiLoading(true);
+    try {
+      const res = await fetch("/api/ki/bestellung-zusammenfassung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_id: bestellung.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setKiZusammenfassung(data.zusammenfassung);
+      }
+    } catch {
+      // Fehler ignorieren
+    } finally {
+      setKiLoading(false);
+    }
   }
 
   async function handleScan(file: File) {
@@ -346,6 +367,30 @@ export function BestelldetailClient({
             Rechnung freigeben
           </button>
         ) : null}
+
+        {/* KI-Zusammenfassung */}
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-slate-900">KI-Zusammenfassung</h3>
+            <button
+              onClick={handleKiZusammenfassung}
+              disabled={kiLoading}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#1E4D8C] bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+              </svg>
+              {kiLoading ? "Lädt..." : "Generieren"}
+            </button>
+          </div>
+          {kiZusammenfassung ? (
+            <p className="text-xs text-slate-600 leading-relaxed">{kiZusammenfassung}</p>
+          ) : (
+            <p className="text-xs text-slate-400">
+              Klicke auf &quot;Generieren&quot; für eine KI-Zusammenfassung dieser Bestellung.
+            </p>
+          )}
+        </div>
 
         {/* Kommentare */}
         <div className="bg-white rounded-xl border border-slate-200 p-4">
