@@ -49,19 +49,32 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Rollenprüfung für geschützte Bereiche
-  const { data: profil } = await supabase
-    .from("benutzer_rollen")
-    .select("rolle")
-    .eq("user_id", user.id)
-    .single();
+  // Rollenprüfung: erst aus Cookie lesen, nur bei Fehlen aus DB laden
+  let rolle = request.cookies.get("x-user-rolle")?.value || "";
 
-  if (profil) {
+  if (!rolle) {
+    const { data: profil } = await supabase
+      .from("benutzer_rollen")
+      .select("rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    rolle = profil?.rolle || "";
+
+    // Rolle für 5 Minuten im Cookie cachen (nicht httpOnly — nur für Middleware-Routing)
+    if (rolle) {
+      response.cookies.set("x-user-rolle", rolle, {
+        path: "/",
+        maxAge: 300,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
+  }
+
+  if (rolle) {
     // Buchhaltung darf nur /buchhaltung sehen
-    if (
-      profil.rolle === "buchhaltung" &&
-      !pathname.startsWith("/buchhaltung")
-    ) {
+    if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung")) {
       const url = request.nextUrl.clone();
       url.pathname = "/buchhaltung";
       return NextResponse.redirect(url);
@@ -71,7 +84,7 @@ export async function middleware(request: NextRequest) {
     if (
       (pathname.startsWith("/dashboard") ||
         pathname.startsWith("/einstellungen")) &&
-      profil.rolle !== "admin"
+      rolle !== "admin"
     ) {
       const url = request.nextUrl.clone();
       url.pathname = "/bestellungen";

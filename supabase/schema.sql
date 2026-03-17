@@ -109,6 +109,16 @@ CREATE TABLE kommentare (
 );
 
 -- ============================================================
+-- Indexes
+-- ============================================================
+
+CREATE INDEX idx_signale_domain_verarbeitet_zeit ON bestellung_signale (haendler_domain, verarbeitet, zeitstempel DESC);
+CREATE INDEX idx_haendler_domain ON haendler (domain);
+CREATE INDEX idx_benutzer_rollen_user_id ON benutzer_rollen (user_id);
+CREATE INDEX idx_benutzer_rollen_kuerzel ON benutzer_rollen (kuerzel);
+CREATE UNIQUE INDEX idx_freigaben_bestellung_unique ON freigaben (bestellung_id);
+
+-- ============================================================
 -- Row Level Security (RLS)
 -- ============================================================
 

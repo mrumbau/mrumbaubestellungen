@@ -64,6 +64,8 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
   async function handleLogout() {
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
+    // Rollen-Cache Cookie löschen
+    document.cookie = "x-user-rolle=; path=/; max-age=0";
     router.push("/login");
   }
 

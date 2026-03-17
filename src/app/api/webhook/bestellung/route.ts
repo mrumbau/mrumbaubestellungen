@@ -58,6 +58,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
+    // Duplikat-Check: gleicher Besteller + gleicher Händler innerhalb 5 Minuten?
+    const { data: recentSignals } = await supabase
+      .from("bestellung_signale")
+      .select("id")
+      .eq("kuerzel", kuerzel)
+      .eq("haendler_domain", haendler_domain)
+      .gte("zeitstempel", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+      .limit(1);
+
+    if (recentSignals && recentSignals.length > 0) {
+      return NextResponse.json({ success: true, signal_id: data.id, deduplicated: true });
+    }
+
     // Besteller-Name aus benutzer_rollen holen
     const { data: benutzer } = await supabase
       .from("benutzer_rollen")

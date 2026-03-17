@@ -62,6 +62,11 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
+    // Bereits freigegeben? Duplikat verhindern
+    if (bestellung.status === "freigegeben") {
+      return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
+    }
+
     // Freigabe erstellen
     const { data: freigabe, error: freigabeError } = await supabase
       .from("freigaben")
