@@ -36,6 +36,7 @@ CREATE TABLE benutzer_rollen (
   name TEXT NOT NULL,
   kuerzel TEXT NOT NULL,
   rolle TEXT NOT NULL CHECK (rolle IN ('besteller', 'buchhaltung', 'admin')),
+  dashboard_config JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

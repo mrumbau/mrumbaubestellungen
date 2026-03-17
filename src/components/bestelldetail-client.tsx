@@ -214,6 +214,7 @@ export function BestelldetailClient({
   };
 
   const aktivesDokument = dokumente.find((d) => d.typ === activeTab);
+  const hatRechnung = bestellung.hat_rechnung;
   const kannFreigeben =
     !freigabe &&
     bestellung.status !== "freigegeben" &&
@@ -357,7 +358,7 @@ export function BestelldetailClient({
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`relative px-4 py-3 text-xs font-medium transition-colors ${
+                className={`relative px-4 py-3 text-xs font-medium transition-colors flex items-center gap-1.5 ${
                   activeTab === tab.key
                     ? "text-[#570006]"
                     : dok
@@ -365,12 +366,16 @@ export function BestelldetailClient({
                       : "text-[#c4c2bf]"
                 }`}
               >
-                {tab.label}
-                {dok && (
-                  <svg className="inline-block w-3 h-3 ml-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                {dok ? (
+                  <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                ) : (
+                  <span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
                 )}
+                {tab.label}
                 {activeTab === tab.key && (
                   <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#570006]" />
                 )}
@@ -379,7 +384,7 @@ export function BestelldetailClient({
           })}
         </div>
 
-        <div className="flex-1 flex items-center justify-center bg-[#fafaf9]">
+        <div className={`flex items-center justify-center bg-[#fafaf9] ${aktivesDokument?.storage_pfad ? "flex-1 min-h-[400px]" : "py-12"}`}>
           {aktivesDokument?.storage_pfad ? (
             <iframe
               src={`/api/pdfs/${aktivesDokument.id}`}
@@ -387,11 +392,14 @@ export function BestelldetailClient({
               title="PDF Vorschau"
             />
           ) : (
-            <div className="text-center text-[#c4c2bf]">
-              <svg className="w-12 h-12 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-              </svg>
-              <p className="text-sm">Kein Dokument vorhanden</p>
+            <div className="text-center px-6">
+              <div className="w-12 h-12 rounded-xl bg-[#f0eeeb] flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-[#9a9a9a]">Kein Dokument vorhanden</p>
+              <p className="text-[11px] text-[#c4c2bf] mt-1">Wird automatisch angezeigt sobald ein Dokument per E-Mail oder Upload eingeht.</p>
             </div>
           )}
         </div>
@@ -659,9 +667,35 @@ export function BestelldetailClient({
                 </p>
               </>
             ) : (
-              <p className="text-sm text-[#c4c2bf]">
-                Wird nach Eingang aller Dokumente durchgeführt.
-              </p>
+              <div>
+                <p className="text-xs text-[#9a9a9a] mb-3">
+                  Der Abgleich startet automatisch sobald alle Dokumente vorliegen.
+                </p>
+                <div className="space-y-2">
+                  {[
+                    { key: "hat_bestellbestaetigung", label: "Bestellbestätigung" },
+                    { key: "hat_lieferschein", label: "Lieferschein" },
+                    { key: "hat_rechnung", label: "Rechnung" },
+                  ].map((d) => {
+                    const vorhanden = bestellung[d.key as keyof Bestellung];
+                    return (
+                      <div key={d.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs ${vorhanden ? "bg-green-50" : "bg-[#fafaf9]"}`}>
+                        {vorhanden ? (
+                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                            <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
+                        )}
+                        <span className={vorhanden ? "text-green-700 font-medium" : "text-[#9a9a9a]"}>{d.label}</span>
+                        {!vorhanden && <span className="text-[10px] text-[#c4c2bf] ml-auto">ausstehend</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -742,13 +776,18 @@ export function BestelldetailClient({
             <button
               type="button"
               onClick={() => setShowFreigabeDialog(true)}
-              disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm disabled:opacity-50"
+              disabled={loading || !hatRechnung}
+              title={!hatRechnung ? "Rechnung muss zuerst vorhanden sein" : undefined}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm transition-colors ${
+                hatRechnung
+                  ? "btn-primary disabled:opacity-50"
+                  : "bg-[#e8e6e3] text-[#9a9a9a] cursor-not-allowed"
+              }`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              Rechnung freigeben
+              {hatRechnung ? "Rechnung freigeben" : "Rechnung fehlt noch"}
             </button>
             <ConfirmDialog
               open={showFreigabeDialog}

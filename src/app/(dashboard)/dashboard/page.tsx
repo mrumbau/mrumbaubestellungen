@@ -1,15 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
-import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
-import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
-import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
-import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
-import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
-import { getStatusConfig } from "@/lib/status-config";
-import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { DashboardWidgets } from "@/components/dashboard-widgets";
 
 export default async function DashboardPage() {
   const profil = await getBenutzerProfil();
@@ -17,10 +9,11 @@ export default async function DashboardPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  // Alle Dashboard-Daten parallel laden statt 100 Rows bulk-fetchen
   const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Dashboard-Config + alle Daten parallel laden
   const [
+    { data: profilRow },
     { count: offenRaw },
     { count: abweichungenRaw },
     { count: lsFehltRaw },
@@ -33,15 +26,14 @@ export default async function DashboardPage() {
     { data: aktionenNoetigRaw },
     { data: bestellerKuerzelListe },
     { data: unzugeordnetRaw },
-    // Projekte
     { data: aktiveProjekte },
     { data: projektBestellungen },
-    // Admin-Queries laufen mit (RLS filtert für Nicht-Admins)
     { data: bestellerRollen },
     { data: neueHaendlerRoh },
     { data: kiVorschlaegeRoh },
     { data: neueKundenRoh },
   ] = await Promise.all([
+    supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen"),
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung"),
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "ls_fehlt"),
@@ -62,7 +54,6 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] }),
-    // KI-Vorschläge (unbestätigte Projekt-Zuordnungen)
     profil.rolle === "admin"
       ? supabase.from("bestellungen")
           .select("id, bestellnummer, haendler_name, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
@@ -72,13 +63,14 @@ export default async function DashboardPage() {
           .order("created_at", { ascending: false })
           .limit(20)
       : Promise.resolve({ data: [] as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[] }),
-    // Unbestätigte Kunden
     profil.rolle === "admin"
       ? supabase.from("kunden").select("id, name, keywords, created_at").is("confirmed_at", null).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; name: string; keywords: string[] | null; created_at: string }[] }),
   ]);
 
-  // Null-safe Werte
+  // Dashboard-Config aus DB
+  const dashboardConfig = (profilRow?.dashboard_config as { stats?: Record<string, boolean>; widgets?: Record<string, boolean> }) || {};
+
   const offen = offenRaw ?? 0;
   const abweichungen = abweichungenRaw ?? 0;
   const lsFehlt = lsFehltRaw ?? 0;
@@ -91,27 +83,22 @@ export default async function DashboardPage() {
   const unzugeordnet = unzugeordnetRaw || [];
 
   const freigegebenBetrag = (freigegebenBetraege || []).reduce((sum, b) => sum + Number(b.betrag), 0);
+  const gesamtVolumen = (projektBestellungen || []).reduce((s, b) => s + (Number(b.betrag) || 0), 0);
 
-  const bestellerStats = new Map<string, number>();
+  const bestellerStatsMap: Record<string, number> = {};
   for (const b of bestellerKuerzelListe || []) {
-    bestellerStats.set(b.besteller_kuerzel, (bestellerStats.get(b.besteller_kuerzel) || 0) + 1);
+    bestellerStatsMap[b.besteller_kuerzel] = (bestellerStatsMap[b.besteller_kuerzel] || 0) + 1;
   }
 
   const bestellerListe = bestellerRollen || [];
   const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
   const neueKunden = (neueKundenRoh || []) as { id: string; name: string; keywords: string[] | null; created_at: string }[];
 
-  // KI-Vorschläge mit Projekt-Name+Farbe anreichern
   const kiVorschlaege = ((kiVorschlaegeRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[]).map((v) => {
     const projekt = (aktiveProjekte || []).find((p) => p.id === v.projekt_vorschlag_id);
-    return {
-      ...v,
-      vorschlag_projekt_name: projekt?.name || null,
-      vorschlag_projekt_farbe: projekt?.farbe || null,
-    };
+    return { ...v, vorschlag_projekt_name: projekt?.name || null, vorschlag_projekt_farbe: projekt?.farbe || null };
   });
 
-  // Projekt-Stats aggregieren
   const projektStatsMap = new Map<string, { gesamt: number; offen: number; volumen: number }>();
   for (const b of projektBestellungen || []) {
     if (!b.projekt_id) continue;
@@ -126,6 +113,18 @@ export default async function DashboardPage() {
     .sort((a, b) => b.stats.gesamt - a.stats.gesamt)
     .slice(0, 3);
 
+  // Stat-Daten als Array für den Client
+  const statCards = [
+    { id: "offen", label: "Offen", value: offen, color: "#2563eb", row: 1 },
+    { id: "abweichungen", label: "Abweichungen", value: abweichungen, color: "#dc2626", alert: abweichungen > 0, row: 1 },
+    { id: "ls_fehlt", label: "LS fehlt", value: lsFehlt, color: "#d97706", row: 1 },
+    { id: "freigegeben", label: "Freigegeben", value: freigegeben, color: "#059669", row: 1 },
+    { id: "erwartet", label: "Erwartet", value: erwartet, color: "#8b8b8b", row: 2 },
+    { id: "vollstaendig", label: "Vollständig", value: vollstaendig, color: "#16a34a", row: 2 },
+    { id: "gesamt", label: "Gesamt", value: gesamtAnzahl, color: "#570006", row: 2 },
+    { id: "aktive_projekte", label: "Aktive Projekte", value: (aktiveProjekte || []).length, color: "#7c3aed", row: 2 },
+  ];
+
   return (
     <div>
       <div className="mb-8 flex items-end justify-between">
@@ -133,7 +132,6 @@ export default async function DashboardPage() {
           <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Dashboard</h1>
           <p className="text-[#9a9a9a] text-sm mt-1">Willkommen, {profil.name}.</p>
         </div>
-        {/* Industrial corner ornament */}
         <div className="hidden md:block">
           <svg width="48" height="32" viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.08]">
             <line x1="0" y1="31" x2="48" y2="31" stroke="#570006" strokeWidth="1" />
@@ -144,233 +142,22 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <DashboardKIZusammenfassung />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Offen" value={offen} color="#2563eb" />
-        <StatCard label="Abweichungen" value={abweichungen} color="#dc2626" alert={abweichungen > 0} />
-        <StatCard label="LS fehlt" value={lsFehlt} color="#d97706" />
-        <StatCard label="Freigegeben" value={freigegeben} color="#059669" />
-      </div>
-
-      {/* Industrielle Akzentlinie */}
-      <div className="industrial-line my-4" />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Erwartet" value={erwartet} color="#8b8b8b" />
-        <StatCard label="Vollständig" value={vollstaendig} color="#16a34a" />
-        <StatCard label="Gesamt" value={gesamtAnzahl} color="#570006" />
-        <StatCard label="Aktive Projekte" value={(aktiveProjekte || []).length} color="#7c3aed" />
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mt-4">
-        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
-          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Freigegebenes Volumen</p>
-          <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
-        </div>
-        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #2563eb" }}>
-          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #2563eb, transparent)" }} />
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Gesamt-Volumen</p>
-          <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag((projektBestellungen || []).reduce((s, b) => s + (Number(b.betrag) || 0), 0))}</p>
-        </div>
-      </div>
-
-      {/* Projekt-Widget */}
-      {topProjekte.length > 0 && (
-        <div className="card p-5 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Aktive Projekte</h2>
-            <Link href="/projekte" className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors">Alle anzeigen</Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {topProjekte.map((p) => {
-              const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
-              const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
-              return (
-                <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
-                    <span className="text-sm font-semibold text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">{p.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-[11px] text-[#9a9a9a]">
-                    <span><span className="font-mono-amount font-bold text-[#1a1a1a]">{p.stats.gesamt}</span> Best.</span>
-                    {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-amber-600">{p.stats.offen}</span> offen</span>}
-                    <span className="font-mono-amount font-bold text-[#1a1a1a]">{formatBetrag(p.stats.volumen)}</span>
-                  </div>
-                  {p.budget && (
-                    <div className="mt-2">
-                      <div className="w-full h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
-                      </div>
-                      <p className="text-[10px] text-[#9a9a9a] mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Admin-Widgets: KI-Vorschläge + Neue Kunden + Nicht zugeordnet + Neue Händler */}
-      {profil.rolle === "admin" && (kiVorschlaege.length > 0 || neueKunden.length > 0 || unzugeordnet.length > 0 || neueHaendler.length > 0) && (
-        <div className="mt-6 space-y-4">
-          {kiVorschlaege.length > 0 && (
-            <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
-          )}
-          {neueKunden.length > 0 && (
-            <DashboardNeueKunden kunden={neueKunden} />
-          )}
-          {unzugeordnet.length > 0 && (
-            <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
-          )}
-          {neueHaendler.length > 0 && (
-            <DashboardNeueHaendler haendler={neueHaendler} />
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="card p-5 border-l-[3px] border-l-[#dc2626] corner-marks">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Aktion erforderlich</h2>
-            {aktionenNoetig.length > 0 && (
-              <span className="font-mono-amount text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
-                {aktionenNoetig.length}
-              </span>
-            )}
-          </div>
-          {aktionenNoetig.length === 0 ? (
-            <p className="text-sm text-[#c4c2bf] py-4 text-center">Keine offenen Aktionen.</p>
-          ) : (
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {aktionenNoetig.slice(0, 10).map((b) => {
-                const s = getStatusConfig(b.status);
-                return (
-                  <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
-                    <div className="flex items-center gap-3">
-                      <AktionIcon status={b.status} />
-                      <div>
-                        <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors">
-                          <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
-                          <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "–"}</span>
-                        </p>
-                        <p className="text-[11px] text-[#c4c2bf]">{b.besteller_name} · {formatDatum(b.created_at)}</p>
-                      </div>
-                    </div>
-                    <span className={`status-tag ${s.bg} ${s.text}`}>
-                      <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
-                      {s.label}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Letzte Bestellungen</h2>
-            <Link href="/bestellungen" className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors">Alle anzeigen</Link>
-          </div>
-          {letzte.length === 0 ? (
-            <p className="text-sm text-[#c4c2bf] py-4 text-center">Noch keine Bestellungen.</p>
-          ) : (
-            <div className="space-y-1">
-              {letzte.map((b) => {
-                const s = getStatusConfig(b.status);
-                return (
-                  <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
-                    <div>
-                      <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors">
-                        <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
-                        <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "–"}</span>
-                      </p>
-                      <p className="text-[11px] text-[#c4c2bf]">{b.besteller_name} · {formatDatum(b.created_at)}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {b.betrag && (
-                        <span className="font-mono-amount text-sm font-semibold text-[#1a1a1a]">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
-                      )}
-                      <span className={`status-tag ${s.bg} ${s.text}`}>
-                        <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
-                        {s.label}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <DashboardPriorisierung />
-      </div>
-
-      {bestellerStats.size > 0 && (
-        <div className="card p-5 mt-6">
-          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-4">Bestellungen pro Besteller</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Array.from(bestellerStats.entries()).map(([kuerzel, count]) => (
-              <div key={kuerzel} className="flex items-center gap-3 p-3 rounded-lg bg-[#fafaf9] border border-[#f0eeeb]">
-                <div className="w-9 h-9 rounded-lg bg-[#570006] text-white flex items-center justify-center text-[11px] font-bold">{kuerzel}</div>
-                <div>
-                  <p className="font-mono-amount text-lg font-bold text-[#1a1a1a]">{count}</p>
-                  <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wide">Bestellungen</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({ label, value, color, alert }: { label: string; value: number; color: string; alert?: boolean }) {
-  return (
-    <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: `3px solid ${color}` }}>
-      {/* Dezenter Gradient-Schimmer oben */}
-      <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
-      <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">{label}</p>
-      <div className="flex items-end justify-between mt-2 relative">
-        <p className={`font-mono-amount text-3xl font-bold text-[#1a1a1a] ${alert ? "text-red-600" : ""}`}>{value}</p>
-        {alert && value > 0 && (
-          <span className="pulse-urgent w-2 h-2 rounded-full bg-red-500 mb-2" />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AktionIcon({ status }: { status: string }) {
-  if (status === "abweichung") {
-    return (
-      <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
-        <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
-      </div>
-    );
-  }
-  if (status === "ls_fehlt") {
-    return (
-      <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-        <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-    );
-  }
-  return (
-    <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
-      <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
+      <DashboardWidgets
+        savedConfig={dashboardConfig}
+        statCards={statCards}
+        freigegebenBetrag={freigegebenBetrag}
+        gesamtVolumen={gesamtVolumen}
+        topProjekte={topProjekte}
+        isAdmin={profil.rolle === "admin"}
+        kiVorschlaege={kiVorschlaege}
+        neueKunden={neueKunden}
+        unzugeordnet={unzugeordnet}
+        bestellerListe={bestellerListe}
+        neueHaendler={neueHaendler}
+        aktionenNoetig={aktionenNoetig}
+        letzte={letzte}
+        bestellerStats={bestellerStatsMap}
+      />
     </div>
   );
 }
