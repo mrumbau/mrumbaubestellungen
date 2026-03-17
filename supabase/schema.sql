@@ -1,6 +1,32 @@
 -- MR Umbau GmbH – Bestellmanagement Schema
 -- Exportiert aus Supabase Projekt: fxeobohsgzvymgbnxbdc
--- Stand: 2026-03-16
+-- Stand: 2026-03-17
+
+-- ============================================================
+-- Helper Functions (für RLS Policies)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_user_rolle()
+  RETURNS text
+  LANGUAGE sql
+  STABLE SECURITY DEFINER
+  SET search_path TO 'public'
+AS $$
+  SELECT rolle FROM benutzer_rollen WHERE user_id = auth.uid() LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_user_kuerzel()
+  RETURNS text
+  LANGUAGE sql
+  STABLE SECURITY DEFINER
+  SET search_path TO 'public'
+AS $$
+  SELECT kuerzel FROM benutzer_rollen WHERE user_id = auth.uid() LIMIT 1;
+$$;
+
+-- ============================================================
+-- Tabellen
+-- ============================================================
 
 -- Benutzer-Rollen (verknüpft mit Supabase Auth)
 CREATE TABLE benutzer_rollen (
@@ -108,15 +134,51 @@ CREATE TABLE kommentare (
   erstellt_am TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Webhook-Logs (Protokoll für alle Webhook-/Cron-Aufrufe)
+CREATE TABLE webhook_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  typ TEXT NOT NULL CHECK (typ IN ('email', 'extension', 'cron')),
+  status TEXT NOT NULL CHECK (status IN ('success', 'error')),
+  bestellung_id UUID REFERENCES bestellungen(id),
+  bestellnummer TEXT,
+  fehler_text TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================
 -- Indexes
 -- ============================================================
 
+-- bestellung_signale
 CREATE INDEX idx_signale_domain_verarbeitet_zeit ON bestellung_signale (haendler_domain, verarbeitet, zeitstempel DESC);
+
+-- haendler
 CREATE INDEX idx_haendler_domain ON haendler (domain);
+
+-- benutzer_rollen
 CREATE INDEX idx_benutzer_rollen_user_id ON benutzer_rollen (user_id);
 CREATE INDEX idx_benutzer_rollen_kuerzel ON benutzer_rollen (kuerzel);
+
+-- bestellungen
+CREATE INDEX idx_bestellungen_status ON bestellungen (status);
+CREATE INDEX idx_bestellungen_besteller_kuerzel ON bestellungen (besteller_kuerzel);
+CREATE INDEX idx_bestellungen_created_at ON bestellungen (created_at DESC);
+
+-- dokumente
+CREATE INDEX idx_dokumente_bestellung_id ON dokumente (bestellung_id);
+
+-- abgleiche
+CREATE INDEX idx_abgleiche_bestellung_id ON abgleiche (bestellung_id);
+
+-- freigaben (UNIQUE = max 1 Freigabe pro Bestellung)
 CREATE UNIQUE INDEX idx_freigaben_bestellung_unique ON freigaben (bestellung_id);
+
+-- kommentare
+CREATE INDEX idx_kommentare_bestellung_id ON kommentare (bestellung_id);
+
+-- webhook_logs
+CREATE INDEX idx_webhook_logs_created_at ON webhook_logs (created_at DESC);
+CREATE INDEX idx_webhook_logs_status ON webhook_logs (status);
 
 -- ============================================================
 -- Row Level Security (RLS)
@@ -130,22 +192,79 @@ ALTER TABLE dokumente ENABLE ROW LEVEL SECURITY;
 ALTER TABLE abgleiche ENABLE ROW LEVEL SECURITY;
 ALTER TABLE freigaben ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kommentare ENABLE ROW LEVEL SECURITY;
+ALTER TABLE webhook_logs ENABLE ROW LEVEL SECURITY;
 
--- Besteller sehen nur ihre eigenen Bestellungen
-CREATE POLICY besteller_eigene ON bestellungen
-  FOR SELECT USING (
-    besteller_kuerzel = (SELECT kuerzel FROM benutzer_rollen WHERE user_id = auth.uid())
-  );
+-- ============================================================
+-- RLS Policies
+-- ============================================================
 
--- Buchhaltung sieht NUR freigegebene Bestellungen
-CREATE POLICY buchhaltung_freigegeben ON bestellungen
-  FOR SELECT USING (
-    (SELECT rolle FROM benutzer_rollen WHERE user_id = auth.uid()) = 'buchhaltung'
-    AND status = 'freigegeben'
-  );
+-- benutzer_rollen
+CREATE POLICY benutzer_rollen_admin ON benutzer_rollen
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY benutzer_rollen_eigene ON benutzer_rollen
+  FOR SELECT USING (user_id = auth.uid());
 
--- Admin sieht alles
+-- haendler
+CREATE POLICY haendler_admin ON haendler
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY haendler_alle_lesen ON haendler
+  FOR SELECT USING (true);
+
+-- bestellung_signale
+CREATE POLICY signale_admin ON bestellung_signale
+  FOR ALL USING (get_user_rolle() = 'admin');
+
+-- bestellungen
 CREATE POLICY admin_alle ON bestellungen
-  FOR ALL USING (
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY besteller_eigene ON bestellungen
+  FOR SELECT USING (besteller_kuerzel = get_user_kuerzel());
+CREATE POLICY buchhaltung_freigegeben ON bestellungen
+  FOR SELECT USING (get_user_rolle() = 'buchhaltung' AND status = 'freigegeben');
+
+-- dokumente
+CREATE POLICY dokumente_admin ON dokumente
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY dokumente_besteller ON dokumente
+  FOR SELECT USING (bestellung_id IN (
+    SELECT id FROM bestellungen WHERE besteller_kuerzel = get_user_kuerzel()
+  ));
+CREATE POLICY dokumente_buchhaltung ON dokumente
+  FOR SELECT USING (
+    get_user_rolle() = 'buchhaltung'
+    AND bestellung_id IN (SELECT id FROM bestellungen WHERE status = 'freigegeben')
+  );
+
+-- abgleiche
+CREATE POLICY abgleiche_admin ON abgleiche
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY abgleiche_besteller ON abgleiche
+  FOR SELECT USING (bestellung_id IN (
+    SELECT id FROM bestellungen WHERE besteller_kuerzel = get_user_kuerzel()
+  ));
+
+-- freigaben
+CREATE POLICY freigaben_admin ON freigaben
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY freigaben_besteller ON freigaben
+  FOR SELECT USING (bestellung_id IN (
+    SELECT id FROM bestellungen WHERE besteller_kuerzel = get_user_kuerzel()
+  ));
+
+-- kommentare
+CREATE POLICY kommentare_admin ON kommentare
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY kommentare_besteller_select ON kommentare
+  FOR SELECT USING (bestellung_id IN (
+    SELECT id FROM bestellungen WHERE besteller_kuerzel = get_user_kuerzel()
+  ));
+CREATE POLICY kommentare_besteller_insert ON kommentare
+  FOR INSERT WITH CHECK (
+    autor_kuerzel = (SELECT kuerzel FROM benutzer_rollen WHERE user_id = auth.uid())
+  );
+
+-- webhook_logs (nur Admin darf lesen, Service Role schreibt)
+CREATE POLICY admin_read_webhook_logs ON webhook_logs
+  FOR SELECT USING (
     (SELECT rolle FROM benutzer_rollen WHERE user_id = auth.uid()) = 'admin'
   );
