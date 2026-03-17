@@ -185,11 +185,11 @@ function CollapsibleCard({
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      <div className={`transition-all duration-200 ease-in-out overflow-hidden ${open ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}>
+      {open && (
         <div className="px-5 pb-5 border-t border-[#f0eeeb]">
           <div className="pt-4">{children}</div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
