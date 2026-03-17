@@ -84,13 +84,13 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       {/* Logo */}
       <div className="px-5 py-6 border-b border-white/[0.06]">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <Logo size={32} color="#ffffff" />
             <div>
               <p className="font-headline text-[15px] text-white tracking-tight leading-none">UMBAU</p>
               <p className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Bestellungen</p>
             </div>
-          </div>
+          </Link>
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
