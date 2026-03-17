@@ -9,11 +9,6 @@ export function formatDatum(iso: string | null): string {
   });
 }
 
-export function formatDatumZeit(iso: string | null): string {
-  if (!iso) return "–";
-  return new Date(iso).toLocaleString("de-DE");
-}
-
 export function formatBetrag(betrag: number | null, waehrung?: string): string {
   if (betrag == null) return "–";
   return new Intl.NumberFormat("de-DE", {

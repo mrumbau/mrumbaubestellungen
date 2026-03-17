@@ -5,7 +5,7 @@ import { checkCsrf } from "@/lib/csrf";
 
 const ERLAUBTE_FARBEN = ["#570006", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 
-// PUT /api/projekte/[id] – Projekt bearbeiten
+// PUT /api/kunden/[id] – Kunde bearbeiten
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,52 +37,44 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, beschreibung, kunde, farbe, budget, status, adresse, adresse_keywords } = body;
+    const { name, kuerzel, adresse, email, telefon, notizen, keywords, farbe } = body;
 
     const updates: Record<string, unknown> = {};
-    if (name !== undefined) updates.name = name.trim();
-    if (beschreibung !== undefined) updates.beschreibung = beschreibung?.trim() || null;
-    if (kunde !== undefined) updates.kunde = kunde?.trim() || null;
-    if (farbe !== undefined) updates.farbe = ERLAUBTE_FARBEN.includes(farbe) ? farbe : "#570006";
-    if (budget !== undefined) updates.budget = budget ? Number(budget) : null;
-    if (status !== undefined && ["aktiv", "abgeschlossen", "pausiert"].includes(status)) {
-      updates.status = status;
+    if (name !== undefined) updates.name = name?.trim() || null;
+    if (kuerzel !== undefined) updates.kuerzel = kuerzel?.trim() || null;
+    if (adresse !== undefined) updates.adresse = adresse?.trim() || null;
+    if (email !== undefined) updates.email = email?.trim() || null;
+    if (telefon !== undefined) updates.telefon = telefon?.trim() || null;
+    if (notizen !== undefined) updates.notizen = notizen?.trim() || null;
+    if (keywords !== undefined) {
+      updates.keywords = Array.isArray(keywords)
+        ? keywords.filter((k: unknown) => typeof k === "string" && k.trim().length > 0).map((k: string) => k.trim().toLowerCase())
+        : [];
     }
-    if (adresse !== undefined) updates.adresse = typeof adresse === "string" ? adresse.trim() || null : null;
-    if (adresse_keywords !== undefined && Array.isArray(adresse_keywords)) {
-      updates.adresse_keywords = adresse_keywords.filter((k: unknown) => typeof k === "string" && k.trim().length > 0).map((k: string) => k.trim().toLowerCase());
-    }
+    if (farbe !== undefined) updates.farbe = ERLAUBTE_FARBEN.includes(farbe) ? farbe : "#2563eb";
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "Keine Änderungen" }, { status: 400 });
     }
 
-    const { data: projekt, error } = await supabase
-      .from("projekte")
+    const { data: kunde, error } = await supabase
+      .from("kunden")
       .update(updates)
       .eq("id", id)
       .select()
       .single();
 
-    if (error || !projekt) {
-      return NextResponse.json({ error: "Projekt nicht gefunden" }, { status: 404 });
+    if (error || !kunde) {
+      return NextResponse.json({ error: "Kunde nicht gefunden" }, { status: 404 });
     }
 
-    // Denormalisierte Felder in bestellungen aktualisieren
-    if (updates.name) {
-      await supabase
-        .from("bestellungen")
-        .update({ projekt_name: updates.name as string })
-        .eq("projekt_id", id);
-    }
-
-    return NextResponse.json({ projekt });
+    return NextResponse.json({ kunde });
   } catch {
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }
 }
 
-// DELETE /api/projekte/[id] – Projekt archivieren (soft delete)
+// DELETE /api/kunden/[id] – Kunde löschen
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -113,29 +105,25 @@ export async function DELETE(
       return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
     }
 
-    // Prüfe ob Bestellungen zugeordnet sind
-    const { count } = await supabase
+    // Prüfe ob Projekte oder Bestellungen zugeordnet sind
+    const { count: projektCount } = await supabase
+      .from("projekte")
+      .select("*", { count: "exact", head: true })
+      .eq("kunden_id", id);
+
+    const { count: bestellungCount } = await supabase
       .from("bestellungen")
       .select("*", { count: "exact", head: true })
-      .eq("projekt_id", id);
+      .eq("kunden_id", id);
 
-    if (count && count > 0) {
-      // Soft-delete: archivieren statt löschen
-      const { error } = await supabase
-        .from("projekte")
-        .update({ status: "archiviert" })
-        .eq("id", id);
-
-      if (error) {
-        return NextResponse.json({ error: "Archivierung fehlgeschlagen" }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, archiviert: true, grund: `Hat ${count} Bestellung${count > 1 ? "en" : ""}` });
+    if ((projektCount && projektCount > 0) || (bestellungCount && bestellungCount > 0)) {
+      return NextResponse.json({
+        error: `Kunde hat ${projektCount || 0} Projekt(e) und ${bestellungCount || 0} Bestellung(en). Bitte zuerst Zuordnungen entfernen.`,
+      }, { status: 409 });
     }
 
-    // Keine Bestellungen → echtes Löschen
     const { error } = await supabase
-      .from("projekte")
+      .from("kunden")
       .delete()
       .eq("id", id);
 
@@ -143,7 +131,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Löschen fehlgeschlagen" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, geloescht: true });
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
   }

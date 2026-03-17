@@ -13,12 +13,16 @@ export async function updateBestellungStatus(
     .from("bestellungen")
     .select("hat_bestellbestaetigung, hat_lieferschein, hat_rechnung")
     .eq("id", bestellungId)
-    .single();
+    .maybeSingle();
+
+  if (!bestellung) {
+    return "offen";
+  }
 
   const neuerStatus =
-    bestellung?.hat_bestellbestaetigung &&
-    bestellung?.hat_lieferschein &&
-    bestellung?.hat_rechnung
+    bestellung.hat_bestellbestaetigung &&
+    bestellung.hat_lieferschein &&
+    bestellung.hat_rechnung
       ? "vollstaendig"
       : "offen";
 

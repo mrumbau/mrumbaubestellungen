@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID, isValidKuerzel } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
 
 // POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen (nur Admin)
 export async function POST(request: NextRequest) {
   try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
     const supabaseAuth = await createServerSupabaseClient();
     const {
       data: { user },

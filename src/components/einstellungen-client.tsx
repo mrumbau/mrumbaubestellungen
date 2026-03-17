@@ -43,6 +43,22 @@ interface Projekt {
   status: string;
   beschreibung: string | null;
   kunde: string | null;
+  adresse: string | null;
+  adresse_keywords: string[] | null;
+}
+
+interface Kunde {
+  id: string;
+  name: string;
+  kuerzel: string | null;
+  adresse: string | null;
+  email: string | null;
+  telefon: string | null;
+  notizen: string | null;
+  keywords: string[];
+  farbe: string;
+  confirmed_at: string | null;
+  created_at: string;
 }
 
 interface HealthStatus {
@@ -61,6 +77,8 @@ export function EinstellungenClient({
   extensionSignale,
   webhookLogs: initialWebhookLogs,
   projekte: initialProjekte = [],
+  kunden: initialKunden = [],
+  firmaEinstellungen: initialFirmaEinstellungen = [],
 }: {
   haendler: Haendler[];
   benutzer: Benutzer[];
@@ -69,6 +87,8 @@ export function EinstellungenClient({
   extensionSignale: Record<string, string>;
   webhookLogs: WebhookLog[];
   projekte?: Projekt[];
+  kunden?: Kunde[];
+  firmaEinstellungen?: { schluessel: string; wert: string }[];
 }) {
   const [haendler, setHaendler] = useState(initialHaendler);
   const [showForm, setShowForm] = useState(false);
@@ -106,6 +126,32 @@ export function EinstellungenClient({
   const [projektFormKunde, setProjektFormKunde] = useState("");
   const [projektFormStatus, setProjektFormStatus] = useState("aktiv");
   const [archivProjektConfirm, setArchivProjektConfirm] = useState<{ id: string; name: string } | null>(null);
+
+  // Kunden
+  const [kundenListe, setKundenListe] = useState(initialKunden);
+  const [kundenEditId, setKundenEditId] = useState<string | null>(null);
+  const [showKundenForm, setShowKundenForm] = useState(false);
+  const [kundenLoading, setKundenLoading] = useState(false);
+  const [kundenFormName, setKundenFormName] = useState("");
+  const [kundenFormKuerzel, setKundenFormKuerzel] = useState("");
+  const [kundenFormAdresse, setKundenFormAdresse] = useState("");
+  const [kundenFormEmail, setKundenFormEmail] = useState("");
+  const [kundenFormTelefon, setKundenFormTelefon] = useState("");
+  const [kundenFormNotizen, setKundenFormNotizen] = useState("");
+  const [kundenFormKeywords, setKundenFormKeywords] = useState<string[]>([]);
+  const [kundenFormKeywordInput, setKundenFormKeywordInput] = useState("");
+  const [kundenFormFarbe, setKundenFormFarbe] = useState("#2563eb");
+  const [kundenDeleteConfirm, setKundenDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
+  // Projekt-Adresse (singular)
+  const [projektFormAdresse, setProjektFormAdresse] = useState("");
+
+  // Firma-Einstellungen
+  const [bueroAdresse, setBueroAdresse] = useState(initialFirmaEinstellungen.find((e) => e.schluessel === "buero_adresse")?.wert || "");
+  const [konfidenzDirekt, setKonfidenzDirekt] = useState(initialFirmaEinstellungen.find((e) => e.schluessel === "konfidenz_direkt")?.wert || "0.85");
+  const [konfidenzVorschlag, setKonfidenzVorschlag] = useState(initialFirmaEinstellungen.find((e) => e.schluessel === "konfidenz_vorschlag")?.wert || "0.60");
+  const [firmaLoading, setFirmaLoading] = useState(false);
+  const [firmaSaved, setFirmaSaved] = useState(false);
 
   const PROJEKT_FARBEN = ["#570006", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 
@@ -288,6 +334,7 @@ export function EinstellungenClient({
     setProjektFormBudget("");
     setProjektFormKunde("");
     setProjektFormStatus("aktiv");
+    setProjektFormAdresse("");
     setProjektEditId(null);
     setShowProjektForm(false);
   }
@@ -299,6 +346,7 @@ export function EinstellungenClient({
     setProjektFormBudget(p.budget ? String(p.budget) : "");
     setProjektFormKunde(p.kunde || "");
     setProjektFormStatus(p.status);
+    setProjektFormAdresse(p.adresse || "");
     setProjektEditId(p.id);
     setShowProjektForm(true);
   }
@@ -315,6 +363,10 @@ export function EinstellungenClient({
         farbe: projektFormFarbe,
         budget: projektFormBudget ? Number(projektFormBudget) : null,
         status: projektFormStatus,
+        adresse: projektFormAdresse.trim() || null,
+        adresse_keywords: projektFormAdresse.trim()
+          ? projektFormAdresse.trim().toLowerCase().split(/[\s,]+/).filter(Boolean)
+          : [],
       };
       if (projektEditId) {
         const res = await fetch(`/api/projekte/${projektEditId}`, {
@@ -365,6 +417,104 @@ export function EinstellungenClient({
   const aktiveProjekte = projekteListe.filter((p) => ["aktiv", "pausiert"].includes(p.status));
   const inaktiveProjekte = projekteListe.filter((p) => ["abgeschlossen", "archiviert"].includes(p.status));
 
+  // Kunden-Funktionen
+  function resetKundenForm() {
+    setKundenFormName("");
+    setKundenFormKuerzel("");
+    setKundenFormAdresse("");
+    setKundenFormEmail("");
+    setKundenFormTelefon("");
+    setKundenFormNotizen("");
+    setKundenFormKeywords([]);
+    setKundenFormKeywordInput("");
+    setKundenFormFarbe("#2563eb");
+    setKundenEditId(null);
+    setShowKundenForm(false);
+  }
+
+  function startKundenEdit(k: Kunde) {
+    setKundenFormName(k.name);
+    setKundenFormKuerzel(k.kuerzel || "");
+    setKundenFormAdresse(k.adresse || "");
+    setKundenFormEmail(k.email || "");
+    setKundenFormTelefon(k.telefon || "");
+    setKundenFormNotizen(k.notizen || "");
+    setKundenFormKeywords(k.keywords || []);
+    setKundenFormFarbe(k.farbe);
+    setKundenEditId(k.id);
+    setShowKundenForm(true);
+  }
+
+  async function handleKundenSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!kundenFormName.trim()) return;
+    setKundenLoading(true);
+    try {
+      const payload = {
+        name: kundenFormName.trim(),
+        kuerzel: kundenFormKuerzel.trim() || null,
+        adresse: kundenFormAdresse.trim() || null,
+        email: kundenFormEmail.trim() || null,
+        telefon: kundenFormTelefon.trim() || null,
+        notizen: kundenFormNotizen.trim() || null,
+        keywords: kundenFormKeywords,
+        farbe: kundenFormFarbe,
+      };
+      if (kundenEditId) {
+        const res = await fetch(`/api/kunden/${kundenEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setKundenListe((prev) => prev.map((k) => (k.id === kundenEditId ? data.kunde : k)));
+      } else {
+        const res = await fetch("/api/kunden", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setKundenListe((prev) => [...prev, data.kunde].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      resetKundenForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setKundenLoading(false);
+    }
+  }
+
+  async function handleKundenDelete(id: string) {
+    setKundenDeleteConfirm(null);
+    setKundenLoading(true);
+    try {
+      const res = await fetch(`/api/kunden/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setKundenListe((prev) => prev.filter((k) => k.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Löschen");
+    } finally {
+      setKundenLoading(false);
+    }
+  }
+
+  function handleKeywordAdd(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && kundenFormKeywordInput.trim()) {
+      e.preventDefault();
+      const kw = kundenFormKeywordInput.trim().toLowerCase();
+      if (!kundenFormKeywords.includes(kw)) {
+        setKundenFormKeywords((prev) => [...prev, kw]);
+      }
+      setKundenFormKeywordInput("");
+    }
+  }
+
+  // startProjektEdit() setzt bereits projektFormAdresse
+
   // Webhook-Logs refresh
   async function refreshWebhookLogs() {
     try {
@@ -376,6 +526,35 @@ export function EinstellungenClient({
         .limit(20);
       if (data) setWebhookLogs(data);
     } catch { /* stille Fehlerbehandlung */ }
+  }
+
+  async function saveFirmaEinstellungen() {
+    setFirmaLoading(true);
+    setFirmaSaved(false);
+    try {
+      const settings = [
+        { schluessel: "buero_adresse", wert: bueroAdresse.trim() },
+        { schluessel: "konfidenz_direkt", wert: konfidenzDirekt },
+        { schluessel: "konfidenz_vorschlag", wert: konfidenzVorschlag },
+      ];
+      for (const s of settings) {
+        const res = await fetch("/api/einstellungen/firma", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(s),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Speichern fehlgeschlagen");
+        }
+      }
+      setFirmaSaved(true);
+      setTimeout(() => setFirmaSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setFirmaLoading(false);
+    }
   }
 
   const filteredLogs = logFilter === "error"
@@ -463,6 +642,74 @@ export function EinstellungenClient({
             <span className="w-5 h-5 spinner" />
           </div>
         )}
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          FIRMA-EINSTELLUNGEN (KI-Erkennung)
+          ═══════════════════════════════════════════ */}
+      <div className="mt-6 card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Firma / KI-Erkennung</h2>
+          </div>
+          {firmaSaved && (
+            <span className="text-[11px] text-green-600 font-medium flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Gespeichert
+            </span>
+          )}
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Büro-Adresse</label>
+            <input
+              type="text"
+              value={bueroAdresse}
+              onChange={(e) => setBueroAdresse(e.target.value)}
+              placeholder="z.B. Hauptstraße 5, 50667 Köln"
+              className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            />
+            <p className="text-[10px] text-[#c4c2bf] mt-1">Lieferungen an diese Adresse werden bei der Baustellen-Erkennung ignoriert.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Konfidenz Direkt-Zuordnung</label>
+              <input
+                type="number"
+                value={konfidenzDirekt}
+                onChange={(e) => setKonfidenzDirekt(e.target.value)}
+                min="0" max="1" step="0.05"
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              />
+              <p className="text-[10px] text-[#c4c2bf] mt-1">Ab diesem Wert wird automatisch zugeordnet (Standard: 0.85)</p>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Konfidenz Vorschlag</label>
+              <input
+                type="number"
+                value={konfidenzVorschlag}
+                onChange={(e) => setKonfidenzVorschlag(e.target.value)}
+                min="0" max="1" step="0.05"
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              />
+              <p className="text-[10px] text-[#c4c2bf] mt-1">Ab diesem Wert wird ein Vorschlag angezeigt (Standard: 0.60)</p>
+            </div>
+          </div>
+          <button
+            onClick={saveFirmaEinstellungen}
+            disabled={firmaLoading}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#570006] rounded-lg hover:bg-[#3d0004] transition-colors disabled:opacity-50"
+          >
+            {firmaLoading ? "Speichert..." : "Firma-Einstellungen speichern"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -737,6 +984,18 @@ export function EinstellungenClient({
                   className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
               </div>
             </div>
+            {/* Baustellen-Adresse */}
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Baustellen-Adresse</label>
+              <input
+                type="text"
+                value={projektFormAdresse}
+                onChange={(e) => setProjektFormAdresse(e.target.value)}
+                placeholder="z.B. Musterstraße 12, 10115 Berlin"
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              />
+              <p className="text-[10px] text-[#c4c2bf] mt-1">Die Lieferadresse der Baustelle. Wird zur automatischen Projekt-Erkennung genutzt.</p>
+            </div>
             {projektEditId && (
               <div>
                 <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Status</label>
@@ -816,6 +1075,202 @@ export function EinstellungenClient({
               ))}
             </div>
           </details>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          KUNDEN
+          ═══════════════════════════════════════════ */}
+      <div className="card p-6 mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Kunden ({kundenListe.length})</h2>
+              <p className="text-[10px] text-[#c4c2bf] mt-0.5">Kunden für Projekt-Zuordnung</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { resetKundenForm(); setShowKundenForm(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#570006] rounded-lg hover:bg-[#3d0004] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Neuer Kunde
+          </button>
+        </div>
+
+        {showKundenForm && (
+          <form onSubmit={handleKundenSubmit} className="mb-4 p-4 bg-[#fafaf9] rounded-lg border border-[#f0eeeb] space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={kundenFormName}
+                  onChange={(e) => setKundenFormName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Kürzel</label>
+                <input
+                  type="text"
+                  value={kundenFormKuerzel}
+                  onChange={(e) => setKundenFormKuerzel(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none"
+                  placeholder="z.B. MUE"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Adresse</label>
+              <input
+                type="text"
+                value={kundenFormAdresse}
+                onChange={(e) => setKundenFormAdresse(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none"
+                placeholder="Straße Nr, PLZ Ort"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">E-Mail</label>
+                <input
+                  type="email"
+                  value={kundenFormEmail}
+                  onChange={(e) => setKundenFormEmail(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Telefon</label>
+                <input
+                  type="tel"
+                  value={kundenFormTelefon}
+                  onChange={(e) => setKundenFormTelefon(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Notizen</label>
+              <textarea
+                value={kundenFormNotizen}
+                onChange={(e) => setKundenFormNotizen(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none resize-none"
+                rows={2}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Keywords (Enter zum Hinzufügen)</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {kundenFormKeywords.map((kw, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[11px] font-medium">
+                    {kw}
+                    <button type="button" onClick={() => setKundenFormKeywords((prev) => prev.filter((_, j) => j !== i))} className="text-blue-400 hover:text-blue-700">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={kundenFormKeywordInput}
+                onChange={(e) => setKundenFormKeywordInput(e.target.value)}
+                onKeyDown={handleKeywordAdd}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#570006] focus:border-[#570006] outline-none"
+                placeholder="Keyword eingeben + Enter"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Farbe</label>
+              <div className="flex gap-2">
+                {PROJEKT_FARBEN.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setKundenFormFarbe(f)}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${kundenFormFarbe === f ? "border-[#1a1a1a] scale-110" : "border-transparent"}`}
+                    style={{ background: f }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={kundenLoading}
+                className="px-4 py-2 text-xs font-medium text-white bg-[#570006] rounded-lg hover:bg-[#3d0004] disabled:opacity-50 transition-colors"
+              >
+                {kundenLoading ? "Speichern..." : kundenEditId ? "Aktualisieren" : "Anlegen"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { resetKundenForm(); setShowKundenForm(false); }}
+                className="px-4 py-2 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        {kundenListe.length === 0 ? (
+          <p className="text-sm text-[#c4c2bf] py-4 text-center">Noch keine Kunden angelegt.</p>
+        ) : (
+          <div className="space-y-2">
+            {kundenListe.map((k) => (
+              <div key={k.id} className="flex items-start justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="w-3 h-3 rounded-full shrink-0 mt-1" style={{ background: k.farbe }} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[#1a1a1a]">{k.name}</span>
+                      {k.kuerzel && <span className="text-[10px] text-[#c4c2bf] font-mono">{k.kuerzel}</span>}
+                      {!k.confirmed_at && (
+                        <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wide">Auto-erkannt</span>
+                      )}
+                    </div>
+                    {k.adresse && <p className="text-[11px] text-[#9a9a9a] truncate">{k.adresse}</p>}
+                    {k.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {k.keywords.map((kw, i) => (
+                          <span key={i} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{kw}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  <button
+                    onClick={() => { startKundenEdit(k); setShowKundenForm(true); }}
+                    className="p-1.5 text-[#c4c2bf] hover:text-[#570006] transition-colors rounded-lg hover:bg-[#f0eeeb]"
+                    title="Bearbeiten"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setKundenDeleteConfirm({ id: k.id, name: k.name })}
+                    className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                    title="Löschen"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
@@ -1125,6 +1580,15 @@ export function EinstellungenClient({
         variant="danger"
         onConfirm={() => archivProjektConfirm && handleProjektArchiv(archivProjektConfirm.id)}
         onCancel={() => setArchivProjektConfirm(null)}
+      />
+      <ConfirmDialog
+        open={!!kundenDeleteConfirm}
+        title="Kunde löschen"
+        message={`Soll der Kunde "${kundenDeleteConfirm?.name}" gelöscht werden?`}
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={() => kundenDeleteConfirm && handleKundenDelete(kundenDeleteConfirm.id)}
+        onCancel={() => setKundenDeleteConfirm(null)}
       />
     </div>
   );

@@ -6,6 +6,8 @@ import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
 import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
+import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
+import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 
@@ -37,6 +39,8 @@ export default async function DashboardPage() {
     // Admin-Queries laufen mit (RLS filtert für Nicht-Admins)
     { data: bestellerRollen },
     { data: neueHaendlerRoh },
+    { data: kiVorschlaegeRoh },
+    { data: neueKundenRoh },
   ] = await Promise.all([
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen"),
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung"),
@@ -58,6 +62,20 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] }),
+    // KI-Vorschläge (unbestätigte Projekt-Zuordnungen)
+    profil.rolle === "admin"
+      ? supabase.from("bestellungen")
+          .select("id, bestellnummer, haendler_name, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
+          .is("projekt_id", null)
+          .not("projekt_vorschlag_id", "is", null)
+          .eq("projekt_bestaetigt", false)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[] }),
+    // Unbestätigte Kunden
+    profil.rolle === "admin"
+      ? supabase.from("kunden").select("id, name, keywords, created_at").is("confirmed_at", null).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; name: string; keywords: string[] | null; created_at: string }[] }),
   ]);
 
   // Null-safe Werte
@@ -81,6 +99,17 @@ export default async function DashboardPage() {
 
   const bestellerListe = bestellerRollen || [];
   const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
+  const neueKunden = (neueKundenRoh || []) as { id: string; name: string; keywords: string[] | null; created_at: string }[];
+
+  // KI-Vorschläge mit Projekt-Name+Farbe anreichern
+  const kiVorschlaege = ((kiVorschlaegeRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[]).map((v) => {
+    const projekt = (aktiveProjekte || []).find((p) => p.id === v.projekt_vorschlag_id);
+    return {
+      ...v,
+      vorschlag_projekt_name: projekt?.name || null,
+      vorschlag_projekt_farbe: projekt?.farbe || null,
+    };
+  });
 
   // Projekt-Stats aggregieren
   const projektStatsMap = new Map<string, { gesamt: number; offen: number; volumen: number }>();
@@ -184,9 +213,15 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Admin-Widgets: Nicht zugeordnet + Neue Händler */}
-      {profil.rolle === "admin" && (unzugeordnet.length > 0 || neueHaendler.length > 0) && (
+      {/* Admin-Widgets: KI-Vorschläge + Neue Kunden + Nicht zugeordnet + Neue Händler */}
+      {profil.rolle === "admin" && (kiVorschlaege.length > 0 || neueKunden.length > 0 || unzugeordnet.length > 0 || neueHaendler.length > 0) && (
         <div className="mt-6 space-y-4">
+          {kiVorschlaege.length > 0 && (
+            <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
+          )}
+          {neueKunden.length > 0 && (
+            <DashboardNeueKunden kunden={neueKunden} />
+          )}
           {unzugeordnet.length > 0 && (
             <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
           )}

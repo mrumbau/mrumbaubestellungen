@@ -129,11 +129,18 @@ export function ProjekteClient({
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      await fetch(`/api/projekte/${deleteId}`, { method: "DELETE" });
-      setDeleteId(null);
-      router.refresh();
+      const res = await fetch(`/api/projekte/${deleteId}`, { method: "DELETE" });
+      if (res.ok) {
+        setDeleteId(null);
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Projekt konnte nicht gelöscht werden");
+        setDeleteId(null);
+      }
     } catch {
-      // ignore
+      setError("Netzwerkfehler beim Löschen");
+      setDeleteId(null);
     }
   };
 

@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bestellung nicht gefunden" }, { status: 404 });
     }
 
-    // Abgleich laden
+    // Abgleich laden (nicht jede Bestellung hat einen)
     const { data: abgleich } = await supabase
       .from("abgleiche")
       .select("abweichungen")
       .eq("bestellung_id", bestellung_id)
       .order("erstellt_am", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     // Kommentare laden
     const { data: kommentare } = await supabase

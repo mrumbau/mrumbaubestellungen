@@ -53,6 +53,14 @@ interface Bestellung {
   besteller_kuerzel: string;
   projekt_id: string | null;
   projekt_name: string | null;
+  kunden_id: string | null;
+  kunden_name: string | null;
+  lieferadresse_erkannt: string | null;
+  projekt_vorschlag_id: string | null;
+  projekt_vorschlag_konfidenz: number | null;
+  projekt_vorschlag_methode: string | null;
+  projekt_vorschlag_begruendung: string | null;
+  projekt_bestaetigt: boolean;
 }
 
 function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
@@ -139,6 +147,7 @@ export function BestelldetailClient({
   const [kiZusammenfassung, setKiZusammenfassung] = useState<string | null>(null);
   const [kiLoading, setKiLoading] = useState(false);
   const [showFreigabeDialog, setShowFreigabeDialog] = useState(false);
+  const [freigabeError, setFreigabeError] = useState<string | null>(null);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const [duplikatResult, setDuplikatResult] = useState<{ ist_duplikat: boolean; konfidenz: number; duplikat_von: string | null; begruendung: string } | null>(null);
   const [duplikatLoading, setDuplikatLoading] = useState(false);
@@ -147,6 +156,8 @@ export function BestelldetailClient({
   const [projektLoading, setProjektLoading] = useState(false);
   const [showProjektSelect, setShowProjektSelect] = useState(false);
   const [projektStats, setProjektStats] = useState<{ gesamt_ausgaben: number; budget: number | null; budget_auslastung_prozent: number | null } | null>(null);
+  const [vorschlagLoading, setVorschlagLoading] = useState(false);
+  const [showVorschlagKorrektur, setShowVorschlagKorrektur] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,6 +186,33 @@ export function BestelldetailClient({
     }
   }
 
+  async function handleVorschlagAktion(aktion: "bestaetigen" | "ablehnen", korrektesProjektId?: string) {
+    setVorschlagLoading(true);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellung.id}/projekt-bestaetigen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aktion,
+          ...(korrektesProjektId ? { korrektes_projekt_id: korrektesProjektId } : {}),
+        }),
+      });
+      if (res.ok) {
+        setShowVorschlagKorrektur(false);
+        router.refresh();
+      }
+    } catch { /* ignore */ } finally {
+      setVorschlagLoading(false);
+    }
+  }
+
+  const METHODEN_LABELS: Record<string, string> = {
+    lieferadresse: "Lieferadresse",
+    kundenname: "Kundenname",
+    projektname_text: "Projektname im Text",
+    besteller_affinitaet: "Besteller-Muster",
+  };
+
   const aktivesDokument = dokumente.find((d) => d.typ === activeTab);
   const kannFreigeben =
     !freigabe &&
@@ -183,14 +221,25 @@ export function BestelldetailClient({
 
   async function handleFreigabe() {
     setShowFreigabeDialog(false);
+    setFreigabeError(null);
     setLoading(true);
-    await fetch(`/api/bestellungen/${bestellung.id}/freigeben`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    router.refresh();
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellung.id}/freigeben`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setFreigabeError(data.error || "Freigabe fehlgeschlagen");
+      }
+    } catch {
+      setFreigabeError("Netzwerkfehler bei der Freigabe");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleKommentar(e: React.FormEvent) {
@@ -377,6 +426,119 @@ export function BestelldetailClient({
 
       {/* Rechts: Projekt + KI-Abgleich + Scan + Freigabe + Kommentare */}
       <div className="w-full md:w-80 flex flex-col gap-4 overflow-auto">
+        {/* KI-Vorschlag Banner */}
+        {bestellung.projekt_vorschlag_id && !bestellung.projekt_bestaetigt && !bestellung.projekt_id && (
+          <div className="card p-4 border-l-[3px] border-l-[#d97706]">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-bold text-amber-700 tracking-widest uppercase">KI-Vorschlag</span>
+            </div>
+
+            {bestellung.lieferadresse_erkannt && (
+              <div className="flex items-start gap-2 mb-2.5 px-2.5 py-2 bg-amber-50/50 rounded-lg">
+                <svg className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="text-xs text-[#6b6b6b]">{bestellung.lieferadresse_erkannt}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mb-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ background: projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.farbe || "#570006" }}
+              />
+              <span className="text-sm font-medium text-[#1a1a1a]">
+                {projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.name || "Unbekanntes Projekt"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-mono-amount text-[11px] font-bold text-amber-700">
+                {Math.round((bestellung.projekt_vorschlag_konfidenz || 0) * 100)}%
+              </span>
+              <span className="text-[10px] text-[#9a9a9a]">
+                {METHODEN_LABELS[bestellung.projekt_vorschlag_methode || ""] || bestellung.projekt_vorschlag_methode}
+              </span>
+            </div>
+
+            {bestellung.projekt_vorschlag_begruendung && (
+              <p className="text-[11px] text-[#9a9a9a] italic mb-3">
+                &ldquo;{bestellung.projekt_vorschlag_begruendung}&rdquo;
+              </p>
+            )}
+
+            {bestellung.kunden_name && (
+              <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-[#f5f4f2] rounded-lg">
+                <svg className="w-3 h-3 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <span className="text-[11px] text-[#6b6b6b]">Kunde: <span className="font-medium text-[#1a1a1a]">{bestellung.kunden_name}</span></span>
+              </div>
+            )}
+
+            {!showVorschlagKorrektur ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleVorschlagAktion("bestaetigen")}
+                  disabled={vorschlagLoading}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Korrekt
+                </button>
+                <button
+                  onClick={() => setShowVorschlagKorrektur(true)}
+                  disabled={vorschlagLoading}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Falsch
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] text-[#9a9a9a]">Korrektes Projekt auswählen:</p>
+                {projekte.filter((p) => p.id !== bestellung.projekt_vorschlag_id).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleVorschlagAktion("ablehnen", p.id)}
+                    disabled={vorschlagLoading}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
+                    {p.name}
+                  </button>
+                ))}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleVorschlagAktion("ablehnen")}
+                    disabled={vorschlagLoading}
+                    className="text-[11px] text-[#9a9a9a] hover:text-red-600 transition-colors"
+                  >
+                    Ohne Korrektur ablehnen
+                  </button>
+                  <button
+                    onClick={() => setShowVorschlagKorrektur(false)}
+                    className="text-[11px] text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Projekt-Zuordnung */}
         <div className="card p-4">
           <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Projekt</h3>
@@ -596,6 +758,9 @@ export function BestelldetailClient({
               onConfirm={handleFreigabe}
               onCancel={() => setShowFreigabeDialog(false)}
             />
+            {freigabeError && (
+              <p className="text-xs text-red-600 mt-2 font-medium">{freigabeError}</p>
+            )}
           </>
         ) : null}
 

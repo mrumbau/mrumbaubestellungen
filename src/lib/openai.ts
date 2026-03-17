@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -23,6 +24,16 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   throw new Error("Max retries reached");
 }
 
+/** Sicherer JSON-Parser für GPT-Responses — gibt Fallback statt Crash */
+function safeParseGptJson<T>(text: string, fallback: T): T {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  try {
+    return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  } catch {
+    return fallback;
+  }
+}
+
 export interface DokumentAnalyse {
   typ: "bestellbestaetigung" | "lieferschein" | "rechnung";
   bestellnummer: string | null;
@@ -36,6 +47,8 @@ export interface DokumentAnalyse {
   lieferdatum: string | null;
   iban: string | null;
   konfidenz: number;
+  lieferadressen?: string[];
+  volltext?: string;
 }
 
 export interface AbgleichErgebnis {
@@ -95,8 +108,14 @@ Gib folgende Struktur zurück:
   "faelligkeitsdatum": "2026-03-26",
   "lieferdatum": null,
   "iban": "DE12 3456 7890 1234 5678 90",
-  "konfidenz": 0.95
+  "konfidenz": 0.95,
+  "lieferadressen": ["Kernstraße 14, 81671 München"],
+  "volltext": "Kompletter erkannter Text des Dokuments..."
 }
+
+Extrahiere auch:
+- "lieferadressen": Array aller Lieferadressen, Versandadressen und Empfängeradressen die du im Dokument findest (Lieferschein-Header, Rechnungsadresse, Versandadresse). Leeres Array wenn keine gefunden.
+- "volltext": Der gesamte erkannte Text des Dokuments als String.
 
 Falls ein Feld nicht erkennbar ist, setze null.`;
 
@@ -139,7 +158,16 @@ export async function analysiereDokument(
 
   const text = response.choices[0]?.message?.content || "{}";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  try {
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    return {
+      ...parsed,
+      lieferadressen: parsed.lieferadressen || [],
+      volltext: parsed.volltext || "",
+    };
+  } catch {
+    return { typ: "unbekannt", konfidenz: 0, lieferadressen: [], volltext: text } as unknown as DokumentAnalyse;
+  }
 }
 
 // KI-Abgleich zwischen den 3 Dokumenten
@@ -186,8 +214,7 @@ Rechnung: ${JSON.stringify(rechnung)}`,
   );
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // ========== NEUE KI-FUNKTIONEN ==========
@@ -231,8 +258,7 @@ ${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.arti
   );
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 2. Lieferschein-Erinnerung generieren
@@ -307,8 +333,7 @@ ${historischePreise.map((h) => `${h.name}: ${h.preise.map((p) => p.toFixed(2) + 
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 4. Automatische Händler-Erkennung aus E-Mail
@@ -416,8 +441,7 @@ ${stats.abweichende_bestellungen.length > 0
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 6. Duplikat-Erkennung
@@ -472,8 +496,7 @@ ${existierendeBestellungen.map((b) => `- ${b.bestellnummer} (${b.datum}): ${b.be
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 7. Automatische Artikel-Kategorisierung
@@ -525,8 +548,7 @@ Gib NUR ein JSON-Objekt zurück:
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 8. Fälligkeits-Priorisierung
@@ -594,8 +616,7 @@ Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 9. Besteller-Hinweise aus E-Mail-Text und Dokumenten extrahieren
@@ -663,8 +684,7 @@ ${dokumentTexte.map((t, i) => `--- Dokument ${i + 1} ---\n${t.slice(0, 1500)}`).
   );
 
   const text = response.choices[0]?.message?.content || "{}";
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+  return safeParseGptJson(text, {} as never);
 }
 
 // 10. Kommentar-Zusammenfassung für eine Bestellung
@@ -704,4 +724,193 @@ ${kommentare.length > 0
   }));
 
   return response.choices[0]?.message?.content || "Zusammenfassung konnte nicht erstellt werden.";
+}
+
+// ============================================================
+// INTELLIGENTE BAUSTELLEN- & KUNDENERKENNUNG
+// ============================================================
+
+export interface ProjektMatchErgebnis {
+  projekt_id: string | null;
+  konfidenz: number;
+  methode: "lieferadresse" | "projektname_text" | "kundenname" | "besteller_affinitaet" | "unbekannt";
+  begruendung: string;
+  extrahierte_lieferadresse?: string | null;
+  extrahierter_projektname?: string | null;
+}
+
+
+// 11. Projekt-Erkennung aus E-Mail + Dokumenten (GPT-4o, Stufen 1-3)
+export async function erkenneProjektAusInhalt(params: {
+  email_betreff: string;
+  email_body: string;
+  dokument_texte: string[];
+  lieferadressen: string[];
+  buero_adresse: string;
+  aktive_projekte: {
+    id: string;
+    name: string;
+    beschreibung: string | null;
+    adresse: string | null;
+    adresse_keywords: string[];
+    kunden_name: string | null;
+  }[];
+}): Promise<ProjektMatchErgebnis | null> {
+  if (params.aktive_projekte.length === 0) return null;
+
+  const bueroHinweis = params.buero_adresse
+    ? `Ignoriere die Büro-Adresse: ${params.buero_adresse}`
+    : "Keine Büro-Adresse konfiguriert — überspringe diesen Filter.";
+
+  const projekteListe = params.aktive_projekte.map((p) =>
+    `- ID: ${p.id} | Name: "${p.name}" | Adresse: ${p.adresse || "keine"} | Keywords: [${p.adresse_keywords.join(", ")}] | Kunde: ${p.kunden_name || "keiner"} | Beschreibung: ${p.beschreibung || "keine"}`
+  ).join("\n");
+
+  const response = await withRetry(() =>
+    openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `Du bist ein Assistent der Bestellungen Baustellen zuordnet.
+
+Analysiere E-Mail und PDF-Inhalt und bestimme welche Baustelle/Projekt gemeint ist. Nutze diese Signale:
+
+1. LIEFERADRESSE: Suche nach Lieferadressen im Text. Vergleiche mit den Baustellen-Adressen der Projekte. Fuzzy-Matching: "Kernstr. 14" = "Kernstraße 14". ${bueroHinweis}
+
+2. PROJEKTNAME/BAUSTELLE: Suche nach direkten Erwähnungen von Projektnamen, Baustellen-Bezeichnungen, Objektnamen, BV-Nummern, Auftragsnummern. Vergleiche mit den Projektnamen und Beschreibungen.
+
+3. KUNDENNAME: Suche nach Auftraggeber, Rechnungsempfänger, Auftraggeber-Adresse. Vergleiche mit Kundennamen der Projekte.
+
+Wichtig: Artikelnamen sind KEIN Erkennungsmerkmal. Nur Adressen, Namen und Projektreferenzen zählen.
+
+Antworte NUR als JSON:
+{
+  "projekt_id": "uuid oder null",
+  "konfidenz": 0.0-1.0,
+  "methode": "lieferadresse|projektname_text|kundenname|unbekannt",
+  "begruendung": "Kurze deutsche Erklärung",
+  "extrahierte_lieferadresse": "Adresse oder null",
+  "extrahierter_projektname": "Name oder null"
+}
+
+Wenn kein Projekt passt: projekt_id=null, methode="unbekannt", konfidenz=0.`,
+        },
+        {
+          role: "user",
+          content: `AKTIVE PROJEKTE:
+${projekteListe}
+
+E-MAIL-BETREFF: ${params.email_betreff || "(leer)"}
+
+E-MAIL-TEXT:
+${(params.email_body || "").slice(0, 2000)}
+
+EXTRAHIERTE LIEFERADRESSEN:
+${params.lieferadressen.length > 0 ? params.lieferadressen.join("\n") : "(keine)"}
+
+DOKUMENT-TEXTE:
+${params.dokument_texte.length > 0
+  ? params.dokument_texte.map((t, i) => `--- Dokument ${i + 1} ---\n${t.slice(0, 1500)}`).join("\n\n")
+  : "(keine Dokument-Texte verfügbar)"}`,
+        },
+      ],
+      max_tokens: 500,
+      temperature: 0.1,
+    })
+  );
+
+  const text = response.choices[0]?.message?.content || "{}";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  try {
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    if (!parsed.projekt_id || parsed.methode === "unbekannt" || parsed.konfidenz <= 0) {
+      return null;
+    }
+    return {
+      projekt_id: parsed.projekt_id,
+      konfidenz: Math.max(0, Math.min(1, Number(parsed.konfidenz) || 0)),
+      methode: parsed.methode || "unbekannt",
+      begruendung: parsed.begruendung || "",
+      extrahierte_lieferadresse: parsed.extrahierte_lieferadresse || null,
+      extrahierter_projektname: parsed.extrahierter_projektname || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// 12. Recency-Boost: Kürzlich aktive Projekte höher gewichten
+function recencyBoost(letzteBestellung: string | null): number {
+  if (!letzteBestellung) return 1.0;
+  const tage = (Date.now() - new Date(letzteBestellung).getTime()) / (1000 * 60 * 60 * 24);
+  if (tage <= 7) return 1.15;   // letzte Woche: +15%
+  if (tage <= 30) return 1.05;  // letzter Monat: +5%
+  if (tage > 90) return 0.85;   // > 3 Monate: -15%
+  return 1.0;
+}
+
+// 13. Besteller-Affinität (deterministisch, kostenlos — wird VOR GPT geprüft)
+export function berechneAffinitaet(
+  bestellerKuerzel: string,
+  projekte: { id: string; name: string; besteller_affinitaet: Record<string, number> | null; letzte_bestellung: string | null }[]
+): ProjektMatchErgebnis | null {
+  let maxAdjusted = 0;
+  let affinitaetsProjekt: typeof projekte[0] | null = null;
+  let rawAnteil = 0;
+
+  for (const projekt of projekte) {
+    if (!projekt.besteller_affinitaet) continue;
+    const anteil = projekt.besteller_affinitaet[bestellerKuerzel] || 0;
+    if (anteil < 0.5) continue;
+    const adjusted = anteil * recencyBoost(projekt.letzte_bestellung);
+    if (adjusted > maxAdjusted) {
+      maxAdjusted = adjusted;
+      affinitaetsProjekt = projekt;
+      rawAnteil = anteil;
+    }
+  }
+
+  if (affinitaetsProjekt && maxAdjusted > 0) {
+    const konfidenz = Math.min(maxAdjusted * 0.80, 0.80);
+    if (konfidenz >= 0.60) {
+      return {
+        projekt_id: affinitaetsProjekt.id,
+        konfidenz,
+        methode: "besteller_affinitaet",
+        begruendung: `Besteller ${bestellerKuerzel} bestellt zu ${Math.round(rawAnteil * 100)}% für "${affinitaetsProjekt.name}"`,
+      };
+    }
+  }
+  return null;
+}
+
+// 14. Besteller-Affinität aktualisieren (Self-Learning)
+export async function aktualisiereBestellerAffinitaet(
+  supabase: SupabaseClient,
+  projektId: string
+): Promise<void> {
+  const { data: bestellungen } = await supabase
+    .from("bestellungen")
+    .select("besteller_kuerzel")
+    .eq("projekt_id", projektId)
+    .neq("besteller_kuerzel", "UNBEKANNT");
+
+  if (!bestellungen || bestellungen.length === 0) return;
+
+  const counts: Record<string, number> = {};
+  for (const b of bestellungen) {
+    counts[b.besteller_kuerzel] = (counts[b.besteller_kuerzel] || 0) + 1;
+  }
+
+  const gesamt = bestellungen.length;
+  const affinitaet: Record<string, number> = {};
+  for (const [kuerzel, anzahl] of Object.entries(counts)) {
+    affinitaet[kuerzel] = Math.round((anzahl / gesamt) * 100) / 100;
+  }
+
+  await supabase
+    .from("projekte")
+    .update({ besteller_affinitaet: affinitaet })
+    .eq("id", projektId);
 }

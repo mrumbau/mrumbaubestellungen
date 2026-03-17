@@ -19,6 +19,8 @@ export default async function EinstellungenPage() {
     { data: extensionSignale },
     { data: webhookLogs },
     { data: projekte },
+    { data: kunden },
+    { data: firmaEinstellungen },
   ] = await Promise.all([
     supabase.from("haendler").select("*").order("name", { ascending: true }),
     supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
@@ -39,8 +41,17 @@ export default async function EinstellungenPage() {
     // Projekte
     supabase
       .from("projekte")
-      .select("id, name, farbe, budget, status, beschreibung, kunde")
+      .select("id, name, farbe, budget, status, beschreibung, kunde, adresse, adresse_keywords")
       .order("name"),
+    // Kunden
+    supabase
+      .from("kunden")
+      .select("*")
+      .order("name"),
+    // Firma-Einstellungen
+    supabase
+      .from("firma_einstellungen")
+      .select("schluessel, wert"),
   ]);
 
   // Händler-Stats aggregieren: { haendler_name: { gesamt, letzte, abweichungen } }
@@ -73,7 +84,9 @@ export default async function EinstellungenPage() {
       haendlerStats={statsMap}
       extensionSignale={signalMap}
       webhookLogs={(webhookLogs || []) as { id: string; typ: string; status: string; bestellnummer: string | null; fehler_text: string | null; created_at: string }[]}
-      projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null }[]}
+      projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
+      kunden={(kunden || []) as { id: string; name: string; kuerzel: string | null; adresse: string | null; email: string | null; telefon: string | null; notizen: string | null; keywords: string[]; farbe: string; confirmed_at: string | null; created_at: string }[]}
+      firmaEinstellungen={(firmaEinstellungen || []) as { schluessel: string; wert: string }[]}
     />
   );
 }

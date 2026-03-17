@@ -42,14 +42,14 @@ export async function GET(
       .eq("bestellung_id", id)
       .order("created_at", { ascending: true });
 
-    // Abgleich laden
+    // Abgleich laden (nicht jede Bestellung hat einen)
     const { data: abgleich } = await supabase
       .from("abgleiche")
       .select("*")
       .eq("bestellung_id", id)
       .order("erstellt_am", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     // Kommentare laden
     const { data: kommentare } = await supabase
@@ -58,12 +58,12 @@ export async function GET(
       .eq("bestellung_id", id)
       .order("erstellt_am", { ascending: true });
 
-    // Freigabe laden
+    // Freigabe laden (nicht jede Bestellung ist freigegeben)
     const { data: freigabe } = await supabase
       .from("freigaben")
       .select("*")
       .eq("bestellung_id", id)
-      .single();
+      .maybeSingle();
 
     return NextResponse.json({
       bestellung,

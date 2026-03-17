@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel, extrahiereBestellerHinweise } from "@/lib/openai";
+import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel, extrahiereBestellerHinweise, erkenneProjektAusInhalt, berechneAffinitaet, aktualisiereBestellerAffinitaet, type ProjektMatchErgebnis } from "@/lib/openai";
 import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
@@ -271,7 +271,6 @@ export async function POST(request: NextRequest) {
             .from("bestellungen")
             .select("id, haendler_name")
             .eq("besteller_kuerzel", benutzer.kuerzel)
-            .neq("besteller_kuerzel", "UNBEKANNT")
             .limit(30);
 
           const bestellIds = (bestellungen || []).map((b) => b.id);
@@ -387,7 +386,7 @@ export async function POST(request: NextRequest) {
         .select("id")
         .eq("bestellnummer", erkannteBestellnummer)
         .limit(1)
-        .single();
+        .maybeSingle();
       existierendeBestellung = data;
     }
 
@@ -434,7 +433,7 @@ export async function POST(request: NextRequest) {
             .select("id")
             .eq("bestellnummer", erkannteBestellnummer)
             .limit(1)
-            .single();
+            .maybeSingle();
           if (fallback) {
             bestellungId = fallback.id;
           } else {
@@ -631,6 +630,142 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         logError("/api/webhook/email", "Kategorisierung fehlgeschlagen", err);
       }
+    }
+
+    // === FEATURE: Intelligente Baustellen-Erkennung (5-Stufen-Kette) ===
+    try {
+      // 1. Volltext + Lieferadressen aus Scan-Ergebnissen sammeln
+      const dokumentTexte = ergebnisse.map((e) => e.analyse.volltext || "").filter(Boolean);
+      const lieferadressen = ergebnisse.flatMap((e) => e.analyse.lieferadressen || []).filter(Boolean);
+
+      // 2. Büro-Adresse + Konfidenz-Schwellwerte laden
+      const { data: firmaSettings } = await supabase
+        .from("firma_einstellungen")
+        .select("schluessel, wert")
+        .in("schluessel", ["buero_adresse", "konfidenz_direkt", "konfidenz_vorschlag"]);
+      const bueroAdresse = firmaSettings?.find((s: { schluessel: string }) => s.schluessel === "buero_adresse")?.wert || "";
+      const schwelleDirekt = parseFloat(firmaSettings?.find((s: { schluessel: string }) => s.schluessel === "konfidenz_direkt")?.wert || "0.85");
+      const schwelleVorschlag = parseFloat(firmaSettings?.find((s: { schluessel: string }) => s.schluessel === "konfidenz_vorschlag")?.wert || "0.60");
+
+      // 3. Aktive Projekte mit Kunden-Info laden
+      const { data: aktiveProjekte } = await supabase
+        .from("projekte")
+        .select("id, name, beschreibung, adresse, adresse_keywords, kunden_id, besteller_affinitaet, kunden(name)")
+        .in("status", ["aktiv", "pausiert"]);
+
+      type ProjektRow = { id: string; name: string; beschreibung: string | null; adresse: string | null; adresse_keywords: string[] | null; kunden_id: string | null; besteller_affinitaet: unknown; kunden: { name: string }[] | null };
+      const kundenName = (p: ProjektRow) => {
+        const k = p.kunden;
+        if (Array.isArray(k)) return k[0]?.name || null;
+        if (k && typeof k === "object") return (k as { name: string }).name || null;
+        return null;
+      };
+
+      // 4. Letzte Bestellung pro Projekt laden (für Recency-Boost)
+      const projektIds = (aktiveProjekte || []).map((p: { id: string }) => p.id);
+      let letzteBestellungMap: Record<string, string> = {};
+      if (projektIds.length > 0) {
+        const { data: letzteBestellungen } = await supabase
+          .from("bestellungen")
+          .select("projekt_id, created_at")
+          .in("projekt_id", projektIds)
+          .order("created_at", { ascending: false });
+        for (const b of letzteBestellungen || []) {
+          if (b.projekt_id && !letzteBestellungMap[b.projekt_id]) {
+            letzteBestellungMap[b.projekt_id] = b.created_at;
+          }
+        }
+      }
+
+      // 5. STUFE 0: Affinität prüfen (kostenlos, kein API-Call)
+      let projektErgebnis: ProjektMatchErgebnis | null = null;
+      let affinitaetsMatch: ProjektMatchErgebnis | null = null;
+      if (bestellerKuerzel && bestellerKuerzel !== "UNBEKANNT" && aktiveProjekte) {
+        affinitaetsMatch = berechneAffinitaet(
+          bestellerKuerzel,
+          (aktiveProjekte as ProjektRow[]).map((p) => ({
+            id: p.id,
+            name: p.name,
+            besteller_affinitaet: p.besteller_affinitaet as Record<string, number> | null,
+            letzte_bestellung: letzteBestellungMap[p.id] || null,
+          }))
+        );
+      }
+
+      if (affinitaetsMatch && affinitaetsMatch.konfidenz >= schwelleDirekt) {
+        // Affinität allein reicht für Direkt-Zuordnung → GPT überspringen
+        projektErgebnis = affinitaetsMatch;
+        logInfo("/api/webhook/email", `Affinität-Shortcut: GPT übersprungen (${Math.round(affinitaetsMatch.konfidenz * 100)}%)`, { bestellungId });
+      } else {
+        // 6. Stufen 1-3: GPT-4o Erkennung
+        const gptErgebnis = await erkenneProjektAusInhalt({
+          email_betreff: email_betreff || "",
+          email_body: emailText,
+          dokument_texte: dokumentTexte,
+          lieferadressen,
+          buero_adresse: bueroAdresse,
+          aktive_projekte: ((aktiveProjekte || []) as ProjektRow[]).map((p) => ({
+            id: p.id,
+            name: p.name,
+            beschreibung: p.beschreibung,
+            adresse: p.adresse,
+            adresse_keywords: p.adresse_keywords || [],
+            kunden_name: kundenName(p),
+          })),
+        });
+
+        // 7. Bestes Ergebnis nehmen: max(GPT, Affinität), mindestens schwelleVorschlag
+        const best = (gptErgebnis && affinitaetsMatch)
+          ? (gptErgebnis.konfidenz >= affinitaetsMatch.konfidenz ? gptErgebnis : affinitaetsMatch)
+          : (gptErgebnis || affinitaetsMatch);
+        if (best && best.konfidenz >= schwelleVorschlag) {
+          projektErgebnis = best;
+        }
+      }
+
+      // 6. Speichern
+      const updateDaten: Record<string, unknown> = {
+        lieferadresse_erkannt: projektErgebnis?.extrahierte_lieferadresse || lieferadressen[0] || null,
+      };
+
+      if (projektErgebnis && projektErgebnis.projekt_id) {
+        const direktZuordnen = projektErgebnis.konfidenz >= schwelleDirekt;
+
+        // Projekt-Name nachschlagen
+        const matchProjekt = (aktiveProjekte as ProjektRow[])?.find((p) => p.id === projektErgebnis!.projekt_id);
+        const projektName = matchProjekt?.name || "";
+
+        if (direktZuordnen) {
+          updateDaten.projekt_id = projektErgebnis.projekt_id;
+          updateDaten.projekt_name = projektName;
+          updateDaten.projekt_vorschlag_id = null;
+          updateDaten.projekt_vorschlag_konfidenz = projektErgebnis.konfidenz;
+          updateDaten.projekt_vorschlag_methode = projektErgebnis.methode;
+          updateDaten.projekt_vorschlag_begruendung = projektErgebnis.begruendung;
+          updateDaten.projekt_bestaetigt = true;
+        } else {
+          updateDaten.projekt_vorschlag_id = projektErgebnis.projekt_id;
+          updateDaten.projekt_vorschlag_konfidenz = projektErgebnis.konfidenz;
+          updateDaten.projekt_vorschlag_methode = projektErgebnis.methode;
+          updateDaten.projekt_vorschlag_begruendung = projektErgebnis.begruendung;
+          updateDaten.projekt_bestaetigt = false;
+        }
+
+        logInfo("/api/webhook/email", `Projekt-Match: ${projektName} (${Math.round(projektErgebnis.konfidenz * 100)}%, ${projektErgebnis.methode})`, { bestellungId, direkt: direktZuordnen });
+      }
+
+      await supabase
+        .from("bestellungen")
+        .update(updateDaten)
+        .eq("id", bestellungId);
+
+      // 7. Self-Learning bei Direkt-Zuordnung
+      if (projektErgebnis && projektErgebnis.projekt_id && projektErgebnis.konfidenz >= schwelleDirekt) {
+        await aktualisiereBestellerAffinitaet(supabase, projektErgebnis.projekt_id);
+      }
+    } catch (err) {
+      logError("/api/webhook/email", "Baustellen-Erkennung fehlgeschlagen", err);
+      // Pipeline läuft trotzdem weiter
     }
 
     // Status aktualisieren (zentralisiert)

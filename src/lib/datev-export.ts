@@ -109,7 +109,23 @@ export function generiereZEILE(
   gegenKonto: string,
   kost1?: string
 ): string {
-  const netto = rechnung.netto || Number(rechnung.betrag) / 1.19;
+  // MwSt-Satz aus Rechnungsdaten ableiten, Fallback 19%
+  let netto: number;
+  let buSchluessel: string;
+
+  if (rechnung.netto && rechnung.mwst && rechnung.netto > 0) {
+    // Netto und MwSt direkt aus Rechnung verfügbar
+    netto = rechnung.netto;
+    const mwstProzent = Math.round((rechnung.mwst / rechnung.netto) * 100);
+    buSchluessel = mwstProzent <= 9 ? "1" : "9"; // 1 = 7%, 9 = 19%
+  } else if (rechnung.netto) {
+    netto = rechnung.netto;
+    buSchluessel = "9"; // Standard 19%
+  } else {
+    netto = Number(rechnung.betrag) / 1.19;
+    buSchluessel = "9"; // Standard 19%
+  }
+
   const betragFormatiert = formatiereBetrag(netto);
 
   const datum = new Date(rechnung.updated_at || rechnung.created_at);
@@ -122,9 +138,6 @@ export function generiereZEILE(
     buchungstext += ` / ${rechnung.projekt_name}`;
   }
   buchungstext = buchungstext.slice(0, 60);
-
-  // BU-Schlüssel 9 = 19% MwSt (Standard)
-  const buSchluessel = "9";
 
   // Felder bis KOST1 (39 Felder total)
   const felder = [
