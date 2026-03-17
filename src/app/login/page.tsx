@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
+import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -93,18 +94,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center">
-              <span className="font-headline text-2xl text-white font-bold tracking-tight">MR</span>
-            </div>
-            <div>
-              <h1 className="font-headline text-3xl text-white tracking-tight">UMBAU</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="h-px w-8 bg-white/40" />
-                <span className="text-[9px] text-white/40 tracking-[0.2em] uppercase">GmbH</span>
-              </div>
-            </div>
-          </div>
+          <Logo size={56} color="#ffffff" />
         </div>
 
         {/* Haupttext + Motto */}
@@ -156,14 +146,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-[#f5f4f2]">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 bg-[#570006] rounded-lg flex items-center justify-center">
-              <span className="font-headline text-lg text-white font-bold">MR</span>
-            </div>
-            <div>
-              <span className="font-headline text-xl text-[#1a1a1a] tracking-tight">UMBAU</span>
-              <p className="text-[9px] text-[#9a9a9a] tracking-[0.15em] uppercase">Bestellmanagement</p>
-            </div>
+          <div className="lg:hidden mb-12">
+            <Logo size={40} color="#570006" />
           </div>
 
           <div>

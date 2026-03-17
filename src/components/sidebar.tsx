@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import type { BenutzerProfil } from "@/lib/auth";
+import { Logo } from "@/components/logo";
 
 function IconDashboard({ className }: { className?: string }) {
   return (
@@ -72,9 +73,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       <div className="px-5 py-6 border-b border-white/[0.06]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#570006] rounded-lg flex items-center justify-center">
-              <span className="font-headline text-sm text-white font-bold tracking-tight">MR</span>
-            </div>
+            <Logo size={32} color="#ffffff" />
             <div>
               <p className="font-headline text-[15px] text-white tracking-tight leading-none">UMBAU</p>
               <p className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Bestellungen</p>
