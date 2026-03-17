@@ -117,6 +117,15 @@ export function ProjekteClient({
         return;
       }
 
+      const data = await res.json();
+      const saved = data.projekt as Projekt;
+
+      if (editId) {
+        setProjekte((prev) => prev.map((p) => (p.id === editId ? saved : p)));
+      } else {
+        setProjekte((prev) => [...prev, saved]);
+      }
+
       resetForm();
       router.refresh();
     } catch {
@@ -131,6 +140,14 @@ export function ProjekteClient({
     try {
       const res = await fetch(`/api/projekte/${deleteId}`, { method: "DELETE" });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.archiviert) {
+          // Soft-delete: Status auf archiviert setzen
+          setProjekte((prev) => prev.map((p) => (p.id === deleteId ? { ...p, status: "archiviert" } : p)));
+        } else {
+          // Echtes Löschen: aus Liste entfernen
+          setProjekte((prev) => prev.filter((p) => p.id !== deleteId));
+        }
         setDeleteId(null);
         router.refresh();
       } else {

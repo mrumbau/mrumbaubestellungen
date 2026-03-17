@@ -712,7 +712,7 @@ export function EinstellungenClient({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ═══════════════════════════════════════════
             HÄNDLERLISTE + STATISTIKEN
             ═══════════════════════════════════════════ */}
