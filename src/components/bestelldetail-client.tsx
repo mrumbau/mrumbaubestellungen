@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { BenutzerProfil } from "@/lib/auth";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -12,6 +12,8 @@ interface Dokument {
   storage_pfad: string | null;
   artikel: { name: string; menge: number; einzelpreis: number; gesamtpreis: number }[] | null;
   gesamtbetrag: number | null;
+  netto: number | null;
+  mwst: number | null;
   created_at: string;
 }
 
@@ -42,6 +44,7 @@ interface ProjektOption {
   id: string;
   name: string;
   farbe: string;
+  budget?: number | null;
 }
 
 interface Bestellung {
@@ -63,19 +66,41 @@ interface Bestellung {
   projekt_bestaetigt: boolean;
 }
 
+// ─── Icons ──────────────────────────────────────────────
+
 function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
   return (
-    <svg
-      className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180" : ""} ${className || ""}`}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
+    <svg className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180" : ""} ${className || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
   );
 }
+
+function BestellIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+    </svg>
+  );
+}
+
+function LieferscheinIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
+    </svg>
+  );
+}
+
+function RechnungIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+    </svg>
+  );
+}
+
+// ─── Sub-components ─────────────────────────────────────
 
 function CollapsibleWidget({
   title,
@@ -91,7 +116,6 @@ function CollapsibleWidget({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-
   return (
     <div className="card overflow-hidden">
       <button
@@ -115,11 +139,13 @@ function CollapsibleWidget({
   );
 }
 
-const DOK_TABS = [
-  { key: "bestellbestaetigung", label: "Bestellbestätigung" },
-  { key: "lieferschein", label: "Lieferschein" },
-  { key: "rechnung", label: "Rechnung" },
+const DOK_TABS: { key: string; label: string; icon: (props: { className?: string }) => React.JSX.Element }[] = [
+  { key: "bestellbestaetigung", label: "Bestätigung", icon: BestellIcon },
+  { key: "lieferschein", label: "Lieferschein", icon: LieferscheinIcon },
+  { key: "rechnung", label: "Rechnung", icon: RechnungIcon },
 ];
+
+// ─── Main Component ─────────────────────────────────────
 
 export function BestelldetailClient({
   bestellung,
@@ -155,9 +181,13 @@ export function BestelldetailClient({
   const [katLoading, setKatLoading] = useState(false);
   const [projektLoading, setProjektLoading] = useState(false);
   const [showProjektSelect, setShowProjektSelect] = useState(false);
+  const [projektSuche, setProjektSuche] = useState("");
   const [projektStats, setProjektStats] = useState<{ gesamt_ausgaben: number; budget: number | null; budget_auslastung_prozent: number | null } | null>(null);
   const [vorschlagLoading, setVorschlagLoading] = useState(false);
   const [showVorschlagKorrektur, setShowVorschlagKorrektur] = useState(false);
+  const [artikelDrawerOpen, setArtikelDrawerOpen] = useState(false);
+  const [mobileSection, setMobileSection] = useState<"dokumente" | "details" | "aktionen">("dokumente");
+  const [openAbweichungen, setOpenAbweichungen] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -169,6 +199,26 @@ export function BestelldetailClient({
       .catch(() => {});
   }, [bestellung.projekt_id]);
 
+  // Filtered projects for Combobox
+  const filteredProjekte = useMemo(() => {
+    if (!projektSuche.trim()) return projekte;
+    const q = projektSuche.toLowerCase();
+    return projekte.filter((p) => p.name.toLowerCase().includes(q));
+  }, [projekte, projektSuche]);
+
+  // Build timeline
+  const timeline = useMemo(() => {
+    const items: { zeit: string; label: string; typ: "dok" | "abgleich" | "freigabe" | "kommentar"; farbe: string }[] = [];
+    for (const d of dokumente) {
+      const typLabels: Record<string, string> = { bestellbestaetigung: "Bestellbestätigung", lieferschein: "Lieferschein", rechnung: "Rechnung" };
+      items.push({ zeit: d.created_at, label: `${typLabels[d.typ] || d.typ} eingegangen`, typ: "dok", farbe: "#2563eb" });
+    }
+    if (abgleich) items.push({ zeit: abgleich.erstellt_am, label: `KI-Abgleich: ${abgleich.status === "ok" ? "OK" : "Abweichung"}`, typ: "abgleich", farbe: abgleich.status === "ok" ? "#16a34a" : "#dc2626" });
+    if (freigabe) items.push({ zeit: freigabe.freigegeben_am, label: `Freigegeben von ${freigabe.freigegeben_von_name}`, typ: "freigabe", farbe: "#059669" });
+    for (const k of kommentare) items.push({ zeit: k.erstellt_am, label: `${k.autor_kuerzel}: "${k.text.slice(0, 60)}${k.text.length > 60 ? "…" : ""}"`, typ: "kommentar", farbe: "#9a9a9a" });
+    return items.sort((a, b) => new Date(a.zeit).getTime() - new Date(b.zeit).getTime());
+  }, [dokumente, abgleich, freigabe, kommentare]);
+
   async function handleProjektZuordnen(projektId: string | null) {
     setProjektLoading(true);
     try {
@@ -179,6 +229,7 @@ export function BestelldetailClient({
       });
       if (res.ok) {
         setShowProjektSelect(false);
+        setProjektSuche("");
         router.refresh();
       }
     } catch { /* ignore */ } finally {
@@ -192,15 +243,9 @@ export function BestelldetailClient({
       const res = await fetch(`/api/bestellungen/${bestellung.id}/projekt-bestaetigen`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aktion,
-          ...(korrektesProjektId ? { korrektes_projekt_id: korrektesProjektId } : {}),
-        }),
+        body: JSON.stringify({ aktion, ...(korrektesProjektId ? { korrektes_projekt_id: korrektesProjektId } : {}) }),
       });
-      if (res.ok) {
-        setShowVorschlagKorrektur(false);
-        router.refresh();
-      }
+      if (res.ok) { setShowVorschlagKorrektur(false); router.refresh(); }
     } catch { /* ignore */ } finally {
       setVorschlagLoading(false);
     }
@@ -230,17 +275,13 @@ export function BestelldetailClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (res.ok) {
-        router.refresh();
-      } else {
+      if (res.ok) { router.refresh(); }
+      else {
         const data = await res.json().catch(() => ({}));
         setFreigabeError(data.error || "Freigabe fehlgeschlagen");
       }
-    } catch {
-      setFreigabeError("Netzwerkfehler bei der Freigabe");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setFreigabeError("Netzwerkfehler bei der Freigabe"); }
+    finally { setLoading(false); }
   }
 
   async function handleKommentar(e: React.FormEvent) {
@@ -252,10 +293,7 @@ export function BestelldetailClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bestellung_id: bestellung.id, text: kommentarText }),
     });
-    if (res.ok) {
-      setKommentarText("");
-      router.refresh();
-    }
+    if (res.ok) { setKommentarText(""); router.refresh(); }
     setLoading(false);
   }
 
@@ -268,14 +306,8 @@ export function BestelldetailClient({
         body: JSON.stringify({ bestellung_id: bestellung.id }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setKiZusammenfassung(data.zusammenfassung);
-      }
-    } catch {
-      // Fehler ignorieren
-    } finally {
-      setKiLoading(false);
-    }
+      if (res.ok) setKiZusammenfassung(data.zusammenfassung);
+    } catch { /* ignore */ } finally { setKiLoading(false); }
   }
 
   async function handleDuplikatCheck() {
@@ -288,9 +320,7 @@ export function BestelldetailClient({
       });
       const data = await res.json();
       if (res.ok) setDuplikatResult(data);
-    } catch { /* ignore */ } finally {
-      setDuplikatLoading(false);
-    }
+    } catch { /* ignore */ } finally { setDuplikatLoading(false); }
   }
 
   async function handleKategorisierung() {
@@ -303,9 +333,7 @@ export function BestelldetailClient({
       });
       const data = await res.json();
       if (res.ok) setKatResult(data);
-    } catch { /* ignore */ } finally {
-      setKatLoading(false);
-    }
+    } catch { /* ignore */ } finally { setKatLoading(false); }
   }
 
   async function handleScan(file: File) {
@@ -314,7 +342,6 @@ export function BestelldetailClient({
       return;
     }
     setFileSizeError(null);
-
     setScanLoading(true);
     setScanError(null);
     const reader = new FileReader();
@@ -324,116 +351,111 @@ export function BestelldetailClient({
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bestellung_id: bestellung.id,
-            base64,
-            mime_type: file.type,
-            datei_name: file.name,
-          }),
+          body: JSON.stringify({ bestellung_id: bestellung.id, base64, mime_type: file.type, datei_name: file.name }),
         });
         const data = await res.json();
-        if (!res.ok) {
-          setScanError(data.error || "Upload fehlgeschlagen");
-        } else {
-          router.refresh();
-        }
-      } catch {
-        setScanError("Netzwerkfehler beim Upload");
-      } finally {
-        setScanLoading(false);
-      }
+        if (!res.ok) setScanError(data.error || "Upload fehlgeschlagen");
+        else router.refresh();
+      } catch { setScanError("Netzwerkfehler beim Upload"); }
+      finally { setScanLoading(false); }
     };
     reader.readAsDataURL(file);
   }
 
-  return (
-    <div className="flex flex-col md:flex-row gap-5 flex-1 min-h-0">
-      {/* Links: PDF-Viewer */}
-      <div className="flex-1 card flex flex-col overflow-hidden">
-        {/* Underline Tabs */}
-        <div className="flex border-b border-[#e8e6e3]">
-          {DOK_TABS.map((tab) => {
-            const dok = dokumente.find((d) => d.typ === tab.key);
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`relative px-4 py-3 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  activeTab === tab.key
-                    ? "text-[#570006]"
-                    : dok
-                      ? "text-[#6b6b6b] hover:text-[#1a1a1a]"
-                      : "text-[#c4c2bf]"
-                }`}
-              >
-                {dok ? (
-                  <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                    <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </span>
-                ) : (
-                  <span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
-                )}
-                {tab.label}
-                {activeTab === tab.key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#570006]" />
-                )}
-              </button>
-            );
-          })}
-        </div>
+  async function handleZipDownload() {
+    const pdfDokumente = dokumente.filter((d) => d.storage_pfad);
+    if (pdfDokumente.length === 0) return;
+    // Open each PDF in new tab as fallback (real ZIP would need server-side endpoint)
+    for (const d of pdfDokumente) {
+      window.open(`/api/pdfs/${d.id}`, "_blank");
+    }
+  }
 
-        <div className={`flex items-center justify-center bg-[#fafaf9] ${aktivesDokument?.storage_pfad ? "flex-1 min-h-[400px]" : "py-12"}`}>
-          {aktivesDokument?.storage_pfad ? (
-            <iframe
-              src={`/api/pdfs/${aktivesDokument.id}`}
-              className="w-full h-full"
-              title="PDF Vorschau"
-            />
-          ) : (
-            <div className="text-center px-6">
-              <div className="w-12 h-12 rounded-xl bg-[#f0eeeb] flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-[#9a9a9a]">Kein Dokument vorhanden</p>
-              <p className="text-[11px] text-[#c4c2bf] mt-1">Wird automatisch angezeigt sobald ein Dokument per E-Mail oder Upload eingeht.</p>
-            </div>
-          )}
-        </div>
+  // ─── Render: Sidebar content ──────────────────────────
 
-        {/* Artikelliste */}
-        {aktivesDokument?.artikel && aktivesDokument.artikel.length > 0 && (
-          <div className="border-t border-[#e8e6e3] p-4 max-h-48 overflow-auto">
-            <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-2">Erkannte Artikel</p>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-[#9a9a9a]">
-                  <th className="pb-1">Artikel</th>
-                  <th className="pb-1 text-right">Menge</th>
-                  <th className="pb-1 text-right">Einzelpreis</th>
-                  <th className="pb-1 text-right">Gesamt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {aktivesDokument.artikel.map((a, i) => (
-                  <tr key={i} className="border-t border-[#f0eeeb]">
-                    <td className="py-1 text-[#1a1a1a]">{a.name}</td>
-                    <td className="py-1 text-right font-mono-amount text-[#6b6b6b]">{a.menge}</td>
-                    <td className="py-1 text-right font-mono-amount text-[#6b6b6b]">{a.einzelpreis?.toFixed(2)} &euro;</td>
-                    <td className="py-1 text-right font-mono-amount font-semibold text-[#1a1a1a]">{a.gesamtpreis?.toFixed(2)} &euro;</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+  function renderUploadArea() {
+    return (
+      <>
+        <div className="flex gap-2">
+          <button onClick={() => cameraInputRef.current?.click()} disabled={scanLoading} aria-label="Dokument mit Kamera scannen" className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors">
+            <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+            </svg>
+            Kamera
+          </button>
+          <button onClick={() => fileInputRef.current?.click()} disabled={scanLoading} aria-label="Datei hochladen" className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors">
+            <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            Datei
+          </button>
+        </div>
+        {scanLoading && (
+          <div className="flex items-center gap-2 mt-2">
+            <div className="spinner w-3 h-3" />
+            <span className="text-xs text-[#570006] font-medium">Wird analysiert...</span>
           </div>
         )}
-      </div>
+        {scanError && <p className="text-xs text-red-600 mt-2 font-medium">{scanError}</p>}
+        {fileSizeError && <p className="text-xs text-red-600 mt-2 font-medium">{fileSizeError}</p>}
+      </>
+    );
+  }
 
-      {/* Rechts: Projekt + KI-Abgleich + Scan + Freigabe + Kommentare */}
-      <div className="w-full md:w-80 flex flex-col gap-4 overflow-auto">
+  function renderSidebar() {
+    return (
+      <>
+        {/* ── SECTION: Aktionen (immer oben) ────────────── */}
+
+        {/* Freigabe */}
+        {freigabe ? (
+          <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="font-headline text-sm text-emerald-700">Freigegeben</p>
+            </div>
+            <p className="text-xs text-emerald-600 mt-1.5 ml-6">
+              Von {freigabe.freigegeben_von_name} am {new Date(freigabe.freigegeben_am).toLocaleString("de-DE")}
+            </p>
+            {freigabe.kommentar && <p className="text-xs text-emerald-600 mt-1 ml-6 italic">{freigabe.kommentar}</p>}
+          </div>
+        ) : kannFreigeben ? (
+          <div className="card p-4">
+            <button
+              type="button"
+              onClick={() => setShowFreigabeDialog(true)}
+              disabled={loading || !hatRechnung}
+              title={!hatRechnung ? "Rechnung muss zuerst vorhanden sein" : undefined}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-colors ${
+                hatRechnung ? "btn-primary disabled:opacity-50" : "bg-[#e8e6e3] text-[#9a9a9a] cursor-not-allowed"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              {hatRechnung ? "Rechnung freigeben" : "Rechnung fehlt noch"}
+            </button>
+            {!hatRechnung && (
+              <p className="text-[10px] text-[#c4c2bf] mt-2 text-center">Die Freigabe wird möglich sobald eine Rechnung vorliegt.</p>
+            )}
+            {freigabeError && <p className="text-xs text-red-600 mt-2 font-medium">{freigabeError}</p>}
+          </div>
+        ) : null}
+
+        {/* Upload */}
+        <div className="card p-4">
+          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Dokument hochladen</h3>
+          <p className="text-xs text-[#9a9a9a] mb-3 leading-relaxed">
+            Dokumenttyp wird automatisch erkannt.
+          </p>
+          {renderUploadArea()}
+        </div>
+
+        {/* ── SECTION: Status (mitte) ───────────────────── */}
+
         {/* KI-Vorschlag Banner */}
         {bestellung.projekt_vorschlag_id && !bestellung.projekt_bestaetigt && !bestellung.projekt_id && (
           <div className="card p-4 border-l-[3px] border-l-[#d97706]">
@@ -457,29 +479,31 @@ export function BestelldetailClient({
             )}
 
             <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ background: projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.farbe || "#570006" }}
-              />
-              <span className="text-sm font-medium text-[#1a1a1a]">
-                {projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.name || "Unbekanntes Projekt"}
-              </span>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.farbe || "#570006" }} />
+              <span className="text-sm font-medium text-[#1a1a1a]">{projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.name || "Unbekanntes Projekt"}</span>
             </div>
 
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-mono-amount text-[11px] font-bold text-amber-700">
-                {Math.round((bestellung.projekt_vorschlag_konfidenz || 0) * 100)}%
-              </span>
-              <span className="text-[10px] text-[#9a9a9a]">
-                {METHODEN_LABELS[bestellung.projekt_vorschlag_methode || ""] || bestellung.projekt_vorschlag_methode}
-              </span>
+              <span className="font-mono-amount text-[11px] font-bold text-amber-700">{Math.round((bestellung.projekt_vorschlag_konfidenz || 0) * 100)}%</span>
+              <span className="text-[10px] text-[#9a9a9a]">{METHODEN_LABELS[bestellung.projekt_vorschlag_methode || ""] || bestellung.projekt_vorschlag_methode}</span>
             </div>
 
             {bestellung.projekt_vorschlag_begruendung && (
-              <p className="text-[11px] text-[#9a9a9a] italic mb-3">
-                &ldquo;{bestellung.projekt_vorschlag_begruendung}&rdquo;
-              </p>
+              <p className="text-[11px] text-[#9a9a9a] italic mb-3">&ldquo;{bestellung.projekt_vorschlag_begruendung}&rdquo;</p>
             )}
+
+            {/* Budget im Vorschlag-Banner */}
+            {(() => {
+              const vorschlagProjekt = projekte.find((p) => p.id === bestellung.projekt_vorschlag_id);
+              if (vorschlagProjekt?.budget) {
+                return (
+                  <div className="px-2.5 py-1.5 bg-[#f5f4f2] rounded-lg mb-3 text-[10px] text-[#9a9a9a]">
+                    Budget: <span className="font-mono-amount font-medium text-[#6b6b6b]">{vorschlagProjekt.budget.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {bestellung.kunden_name && (
               <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-[#f5f4f2] rounded-lg">
@@ -492,24 +516,12 @@ export function BestelldetailClient({
 
             {!showVorschlagKorrektur ? (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleVorschlagAktion("bestaetigen")}
-                  disabled={vorschlagLoading}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                <button onClick={() => handleVorschlagAktion("bestaetigen")} disabled={vorschlagLoading} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   Korrekt
                 </button>
-                <button
-                  onClick={() => setShowVorschlagKorrektur(true)}
-                  disabled={vorschlagLoading}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <button onClick={() => setShowVorschlagKorrektur(true)} disabled={vorschlagLoading} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                   Falsch
                 </button>
               </div>
@@ -517,58 +529,138 @@ export function BestelldetailClient({
               <div className="space-y-2">
                 <p className="text-[11px] text-[#9a9a9a]">Korrektes Projekt auswählen:</p>
                 {projekte.filter((p) => p.id !== bestellung.projekt_vorschlag_id).map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleVorschlagAktion("ablehnen", p.id)}
-                    disabled={vorschlagLoading}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
-                  >
+                  <button key={p.id} onClick={() => handleVorschlagAktion("ablehnen", p.id)} disabled={vorschlagLoading} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
                     {p.name}
                   </button>
                 ))}
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleVorschlagAktion("ablehnen")}
-                    disabled={vorschlagLoading}
-                    className="text-[11px] text-[#9a9a9a] hover:text-red-600 transition-colors"
-                  >
-                    Ohne Korrektur ablehnen
-                  </button>
-                  <button
-                    onClick={() => setShowVorschlagKorrektur(false)}
-                    className="text-[11px] text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors"
-                  >
-                    Abbrechen
-                  </button>
+                  <button onClick={() => handleVorschlagAktion("ablehnen")} disabled={vorschlagLoading} className="text-[11px] text-[#9a9a9a] hover:text-red-600 transition-colors">Ohne Korrektur ablehnen</button>
+                  <button onClick={() => setShowVorschlagKorrektur(false)} className="text-[11px] text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors">Abbrechen</button>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Projekt-Zuordnung */}
+        {/* KI-Abgleich — Redesigned */}
+        <div className={`card overflow-hidden ${
+          abgleich?.status === "ok" ? "border-l-[3px] border-l-green-600" : abgleich?.status === "abweichung" ? "border-l-[3px] border-l-red-600" : ""
+        }`}>
+          {abgleich ? (
+            abgleich.status === "ok" ? (
+              /* Compact OK view */
+              <div className="flex items-center gap-3 px-4 py-3 bg-green-50">
+                <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-green-700">Alle Dokumente stimmen überein</p>
+                  <p className="text-[10px] text-green-600/70 mt-0.5">Geprüft am {new Date(abgleich.erstellt_am).toLocaleString("de-DE")}</p>
+                </div>
+              </div>
+            ) : (
+              /* Abweichung view with action banner */
+              <div>
+                <div className="px-4 py-3 bg-red-50 border-b border-red-100">
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-5 h-5 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-red-700">
+                        {abgleich.abweichungen?.length === 1 ? "1 Abweichung gefunden" : `${abgleich.abweichungen?.length || 0} Abweichungen gefunden`}
+                      </p>
+                      <p className="text-[11px] text-red-600 mt-0.5">Bitte prüfe die markierten Positionen bevor du freigibst.</p>
+                    </div>
+                  </div>
+                </div>
+                {abgleich.abweichungen && abgleich.abweichungen.length > 0 && (
+                  <div className="p-3 space-y-1.5">
+                    {abgleich.abweichungen.map((a, i) => (
+                      <div key={i}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenAbweichungen((prev) => ({ ...prev, [i]: !prev[i] }))}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100/70 transition-colors text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${a.schwere === "hoch" ? "bg-red-600" : "bg-amber-500"}`} />
+                            <span className="font-semibold text-red-700">{a.feld}</span>
+                            {a.artikel && <span className="text-red-500">({a.artikel})</span>}
+                          </div>
+                          <ChevronIcon open={!!openAbweichungen[i]} className="text-red-400 w-3 h-3" />
+                        </button>
+                        {openAbweichungen[i] && (
+                          <div className="mx-3 mt-1 mb-2 px-3 py-2 bg-red-50/50 rounded-lg text-[11px] text-red-600 space-y-1">
+                            <div className="flex gap-4">
+                              <span>Erwartet: <span className="font-medium">{a.erwartet}</span></span>
+                              <span>Gefunden: <span className="font-medium">{a.gefunden}</span></span>
+                            </div>
+                            <div className="text-red-400">Dokument: {a.dokument} · Schwere: {a.schwere}</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {abgleich.ki_zusammenfassung && (
+                  <div className="px-4 pb-3">
+                    <p className="text-xs text-[#6b6b6b] leading-relaxed">{abgleich.ki_zusammenfassung}</p>
+                  </div>
+                )}
+                <div className="px-4 pb-3">
+                  <p className="text-[10px] text-[#c4c2bf]">Geprüft am {new Date(abgleich.erstellt_am).toLocaleString("de-DE")}</p>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight">KI-Abgleich</h3>
+              </div>
+              <p className="text-xs text-[#9a9a9a] mb-3">Startet automatisch sobald alle Dokumente vorliegen.</p>
+              <div className="space-y-2">
+                {[
+                  { key: "hat_bestellbestaetigung", label: "Bestellbestätigung" },
+                  { key: "hat_lieferschein", label: "Lieferschein" },
+                  { key: "hat_rechnung", label: "Rechnung" },
+                ].map((d) => {
+                  const vorhanden = bestellung[d.key as keyof Bestellung];
+                  return (
+                    <div key={d.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs ${vorhanden ? "bg-green-50" : "bg-[#fafaf9]"}`}>
+                      {vorhanden ? (
+                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                          <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        </span>
+                      ) : (
+                        <span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
+                      )}
+                      <span className={vorhanden ? "text-green-700 font-medium" : "text-[#9a9a9a]"}>{d.label}</span>
+                      {!vorhanden && <span className="text-[10px] text-[#c4c2bf] ml-auto">ausstehend</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Projekt-Zuordnung — Combobox */}
         <div className="card p-4">
           <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Projekt</h3>
           {bestellung.projekt_name ? (
             <div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-sm text-[#1a1a1a]">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: projekte.find((p) => p.id === bestellung.projekt_id)?.farbe || "#570006" }}
-                  />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projekte.find((p) => p.id === bestellung.projekt_id)?.farbe || "#570006" }} />
                   {bestellung.projekt_name}
                 </span>
-                <button
-                  onClick={() => handleProjektZuordnen(null)}
-                  disabled={projektLoading}
-                  className="text-[10px] text-[#9a9a9a] hover:text-red-600 transition-colors"
-                  title="Zuordnung entfernen"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <button onClick={() => handleProjektZuordnen(null)} disabled={projektLoading} className="text-[10px] text-[#9a9a9a] hover:text-red-600 transition-colors" title="Zuordnung entfernen">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               {projektStats?.budget != null && projektStats.budget_auslastung_prozent != null && (
@@ -576,14 +668,12 @@ export function BestelldetailClient({
                   <div className="flex items-center justify-between text-[10px] mb-1">
                     <span className="text-[#9a9a9a]">Budget</span>
                     <span className="font-mono-amount font-medium text-[#6b6b6b]">
-                      {projektStats.gesamt_ausgaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} / {projektStats.budget!.toLocaleString("de-DE", { minimumFractionDigits: 2 })} &euro;
+                      {projektStats.gesamt_ausgaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} / {projektStats.budget!.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                     </span>
                   </div>
                   <div className="h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        projektStats.budget_auslastung_prozent >= 90 ? "bg-red-500" : projektStats.budget_auslastung_prozent >= 70 ? "bg-amber-500" : "bg-green-500"
-                      }`}
+                      className={`h-full rounded-full transition-all ${projektStats.budget_auslastung_prozent >= 90 ? "bg-red-500" : projektStats.budget_auslastung_prozent >= 70 ? "bg-amber-500" : "bg-green-500"}`}
                       style={{ width: `${Math.min(projektStats.budget_auslastung_prozent, 100)}%` }}
                     />
                   </div>
@@ -593,317 +683,145 @@ export function BestelldetailClient({
             </div>
           ) : showProjektSelect ? (
             <div className="space-y-2">
-              {projekte.filter((p) => p.id !== bestellung.projekt_id).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleProjektZuordnen(p.id)}
-                  disabled={projektLoading}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
-                >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
-                  {p.name}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowProjektSelect(false)}
-                className="text-xs text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors"
-              >
-                Abbrechen
-              </button>
+              <div className="relative">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+                <input
+                  type="text"
+                  value={projektSuche}
+                  onChange={(e) => setProjektSuche(e.target.value)}
+                  placeholder="Projekt suchen..."
+                  className="w-full pl-8 pr-3 py-2 text-xs bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+                  autoFocus
+                />
+              </div>
+              <div className="max-h-48 overflow-auto space-y-1">
+                {filteredProjekte.length === 0 ? (
+                  <p className="text-xs text-[#c4c2bf] py-2 text-center">Kein Projekt gefunden</p>
+                ) : (
+                  filteredProjekte.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => handleProjektZuordnen(p.id)}
+                      disabled={projektLoading}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
+                      <span className="flex-1">{p.name}</span>
+                      {p.budget && <span className="text-[10px] text-[#c4c2bf] font-mono-amount">{p.budget.toLocaleString("de-DE")} €</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+              <button onClick={() => { setShowProjektSelect(false); setProjektSuche(""); }} className="text-xs text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors">Abbrechen</button>
             </div>
           ) : (
-            <button
-              onClick={() => setShowProjektSelect(true)}
-              className="text-xs font-medium text-[#570006] hover:text-[#7a1a1f] border border-[#570006]/20 rounded-lg px-3 py-2 transition-colors"
-            >
+            <button onClick={() => setShowProjektSelect(true)} className="text-xs font-medium text-[#570006] hover:text-[#7a1a1f] border border-[#570006]/20 rounded-lg px-3 py-2 transition-colors">
               Projekt zuordnen
             </button>
           )}
         </div>
 
-        {/* KI-Abgleich */}
-        <div className={`card overflow-hidden ${
-          abgleich?.status === "ok" ? "border-l-[3px] border-l-green-600" : abgleich?.status === "abweichung" ? "border-l-[3px] border-l-red-600" : ""
-        }`}>
-          <div className={`flex items-center justify-between px-4 py-3 ${
-            abgleich?.status === "ok" ? "bg-green-50" : abgleich?.status === "abweichung" ? "bg-red-50" : "bg-[#fafaf9]"
-          }`}>
-            <span className={`text-sm font-semibold ${
-              abgleich?.status === "ok" ? "text-green-700" : abgleich?.status === "abweichung" ? "text-red-700" : "text-[#6b6b6b]"
-            }`}>
-              KI-Abgleich
-            </span>
-            {abgleich && (
-              <span className={`status-tag ${
-                abgleich.status === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-              }`}>
-                <span className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm ${abgleich.status === "ok" ? "bg-green-600" : "bg-red-600"}`} />
-                {abgleich.status === "ok" ? "OK" : "Abweichung"}
-              </span>
-            )}
-          </div>
-          <div className="p-4">
-            {abgleich ? (
-              <>
-                <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                  {abgleich.ki_zusammenfassung}
-                </p>
-                {abgleich.abweichungen && abgleich.abweichungen.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {abgleich.abweichungen.map((a, i) => (
-                      <div key={i} className="bg-red-50 rounded-lg p-2.5 text-xs">
-                        <span className="font-semibold text-red-700">{a.feld}</span>
-                        {a.artikel && <span className="text-red-600"> ({a.artikel})</span>}
-                        <br />
-                        <span className="text-red-600">
-                          Erwartet: {a.erwartet} &rarr; Gefunden: {a.gefunden} ({a.dokument})
-                        </span>
-                      </div>
-                    ))}
+        {/* ── SECTION: Extras (collapsed) ───────────────── */}
+
+        {/* Timeline */}
+        {timeline.length > 0 && (
+          <CollapsibleWidget
+            title="Aktivitätsverlauf"
+            icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            badge={<span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{timeline.length}</span>}
+          >
+            <div className="relative">
+              <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#e8e6e3]" />
+              <div className="space-y-3">
+                {timeline.map((t, i) => (
+                  <div key={i} className="flex items-start gap-3 relative">
+                    <span className="w-[15px] h-[15px] rounded-full border-2 border-white shrink-0 z-10" style={{ background: t.farbe }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-[#1a1a1a] leading-relaxed">{t.label}</p>
+                      <p className="text-[10px] text-[#c4c2bf]">{new Date(t.zeit).toLocaleString("de-DE")}</p>
+                    </div>
                   </div>
-                )}
-                <p className="text-[11px] text-[#c4c2bf] mt-3">
-                  Geprüft am {new Date(abgleich.erstellt_am).toLocaleString("de-DE")}
-                </p>
-              </>
-            ) : (
-              <div>
-                <p className="text-xs text-[#9a9a9a] mb-3">
-                  Der Abgleich startet automatisch sobald alle Dokumente vorliegen.
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { key: "hat_bestellbestaetigung", label: "Bestellbestätigung" },
-                    { key: "hat_lieferschein", label: "Lieferschein" },
-                    { key: "hat_rechnung", label: "Rechnung" },
-                  ].map((d) => {
-                    const vorhanden = bestellung[d.key as keyof Bestellung];
-                    return (
-                      <div key={d.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs ${vorhanden ? "bg-green-50" : "bg-[#fafaf9]"}`}>
-                        {vorhanden ? (
-                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                            <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </span>
-                        ) : (
-                          <span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
-                        )}
-                        <span className={vorhanden ? "text-green-700 font-medium" : "text-[#9a9a9a]"}>{d.label}</span>
-                        {!vorhanden && <span className="text-[10px] text-[#c4c2bf] ml-auto">ausstehend</span>}
-                      </div>
-                    );
-                  })}
-                </div>
+                ))}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Scan */}
-        <div className="card p-4">
-          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Dokument hochladen</h3>
-          <p className="text-xs text-[#9a9a9a] mb-3 leading-relaxed">
-            Rechnung, Lieferschein oder Bestellbestätigung manuell hochladen. Der Dokumenttyp wird automatisch erkannt.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => cameraInputRef.current?.click()}
-              disabled={scanLoading}
-              aria-label="Dokument mit Kamera scannen"
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors"
-            >
-              <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-              </svg>
-              Kamera
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={scanLoading}
-              aria-label="Datei hochladen"
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors"
-            >
-              <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-              Datei
-            </button>
-          </div>
-          {scanLoading && (
-            <div className="flex items-center gap-2 mt-2">
-              <div className="spinner w-3 h-3" />
-              <span className="text-xs text-[#570006] font-medium">Wird analysiert...</span>
             </div>
-          )}
-          {scanError && (
-            <p className="text-xs text-red-600 mt-2 font-medium">{scanError}</p>
-          )}
-          {fileSizeError && (
-            <p className="text-xs text-red-600 mt-2 font-medium">{fileSizeError}</p>
-          )}
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleScan(e.target.files[0])}
-          />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,application/pdf"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleScan(e.target.files[0])}
-          />
-        </div>
+          </CollapsibleWidget>
+        )}
 
-        {/* Freigabe */}
-        {freigabe ? (
-          <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4">
-            <p className="font-headline text-sm text-emerald-700">Freigegeben</p>
-            <p className="text-xs text-emerald-600 mt-1">
-              Von {freigabe.freigegeben_von_name} am {new Date(freigabe.freigegeben_am).toLocaleString("de-DE")}
-            </p>
-            {freigabe.kommentar && (
-              <p className="text-xs text-emerald-600 mt-1 italic">{freigabe.kommentar}</p>
-            )}
-          </div>
-        ) : kannFreigeben ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setShowFreigabeDialog(true)}
-              disabled={loading || !hatRechnung}
-              title={!hatRechnung ? "Rechnung muss zuerst vorhanden sein" : undefined}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm transition-colors ${
-                hatRechnung
-                  ? "btn-primary disabled:opacity-50"
-                  : "bg-[#e8e6e3] text-[#9a9a9a] cursor-not-allowed"
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              {hatRechnung ? "Rechnung freigeben" : "Rechnung fehlt noch"}
-            </button>
-            <ConfirmDialog
-              open={showFreigabeDialog}
-              title="Rechnung freigeben"
-              message="Soll diese Rechnung wirklich freigegeben werden? Sie wird danach für die Buchhaltung sichtbar."
-              confirmLabel="Freigeben"
-              onConfirm={handleFreigabe}
-              onCancel={() => setShowFreigabeDialog(false)}
-            />
-            {freigabeError && (
-              <p className="text-xs text-red-600 mt-2 font-medium">{freigabeError}</p>
-            )}
-          </>
-        ) : null}
-
-        {/* KI-Zusammenfassung (collapsible) */}
+        {/* KI-Zusammenfassung */}
         <CollapsibleWidget
           title="KI-Zusammenfassung"
-          icon={
-            <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-            </svg>
-          }
+          icon={<svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>}
         >
           <div className="flex items-center justify-end mb-2">
-            <button
-              onClick={handleKiZusammenfassung}
-              disabled={kiLoading}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 disabled:opacity-50 transition-colors"
-            >
+            <button onClick={handleKiZusammenfassung} disabled={kiLoading} className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 disabled:opacity-50 transition-colors">
               {kiLoading ? "Lädt..." : "Generieren"}
             </button>
           </div>
           {kiZusammenfassung ? (
             <p className="text-xs text-[#6b6b6b] leading-relaxed">{kiZusammenfassung}</p>
           ) : (
-            <p className="text-xs text-[#c4c2bf]">
-              Klicke auf &quot;Generieren&quot; für eine KI-Zusammenfassung.
-            </p>
+            <p className="text-xs text-[#c4c2bf]">Klicke auf &quot;Generieren&quot; für eine KI-Zusammenfassung.</p>
           )}
         </CollapsibleWidget>
 
-        {/* KI-Analyse (collapsible) */}
+        {/* KI-Analyse */}
         <CollapsibleWidget
           title="KI-Analyse"
-          icon={
-            <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-            </svg>
-          }
+          icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" /></svg>}
         >
           <div className="flex gap-2 mb-3">
-            <button
-              onClick={handleDuplikatCheck}
-              disabled={duplikatLoading}
-              className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.5a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
-              </svg>
+            <button onClick={handleDuplikatCheck} disabled={duplikatLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors">
+              <svg className="w-3.5 h-3.5 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.5a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
               {duplikatLoading ? "Prüft..." : "Duplikat?"}
             </button>
-            <button
-              onClick={handleKategorisierung}
-              disabled={katLoading}
-              className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
-              </svg>
+            <button onClick={handleKategorisierung} disabled={katLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors">
+              <svg className="w-3.5 h-3.5 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
               {katLoading ? "Lädt..." : "Kategorien"}
             </button>
           </div>
-
           {duplikatResult && (
             <div className={`rounded-lg p-2.5 text-xs mb-2 ${duplikatResult.ist_duplikat ? "bg-red-50" : "bg-green-50"}`}>
-              <span className={`font-semibold ${duplikatResult.ist_duplikat ? "text-red-700" : "text-green-700"}`}>
-                {duplikatResult.ist_duplikat ? "Mögliches Duplikat!" : "Kein Duplikat"}
-              </span>
-              <p className={`mt-1 ${duplikatResult.ist_duplikat ? "text-red-600" : "text-green-600"}`}>
-                {duplikatResult.begruendung}
-              </p>
+              <span className={`font-semibold ${duplikatResult.ist_duplikat ? "text-red-700" : "text-green-700"}`}>{duplikatResult.ist_duplikat ? "Mögliches Duplikat!" : "Kein Duplikat"}</span>
+              <p className={`mt-1 ${duplikatResult.ist_duplikat ? "text-red-600" : "text-green-600"}`}>{duplikatResult.begruendung}</p>
             </div>
           )}
-
           {katResult && katResult.kategorien.length > 0 && (
             <div className="space-y-1.5">
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(katResult.zusammenfassung).map(([kat, anzahl]) => (
-                  <span key={kat} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#570006]/5 text-[#570006]">
-                    {kat} ({anzahl})
-                  </span>
+                  <span key={kat} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#570006]/5 text-[#570006]">{kat} ({anzahl})</span>
                 ))}
               </div>
-              <div className="text-[10px] text-[#c4c2bf]">
-                {katResult.kategorien.map((k) => `${k.artikel}: ${k.kategorie}`).join(" · ")}
-              </div>
+              <div className="text-[10px] text-[#c4c2bf]">{katResult.kategorien.map((k) => `${k.artikel}: ${k.kategorie}`).join(" · ")}</div>
             </div>
           )}
         </CollapsibleWidget>
 
-        {/* Kommentare (collapsible, default open if comments exist) */}
+        {/* Alle PDFs herunterladen */}
+        {(() => {
+          const pdfCount = dokumente.filter((d) => d.storage_pfad).length;
+          if (pdfCount <= 1) return null;
+          return (
+            <button
+              onClick={handleZipDownload}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-[#6b6b6b] bg-[#fafaf9] border border-[#e8e6e3] rounded-xl hover:bg-[#f5f4f2] transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              Alle PDFs herunterladen ({pdfCount})
+            </button>
+          );
+        })()}
+
+        {/* Kommentare */}
         <CollapsibleWidget
           title="Kommentare"
           defaultOpen={kommentare.length > 0}
-          icon={
-            <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-            </svg>
-          }
-          badge={kommentare.length > 0 ? (
-            <span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">
-              {kommentare.length}
-            </span>
-          ) : undefined}
+          icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>}
+          badge={kommentare.length > 0 ? <span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{kommentare.length}</span> : undefined}
         >
           {kommentare.length > 0 ? (
             <div className="space-y-3 mb-3">
@@ -912,9 +830,7 @@ export function BestelldetailClient({
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-lg bg-[#570006] text-white flex items-center justify-center text-[9px] font-bold">{k.autor_kuerzel}</div>
                     <span className="text-xs font-semibold text-[#1a1a1a]">{k.autor_name}</span>
-                    <span className="text-[11px] text-[#c4c2bf]">
-                      {new Date(k.erstellt_am).toLocaleDateString("de-DE")}
-                    </span>
+                    <span className="text-[11px] text-[#c4c2bf]">{new Date(k.erstellt_am).toLocaleDateString("de-DE")}</span>
                   </div>
                   <p className="text-xs text-[#6b6b6b] mt-1 ml-8 leading-relaxed">{k.text}</p>
                 </div>
@@ -924,24 +840,420 @@ export function BestelldetailClient({
             <p className="text-xs text-[#c4c2bf] mb-3">Noch keine Kommentare.</p>
           )}
           <form onSubmit={handleKommentar} className="flex gap-2">
-            <input
-              type="text"
-              value={kommentarText}
-              onChange={(e) => setKommentarText(e.target.value)}
-              placeholder="Kommentar schreiben..."
-              className="flex-1 px-3 py-2 text-xs bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={loading || !kommentarText.trim()}
-              aria-label="Kommentar senden"
-              className="px-3 py-2 text-xs font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors"
-            >
-              Senden
-            </button>
+            <input type="text" value={kommentarText} onChange={(e) => setKommentarText(e.target.value)} placeholder="Kommentar schreiben..." className="flex-1 px-3 py-2 text-xs bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
+            <button type="submit" disabled={loading || !kommentarText.trim()} aria-label="Kommentar senden" className="px-3 py-2 text-xs font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors">Senden</button>
           </form>
         </CollapsibleWidget>
+      </>
+    );
+  }
+
+  // ─── Render: PDF viewer area ──────────────────────────
+
+  function renderDocumentArea() {
+    return (
+      <div className="flex-1 card flex flex-col overflow-hidden relative">
+        {/* Tabs — bigger, with doc-type icons */}
+        <div className="flex border-b border-[#e8e6e3]">
+          {DOK_TABS.map((tab) => {
+            const dok = dokumente.find((d) => d.typ === tab.key);
+            const isActive = activeTab === tab.key;
+            const IconComp = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => { setActiveTab(tab.key); setArtikelDrawerOpen(false); }}
+                className={`relative flex items-center gap-2 px-5 py-3.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? "text-[#570006] bg-white"
+                    : dok
+                      ? "text-[#6b6b6b] hover:text-[#1a1a1a] hover:bg-[#fafaf9]"
+                      : "text-[#c4c2bf] hover:text-[#9a9a9a]"
+                }`}
+              >
+                <IconComp className={`w-4 h-4 ${isActive ? "text-[#570006]" : dok ? "text-[#9a9a9a]" : "text-[#d1cfc9]"}`} />
+                <span>{tab.label}</span>
+                {dok ? (
+                  <span className="w-3.5 h-3.5 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <svg className="w-2 h-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  </span>
+                ) : (
+                  <span className="w-3.5 h-3.5 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
+                )}
+                {isActive && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#570006]" />}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* PDF Viewer or Empty State with integrated upload */}
+        <div className={`flex items-center justify-center bg-[#fafaf9] ${aktivesDokument?.storage_pfad ? "flex-1 min-h-[500px]" : "py-16"}`}>
+          {aktivesDokument?.storage_pfad ? (
+            <iframe src={`/api/pdfs/${aktivesDokument.id}`} className="w-full h-full" title="PDF Vorschau" />
+          ) : (
+            <div className="text-center px-6 max-w-xs">
+              <div className="w-14 h-14 rounded-xl bg-[#f0eeeb] flex items-center justify-center mx-auto mb-3">
+                <svg className="w-7 h-7 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-[#9a9a9a]">Kein Dokument vorhanden</p>
+              <p className="text-[11px] text-[#c4c2bf] mt-1 mb-4">Wird automatisch angezeigt sobald ein Dokument per E-Mail eingeht.</p>
+              {/* Integrated upload in empty state */}
+              <div className="flex gap-2 justify-center">
+                <button onClick={() => cameraInputRef.current?.click()} disabled={scanLoading} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                  </svg>
+                  Scannen
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} disabled={scanLoading} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Hochladen
+                </button>
+              </div>
+              {scanLoading && (
+                <div className="flex items-center gap-2 mt-3 justify-center">
+                  <div className="spinner w-3 h-3" />
+                  <span className="text-xs text-[#570006] font-medium">Wird analysiert...</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Artikel Drawer — slides up over the PDF */}
+        {aktivesDokument?.artikel && aktivesDokument.artikel.length > 0 && (
+          <>
+            {/* Toggle button */}
+            <button
+              type="button"
+              onClick={() => setArtikelDrawerOpen(!artikelDrawerOpen)}
+              className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-2 py-2 bg-white/95 backdrop-blur-sm border-t border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors z-20"
+              style={artikelDrawerOpen ? { position: "relative" } : {}}
+            >
+              <svg className={`w-3.5 h-3.5 text-[#9a9a9a] transition-transform duration-200 ${artikelDrawerOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+              </svg>
+              <span className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">
+                Erkannte Artikel ({aktivesDokument.artikel.length})
+              </span>
+            </button>
+            {artikelDrawerOpen && (
+              <div className="border-t border-[#e8e6e3] bg-white max-h-[50%] overflow-auto z-10">
+                <div className="p-4">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-[#9a9a9a]">
+                        <th className="pb-1.5">Artikel</th>
+                        <th className="pb-1.5 text-right">Menge</th>
+                        <th className="pb-1.5 text-right">Einzelpreis</th>
+                        <th className="pb-1.5 text-right">Gesamt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aktivesDokument.artikel.map((a, i) => (
+                        <tr key={i} className="border-t border-[#f0eeeb]">
+                          <td className="py-1.5 text-[#1a1a1a]">{a.name}</td>
+                          <td className="py-1.5 text-right font-mono-amount text-[#6b6b6b]">{a.menge}</td>
+                          <td className="py-1.5 text-right font-mono-amount text-[#6b6b6b]">{a.einzelpreis?.toFixed(2)} €</td>
+                          <td className="py-1.5 text-right font-mono-amount font-semibold text-[#1a1a1a]">{a.gesamtpreis?.toFixed(2)} €</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Summenzeile mit Netto/MwSt */}
+                  <div className="mt-3 pt-3 border-t border-[#e8e6e3] space-y-1">
+                    {aktivesDokument.netto != null && (
+                      <div className="flex justify-between text-xs text-[#6b6b6b]">
+                        <span>Netto</span>
+                        <span className="font-mono-amount">{aktivesDokument.netto.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                      </div>
+                    )}
+                    {aktivesDokument.mwst != null && (
+                      <div className="flex justify-between text-xs text-[#6b6b6b]">
+                        <span>MwSt</span>
+                        <span className="font-mono-amount">{aktivesDokument.mwst.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                      </div>
+                    )}
+                    {aktivesDokument.gesamtbetrag != null && (
+                      <div className="flex justify-between text-xs font-semibold text-[#1a1a1a]">
+                        <span>Gesamt</span>
+                        <span className="font-mono-amount">{aktivesDokument.gesamtbetrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    );
+  }
+
+  // ─── Render: Main layout ──────────────────────────────
+
+  return (
+    <>
+      {/* Mobile section tabs */}
+      <div className="md:hidden flex border-b border-[#e8e6e3] mb-4 -mx-4 px-4">
+        {([
+          { key: "dokumente", label: "Dokumente", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg> },
+          { key: "details", label: "Details", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg> },
+          { key: "aktionen", label: "Aktionen", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setMobileSection(tab.key)}
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium transition-colors relative ${
+              mobileSection === tab.key ? "text-[#570006]" : "text-[#9a9a9a]"
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+            {mobileSection === tab.key && <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#570006]" />}
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop layout */}
+      <div className="hidden md:flex flex-row gap-5 flex-1 min-h-0">
+        {renderDocumentArea()}
+        <div className="w-80 flex flex-col gap-4 overflow-auto">
+          {renderSidebar()}
+        </div>
+      </div>
+
+      {/* Mobile layout — tab-based */}
+      <div className="md:hidden flex flex-col flex-1 min-h-0">
+        {mobileSection === "dokumente" && renderDocumentArea()}
+        {mobileSection === "details" && (
+          <div className="flex flex-col gap-4 overflow-auto pb-20">
+            {/* KI-Vorschlag Banner (wenn vorhanden) */}
+            {bestellung.projekt_vorschlag_id && !bestellung.projekt_bestaetigt && !bestellung.projekt_id && (
+              <div className="card p-4 border-l-[3px] border-l-[#d97706]">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center">
+                    <svg className="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-700 tracking-widest uppercase">KI-Vorschlag</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.farbe || "#570006" }} />
+                  <span className="text-sm font-medium text-[#1a1a1a]">{projekte.find((p) => p.id === bestellung.projekt_vorschlag_id)?.name || "Unbekanntes Projekt"}</span>
+                  <span className="font-mono-amount text-[11px] font-bold text-amber-700 ml-auto">{Math.round((bestellung.projekt_vorschlag_konfidenz || 0) * 100)}%</span>
+                </div>
+                <div className="flex items-center gap-2 mt-3">
+                  <button onClick={() => handleVorschlagAktion("bestaetigen")} disabled={vorschlagLoading} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    Korrekt
+                  </button>
+                  <button onClick={() => setShowVorschlagKorrektur(true)} disabled={vorschlagLoading} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    Falsch
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* KI-Abgleich kompakt */}
+            <div className={`card overflow-hidden ${
+              abgleich?.status === "ok" ? "border-l-[3px] border-l-green-600" : abgleich?.status === "abweichung" ? "border-l-[3px] border-l-red-600" : ""
+            }`}>
+              {abgleich ? (
+                abgleich.status === "ok" ? (
+                  <div className="flex items-center gap-3 px-4 py-3 bg-green-50">
+                    <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-green-700">Alle Dokumente stimmen überein</p>
+                      <p className="text-[10px] text-green-600/70 mt-0.5">Geprüft am {new Date(abgleich.erstellt_am).toLocaleString("de-DE")}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-4 py-3 bg-red-50">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-red-700">{abgleich.abweichungen?.length || 0} Abweichung(en) gefunden</p>
+                        <p className="text-[11px] text-red-600 mt-0.5">Prüfe die Positionen bevor du freigibst.</p>
+                      </div>
+                    </div>
+                    {abgleich.ki_zusammenfassung && <p className="text-xs text-red-600/80 mt-2">{abgleich.ki_zusammenfassung}</p>}
+                  </div>
+                )
+              ) : (
+                <div className="p-4">
+                  <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-1">KI-Abgleich</h3>
+                  <p className="text-xs text-[#9a9a9a]">Startet automatisch sobald alle Dokumente vorliegen.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Projekt */}
+            <div className="card p-4">
+              <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Projekt</h3>
+              {bestellung.projekt_name ? (
+                <span className="inline-flex items-center gap-1.5 text-sm text-[#1a1a1a]">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projekte.find((p) => p.id === bestellung.projekt_id)?.farbe || "#570006" }} />
+                  {bestellung.projekt_name}
+                </span>
+              ) : (
+                <button onClick={() => { setShowProjektSelect(true); setMobileSection("dokumente"); }} className="text-xs font-medium text-[#570006] hover:text-[#7a1a1f] border border-[#570006]/20 rounded-lg px-3 py-2 transition-colors">
+                  Projekt zuordnen
+                </button>
+              )}
+            </div>
+
+            {/* Timeline */}
+            {timeline.length > 0 && (
+              <CollapsibleWidget
+                title="Aktivitätsverlauf"
+                defaultOpen
+                icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                badge={<span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{timeline.length}</span>}
+              >
+                <div className="relative">
+                  <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#e8e6e3]" />
+                  <div className="space-y-3">
+                    {timeline.map((t, i) => (
+                      <div key={i} className="flex items-start gap-3 relative">
+                        <span className="w-[15px] h-[15px] rounded-full border-2 border-white shrink-0 z-10" style={{ background: t.farbe }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-[#1a1a1a] leading-relaxed">{t.label}</p>
+                          <p className="text-[10px] text-[#c4c2bf]">{new Date(t.zeit).toLocaleString("de-DE")}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CollapsibleWidget>
+            )}
+
+            {/* Kommentare */}
+            {kommentare.length > 0 && (
+              <CollapsibleWidget
+                title="Kommentare"
+                defaultOpen
+                icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>}
+                badge={<span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{kommentare.length}</span>}
+              >
+                <div className="space-y-3">
+                  {kommentare.map((k) => (
+                    <div key={k.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-[#570006] text-white flex items-center justify-center text-[9px] font-bold">{k.autor_kuerzel}</div>
+                        <span className="text-xs font-semibold text-[#1a1a1a]">{k.autor_name}</span>
+                        <span className="text-[11px] text-[#c4c2bf]">{new Date(k.erstellt_am).toLocaleDateString("de-DE")}</span>
+                      </div>
+                      <p className="text-xs text-[#6b6b6b] mt-1 ml-8 leading-relaxed">{k.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleWidget>
+            )}
+          </div>
+        )}
+        {mobileSection === "aktionen" && (
+          <div className="flex flex-col gap-4 overflow-auto pb-20">
+            {/* Freigabe + Upload prominent on mobile */}
+            {freigabe ? (
+              <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <p className="text-sm font-medium text-emerald-700">Freigegeben von {freigabe.freigegeben_von_name}</p>
+                </div>
+              </div>
+            ) : kannFreigeben ? (
+              <button
+                type="button"
+                onClick={() => setShowFreigabeDialog(true)}
+                disabled={loading || !hatRechnung}
+                className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl text-base font-medium transition-colors ${
+                  hatRechnung ? "btn-primary disabled:opacity-50" : "bg-[#e8e6e3] text-[#9a9a9a] cursor-not-allowed"
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                {hatRechnung ? "Rechnung freigeben" : "Rechnung fehlt noch"}
+              </button>
+            ) : null}
+
+            {/* Scan prominent on mobile */}
+            <div className="card p-4">
+              <h3 className="font-headline text-base text-[#1a1a1a] tracking-tight mb-3">Dokument scannen / hochladen</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => cameraInputRef.current?.click()} disabled={scanLoading} className="flex flex-col items-center gap-2 py-4 text-sm font-medium bg-[#570006]/5 text-[#570006] rounded-xl hover:bg-[#570006]/10 transition-colors">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                  </svg>
+                  Kamera
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} disabled={scanLoading} className="flex flex-col items-center gap-2 py-4 text-sm font-medium bg-[#570006]/5 text-[#570006] rounded-xl hover:bg-[#570006]/10 transition-colors">
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  Datei
+                </button>
+              </div>
+              {scanLoading && (
+                <div className="flex items-center gap-2 mt-3 justify-center">
+                  <div className="spinner w-3 h-3" />
+                  <span className="text-xs text-[#570006] font-medium">Wird analysiert...</span>
+                </div>
+              )}
+              {scanError && <p className="text-xs text-red-600 mt-2 font-medium">{scanError}</p>}
+            </div>
+
+            {/* Quick comment on mobile */}
+            <div className="card p-4">
+              <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Kommentar</h3>
+              <form onSubmit={handleKommentar} className="flex gap-2">
+                <input type="text" value={kommentarText} onChange={(e) => setKommentarText(e.target.value)} placeholder="Kommentar schreiben..." className="flex-1 px-3 py-2 text-sm bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
+                <button type="submit" disabled={loading || !kommentarText.trim()} className="px-4 py-2 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors">Senden</button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile fixed bottom bar — Freigabe CTA */}
+      {kannFreigeben && !freigabe && hatRechnung && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-sm border-t border-[#e8e6e3] z-50">
+          <button
+            type="button"
+            onClick={() => setShowFreigabeDialog(true)}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-medium btn-primary disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            Rechnung freigeben
+          </button>
+        </div>
+      )}
+
+      {/* Hidden file inputs (shared between desktop & mobile) */}
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleScan(e.target.files[0])} />
+      <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleScan(e.target.files[0])} />
+
+      {/* Shared confirm dialog */}
+      <ConfirmDialog
+        open={showFreigabeDialog}
+        title="Rechnung freigeben"
+        message="Soll diese Rechnung wirklich freigegeben werden? Sie wird danach für die Buchhaltung sichtbar."
+        confirmLabel="Freigeben"
+        onConfirm={handleFreigabe}
+        onCancel={() => setShowFreigabeDialog(false)}
+      />
+    </>
   );
 }
