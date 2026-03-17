@@ -10,21 +10,12 @@ export default async function EinstellungenPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: haendler } = await supabase
-    .from("haendler")
-    .select("*")
-    .order("name", { ascending: true });
-
-  const { data: benutzer } = await supabase
-    .from("benutzer_rollen")
-    .select("id, email, name, kuerzel, rolle")
-    .order("name", { ascending: true });
-
-  const { data: testCheck } = await supabase
-    .from("bestellungen")
-    .select("id")
-    .like("bestellnummer", "TEST-%")
-    .limit(1);
+  // Alle 3 Queries parallel — keine Abhängigkeiten
+  const [{ data: haendler }, { data: benutzer }, { data: testCheck }] = await Promise.all([
+    supabase.from("haendler").select("*").order("name", { ascending: true }),
+    supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
+    supabase.from("bestellungen").select("id").like("bestellnummer", "TEST-%").limit(1),
+  ]);
 
   return (
     <EinstellungenClient

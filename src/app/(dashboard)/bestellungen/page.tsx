@@ -13,25 +13,18 @@ export default async function BestellungenPage({
   const supabase = await createServerSupabaseClient();
   const { page: pageStr } = await searchParams;
   const page = Math.max(1, parseInt(pageStr || "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
-  // Gesamtanzahl ermitteln
-  const { count } = await supabase
-    .from("bestellungen")
-    .select("*", { count: "exact", head: true });
+  // Count + Daten parallel laden
+  const [{ count }, { data: bestellungen }] = await Promise.all([
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }),
+    supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).range(from, to),
+  ]);
 
   const total = count || 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-
-  // Paginierte Daten laden
-  const from = (currentPage - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  const { data: bestellungen } = await supabase
-    .from("bestellungen")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .range(from, to);
 
   return (
     <div>

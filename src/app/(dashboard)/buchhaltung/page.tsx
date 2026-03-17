@@ -16,45 +16,27 @@ export default async function BuchhaltungPage({
   const supabase = await createServerSupabaseClient();
   const { page: pageStr } = await searchParams;
   const page = Math.max(1, parseInt(pageStr || "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
-  // Gesamtanzahl ermitteln
-  const { count } = await supabase
-    .from("bestellungen")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "freigegeben");
+  // Phase 1: Count + Daten parallel
+  const [{ count }, { data: bestellungen }] = await Promise.all([
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
+    supabase.from("bestellungen").select("*").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
+  ]);
 
   const total = count || 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 
-  // Paginierte freigegebene Bestellungen laden
-  const from = (currentPage - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
-
-  const { data: bestellungen } = await supabase
-    .from("bestellungen")
-    .select("*")
-    .eq("status", "freigegeben")
-    .order("updated_at", { ascending: false })
-    .range(from, to);
-
-  // Freigaben laden
+  // Phase 2: Freigaben + Rechnungen parallel (brauchen bestellIds)
   const bestellIds = (bestellungen || []).map((b) => b.id);
-  const { data: freigaben } = bestellIds.length
-    ? await supabase
-        .from("freigaben")
-        .select("*")
-        .in("bestellung_id", bestellIds)
-    : { data: [] };
-
-  // Rechnungs-Dokumente laden (für Fälligkeitsdatum + PDF-Download)
-  const { data: rechnungen } = bestellIds.length
-    ? await supabase
-        .from("dokumente")
-        .select("*")
-        .in("bestellung_id", bestellIds)
-        .eq("typ", "rechnung")
-    : { data: [] };
+  const [{ data: freigaben }, { data: rechnungen }] = bestellIds.length
+    ? await Promise.all([
+        supabase.from("freigaben").select("*").in("bestellung_id", bestellIds),
+        supabase.from("dokumente").select("*").in("bestellung_id", bestellIds).eq("typ", "rechnung"),
+      ])
+    : [{ data: [] as never[] }, { data: [] as never[] }];
 
   // Daten zusammenführen
   const freigabenMap = new Map(

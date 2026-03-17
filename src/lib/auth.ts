@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerSupabaseClient } from "./supabase-server";
 
 export type Rolle = "besteller" | "buchhaltung" | "admin";
@@ -12,7 +13,8 @@ export interface BenutzerProfil {
 }
 
 // Holt das Benutzerprofil inkl. Rolle aus benutzer_rollen
-export async function getBenutzerProfil(): Promise<BenutzerProfil | null> {
+// cache() dedupliziert innerhalb eines Server-Requests (Layout + Page = 1 Call statt 2)
+export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> => {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -27,7 +29,7 @@ export async function getBenutzerProfil(): Promise<BenutzerProfil | null> {
     .single();
 
   return data as BenutzerProfil | null;
-}
+});
 
 // Redirect-Pfad basierend auf Rolle
 export function getRedirectForRolle(rolle: Rolle): string {

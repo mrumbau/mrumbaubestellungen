@@ -15,59 +15,67 @@ export default async function DashboardPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: bestellungen } = await supabase
-    .from("bestellungen")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(100);
+  // Alle Dashboard-Daten parallel laden statt 100 Rows bulk-fetchen
+  const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const alle = bestellungen || [];
+  const [
+    { count: offenRaw },
+    { count: abweichungenRaw },
+    { count: lsFehltRaw },
+    { count: freigegebenRaw },
+    { count: erwartetRaw },
+    { count: vollstaendigRaw },
+    { count: gesamtRaw },
+    { data: freigegebenBetraege },
+    { data: letzteRaw },
+    { data: aktionenNoetigRaw },
+    { data: bestellerKuerzelListe },
+    { data: unzugeordnetRaw },
+    // Admin-Queries laufen mit (RLS filtert für Nicht-Admins)
+    { data: bestellerRollen },
+    { data: neueHaendlerRoh },
+  ] = await Promise.all([
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen"),
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung"),
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "ls_fehlt"),
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "erwartet"),
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "vollstaendig"),
+    supabase.from("bestellungen").select("*", { count: "exact", head: true }),
+    supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null),
+    supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5),
+    supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10),
+    supabase.from("bestellungen").select("besteller_kuerzel"),
+    supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").order("created_at", { ascending: false }),
+    profil.rolle === "admin"
+      ? supabase.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller")
+      : Promise.resolve({ data: [] as { kuerzel: string; name: string }[] }),
+    profil.rolle === "admin"
+      ? supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] }),
+  ]);
 
-  const offen = alle.filter((b) => b.status === "offen").length;
-  const abweichungen = alle.filter((b) => b.status === "abweichung").length;
-  const lsFehlt = alle.filter((b) => b.status === "ls_fehlt").length;
-  const freigegeben = alle.filter((b) => b.status === "freigegeben").length;
-  const erwartet = alle.filter((b) => b.status === "erwartet").length;
-  const vollstaendig = alle.filter((b) => b.status === "vollstaendig").length;
+  // Null-safe Werte
+  const offen = offenRaw ?? 0;
+  const abweichungen = abweichungenRaw ?? 0;
+  const lsFehlt = lsFehltRaw ?? 0;
+  const freigegeben = freigegebenRaw ?? 0;
+  const erwartet = erwartetRaw ?? 0;
+  const vollstaendig = vollstaendigRaw ?? 0;
+  const gesamtAnzahl = gesamtRaw ?? 0;
+  const letzte = letzteRaw || [];
+  const aktionenNoetig = aktionenNoetigRaw || [];
+  const unzugeordnet = unzugeordnetRaw || [];
 
-  const freigegebenBetrag = alle
-    .filter((b) => b.status === "freigegeben" && b.betrag)
-    .reduce((sum, b) => sum + Number(b.betrag), 0);
-
-  const letzte = alle.slice(0, 5);
+  const freigegebenBetrag = (freigegebenBetraege || []).reduce((sum, b) => sum + Number(b.betrag), 0);
 
   const bestellerStats = new Map<string, number>();
-  for (const b of alle) {
+  for (const b of bestellerKuerzelListe || []) {
     bestellerStats.set(b.besteller_kuerzel, (bestellerStats.get(b.besteller_kuerzel) || 0) + 1);
   }
 
-  const aktionenNoetig = alle.filter(
-    (b) => b.status === "abweichung" || b.status === "ls_fehlt" || b.status === "vollstaendig"
-  );
-
-  // Nicht zugeordnete Bestellungen (nur für Admin)
-  const unzugeordnet = alle.filter((b) => b.besteller_kuerzel === "UNBEKANNT");
-  let bestellerListe: { kuerzel: string; name: string }[] = [];
-  if (profil.rolle === "admin" && unzugeordnet.length > 0) {
-    const { data: besteller } = await supabase
-      .from("benutzer_rollen")
-      .select("kuerzel, name")
-      .eq("rolle", "besteller");
-    bestellerListe = besteller || [];
-  }
-
-  // Neue, unbestätigte Händler (letzte 7 Tage, nur für Admin)
-  let neueHaendler: { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] = [];
-  if (profil.rolle === "admin") {
-    const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: haendler } = await supabase
-      .from("haendler")
-      .select("id, name, domain, email_absender, created_at")
-      .is("confirmed_at", null)
-      .gte("created_at", siebenTageZurueck)
-      .order("created_at", { ascending: false });
-    neueHaendler = (haendler || []) as typeof neueHaendler;
-  }
+  const bestellerListe = bestellerRollen || [];
+  const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
 
   return (
     <div>
@@ -102,7 +110,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Erwartet" value={erwartet} color="#8b8b8b" />
         <StatCard label="Vollständig" value={vollstaendig} color="#16a34a" />
-        <StatCard label="Gesamt" value={alle.length} color="#570006" />
+        <StatCard label="Gesamt" value={gesamtAnzahl} color="#570006" />
         <div className="card card-hover p-5">
           <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Freigegebenes Volumen</p>
           <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2">{formatBetrag(freigegebenBetrag)}</p>

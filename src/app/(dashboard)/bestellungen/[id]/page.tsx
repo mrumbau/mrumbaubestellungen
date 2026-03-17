@@ -33,31 +33,18 @@ export default async function BestellungDetailPage({
     );
   }
 
-  const { data: dokumente } = await supabase
-    .from("dokumente")
-    .select("*")
-    .eq("bestellung_id", id)
-    .order("created_at", { ascending: true });
-
-  const { data: abgleich } = await supabase
-    .from("abgleiche")
-    .select("*")
-    .eq("bestellung_id", id)
-    .order("erstellt_am", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: kommentare } = await supabase
-    .from("kommentare")
-    .select("*")
-    .eq("bestellung_id", id)
-    .order("erstellt_am", { ascending: true });
-
-  const { data: freigabe } = await supabase
-    .from("freigaben")
-    .select("*")
-    .eq("bestellung_id", id)
-    .maybeSingle();
+  // Alle 4 Queries parallel — keine Abhängigkeiten untereinander
+  const [
+    { data: dokumente },
+    { data: abgleich },
+    { data: kommentare },
+    { data: freigabe },
+  ] = await Promise.all([
+    supabase.from("dokumente").select("*").eq("bestellung_id", id).order("created_at", { ascending: true }),
+    supabase.from("abgleiche").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("kommentare").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: true }),
+    supabase.from("freigaben").select("*").eq("bestellung_id", id).maybeSingle(),
+  ]);
 
   const statusConfig = getStatusConfig(bestellung.status);
 
