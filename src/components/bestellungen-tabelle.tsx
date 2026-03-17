@@ -18,7 +18,15 @@ interface Bestellung {
   hat_bestellbestaetigung: boolean;
   hat_lieferschein: boolean;
   hat_rechnung: boolean;
+  projekt_id: string | null;
+  projekt_name: string | null;
   created_at: string;
+}
+
+interface ProjektOption {
+  id: string;
+  name: string;
+  farbe: string;
 }
 
 function DokumentIcon({ vorhanden }: { vorhanden: boolean }) {
@@ -36,14 +44,21 @@ export function BestellungenTabelle({
   currentPage,
   totalPages,
   totalCount,
+  projekte = [],
+  aktiverProjektFilter,
+  aktiverProjektName,
 }: {
   bestellungen: Bestellung[];
   currentPage: number;
   totalPages: number;
   totalCount: number;
+  projekte?: ProjektOption[];
+  aktiverProjektFilter?: string | null;
+  aktiverProjektName?: string | null;
 }) {
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -55,9 +70,12 @@ export function BestellungenTabelle({
       b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
 
     const statusMatch = !statusFilter || b.status === statusFilter;
+    const projektMatch = !projektFilter || b.projekt_id === projektFilter;
 
-    return suchMatch && statusMatch;
+    return suchMatch && statusMatch && projektMatch;
   });
+
+  const projektFarbenMap = new Map(projekte.map((p) => [p.id, p.farbe]));
 
   function goToPage(page: number) {
     const params = new URLSearchParams(searchParams.toString());
@@ -94,7 +112,36 @@ export function BestellungenTabelle({
           <option value="ls_fehlt">LS fehlt</option>
           <option value="freigegeben">Freigegeben</option>
         </select>
+        {projekte.length > 0 && (
+          <select
+            value={projektFilter}
+            onChange={(e) => setProjektFilter(e.target.value)}
+            className="px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+          >
+            <option value="">Alle Projekte</option>
+            {projekte.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
       </div>
+
+      {/* Projekt-Filter Banner */}
+      {aktiverProjektName && aktiverProjektFilter && (
+        <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-sm">
+          <span className="text-[#9a9a9a]">Gefiltert nach:</span>
+          <span className="font-semibold text-[#1a1a1a]">{aktiverProjektName}</span>
+          <button
+            onClick={() => router.push("/bestellungen")}
+            className="ml-auto p-1 text-[#9a9a9a] hover:text-[#570006] transition-colors"
+            title="Filter entfernen"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="mt-4 card overflow-hidden">
@@ -103,6 +150,7 @@ export function BestellungenTabelle({
             <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Projekt</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Datum</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Best.</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">LS</th>
@@ -114,7 +162,7 @@ export function BestellungenTabelle({
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-[#9a9a9a]">
+                <td colSpan={9} className="px-4 py-12 text-center text-[#9a9a9a]">
                   {bestellungen.length === 0
                     ? "Noch keine Bestellungen vorhanden."
                     : "Keine Bestellungen gefunden."}
@@ -138,6 +186,19 @@ export function BestellungenTabelle({
                     </td>
                     <td className="px-4 py-3.5 text-[#1a1a1a]">
                       {b.haendler_name || "–"}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {b.projekt_name ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-[#1a1a1a] max-w-[100px] truncate">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
+                          />
+                          {b.projekt_name}
+                        </span>
+                      ) : (
+                        <span className="text-[#c4c2bf] text-xs">–</span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-[#9a9a9a] text-xs">
                       {formatDatum(b.created_at)}

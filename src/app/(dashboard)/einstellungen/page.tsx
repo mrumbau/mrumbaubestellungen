@@ -18,6 +18,7 @@ export default async function EinstellungenPage() {
     { data: haendlerStats },
     { data: extensionSignale },
     { data: webhookLogs },
+    { data: projekte },
   ] = await Promise.all([
     supabase.from("haendler").select("*").order("name", { ascending: true }),
     supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
@@ -35,6 +36,11 @@ export default async function EinstellungenPage() {
       .select("id, typ, status, bestellnummer, fehler_text, created_at")
       .order("created_at", { ascending: false })
       .limit(20),
+    // Projekte
+    supabase
+      .from("projekte")
+      .select("id, name, farbe, budget, status, beschreibung, kunde")
+      .order("name"),
   ]);
 
   // Händler-Stats aggregieren: { haendler_name: { gesamt, letzte, abweichungen } }
@@ -67,6 +73,7 @@ export default async function EinstellungenPage() {
       haendlerStats={statsMap}
       extensionSignale={signalMap}
       webhookLogs={(webhookLogs || []) as { id: string; typ: string; status: string; bestellnummer: string | null; fehler_text: string | null; created_at: string }[]}
+      projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null }[]}
     />
   );
 }

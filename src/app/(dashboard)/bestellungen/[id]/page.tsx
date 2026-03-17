@@ -33,17 +33,19 @@ export default async function BestellungDetailPage({
     );
   }
 
-  // Alle 4 Queries parallel — keine Abhängigkeiten untereinander
+  // Alle 5 Queries parallel — keine Abhängigkeiten untereinander
   const [
     { data: dokumente },
     { data: abgleich },
     { data: kommentare },
     { data: freigabe },
+    { data: projekte },
   ] = await Promise.all([
     supabase.from("dokumente").select("*").eq("bestellung_id", id).order("created_at", { ascending: true }),
     supabase.from("abgleiche").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("kommentare").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: true }),
     supabase.from("freigaben").select("*").eq("bestellung_id", id).maybeSingle(),
+    supabase.from("projekte").select("id, name, farbe").in("status", ["aktiv", "pausiert"]).order("name"),
   ]);
 
   const statusConfig = getStatusConfig(bestellung.status);
@@ -115,6 +117,7 @@ export default async function BestellungDetailPage({
         kommentare={kommentare || []}
         freigabe={freigabe}
         profil={profil}
+        projekte={projekte || []}
       />
     </div>
   );

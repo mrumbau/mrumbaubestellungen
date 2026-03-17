@@ -31,6 +31,9 @@ export default async function DashboardPage() {
     { data: aktionenNoetigRaw },
     { data: bestellerKuerzelListe },
     { data: unzugeordnetRaw },
+    // Projekte
+    { data: aktiveProjekte },
+    { data: projektBestellungen },
     // Admin-Queries laufen mit (RLS filtert für Nicht-Admins)
     { data: bestellerRollen },
     { data: neueHaendlerRoh },
@@ -47,6 +50,8 @@ export default async function DashboardPage() {
     supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10),
     supabase.from("bestellungen").select("besteller_kuerzel"),
     supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").order("created_at", { ascending: false }),
+    supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
+    supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null),
     profil.rolle === "admin"
       ? supabase.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller")
       : Promise.resolve({ data: [] as { kuerzel: string; name: string }[] }),
@@ -76,6 +81,21 @@ export default async function DashboardPage() {
 
   const bestellerListe = bestellerRollen || [];
   const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
+
+  // Projekt-Stats aggregieren
+  const projektStatsMap = new Map<string, { gesamt: number; offen: number; volumen: number }>();
+  for (const b of projektBestellungen || []) {
+    if (!b.projekt_id) continue;
+    const s = projektStatsMap.get(b.projekt_id) || { gesamt: 0, offen: 0, volumen: 0 };
+    s.gesamt++;
+    if (["offen", "erwartet", "abweichung", "ls_fehlt", "vollstaendig"].includes(b.status)) s.offen++;
+    s.volumen += Number(b.betrag) || 0;
+    projektStatsMap.set(b.projekt_id, s);
+  }
+  const topProjekte = (aktiveProjekte || [])
+    .map((p) => ({ ...p, stats: projektStatsMap.get(p.id) || { gesamt: 0, offen: 0, volumen: 0 } }))
+    .sort((a, b) => b.stats.gesamt - a.stats.gesamt)
+    .slice(0, 3);
 
   return (
     <div>
@@ -111,11 +131,58 @@ export default async function DashboardPage() {
         <StatCard label="Erwartet" value={erwartet} color="#8b8b8b" />
         <StatCard label="Vollständig" value={vollstaendig} color="#16a34a" />
         <StatCard label="Gesamt" value={gesamtAnzahl} color="#570006" />
-        <div className="card card-hover p-5">
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Freigegebenes Volumen</p>
-          <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2">{formatBetrag(freigegebenBetrag)}</p>
+        <StatCard label="Aktive Projekte" value={(aktiveProjekte || []).length} color="#7c3aed" />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mt-4">
+        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
+          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Freigegebenes Volumen</p>
+          <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
+        </div>
+        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #2563eb" }}>
+          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #2563eb, transparent)" }} />
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Gesamt-Volumen</p>
+          <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag((projektBestellungen || []).reduce((s, b) => s + (Number(b.betrag) || 0), 0))}</p>
         </div>
       </div>
+
+      {/* Projekt-Widget */}
+      {topProjekte.length > 0 && (
+        <div className="card p-5 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Aktive Projekte</h2>
+            <Link href="/projekte" className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors">Alle anzeigen</Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {topProjekte.map((p) => {
+              const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
+              const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
+              return (
+                <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
+                    <span className="text-sm font-semibold text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">{p.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-[#9a9a9a]">
+                    <span><span className="font-mono-amount font-bold text-[#1a1a1a]">{p.stats.gesamt}</span> Best.</span>
+                    {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-amber-600">{p.stats.offen}</span> offen</span>}
+                    <span className="font-mono-amount font-bold text-[#1a1a1a]">{formatBetrag(p.stats.volumen)}</span>
+                  </div>
+                  {p.budget && (
+                    <div className="mt-2">
+                      <div className="w-full h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
+                      </div>
+                      <p className="text-[10px] text-[#9a9a9a] mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Admin-Widgets: Nicht zugeordnet + Neue Händler */}
       {profil.rolle === "admin" && (unzugeordnet.length > 0 || neueHaendler.length > 0) && (

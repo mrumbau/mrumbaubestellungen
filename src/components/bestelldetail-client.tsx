@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { BenutzerProfil } from "@/lib/auth";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -38,6 +38,12 @@ interface Freigabe {
   kommentar: string | null;
 }
 
+interface ProjektOption {
+  id: string;
+  name: string;
+  farbe: string;
+}
+
 interface Bestellung {
   id: string;
   status: string;
@@ -45,6 +51,8 @@ interface Bestellung {
   hat_lieferschein: boolean;
   hat_rechnung: boolean;
   besteller_kuerzel: string;
+  projekt_id: string | null;
+  projekt_name: string | null;
 }
 
 function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
@@ -112,6 +120,7 @@ export function BestelldetailClient({
   kommentare,
   freigabe,
   profil,
+  projekte = [],
 }: {
   bestellung: Bestellung;
   dokumente: Dokument[];
@@ -119,6 +128,7 @@ export function BestelldetailClient({
   kommentare: Kommentar[];
   freigabe: Freigabe | null;
   profil: BenutzerProfil;
+  projekte?: ProjektOption[];
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(DOK_TABS[0].key);
@@ -134,8 +144,36 @@ export function BestelldetailClient({
   const [duplikatLoading, setDuplikatLoading] = useState(false);
   const [katResult, setKatResult] = useState<{ kategorien: { artikel: string; kategorie: string }[]; zusammenfassung: Record<string, number> } | null>(null);
   const [katLoading, setKatLoading] = useState(false);
+  const [projektLoading, setProjektLoading] = useState(false);
+  const [showProjektSelect, setShowProjektSelect] = useState(false);
+  const [projektStats, setProjektStats] = useState<{ gesamt_ausgaben: number; budget: number | null; budget_auslastung_prozent: number | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!bestellung.projekt_id) { setProjektStats(null); return; }
+    fetch(`/api/projekte/${bestellung.projekt_id}/stats`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => data && setProjektStats({ gesamt_ausgaben: data.gesamt_ausgaben, budget: data.budget, budget_auslastung_prozent: data.budget_auslastung_prozent }))
+      .catch(() => {});
+  }, [bestellung.projekt_id]);
+
+  async function handleProjektZuordnen(projektId: string | null) {
+    setProjektLoading(true);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellung.id}/projekt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projekt_id: projektId }),
+      });
+      if (res.ok) {
+        setShowProjektSelect(false);
+        router.refresh();
+      }
+    } catch { /* ignore */ } finally {
+      setProjektLoading(false);
+    }
+  }
 
   const aktivesDokument = dokumente.find((d) => d.typ === activeTab);
   const kannFreigeben =
@@ -337,8 +375,82 @@ export function BestelldetailClient({
         )}
       </div>
 
-      {/* Rechts: KI-Abgleich + Scan + Freigabe + Kommentare */}
+      {/* Rechts: Projekt + KI-Abgleich + Scan + Freigabe + Kommentare */}
       <div className="w-full md:w-80 flex flex-col gap-4 overflow-auto">
+        {/* Projekt-Zuordnung */}
+        <div className="card p-4">
+          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Projekt</h3>
+          {bestellung.projekt_name ? (
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-sm text-[#1a1a1a]">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ background: projekte.find((p) => p.id === bestellung.projekt_id)?.farbe || "#570006" }}
+                  />
+                  {bestellung.projekt_name}
+                </span>
+                <button
+                  onClick={() => handleProjektZuordnen(null)}
+                  disabled={projektLoading}
+                  className="text-[10px] text-[#9a9a9a] hover:text-red-600 transition-colors"
+                  title="Zuordnung entfernen"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {projektStats?.budget != null && projektStats.budget_auslastung_prozent != null && (
+                <div className="mt-2.5">
+                  <div className="flex items-center justify-between text-[10px] mb-1">
+                    <span className="text-[#9a9a9a]">Budget</span>
+                    <span className="font-mono-amount font-medium text-[#6b6b6b]">
+                      {projektStats.gesamt_ausgaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} / {projektStats.budget!.toLocaleString("de-DE", { minimumFractionDigits: 2 })} &euro;
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        projektStats.budget_auslastung_prozent >= 90 ? "bg-red-500" : projektStats.budget_auslastung_prozent >= 70 ? "bg-amber-500" : "bg-green-500"
+                      }`}
+                      style={{ width: `${Math.min(projektStats.budget_auslastung_prozent, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-[#c4c2bf] mt-0.5 font-mono-amount">{projektStats.budget_auslastung_prozent.toFixed(0)}% ausgelastet</p>
+                </div>
+              )}
+            </div>
+          ) : showProjektSelect ? (
+            <div className="space-y-2">
+              {projekte.filter((p) => p.id !== bestellung.projekt_id).map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => handleProjektZuordnen(p.id)}
+                  disabled={projektLoading}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
+                  {p.name}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowProjektSelect(false)}
+                className="text-xs text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowProjektSelect(true)}
+              className="text-xs font-medium text-[#570006] hover:text-[#7a1a1f] border border-[#570006]/20 rounded-lg px-3 py-2 transition-colors"
+            >
+              Projekt zuordnen
+            </button>
+          )}
+        </div>
+
         {/* KI-Abgleich */}
         <div className={`card overflow-hidden ${
           abgleich?.status === "ok" ? "border-l-[3px] border-l-green-600" : abgleich?.status === "abweichung" ? "border-l-[3px] border-l-red-600" : ""

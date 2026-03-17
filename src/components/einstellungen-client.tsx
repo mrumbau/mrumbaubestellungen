@@ -35,6 +35,16 @@ interface WebhookLog {
   created_at: string;
 }
 
+interface Projekt {
+  id: string;
+  name: string;
+  farbe: string;
+  budget: number | null;
+  status: string;
+  beschreibung: string | null;
+  kunde: string | null;
+}
+
 interface HealthStatus {
   status: string;
   timestamp: string;
@@ -50,6 +60,7 @@ export function EinstellungenClient({
   haendlerStats,
   extensionSignale,
   webhookLogs: initialWebhookLogs,
+  projekte: initialProjekte = [],
 }: {
   haendler: Haendler[];
   benutzer: Benutzer[];
@@ -57,6 +68,7 @@ export function EinstellungenClient({
   haendlerStats: Record<string, HaendlerStat>;
   extensionSignale: Record<string, string>;
   webhookLogs: WebhookLog[];
+  projekte?: Projekt[];
 }) {
   const [haendler, setHaendler] = useState(initialHaendler);
   const [showForm, setShowForm] = useState(false);
@@ -81,6 +93,21 @@ export function EinstellungenClient({
   // Webhook-Logs
   const [webhookLogs, setWebhookLogs] = useState(initialWebhookLogs);
   const [logFilter, setLogFilter] = useState<"alle" | "error">("alle");
+
+  // Projekte
+  const [projekteListe, setProjekteListe] = useState(initialProjekte);
+  const [projektEditId, setProjektEditId] = useState<string | null>(null);
+  const [showProjektForm, setShowProjektForm] = useState(false);
+  const [projektLoading, setProjektLoading] = useState(false);
+  const [projektFormName, setProjektFormName] = useState("");
+  const [projektFormBeschreibung, setProjektFormBeschreibung] = useState("");
+  const [projektFormFarbe, setProjektFormFarbe] = useState("#570006");
+  const [projektFormBudget, setProjektFormBudget] = useState("");
+  const [projektFormKunde, setProjektFormKunde] = useState("");
+  const [projektFormStatus, setProjektFormStatus] = useState("aktiv");
+  const [archivProjektConfirm, setArchivProjektConfirm] = useState<{ id: string; name: string } | null>(null);
+
+  const PROJEKT_FARBEN = ["#570006", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 
   // Passwort ändern
   const [pwAktuell, setPwAktuell] = useState("");
@@ -252,6 +279,91 @@ export function EinstellungenClient({
       setPwLoading(false);
     }
   }
+
+  // Projekt-Funktionen
+  function resetProjektForm() {
+    setProjektFormName("");
+    setProjektFormBeschreibung("");
+    setProjektFormFarbe("#570006");
+    setProjektFormBudget("");
+    setProjektFormKunde("");
+    setProjektFormStatus("aktiv");
+    setProjektEditId(null);
+    setShowProjektForm(false);
+  }
+
+  function startProjektEdit(p: Projekt) {
+    setProjektFormName(p.name);
+    setProjektFormBeschreibung(p.beschreibung || "");
+    setProjektFormFarbe(p.farbe);
+    setProjektFormBudget(p.budget ? String(p.budget) : "");
+    setProjektFormKunde(p.kunde || "");
+    setProjektFormStatus(p.status);
+    setProjektEditId(p.id);
+    setShowProjektForm(true);
+  }
+
+  async function handleProjektSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!projektFormName.trim()) return;
+    setProjektLoading(true);
+    try {
+      const payload = {
+        name: projektFormName.trim(),
+        beschreibung: projektFormBeschreibung.trim() || null,
+        kunde: projektFormKunde.trim() || null,
+        farbe: projektFormFarbe,
+        budget: projektFormBudget ? Number(projektFormBudget) : null,
+        status: projektFormStatus,
+      };
+      if (projektEditId) {
+        const res = await fetch(`/api/projekte/${projektEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setProjekteListe((prev) => prev.map((p) => (p.id === projektEditId ? data.projekt : p)));
+      } else {
+        const res = await fetch("/api/projekte", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setProjekteListe((prev) => [...prev, data.projekt].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      resetProjektForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setProjektLoading(false);
+    }
+  }
+
+  async function handleProjektArchiv(id: string) {
+    setArchivProjektConfirm(null);
+    setProjektLoading(true);
+    try {
+      const res = await fetch(`/api/projekte/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.geloescht) {
+        setProjekteListe((prev) => prev.filter((p) => p.id !== id));
+      } else {
+        setProjekteListe((prev) => prev.map((p) => (p.id === id ? { ...p, status: "archiviert" } : p)));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Archivieren");
+    } finally {
+      setProjektLoading(false);
+    }
+  }
+
+  const aktiveProjekte = projekteListe.filter((p) => ["aktiv", "pausiert"].includes(p.status));
+  const inaktiveProjekte = projekteListe.filter((p) => ["abgeschlossen", "archiviert"].includes(p.status));
 
   // Webhook-Logs refresh
   async function refreshWebhookLogs() {
@@ -565,6 +677,149 @@ export function EinstellungenClient({
       </div>
 
       {/* ═══════════════════════════════════════════
+          PROJEKT-VERWALTUNG
+          ═══════════════════════════════════════════ */}
+      <div className="mt-6 card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#7c3aed]/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#7c3aed]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Projekte / Baustellen ({aktiveProjekte.length})</h2>
+          </div>
+          <button
+            onClick={() => { resetProjektForm(); setShowProjektForm(true); }}
+            className="px-3 py-1.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors"
+          >
+            + Neues Projekt
+          </button>
+        </div>
+
+        {showProjektForm && (
+          <form onSubmit={handleProjektSubmit} className="mb-4 p-4 bg-[#fafaf9] rounded-lg border border-[#e8e6e3] space-y-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Name *</label>
+              <input type="text" value={projektFormName} onChange={(e) => setProjektFormName(e.target.value)}
+                placeholder="z.B. Sanierung Hauptstraße 12"
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Beschreibung</label>
+                <input type="text" value={projektFormBeschreibung} onChange={(e) => setProjektFormBeschreibung(e.target.value)}
+                  placeholder="Optional"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Kunde</label>
+                <input type="text" value={projektFormKunde} onChange={(e) => setProjektFormKunde(e.target.value)}
+                  placeholder="z.B. Müller GmbH"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Farbe</label>
+                <div className="flex gap-2">
+                  {PROJEKT_FARBEN.map((f) => (
+                    <button key={f} type="button" onClick={() => setProjektFormFarbe(f)}
+                      className={`w-7 h-7 rounded-lg transition-all ${projektFormFarbe === f ? "ring-2 ring-offset-2 ring-[#570006] scale-110" : "hover:scale-105"}`}
+                      style={{ background: f }} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Budget (€)</label>
+                <input type="number" value={projektFormBudget} onChange={(e) => setProjektFormBudget(e.target.value)}
+                  placeholder="Optional" min="0" step="0.01"
+                  className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors" />
+              </div>
+            </div>
+            {projektEditId && (
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Status</label>
+                <select value={projektFormStatus} onChange={(e) => setProjektFormStatus(e.target.value)}
+                  className="px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30">
+                  <option value="aktiv">Aktiv</option>
+                  <option value="pausiert">Pausiert</option>
+                  <option value="abgeschlossen">Abgeschlossen</option>
+                </select>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button type="submit" disabled={projektLoading}
+                className="px-4 py-2 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors disabled:opacity-50">
+                {projektLoading ? "Speichern..." : projektEditId ? "Aktualisieren" : "Anlegen"}
+              </button>
+              <button type="button" onClick={resetProjektForm}
+                className="px-4 py-2 text-sm font-medium bg-[#f5f4f2] text-[#6b6b6b] border border-[#e8e6e3] rounded-lg hover:bg-[#ebe9e6] transition-colors">
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        {aktiveProjekte.length === 0 ? (
+          <p className="text-sm text-[#c4c2bf] py-4 text-center">Noch keine Projekte angelegt.</p>
+        ) : (
+          <div className="space-y-2">
+            {aktiveProjekte.map((p) => (
+              <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="w-3 h-3 rounded-full shrink-0" style={{ background: p.farbe }} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-[#1a1a1a]">{p.name}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                        p.status === "aktiv" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                      }`}>{p.status === "aktiv" ? "Aktiv" : "Pausiert"}</span>
+                    </div>
+                    {p.beschreibung && <p className="text-[11px] text-[#c4c2bf] mt-0.5">{p.beschreibung}</p>}
+                    {p.budget && (
+                      <p className="text-[11px] text-[#9a9a9a] font-mono-amount mt-0.5">
+                        Budget: {Number(p.budget).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  <button onClick={() => startProjektEdit(p)} className="p-1.5 text-[#c4c2bf] hover:text-[#570006] transition-colors" title="Bearbeiten">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button onClick={() => setArchivProjektConfirm({ id: p.id, name: p.name })} className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors" title="Archivieren">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {inaktiveProjekte.length > 0 && (
+          <details className="mt-4">
+            <summary className="text-[11px] font-medium text-[#9a9a9a] cursor-pointer hover:text-[#570006] transition-colors">
+              {inaktiveProjekte.length} abgeschlossene/archivierte Projekte
+            </summary>
+            <div className="mt-2 space-y-1">
+              {inaktiveProjekte.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg opacity-60">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
+                  <span className="text-sm text-[#9a9a9a]">{p.name}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#f5f4f2] text-[#c4c2bf]">{p.status}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════
           3. CHROME EXTENSION STATUS
           ═══════════════════════════════════════════ */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -861,6 +1116,15 @@ export function EinstellungenClient({
         variant="danger"
         onConfirm={() => handleTestdaten("delete")}
         onCancel={() => setTestdatenConfirm(null)}
+      />
+      <ConfirmDialog
+        open={!!archivProjektConfirm}
+        title="Projekt archivieren"
+        message={`Soll das Projekt "${archivProjektConfirm?.name}" archiviert werden? Zugeordnete Bestellungen behalten ihre Zuordnung.`}
+        confirmLabel="Archivieren"
+        variant="danger"
+        onConfirm={() => archivProjektConfirm && handleProjektArchiv(archivProjektConfirm.id)}
+        onCancel={() => setArchivProjektConfirm(null)}
       />
     </div>
   );

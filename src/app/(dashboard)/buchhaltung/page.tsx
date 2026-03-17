@@ -19,10 +19,11 @@ export default async function BuchhaltungPage({
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  // Phase 1: Count + Daten parallel
-  const [{ count }, { data: bestellungen }] = await Promise.all([
+  // Phase 1: Count + Daten + Projekte parallel
+  const [{ count }, { data: bestellungen }, { data: projekte }] = await Promise.all([
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
     supabase.from("bestellungen").select("*").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
+    supabase.from("projekte").select("id, name").in("status", ["aktiv", "pausiert", "abgeschlossen"]).order("name"),
   ]);
 
   const total = count || 0;
@@ -68,6 +69,7 @@ export default async function BuchhaltungPage({
       currentPage={currentPage}
       totalPages={totalPages}
       totalCount={total}
+      projekte={(projekte || []).map((p) => ({ id: p.id, name: p.name }))}
     />
   );
 }

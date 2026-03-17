@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidUUID } from "@/lib/validation";
+import { checkCsrf } from "@/lib/csrf";
+
+// POST /api/bestellungen/[id]/projekt – Projekt zuordnen
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    if (!checkCsrf(request)) {
+      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+    }
+
+    const { id } = await params;
+    if (!isValidUUID(id)) {
+      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { projekt_id } = body;
+
+    // projekt_id = null → Zuordnung entfernen
+    if (projekt_id !== null) {
+      if (!isValidUUID(projekt_id)) {
+        return NextResponse.json({ error: "Ungültige Projekt-ID" }, { status: 400 });
+      }
+
+      // Projekt existiert?
+      const { data: projekt } = await supabase
+        .from("projekte")
+        .select("id, name")
+        .eq("id", projekt_id)
+        .single();
+
+      if (!projekt) {
+        return NextResponse.json({ error: "Projekt nicht gefunden" }, { status: 404 });
+      }
+
+      const { error } = await supabase
+        .from("bestellungen")
+        .update({
+          projekt_id: projekt.id,
+          projekt_name: projekt.name,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) {
+        return NextResponse.json({ error: "Zuordnung fehlgeschlagen" }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, projekt_name: projekt.name });
+    }
+
+    // Zuordnung entfernen
+    const { error } = await supabase
+      .from("bestellungen")
+      .update({
+        projekt_id: null,
+        projekt_name: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: "Entfernung fehlgeschlagen" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, projekt_name: null });
+  } catch {
+    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+  }
+}

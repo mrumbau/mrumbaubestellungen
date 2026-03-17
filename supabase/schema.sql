@@ -78,6 +78,8 @@ CREATE TABLE bestellungen (
   lieferschein_physisch BOOLEAN DEFAULT FALSE,
   zuordnung_methode TEXT, -- signal_60min, signal_24h, haendler_affinitaet, name_im_text, email_body_ki, ki_historien, manuell_admin, unbekannt
   artikel_kategorien JSONB,
+  projekt_id UUID REFERENCES projekte(id),
+  projekt_name TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -134,6 +136,19 @@ CREATE TABLE kommentare (
   erstellt_am TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Projekte / Baustellen
+CREATE TABLE projekte (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  beschreibung TEXT,
+  kunde TEXT,
+  status TEXT NOT NULL DEFAULT 'aktiv' CHECK (status IN ('aktiv', 'abgeschlossen', 'pausiert', 'archiviert')),
+  farbe TEXT DEFAULT '#570006',
+  budget NUMERIC(10,2),
+  erstellt_von UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Webhook-Logs (Protokoll für alle Webhook-/Cron-Aufrufe)
 CREATE TABLE webhook_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -163,6 +178,7 @@ CREATE INDEX idx_benutzer_rollen_kuerzel ON benutzer_rollen (kuerzel);
 CREATE INDEX idx_bestellungen_status ON bestellungen (status);
 CREATE INDEX idx_bestellungen_besteller_kuerzel ON bestellungen (besteller_kuerzel);
 CREATE INDEX idx_bestellungen_created_at ON bestellungen (created_at DESC);
+CREATE INDEX idx_bestellungen_projekt_id ON bestellungen (projekt_id);
 
 -- dokumente
 CREATE INDEX idx_dokumente_bestellung_id ON dokumente (bestellung_id);
@@ -175,6 +191,9 @@ CREATE UNIQUE INDEX idx_freigaben_bestellung_unique ON freigaben (bestellung_id)
 
 -- kommentare
 CREATE INDEX idx_kommentare_bestellung_id ON kommentare (bestellung_id);
+
+-- projekte
+CREATE INDEX idx_projekte_status ON projekte (status);
 
 -- webhook_logs
 CREATE INDEX idx_webhook_logs_created_at ON webhook_logs (created_at DESC);
@@ -193,6 +212,7 @@ ALTER TABLE abgleiche ENABLE ROW LEVEL SECURITY;
 ALTER TABLE freigaben ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kommentare ENABLE ROW LEVEL SECURITY;
 ALTER TABLE webhook_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projekte ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- RLS Policies
@@ -262,6 +282,14 @@ CREATE POLICY kommentare_besteller_insert ON kommentare
   FOR INSERT WITH CHECK (
     autor_kuerzel = (SELECT kuerzel FROM benutzer_rollen WHERE user_id = auth.uid())
   );
+
+-- projekte
+CREATE POLICY projekte_admin ON projekte
+  FOR ALL USING (get_user_rolle() = 'admin');
+CREATE POLICY projekte_besteller_lesen ON projekte
+  FOR SELECT USING (get_user_rolle() = 'besteller');
+CREATE POLICY projekte_buchhaltung_lesen ON projekte
+  FOR SELECT USING (get_user_rolle() = 'buchhaltung');
 
 -- webhook_logs (nur Admin darf lesen, Service Role schreibt)
 CREATE POLICY admin_read_webhook_logs ON webhook_logs
