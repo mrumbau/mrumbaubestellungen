@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
+import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 
@@ -55,6 +56,19 @@ export default async function DashboardPage() {
     bestellerListe = besteller || [];
   }
 
+  // Neue, unbestätigte Händler (letzte 7 Tage, nur für Admin)
+  let neueHaendler: { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] = [];
+  if (profil.rolle === "admin") {
+    const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: haendler } = await supabase
+      .from("haendler")
+      .select("id, name, domain, email_absender, created_at")
+      .is("confirmed_at", null)
+      .gte("created_at", siebenTageZurueck)
+      .order("created_at", { ascending: false });
+    neueHaendler = (haendler || []) as typeof neueHaendler;
+  }
+
   return (
     <div>
       <div className="mb-8 flex items-end justify-between">
@@ -95,10 +109,15 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Nicht zugeordnete Bestellungen – nur für Admin */}
-      {profil.rolle === "admin" && unzugeordnet.length > 0 && (
-        <div className="mt-6">
-          <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
+      {/* Admin-Widgets: Nicht zugeordnet + Neue Händler */}
+      {profil.rolle === "admin" && (unzugeordnet.length > 0 || neueHaendler.length > 0) && (
+        <div className="mt-6 space-y-4">
+          {unzugeordnet.length > 0 && (
+            <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
+          )}
+          {neueHaendler.length > 0 && (
+            <DashboardNeueHaendler haendler={neueHaendler} />
+          )}
         </div>
       )}
 

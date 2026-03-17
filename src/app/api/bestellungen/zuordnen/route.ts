@@ -50,12 +50,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Besteller nicht gefunden" }, { status: 404 });
     }
 
+    // Vorherigen Besteller laden für den Kommentar
+    const { data: bestellung } = await supabase
+      .from("bestellungen")
+      .select("besteller_kuerzel, besteller_name")
+      .eq("id", bestellung_id)
+      .single();
+
+    const vorher = bestellung?.besteller_kuerzel || "UNBEKANNT";
+
     // Bestellung aktualisieren
     const { error } = await supabase
       .from("bestellungen")
       .update({
         besteller_kuerzel: benutzer.kuerzel,
         besteller_name: benutzer.name,
+        zuordnung_methode: "manuell_admin",
         updated_at: new Date().toISOString(),
       })
       .eq("id", bestellung_id);
@@ -63,6 +73,14 @@ export async function POST(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: "Zuordnung fehlgeschlagen" }, { status: 500 });
     }
+
+    // Kommentar für Nachvollziehbarkeit
+    await supabase.from("kommentare").insert({
+      bestellung_id,
+      autor_kuerzel: "ADMIN",
+      autor_name: "Admin",
+      text: `Besteller manuell zugeordnet: ${vorher} → ${benutzer.kuerzel} (${benutzer.name})`,
+    });
 
     return NextResponse.json({ success: true });
   } catch {

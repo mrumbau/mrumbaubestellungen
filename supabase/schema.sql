@@ -20,6 +20,7 @@ CREATE TABLE haendler (
   domain TEXT NOT NULL,
   url_muster TEXT[],
   email_absender TEXT[],
+  confirmed_at TIMESTAMPTZ, -- NULL = noch nicht vom Admin bestätigt
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -49,6 +50,8 @@ CREATE TABLE bestellungen (
   hat_lieferschein BOOLEAN DEFAULT FALSE,
   hat_rechnung BOOLEAN DEFAULT FALSE,
   lieferschein_physisch BOOLEAN DEFAULT FALSE,
+  zuordnung_methode TEXT, -- signal_60min, signal_24h, haendler_affinitaet, name_im_text, email_body_ki, ki_historien, manuell_admin, unbekannt
+  artikel_kategorien JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

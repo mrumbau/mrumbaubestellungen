@@ -598,7 +598,76 @@ Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
   return JSON.parse(jsonMatch ? jsonMatch[0] : text);
 }
 
-// 9. Kommentar-Zusammenfassung für eine Bestellung
+// 9. Besteller-Hinweise aus E-Mail-Text und Dokumenten extrahieren
+export interface BestellerHinweiseErgebnis {
+  gefundene_hinweise: {
+    typ: "name" | "adresse" | "kundennummer" | "ansprechpartner" | "telefon" | "abteilung";
+    wert: string;
+    quelle: string;
+  }[];
+  vorgeschlagenes_kuerzel: string | null;
+  konfidenz: number;
+  begruendung: string;
+}
+
+export async function extrahiereBestellerHinweise(
+  emailText: string,
+  emailBetreff: string,
+  dokumentTexte: string[],
+  bekannteBenutzer: { kuerzel: string; name: string; email: string }[]
+): Promise<BestellerHinweiseErgebnis> {
+  const response = await withRetry(() =>
+    openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `Du bist ein Zuordnungsassistent für eine deutsche Baufirma (MR Umbau GmbH).
+Analysiere E-Mail-Text und Dokumentinhalte nach Hinweisen, wer die Bestellung aufgegeben hat.
+
+Suche nach:
+- Personennamen (Ansprechpartner, Besteller, "Bestellt von", "Aufgegeben von")
+- Lieferadressen mit Personennamen ("z.Hd.", "c/o", "Empfänger")
+- Kundennummern die einem Mitarbeiter zugeordnet werden können
+- Telefonnummern oder E-Mail-Adressen im Dokument
+- Abteilungshinweise oder Kostenstellen
+
+Bekannte Mitarbeiter:
+${bekannteBenutzer.map((b) => `- ${b.kuerzel}: ${b.name} (${b.email})`).join("\n")}
+
+Gib NUR ein JSON-Objekt zurück:
+{
+  "gefundene_hinweise": [
+    { "typ": "name", "wert": "Marlon Tschon", "quelle": "Lieferadresse" },
+    { "typ": "kundennummer", "wert": "KD-4812", "quelle": "E-Mail-Text" }
+  ],
+  "vorgeschlagenes_kuerzel": "MT",
+  "konfidenz": 0.75,
+  "begruendung": "Name 'Marlon Tschon' in Lieferadresse gefunden, passt zu Mitarbeiter MT"
+}
+
+Falls keine Hinweise gefunden: vorgeschlagenes_kuerzel null, konfidenz 0.`,
+        },
+        {
+          role: "user",
+          content: `E-Mail-Betreff: ${emailBetreff}
+E-Mail-Text (Auszug): ${emailText.slice(0, 2000)}
+
+Dokumentinhalte:
+${dokumentTexte.map((t, i) => `--- Dokument ${i + 1} ---\n${t.slice(0, 1500)}`).join("\n\n")}`,
+        },
+      ],
+      max_tokens: 800,
+      temperature: 0.1,
+    })
+  );
+
+  const text = response.choices[0]?.message?.content || "{}";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+}
+
+// 10. Kommentar-Zusammenfassung für eine Bestellung
 export async function fasseBestellungZusammen(
   bestellung: { bestellnummer: string; haendler: string; status: string; betrag: number },
   abweichungen: { feld: string; artikel?: string; erwartet: string | number; gefunden: string | number }[],
