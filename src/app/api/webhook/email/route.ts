@@ -665,6 +665,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Webhook-Log: Erfolg
+    await supabase.from("webhook_logs").insert({
+      typ: "email",
+      status: "success",
+      bestellung_id: bestellungId,
+      bestellnummer: erkannteBestellnummer || null,
+    });
+
     return NextResponse.json({
       success: true,
       bestellung_id: bestellungId,
@@ -675,6 +683,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     logError("/api/webhook/email", "Webhook Fehler", err);
+
+    // Webhook-Log: Fehler
+    try {
+      const supabase = createServiceClient();
+      await supabase.from("webhook_logs").insert({
+        typ: "email",
+        status: "error",
+        fehler_text: err instanceof Error ? err.message : "Unbekannter Fehler",
+      });
+    } catch { /* Log-Fehler nicht weiter propagieren */ }
+
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

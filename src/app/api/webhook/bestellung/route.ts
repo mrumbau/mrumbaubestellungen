@@ -161,8 +161,25 @@ export async function POST(request: NextRequest) {
       console.log(`[Webhook] Händler erkannt via ${erkennung}: ${haendler_domain} (${kuerzel})`);
     }
 
+    // Webhook-Log: Erfolg
+    await supabase.from("webhook_logs").insert({
+      typ: "extension",
+      status: "success",
+      bestellnummer: bestellnummer || null,
+    });
+
     return NextResponse.json({ success: true, signal_id: data.id });
-  } catch {
+  } catch (err) {
+    // Webhook-Log: Fehler
+    try {
+      const supabase = createServiceClient();
+      await supabase.from("webhook_logs").insert({
+        typ: "extension",
+        status: "error",
+        fehler_text: err instanceof Error ? err.message : "Unbekannter Fehler",
+      });
+    } catch { /* Log-Fehler nicht weiter propagieren */ }
+
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

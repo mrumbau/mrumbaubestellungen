@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { createBrowserSupabaseClient } from "@/lib/supabase";
 
 interface Haendler {
   id: string;
@@ -19,14 +20,43 @@ interface Benutzer {
   rolle: string;
 }
 
+interface HaendlerStat {
+  gesamt: number;
+  letzte: string | null;
+  abweichungen: number;
+}
+
+interface WebhookLog {
+  id: string;
+  typ: string;
+  status: string;
+  bestellnummer: string | null;
+  fehler_text: string | null;
+  created_at: string;
+}
+
+interface HealthStatus {
+  status: string;
+  timestamp: string;
+  supabase: string;
+  openai: string;
+  make_webhook: string;
+}
+
 export function EinstellungenClient({
   haendler: initialHaendler,
   benutzer,
   hatTestdaten: initialHatTestdaten,
+  haendlerStats,
+  extensionSignale,
+  webhookLogs: initialWebhookLogs,
 }: {
   haendler: Haendler[];
   benutzer: Benutzer[];
   hatTestdaten: boolean;
+  haendlerStats: Record<string, HaendlerStat>;
+  extensionSignale: Record<string, string>;
+  webhookLogs: WebhookLog[];
 }) {
   const [haendler, setHaendler] = useState(initialHaendler);
   const [showForm, setShowForm] = useState(false);
@@ -43,6 +73,36 @@ export function EinstellungenClient({
   const [formDomain, setFormDomain] = useState("");
   const [formUrlMuster, setFormUrlMuster] = useState("");
   const [formEmailAbsender, setFormEmailAbsender] = useState("");
+
+  // System-Status
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+
+  // Webhook-Logs
+  const [webhookLogs, setWebhookLogs] = useState(initialWebhookLogs);
+  const [logFilter, setLogFilter] = useState<"alle" | "error">("alle");
+
+  // Passwort ändern
+  const [pwAktuell, setPwAktuell] = useState("");
+  const [pwNeu, setPwNeu] = useState("");
+  const [pwBestaetigung, setPwBestaetigung] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const fetchHealth = useCallback(async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch("/api/health");
+      const data = await res.json();
+      setHealth(data);
+    } catch {
+      setHealth({ status: "error", timestamp: new Date().toISOString(), supabase: "error", openai: "error", make_webhook: "error" });
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchHealth(); }, [fetchHealth]);
 
   function resetForm() {
     setFormName("");
@@ -161,11 +221,79 @@ export function EinstellungenClient({
     }
   }
 
+  async function handlePasswortAendern(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pwNeu || !pwBestaetigung) {
+      setPwMsg({ type: "error", text: "Bitte alle Felder ausfüllen." });
+      return;
+    }
+    if (pwNeu !== pwBestaetigung) {
+      setPwMsg({ type: "error", text: "Passwörter stimmen nicht überein." });
+      return;
+    }
+    if (pwNeu.length < 8) {
+      setPwMsg({ type: "error", text: "Mindestens 8 Zeichen erforderlich." });
+      return;
+    }
+
+    setPwLoading(true);
+    setPwMsg(null);
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { error } = await supabase.auth.updateUser({ password: pwNeu });
+      if (error) throw new Error(error.message);
+      setPwMsg({ type: "success", text: "Passwort erfolgreich geändert." });
+      setPwAktuell("");
+      setPwNeu("");
+      setPwBestaetigung("");
+    } catch (err) {
+      setPwMsg({ type: "error", text: err instanceof Error ? err.message : "Fehler beim Ändern" });
+    } finally {
+      setPwLoading(false);
+    }
+  }
+
+  // Webhook-Logs refresh
+  async function refreshWebhookLogs() {
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { data } = await supabase
+        .from("webhook_logs")
+        .select("id, typ, status, bestellnummer, fehler_text, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (data) setWebhookLogs(data);
+    } catch { /* stille Fehlerbehandlung */ }
+  }
+
+  const filteredLogs = logFilter === "error"
+    ? webhookLogs.filter((l) => l.status === "error")
+    : webhookLogs;
+
+  // Hilfsfunktionen
+  function formatZeit(iso: string) {
+    return new Date(iso).toLocaleString("de-DE", {
+      day: "2-digit", month: "2-digit", year: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  function getExtensionStatus(kuerzel: string): { label: string; color: string; dotClass: string } {
+    const letztes = extensionSignale[kuerzel];
+    if (!letztes) return { label: "Noch kein Signal", color: "text-red-600", dotClass: "bg-red-500 animate-pulse" };
+    const tage = Math.floor((Date.now() - new Date(letztes).getTime()) / (1000 * 60 * 60 * 24));
+    if (tage < 7) return { label: `Aktiv vor ${tage === 0 ? "heute" : `${tage} Tag${tage > 1 ? "en" : ""}`}`, color: "text-green-600", dotClass: "bg-green-500" };
+    if (tage <= 30) return { label: `Vor ${tage} Tagen`, color: "text-amber-600", dotClass: "bg-amber-500" };
+    return { label: `Vor ${tage} Tagen`, color: "text-red-600", dotClass: "bg-red-500 animate-pulse" };
+  }
+
+  const besteller = benutzer.filter((b) => b.rolle === "besteller");
+
   return (
     <div>
       <div className="mb-8">
         <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Einstellungen</h1>
-        <p className="text-[#9a9a9a] text-sm mt-1">Händler, Benutzer & Testdaten</p>
+        <p className="text-[#9a9a9a] text-sm mt-1">System, Händler, Benutzer & Testdaten</p>
       </div>
 
       {error && (
@@ -174,8 +302,61 @@ export function EinstellungenClient({
         </div>
       )}
 
+      {/* ═══════════════════════════════════════════
+          1. SYSTEM-STATUS WIDGET
+          ═══════════════════════════════════════════ */}
+      <div className={`card p-5 mb-6 ${health && health.status !== "ok" ? "border-l-4 border-l-amber-400" : ""}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            </div>
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">System-Status</h2>
+          </div>
+          <button
+            onClick={fetchHealth}
+            disabled={healthLoading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 transition-colors disabled:opacity-50"
+          >
+            {healthLoading ? (
+              <span className="w-3 h-3 spinner" />
+            ) : (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
+            Prüfen
+          </button>
+        </div>
+
+        {health ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatusDot label="Supabase" status={health.supabase === "ok" ? "online" : "offline"} />
+            <StatusDot label="OpenAI API" status={health.openai === "ok" ? "online" : "offline"} />
+            <StatusDot label="Make.com Webhook" status={health.make_webhook === "configured" ? "configured" : "offline"} />
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#fafaf9]">
+              <svg className="w-3.5 h-3.5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-[10px] text-[#c4c2bf] uppercase tracking-wider">Letzter Check</p>
+                <p className="text-[11px] font-medium text-[#6b6b6b]">{formatZeit(health.timestamp)}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-4">
+            <span className="w-5 h-5 spinner" />
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Händlerliste */}
+        {/* ═══════════════════════════════════════════
+            HÄNDLERLISTE + STATISTIKEN
+            ═══════════════════════════════════════════ */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">
@@ -255,66 +436,91 @@ export function EinstellungenClient({
             </form>
           )}
 
-          {/* Händler-Liste */}
+          {/* Händler-Liste mit Stats */}
           {haendler.length === 0 ? (
             <p className="text-sm text-[#c4c2bf] py-4 text-center">
               Noch keine Händler konfiguriert.
             </p>
           ) : (
             <div className="space-y-2">
-              {haendler.map((h) => (
-                <div
-                  key={h.id}
-                  className="flex items-start justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[#1a1a1a]">{h.name}</p>
-                      <span className="text-[10px] px-2 py-0.5 bg-[#f5f4f2] text-[#9a9a9a] rounded font-mono-amount">
-                        {h.domain}
-                      </span>
+              {haendler.map((h) => {
+                const stat = haendlerStats[h.name];
+                return (
+                  <div
+                    key={h.id}
+                    className="flex items-start justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-[#1a1a1a]">{h.name}</p>
+                        <span className="text-[10px] px-2 py-0.5 bg-[#f5f4f2] text-[#9a9a9a] rounded font-mono-amount">
+                          {h.domain}
+                        </span>
+                      </div>
+                      {h.url_muster.length > 0 && (
+                        <p className="text-[11px] text-[#c4c2bf] mt-1 truncate">
+                          URLs: {h.url_muster.join(", ")}
+                        </p>
+                      )}
+                      {h.email_absender.length > 0 && (
+                        <p className="text-[11px] text-[#c4c2bf] truncate">
+                          E-Mails: {h.email_absender.join(", ")}
+                        </p>
+                      )}
+                      {/* Händler-Statistiken */}
+                      {stat && (
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-[#6b6b6b]">
+                            <span className="font-mono-amount font-bold text-[#1a1a1a]">{stat.gesamt}</span> Bestellungen
+                          </span>
+                          {stat.letzte && (
+                            <span className="text-[10px] text-[#c4c2bf]">
+                              Letzte: {new Date(stat.letzte).toLocaleDateString("de-DE")}
+                            </span>
+                          )}
+                          {stat.gesamt > 0 && (
+                            <span className={`text-[10px] font-medium ${stat.abweichungen > 0 ? "text-red-600" : "text-green-600"}`}>
+                              {stat.abweichungen > 0
+                                ? `${Math.round((stat.abweichungen / stat.gesamt) * 100)}% Abw.`
+                                : "0% Abw."}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {h.url_muster.length > 0 && (
-                      <p className="text-[11px] text-[#c4c2bf] mt-1 truncate">
-                        URLs: {h.url_muster.join(", ")}
-                      </p>
-                    )}
-                    {h.email_absender.length > 0 && (
-                      <p className="text-[11px] text-[#c4c2bf] truncate">
-                        E-Mails: {h.email_absender.join(", ")}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-1 ml-2 shrink-0">
+                      <button
+                        onClick={() => startEdit(h)}
+                        className="p-1.5 text-[#c4c2bf] hover:text-[#570006] transition-colors"
+                        title="Bearbeiten"
+                        aria-label={`${h.name} bearbeiten`}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirm({ id: h.id, name: h.name })}
+                        className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors"
+                        title="Löschen"
+                        aria-label={`${h.name} löschen`}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 ml-2 shrink-0">
-                    <button
-                      onClick={() => startEdit(h)}
-                      className="p-1.5 text-[#c4c2bf] hover:text-[#570006] transition-colors"
-                      title="Bearbeiten"
-                      aria-label={`${h.name} bearbeiten`}
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirm({ id: h.id, name: h.name })}
-                      className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors"
-                      title="Löschen"
-                      aria-label={`${h.name} löschen`}
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Benutzerverwaltung */}
+        {/* ═══════════════════════════════════════════
+            BENUTZERVERWALTUNG
+            ═══════════════════════════════════════════ */}
         <div className="card p-6">
           <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-4">
             Benutzer ({benutzer.length})
@@ -356,6 +562,222 @@ export function EinstellungenClient({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          3. CHROME EXTENSION STATUS
+          ═══════════════════════════════════════════ */}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Chrome Extension</h2>
+              <p className="text-[10px] text-[#c4c2bf] mt-0.5">Signale pro Besteller</p>
+            </div>
+          </div>
+
+          {besteller.length === 0 ? (
+            <p className="text-sm text-[#c4c2bf] py-4 text-center">Keine Besteller vorhanden.</p>
+          ) : (
+            <div className="space-y-2">
+              {besteller.map((b) => {
+                const ext = getExtensionStatus(b.kuerzel);
+                return (
+                  <div key={b.id} className="flex items-center justify-between p-3 rounded-lg border border-[#f0eeeb]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold">
+                        {b.kuerzel}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[#1a1a1a]">{b.name}</p>
+                        <p className={`text-[11px] ${ext.color}`}>{ext.label}</p>
+                      </div>
+                    </div>
+                    <span className={`w-2.5 h-2.5 rounded-full ${ext.dotClass}`} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-4 p-3 bg-[#fafaf9] rounded-lg border border-[#f0eeeb]">
+            <p className="text-[11px] text-[#9a9a9a]">
+              Die Chrome Extension sendet bei jeder Bestellung ein Signal. Installieren unter: <span className="font-medium text-[#570006]">chrome://extensions</span> (Entwicklermodus)
+            </p>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════
+            5. PASSWORT ÄNDERN
+            ═══════════════════════════════════════════ */}
+        <div className="card p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Passwort ändern</h2>
+          </div>
+
+          {pwMsg && (
+            <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
+              pwMsg.type === "success"
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}>
+              {pwMsg.text}
+            </div>
+          )}
+
+          <form onSubmit={handlePasswortAendern} className="space-y-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Aktuelles Passwort</label>
+              <input
+                type="password"
+                value={pwAktuell}
+                onChange={(e) => setPwAktuell(e.target.value)}
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Neues Passwort</label>
+              <input
+                type="password"
+                value={pwNeu}
+                onChange={(e) => setPwNeu(e.target.value)}
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Passwort bestätigen</label>
+              <input
+                type="password"
+                value={pwBestaetigung}
+                onChange={(e) => setPwBestaetigung(e.target.value)}
+                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={pwLoading}
+              className="w-full px-4 py-2.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors disabled:opacity-50"
+            >
+              {pwLoading ? "Wird geändert..." : "Passwort ändern"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          4. WEBHOOK LOGS
+          ═══════════════════════════════════════════ */}
+      <div className="mt-6 card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            </div>
+            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Webhook-Logs</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-[#f5f4f2] rounded-lg p-0.5">
+              <button
+                onClick={() => setLogFilter("alle")}
+                className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                  logFilter === "alle"
+                    ? "bg-white text-[#1a1a1a] shadow-sm"
+                    : "text-[#9a9a9a] hover:text-[#6b6b6b]"
+                }`}
+              >
+                Alle
+              </button>
+              <button
+                onClick={() => setLogFilter("error")}
+                className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                  logFilter === "error"
+                    ? "bg-white text-red-600 shadow-sm"
+                    : "text-[#9a9a9a] hover:text-[#6b6b6b]"
+                }`}
+              >
+                Nur Fehler
+              </button>
+            </div>
+            <button
+              onClick={refreshWebhookLogs}
+              className="p-1.5 text-[#c4c2bf] hover:text-[#570006] transition-colors"
+              title="Aktualisieren"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {filteredLogs.length === 0 ? (
+          <p className="text-sm text-[#c4c2bf] py-6 text-center">
+            {logFilter === "error" ? "Keine Fehler gefunden." : "Noch keine Webhook-Logs vorhanden."}
+          </p>
+        ) : (
+          <div className="overflow-x-auto -mx-6">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#e8e6e3]">
+                  <th className="text-left text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase px-6 py-2">Zeitpunkt</th>
+                  <th className="text-left text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase px-3 py-2">Typ</th>
+                  <th className="text-left text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase px-3 py-2">Status</th>
+                  <th className="text-left text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase px-3 py-2">Bestellnr.</th>
+                  <th className="text-left text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase px-6 py-2">Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.map((log, i) => (
+                  <tr
+                    key={log.id}
+                    className={`border-b border-[#f0eeeb] transition-colors ${
+                      log.status === "error"
+                        ? "bg-red-50/50 hover:bg-red-50"
+                        : i % 2 === 0
+                        ? "bg-white hover:bg-[#fafaf9]"
+                        : "bg-[#fafaf9] hover:bg-[#f5f4f2]"
+                    }`}
+                  >
+                    <td className="px-6 py-2.5 font-mono-amount text-[11px] text-[#6b6b6b] whitespace-nowrap">
+                      {formatZeit(log.created_at)}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <WebhookTypBadge typ={log.typ} />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium ${
+                        log.status === "success" ? "text-green-700" : "text-red-700"
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          log.status === "success" ? "bg-green-500" : "bg-red-500"
+                        }`} />
+                        {log.status === "success" ? "OK" : "Fehler"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 font-mono-amount text-[11px] text-[#1a1a1a]">
+                      {log.bestellnummer || "–"}
+                    </td>
+                    <td className="px-6 py-2.5 text-[11px] text-[#9a9a9a] max-w-[200px] truncate">
+                      {log.fehler_text || "–"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Testdaten */}
@@ -441,5 +863,40 @@ export function EinstellungenClient({
         onCancel={() => setTestdatenConfirm(null)}
       />
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Sub-Komponenten
+   ═══════════════════════════════════════════ */
+
+function StatusDot({ label, status }: { label: string; status: "online" | "offline" | "configured" }) {
+  const isOk = status === "online" || status === "configured";
+  return (
+    <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-[#fafaf9]">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${
+        isOk ? "bg-green-500" : "bg-red-500 animate-pulse"
+      }`} />
+      <div>
+        <p className="text-[10px] text-[#c4c2bf] uppercase tracking-wider">{label}</p>
+        <p className={`text-[11px] font-medium ${isOk ? "text-green-700" : "text-red-700"}`}>
+          {status === "online" ? "Online" : status === "configured" ? "Konfiguriert" : "Offline"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function WebhookTypBadge({ typ }: { typ: string }) {
+  const config = {
+    email: { bg: "bg-blue-50", text: "text-blue-700", label: "E-Mail" },
+    extension: { bg: "bg-purple-50", text: "text-purple-700", label: "Extension" },
+    cron: { bg: "bg-amber-50", text: "text-amber-700", label: "Cron" },
+  }[typ] || { bg: "bg-gray-50", text: "text-gray-700", label: typ };
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${config.bg} ${config.text}`}>
+      {config.label}
+    </span>
   );
 }

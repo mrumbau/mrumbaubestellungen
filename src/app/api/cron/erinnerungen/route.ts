@@ -90,6 +90,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Webhook-Log: Erfolg
+    await supabase.from("webhook_logs").insert({
+      typ: "cron",
+      status: "success",
+      fehler_text: `${erinnerungen.length} Erinnerung(en) generiert`,
+    });
+
     return NextResponse.json({
       success: true,
       message: `${erinnerungen.length} Erinnerung${erinnerungen.length !== 1 ? "en" : ""} generiert.`,
@@ -97,6 +104,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("Erinnerungen-Cron Fehler:", err);
+
+    // Webhook-Log: Fehler
+    try {
+      const supabase = createServiceClient();
+      await supabase.from("webhook_logs").insert({
+        typ: "cron",
+        status: "error",
+        fehler_text: err instanceof Error ? err.message : "Unbekannter Fehler",
+      });
+    } catch { /* Log-Fehler nicht propagieren */ }
+
     return NextResponse.json(
       { error: "Interner Serverfehler" },
       { status: 500 }

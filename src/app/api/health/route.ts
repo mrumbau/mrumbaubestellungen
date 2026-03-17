@@ -8,6 +8,7 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     supabase: "unknown",
     openai: "unknown",
+    make_webhook: "unknown",
   };
 
   // Supabase prüfen
@@ -22,7 +23,10 @@ export async function GET() {
   // OpenAI Key prüfen (nur ob vorhanden, kein API-Call)
   checks.openai = process.env.OPENAI_API_KEY ? "ok" : "missing";
 
-  const allOk = checks.supabase === "ok" && checks.openai === "ok";
+  // Make.com Webhook Secret prüfen (konfiguriert oder nicht)
+  checks.make_webhook = process.env.MAKE_WEBHOOK_SECRET ? "configured" : "missing";
+
+  const allOk = checks.supabase === "ok" && checks.openai === "ok" && checks.make_webhook === "configured";
   checks.status = allOk ? "ok" : "degraded";
 
   return NextResponse.json(checks, { status: allOk ? 200 : 503 });
