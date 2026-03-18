@@ -4,6 +4,8 @@
 
 var WEBHOOK_URL = "https://cloud.mrumbau.de/api/webhook/bestellung";
 var ERKENNUNG_URL = "https://cloud.mrumbau.de/api/extension/erkennung";
+
+// Secret für API-Authentifizierung (muss mit EXTENSION_SECRET in .env.local übereinstimmen)
 var EXTENSION_SECRET = "mrumbau-ext-2026";
 
 // =====================================================================

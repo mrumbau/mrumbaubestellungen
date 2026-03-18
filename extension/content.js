@@ -9,6 +9,7 @@
   var hostname = window.location.hostname;
   var pathname = window.location.pathname.toLowerCase();
   var fullUrl = window.location.href;
+  var FETCH_TIMEOUT_MS = 5000;
 
   if (!fullUrl.startsWith("http")) return;
 
@@ -35,6 +36,14 @@
   // Duplikat-Schutz
   var signalKey = "mr_signal_" + rootDomain + "_" + pathname;
   if (sessionStorage.getItem(signalKey)) return;
+
+  // Fetch mit Timeout
+  function fetchWithTimeout(url, options, timeoutMs) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, timeoutMs || FETCH_TIMEOUT_MS);
+    var opts = Object.assign({}, options, { signal: controller.signal });
+    return fetch(url, opts).finally(function () { clearTimeout(timer); });
+  }
 
   // ===================================================================
   // STUFE 1: Hardcoded Händler (sofort, ohne async)
@@ -221,7 +230,7 @@
   }
 
   // ===================================================================
-  // STUFE 3: KI-Bestätigung
+  // STUFE 3: KI-Bestätigung (mit Timeout + JSON-Validierung)
   // ===================================================================
 
   function kiBestaetigung() {
@@ -232,7 +241,7 @@
       var kuerzel = result.kuerzel;
       if (!kuerzel) return;
 
-      fetch(ERKENNUNG_URL, {
+      fetchWithTimeout(ERKENNUNG_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -242,29 +251,37 @@
           secret: EXTENSION_SECRET,
           kuerzel: kuerzel,
         }),
-      })
+      }, FETCH_TIMEOUT_MS)
         .then(function (res) {
           if (!res.ok) return null;
           return res.json();
         })
         .then(function (data) {
-          if (!data || !data.ist_bestellung) return;
+          // JSON-Validierung: prüfe erwartete Felder
+          if (!data || typeof data !== "object") return;
+          if (typeof data.ist_bestellung !== "boolean") return;
+          if (!data.ist_bestellung) return;
 
-          var domain = data.haendler_domain || rootDomain;
-          sendeSignal(domain, "ki", data.bestellnummer);
+          var domain = (typeof data.haendler_domain === "string" && data.haendler_domain) || rootDomain;
+          var bestellnummer = (typeof data.bestellnummer === "string") ? data.bestellnummer : null;
+          sendeSignal(domain, "ki", bestellnummer);
           console.log(
             "[MR Umbau] KI bestätigt:", domain,
             "Konfidenz:", data.konfidenz
           );
         })
         .catch(function (err) {
-          console.debug("[MR Umbau] KI-Fehler:", err.message);
+          if (err.name === "AbortError") {
+            console.debug("[MR Umbau] KI-Check: Zeitüberschreitung");
+          } else {
+            console.debug("[MR Umbau] KI-Fehler:", err.message);
+          }
         });
     });
   }
 
   // ===================================================================
-  // Signal senden
+  // Signal senden (mit Timeout + Retry-Queue bei Fehler)
   // ===================================================================
 
   function sendeSignal(domain, quelle, bestellnummer) {
@@ -288,11 +305,11 @@
         payload.bestellnummer = bestellnummer;
       }
 
-      fetch(WEBHOOK_URL, {
+      fetchWithTimeout(WEBHOOK_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      })
+      }, FETCH_TIMEOUT_MS)
         .then(function (res) {
           if (res.ok) {
             sessionStorage.setItem(signalKey, "1");
@@ -306,9 +323,30 @@
               quelle: quelle,
               bestellnummer: bestellnummer,
             });
+          } else {
+            console.warn("[MR Umbau] Signal fehlgeschlagen:", res.status);
+            queueFailedSignal(payload);
           }
         })
-        .catch(function () {});
+        .catch(function (err) {
+          if (err.name === "AbortError") {
+            console.warn("[MR Umbau] Signal: Zeitüberschreitung");
+          } else {
+            console.warn("[MR Umbau] Signal-Fehler:", err.message);
+          }
+          queueFailedSignal(payload);
+        });
+    });
+  }
+
+  // Fehlgeschlagenes Signal zur Background-Queue senden
+  function queueFailedSignal(payload) {
+    // Secret nicht in Queue speichern (wird beim Retry neu geladen)
+    var queuePayload = Object.assign({}, payload);
+    delete queuePayload.secret;
+    chrome.runtime.sendMessage({
+      type: "signal_failed",
+      payload: queuePayload,
     });
   }
 })();
