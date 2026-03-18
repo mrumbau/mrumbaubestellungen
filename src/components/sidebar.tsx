@@ -57,8 +57,10 @@ const NAV_ITEMS = {
     { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
   ],
   besteller: [
+    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard },
     { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
+    { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
   ],
   buchhaltung: [
     { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },

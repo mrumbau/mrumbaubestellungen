@@ -12,7 +12,7 @@ export async function POST(
 ) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     const { id } = await params;

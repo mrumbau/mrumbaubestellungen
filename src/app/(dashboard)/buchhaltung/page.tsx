@@ -60,6 +60,8 @@ export default async function BuchhaltungPage({
       freigegeben_am: freigabe?.freigegeben_am || null,
       faelligkeitsdatum: rechnung?.faelligkeitsdatum || null,
       rechnung_id: rechnung?.id || null,
+      bezahlt_am: b.bezahlt_am || null,
+      bezahlt_von: b.bezahlt_von || null,
     };
   });
 
@@ -70,6 +72,7 @@ export default async function BuchhaltungPage({
       totalPages={totalPages}
       totalCount={total}
       projekte={(projekte || []).map((p) => ({ id: p.id, name: p.name }))}
+      rolle={profil.rolle}
     />
   );
 }

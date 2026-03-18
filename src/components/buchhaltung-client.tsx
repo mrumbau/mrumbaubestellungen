@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
+import type { Rolle } from "@/lib/auth";
 
 interface BuchhaltungRow {
   id: string;
@@ -14,6 +15,8 @@ interface BuchhaltungRow {
   freigegeben_am: string | null;
   faelligkeitsdatum: string | null;
   rechnung_id: string | null;
+  bezahlt_am: string | null;
+  bezahlt_von: string | null;
 }
 
 function isFaelligBald(datum: string | null) {
@@ -38,14 +41,17 @@ export function BuchhaltungClient({
   totalPages,
   totalCount,
   projekte = [],
+  rolle,
 }: {
   rows: BuchhaltungRow[];
   currentPage: number;
   totalPages: number;
   totalCount: number;
   projekte?: ProjektOption[];
+  rolle: Rolle;
 }) {
   const [suche, setSuche] = useState("");
+  const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
   const [showDatev, setShowDatev] = useState(false);
   const [datevLoading, setDatevLoading] = useState(false);
   const [datevError, setDatevError] = useState<string | null>(null);
@@ -74,7 +80,7 @@ export function BuchhaltungClient({
     );
   });
 
-  const summeOffen = rows.reduce((sum, r) => sum + (r.betrag || 0), 0);
+  const summeOffen = rows.filter((r) => !r.bezahlt_am).reduce((sum, r) => sum + (r.betrag || 0), 0);
   const summeMonat = rows
     .filter((r) => {
       if (!r.freigegeben_am) return false;
@@ -95,7 +101,7 @@ export function BuchhaltungClient({
   }
 
   function exportCSV() {
-    const header = "Bestellnr.;Händler;Betrag;Währung;Freigegeben von;Freigegeben am;Fällig\n";
+    const header = "Bestellnr.;Händler;Betrag;Währung;Freigegeben von;Freigegeben am;Fällig;Bezahlt am;Bezahlt von\n";
     const lines = gefiltert.map((r) =>
       [
         r.bestellnummer || "",
@@ -105,6 +111,8 @@ export function BuchhaltungClient({
         r.freigegeben_von,
         r.freigegeben_am ? formatDatum(r.freigegeben_am) : "",
         r.faelligkeitsdatum ? formatDatum(r.faelligkeitsdatum) : "",
+        r.bezahlt_am ? formatDatum(r.bezahlt_am) : "",
+        r.bezahlt_von || "",
       ].join(";")
     );
     const csv = header + lines.join("\n");
@@ -145,6 +153,27 @@ export function BuchhaltungClient({
       setDatevError(e instanceof Error ? e.message : "Unbekannter Fehler");
     } finally {
       setDatevLoading(false);
+    }
+  }
+
+  const kannBezahlen = rolle === "buchhaltung" || rolle === "admin";
+
+  async function toggleBezahlt(bestellungId: string, aktuellBezahlt: boolean) {
+    setBezahltLoading(bestellungId);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellungId}/bezahlt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bezahlt: !aktuellBezahlt }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setBezahltLoading(null);
     }
   }
 
@@ -278,28 +307,32 @@ export function BuchhaltungClient({
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Buchhaltung</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">Freigegebene Rechnungen</p>
+          <p className="text-[#9a9a9a] text-sm mt-1">
+            {rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen" : "Freigegebene Rechnungen"}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowDatev(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            DATEV Export
-          </button>
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-2 border-[#570006] text-[#570006] rounded-lg hover:bg-[#570006] hover:text-white transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            CSV Export
-          </button>
-        </div>
+        {kannBezahlen && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDatev(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-[#e8e6e3] text-[#1a1a1a] bg-white rounded-lg hover:bg-[#fafaf9] hover:border-[#570006]/30 transition-colors"
+            >
+              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              DATEV Export
+            </button>
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-[#e8e6e3] text-[#1a1a1a] bg-white rounded-lg hover:bg-[#fafaf9] hover:border-[#570006]/30 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              CSV Export
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -352,13 +385,14 @@ export function BuchhaltungClient({
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben von</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben am</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Fällig</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bezahlt</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">PDF</th>
             </tr>
           </thead>
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-[#9a9a9a]">
+                <td colSpan={8} className="px-4 py-12 text-center text-[#9a9a9a]">
                   {rows.length === 0
                     ? "Noch keine freigegebenen Rechnungen."
                     : "Keine Rechnungen gefunden."}
@@ -392,6 +426,38 @@ export function BuchhaltungClient({
                     >
                       {formatDatum(r.faelligkeitsdatum)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {kannBezahlen ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleBezahlt(r.id, !!r.bezahlt_am)}
+                        disabled={bezahltLoading === r.id}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all ${
+                          r.bezahlt_am
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "border-[#d4d1cc] hover:border-[#570006]/40 text-transparent hover:text-[#570006]/20"
+                        } ${bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+                        title={r.bezahlt_am
+                          ? `Bezahlt von ${r.bezahlt_von} am ${formatDatum(r.bezahlt_am)}`
+                          : "Als bezahlt markieren"}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                    ) : r.bezahlt_am ? (
+                      <span
+                        className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-500 text-white"
+                        title={`Bezahlt von ${r.bezahlt_von} am ${formatDatum(r.bezahlt_am)}`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center w-6 h-6 text-[#d4d1cc]">–</span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {r.rechnung_id ? (

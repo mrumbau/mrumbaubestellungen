@@ -166,7 +166,7 @@ export async function analysiereDokument(
       volltext: parsed.volltext || "",
     };
   } catch {
-    return { typ: "unbekannt", konfidenz: 0, lieferadressen: [], volltext: text } as unknown as DokumentAnalyse;
+    return { typ: "rechnung", bestellnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: text };
   }
 }
 
@@ -214,7 +214,7 @@ Rechnung: ${JSON.stringify(rechnung)}`,
   );
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<AbgleichErgebnis>(text, { status: "ok", abweichungen: [], zusammenfassung: "Abgleich konnte nicht durchgeführt werden." });
 }
 
 // ========== NEUE KI-FUNKTIONEN ==========
@@ -258,7 +258,7 @@ ${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.arti
   );
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<BestellerErkennungErgebnis>(text, { kuerzel: "UNBEKANNT", konfidenz: 0, begruendung: "Parsing fehlgeschlagen" });
 }
 
 // 2. Lieferschein-Erinnerung generieren
@@ -333,7 +333,7 @@ ${historischePreise.map((h) => `${h.name}: ${h.preise.map((p) => p.toFixed(2) + 
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<PreisAnomalieErgebnis>(text, { hat_anomalie: false, warnungen: [], zusammenfassung: "Preisanalyse konnte nicht durchgeführt werden." });
 }
 
 // 4. Automatische Händler-Erkennung aus E-Mail
@@ -441,7 +441,7 @@ ${stats.abweichende_bestellungen.length > 0
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<WochenzusammenfassungErgebnis>(text, { zusammenfassung: "Zusammenfassung konnte nicht erstellt werden.", dringend: [], highlights: [] });
 }
 
 // 6. Duplikat-Erkennung
@@ -496,7 +496,7 @@ ${existierendeBestellungen.map((b) => `- ${b.bestellnummer} (${b.datum}): ${b.be
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<DuplikatErgebnis>(text, { ist_duplikat: false, konfidenz: 0, duplikat_von: null, begruendung: "Parsing fehlgeschlagen" });
 }
 
 // 7. Automatische Artikel-Kategorisierung
@@ -548,7 +548,7 @@ Gib NUR ein JSON-Objekt zurück:
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<KategorisierungErgebnis>(text, { kategorien: [], zusammenfassung: {} });
 }
 
 // 8. Fälligkeits-Priorisierung
@@ -616,7 +616,7 @@ Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<PriorisierungErgebnis>(text, { bestellungen: [], zusammenfassung: "Priorisierung konnte nicht durchgeführt werden." });
 }
 
 // 9. Besteller-Hinweise aus E-Mail-Text und Dokumenten extrahieren
@@ -684,7 +684,7 @@ ${dokumentTexte.map((t, i) => `--- Dokument ${i + 1} ---\n${t.slice(0, 1500)}`).
   );
 
   const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson(text, {} as never);
+  return safeParseGptJson<BestellerHinweiseErgebnis>(text, { gefundene_hinweise: [], vorgeschlagenes_kuerzel: null, konfidenz: 0, begruendung: "Parsing fehlgeschlagen" });
 }
 
 // 10. Kommentar-Zusammenfassung für eine Bestellung

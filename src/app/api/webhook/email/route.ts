@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
       .from("benutzer_rollen")
       .select("name")
       .eq("kuerzel", bestellerKuerzel)
-      .single();
+      .maybeSingle();
 
     // === FEATURE 4: Automatische Händler-Erkennung ===
     if (!haendler && ergebnisse.length > 0) {

@@ -363,6 +363,9 @@ CREATE POLICY kommentare_besteller_select ON kommentare
 CREATE POLICY kommentare_besteller_insert ON kommentare
   FOR INSERT WITH CHECK (
     autor_kuerzel = (SELECT kuerzel FROM benutzer_rollen WHERE user_id = auth.uid())
+    AND bestellung_id IN (
+      SELECT id FROM bestellungen WHERE besteller_kuerzel = (SELECT kuerzel FROM benutzer_rollen WHERE user_id = auth.uid())
+    )
   );
 
 -- projekte

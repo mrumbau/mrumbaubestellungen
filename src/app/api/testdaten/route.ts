@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
 
 const TESTBESTELLUNGEN = [
   {
@@ -118,7 +119,7 @@ const TEST_ARTIKEL = [
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     // Admin-Check
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
     } = await supabaseAuth.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { data: profil } = await supabaseAuth
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!profil || profil.rolle !== "admin") {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     const supabase = createServiceClient();
@@ -150,9 +151,9 @@ export async function POST(request: NextRequest) {
     return deleteTestdaten(supabase);
   }
 
-  return NextResponse.json({ error: "Ungültige Aktion" }, { status: 400 });
+  return NextResponse.json({ error: ERRORS.UNGUELTIGE_AKTION }, { status: 400 });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }
 

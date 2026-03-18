@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
 
 // GET /api/einstellungen/firma – Alle Firma-Einstellungen laden
 export async function GET() {
@@ -8,7 +9,7 @@ export async function GET() {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { data: profil } = await supabase
@@ -18,7 +19,7 @@ export async function GET() {
       .single();
 
     if (!profil || profil.rolle !== "admin") {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     const { data, error } = await supabase
@@ -37,7 +38,7 @@ export async function GET() {
 
     return NextResponse.json({ einstellungen });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }
 
@@ -45,13 +46,13 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { data: profil } = await supabase
@@ -61,7 +62,7 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (!profil || profil.rolle !== "admin") {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     const body = await request.json();
@@ -86,6 +87,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }

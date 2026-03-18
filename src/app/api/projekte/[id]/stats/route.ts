@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID } from "@/lib/validation";
+import { ERRORS } from "@/lib/errors";
 
 // GET /api/projekte/[id]/stats – Projekt-Statistiken
 export async function GET(
@@ -10,13 +11,13 @@ export async function GET(
   try {
     const { id } = await params;
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     // Projekt + Budget laden
@@ -61,6 +62,6 @@ export async function GET(
       besteller,
     });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }

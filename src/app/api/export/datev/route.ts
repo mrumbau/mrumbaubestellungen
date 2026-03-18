@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { exportiereAlsDATEV, type FreigegebeneRechnung } from "@/lib/datev-export";
+import { ERRORS } from "@/lib/errors";
 
 // GET /api/export/datev – DATEV Buchungsstapel CSV Export
 export async function GET(request: NextRequest) {
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     // Nur Buchhaltung + Admin
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (!profil || !["admin", "buchhaltung"].includes(profil.rolle)) {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     const url = new URL(request.url);
@@ -108,6 +109,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }

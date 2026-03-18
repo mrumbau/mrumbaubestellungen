@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getStatusConfig } from "@/lib/status-config";
@@ -59,6 +59,7 @@ export function BestellungenTabelle({
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
+  useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
   const router = useRouter();
   const searchParams = useSearchParams();
 

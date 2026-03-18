@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { generiereWochenzusammenfassung } from "@/lib/openai";
+import { ERRORS } from "@/lib/errors";
 
 // GET /api/ki/zusammenfassung – KI-Dashboard-Zusammenfassung
 export async function GET() {
@@ -11,10 +12,10 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
-    // Neueste 50 Bestellungen laden (Performance-Limit)
+    // Neueste 50 Bestellungen laden (RLS filtert automatisch nach Rolle)
     const { data: bestellungen } = await supabase
       .from("bestellungen")
       .select("*")
@@ -34,12 +35,16 @@ export async function GET() {
       .filter((b) => b.status === "freigegeben" && b.betrag)
       .reduce((sum, b) => sum + Number(b.betrag), 0);
 
-    // Überfällige Rechnungen
-    const { data: rechnungen } = await supabase
-      .from("dokumente")
-      .select("bestellung_id, faelligkeitsdatum")
-      .eq("typ", "rechnung")
-      .not("faelligkeitsdatum", "is", null);
+    // Überfällige Rechnungen – nur für Bestellungen die der User sehen darf
+    const bestellIds = alle.map((b) => b.id);
+    const { data: rechnungen } = bestellIds.length > 0
+      ? await supabase
+          .from("dokumente")
+          .select("bestellung_id, faelligkeitsdatum")
+          .eq("typ", "rechnung")
+          .in("bestellung_id", bestellIds)
+          .not("faelligkeitsdatum", "is", null)
+      : { data: [] as { bestellung_id: string; faelligkeitsdatum: string }[] };
 
     const ueberfaelligeRechnungen: { bestellnummer: string; haendler: string; faellig: string; betrag: number }[] = [];
 
@@ -98,7 +103,7 @@ export async function GET() {
   } catch (err) {
     console.error("KI-Zusammenfassung Fehler:", err);
     return NextResponse.json(
-      { error: "Zusammenfassung konnte nicht erstellt werden" },
+      { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
     );
   }

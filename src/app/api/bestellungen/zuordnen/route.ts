@@ -3,12 +3,13 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID, isValidKuerzel } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
 
 // POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen (nur Admin)
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     const supabaseAuth = await createServerSupabaseClient();
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
     } = await supabaseAuth.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     // Rolle prüfen (nur Admin)
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (profil?.rolle !== "admin") {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     const body = await request.json();
@@ -89,6 +90,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }

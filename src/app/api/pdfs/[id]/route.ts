@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID, sanitizeFilename } from "@/lib/validation";
+import { ERRORS } from "@/lib/errors";
 
 // GET /api/pdfs/[id] – PDF/Bild aus Supabase Storage abrufen
 export async function GET(
@@ -12,7 +13,7 @@ export async function GET(
     const { id } = await params;
 
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
     const supabaseAuth = await createServerSupabaseClient();
@@ -22,7 +23,7 @@ export async function GET(
     } = await supabaseAuth.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     // Dokument-Metadaten laden (RLS filtert)
@@ -33,7 +34,7 @@ export async function GET(
       .single();
 
     if (!dokument?.storage_pfad) {
-      return NextResponse.json({ error: "Nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
     }
 
     // Datei aus Storage laden (Service Client für Zugriff)
@@ -63,7 +64,7 @@ export async function GET(
     });
   } catch {
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
     );
   }

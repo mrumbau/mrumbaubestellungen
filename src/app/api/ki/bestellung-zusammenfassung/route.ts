@@ -3,12 +3,13 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { fasseBestellungZusammen } from "@/lib/openai";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
 
 // POST /api/ki/bestellung-zusammenfassung – KI-Zusammenfassung einer Bestellung
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     const supabase = await createServerSupabaseClient();
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { bestellung_id } = await request.json();

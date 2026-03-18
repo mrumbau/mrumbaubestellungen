@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
+import { ERRORS } from "@/lib/errors";
 
 const ERLAUBTE_FARBEN = ["#570006", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 
@@ -12,18 +13,18 @@ export async function PUT(
 ) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     const { id } = await params;
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { data: profil } = await supabase
@@ -33,7 +34,7 @@ export async function PUT(
       .single();
 
     if (!profil || profil.rolle !== "admin") {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     const body = await request.json();
@@ -78,7 +79,7 @@ export async function PUT(
 
     return NextResponse.json({ projekt });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }
 
@@ -89,18 +90,18 @@ export async function DELETE(
 ) {
   try {
     if (!checkCsrf(request)) {
-      return NextResponse.json({ error: "Ungültiger Ursprung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
     const { id } = await params;
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     const { data: profil } = await supabase
@@ -110,7 +111,7 @@ export async function DELETE(
       .single();
 
     if (!profil || profil.rolle !== "admin") {
-      return NextResponse.json({ error: "Keine Berechtigung" }, { status: 403 });
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     // Prüfe ob Bestellungen zugeordnet sind
@@ -145,6 +146,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, geloescht: true });
   } catch {
-    return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
+    return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }

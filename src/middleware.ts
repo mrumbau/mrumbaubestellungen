@@ -80,12 +80,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Dashboard + Einstellungen nur für Admin
-    if (
-      (pathname.startsWith("/dashboard") ||
-        pathname.startsWith("/einstellungen")) &&
-      rolle !== "admin"
-    ) {
+    // Einstellungen nur für Admin
+    if (pathname.startsWith("/einstellungen") && rolle !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/bestellungen";
       return NextResponse.redirect(url);

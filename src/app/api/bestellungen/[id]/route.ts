@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID } from "@/lib/validation";
+import { ERRORS } from "@/lib/errors";
 
 // GET /api/bestellungen/[id] – Details + Dokumente + Abgleich
 export async function GET(
@@ -11,7 +12,7 @@ export async function GET(
     const { id } = await params;
 
     if (!isValidUUID(id)) {
-      return NextResponse.json({ error: "Ungültiges ID Format" }, { status: 400 });
+      return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
     const supabase = await createServerSupabaseClient();
@@ -21,7 +22,7 @@ export async function GET(
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert" }, { status: 401 });
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
     // Bestellung laden (RLS filtert)
@@ -32,7 +33,7 @@ export async function GET(
       .single();
 
     if (error || !bestellung) {
-      return NextResponse.json({ error: "Nicht gefunden" }, { status: 404 });
+      return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
     }
 
     // Dokumente laden
@@ -74,7 +75,7 @@ export async function GET(
     });
   } catch {
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
     );
   }
