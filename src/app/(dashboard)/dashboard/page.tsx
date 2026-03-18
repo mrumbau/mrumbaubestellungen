@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceClient } from "@/lib/supabase";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardWidgets } from "@/components/dashboard-widgets";
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
     eigene(supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null)),
     eigene(supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5)),
     eigene(supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
-    eigene(supabase.from("bestellungen").select("besteller_kuerzel")),
+    createServiceClient().from("bestellungen").select("besteller_kuerzel"),
     supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
