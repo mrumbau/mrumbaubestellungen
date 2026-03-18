@@ -1,4 +1,5 @@
 // MR Umbau Bestellerkennung – Background Service Worker (Manifest V3)
+importScripts("config.js");
 
 var BADGE_COLORS = {
   bekannt: "#570006",
