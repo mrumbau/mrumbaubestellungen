@@ -175,6 +175,7 @@ export function BestelldetailClient({
   const [showFreigabeDialog, setShowFreigabeDialog] = useState(false);
   const [freigabeError, setFreigabeError] = useState<string | null>(null);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [duplikatResult, setDuplikatResult] = useState<{ ist_duplikat: boolean; konfidenz: number; duplikat_von: string | null; begruendung: string } | null>(null);
   const [duplikatLoading, setDuplikatLoading] = useState(false);
   const [katResult, setKatResult] = useState<{ kategorien: { artikel: string; kategorie: string }[]; zusammenfassung: Record<string, number> } | null>(null);
@@ -196,7 +197,7 @@ export function BestelldetailClient({
     fetch(`/api/projekte/${bestellung.projekt_id}/stats`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => data && setProjektStats({ gesamt_ausgaben: data.gesamt_ausgaben, budget: data.budget, budget_auslastung_prozent: data.budget_auslastung_prozent }))
-      .catch(() => {});
+      .catch(() => setProjektStats(null));
   }, [bestellung.projekt_id]);
 
   // Filtered projects for Combobox
@@ -230,9 +231,12 @@ export function BestelldetailClient({
       if (res.ok) {
         setShowProjektSelect(false);
         setProjektSuche("");
+        setActionError(null);
         router.refresh();
+      } else {
+        setActionError("Projekt-Zuordnung fehlgeschlagen");
       }
-    } catch { /* ignore */ } finally {
+    } catch { setActionError("Netzwerkfehler bei der Projekt-Zuordnung"); } finally {
       setProjektLoading(false);
     }
   }
@@ -245,8 +249,9 @@ export function BestelldetailClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ aktion, ...(korrektesProjektId ? { korrektes_projekt_id: korrektesProjektId } : {}) }),
       });
-      if (res.ok) { setShowVorschlagKorrektur(false); router.refresh(); }
-    } catch { /* ignore */ } finally {
+      if (res.ok) { setShowVorschlagKorrektur(false); setActionError(null); router.refresh(); }
+      else { setActionError("Projekt-Bestätigung fehlgeschlagen"); }
+    } catch { setActionError("Netzwerkfehler bei der Projekt-Bestätigung"); } finally {
       setVorschlagLoading(false);
     }
   }
@@ -306,8 +311,9 @@ export function BestelldetailClient({
         body: JSON.stringify({ bestellung_id: bestellung.id }),
       });
       const data = await res.json();
-      if (res.ok) setKiZusammenfassung(data.zusammenfassung);
-    } catch { /* ignore */ } finally { setKiLoading(false); }
+      if (res.ok) { setKiZusammenfassung(data.zusammenfassung); setActionError(null); }
+      else { setActionError("KI-Zusammenfassung fehlgeschlagen"); }
+    } catch { setActionError("Netzwerkfehler bei der KI-Zusammenfassung"); } finally { setKiLoading(false); }
   }
 
   async function handleDuplikatCheck() {
@@ -319,8 +325,9 @@ export function BestelldetailClient({
         body: JSON.stringify({ bestellung_id: bestellung.id }),
       });
       const data = await res.json();
-      if (res.ok) setDuplikatResult(data);
-    } catch { /* ignore */ } finally { setDuplikatLoading(false); }
+      if (res.ok) { setDuplikatResult(data); setActionError(null); }
+      else { setActionError("Duplikat-Check fehlgeschlagen"); }
+    } catch { setActionError("Netzwerkfehler beim Duplikat-Check"); } finally { setDuplikatLoading(false); }
   }
 
   async function handleKategorisierung() {
@@ -332,8 +339,9 @@ export function BestelldetailClient({
         body: JSON.stringify({ bestellung_id: bestellung.id }),
       });
       const data = await res.json();
-      if (res.ok) setKatResult(data);
-    } catch { /* ignore */ } finally { setKatLoading(false); }
+      if (res.ok) { setKatResult(data); setActionError(null); }
+      else { setActionError("Kategorisierung fehlgeschlagen"); }
+    } catch { setActionError("Netzwerkfehler bei der Kategorisierung"); } finally { setKatLoading(false); }
   }
 
   async function handleScan(file: File) {
@@ -354,10 +362,17 @@ export function BestelldetailClient({
           body: JSON.stringify({ bestellung_id: bestellung.id, base64, mime_type: file.type, datei_name: file.name }),
         });
         const data = await res.json();
-        if (!res.ok) setScanError(data.error || "Upload fehlgeschlagen");
-        else router.refresh();
-      } catch { setScanError("Netzwerkfehler beim Upload"); }
-      finally { setScanLoading(false); }
+        if (!res.ok) {
+          setScanError(data.error || "Upload fehlgeschlagen");
+          setScanLoading(false);
+        } else {
+          router.refresh();
+          setScanLoading(false);
+        }
+      } catch {
+        setScanError("Netzwerkfehler beim Upload");
+        setScanLoading(false);
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -999,6 +1014,15 @@ export function BestelldetailClient({
 
   return (
     <>
+      {/* Action error banner */}
+      {actionError && (
+        <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       {/* Mobile section tabs */}
       <div className="md:hidden flex border-b border-[#e8e6e3] mb-4 -mx-4 px-4">
         {([

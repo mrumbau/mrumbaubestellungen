@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidKuerzel, isValidDomain, validateTextLength } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { logError } from "@/lib/logger";
 
 // POST /api/webhook/bestellung – Empfängt Signal von Chrome Extension
 export async function POST(request: NextRequest) {
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Signal-Speichern Fehler:", error);
+      logError("/api/webhook/bestellung", "Signal-Speichern fehlgeschlagen", error);
       return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 

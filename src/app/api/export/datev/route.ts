@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { exportiereAlsDATEV, type FreigegebeneRechnung } from "@/lib/datev-export";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 
 // GET /api/export/datev – DATEV Buchungsstapel CSV Export
 export async function GET(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || !["admin", "buchhaltung"].includes(profil.rolle)) {
+    if (!requireRoles(profil, "admin", "buchhaltung")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

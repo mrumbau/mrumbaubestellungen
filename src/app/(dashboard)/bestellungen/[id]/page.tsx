@@ -1,9 +1,10 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { BestelldetailClient } from "@/components/bestelldetail-client";
 import { getStatusConfig } from "@/lib/status-config";
+import { isValidUUID } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export default async function BestellungDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isValidUUID(id)) notFound();
+
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 

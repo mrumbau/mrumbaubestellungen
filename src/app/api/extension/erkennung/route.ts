@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { logError } from "@/lib/logger";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -100,7 +101,7 @@ Seiteninhalt (Auszug): ${kurzText || "(kein Text)"}`,
 
     return NextResponse.json({ ist_bestellung: false });
   } catch (err) {
-    console.error("[Extension/Erkennung] Fehler:", err);
+    logError("/api/extension/erkennung", "Unerwarteter Fehler", err);
     return NextResponse.json({ ist_bestellung: false });
   }
 }

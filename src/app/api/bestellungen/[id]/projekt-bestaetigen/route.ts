@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 import { aktualisiereBestellerAffinitaet } from "@/lib/openai";
 
 // POST /api/bestellungen/[id]/projekt-bestaetigen
@@ -32,7 +33,7 @@ export async function POST(
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

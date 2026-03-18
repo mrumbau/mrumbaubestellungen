@@ -374,6 +374,10 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
 
   const [statsVisible, setStatsVisible] = useState<Record<string, boolean>>(savedConfig.stats || {});
   const [widgetsVisible, setWidgetsVisible] = useState<Record<string, boolean>>(savedConfig.widgets || {});
+  const statsRef = useRef(statsVisible);
+  const widgetsRef = useRef(widgetsVisible);
+  statsRef.current = statsVisible;
+  widgetsRef.current = widgetsVisible;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced save to DB
@@ -396,7 +400,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   function toggleStat(id: string) {
     setStatsVisible((prev) => {
       const next = { ...prev, [id]: prev[id] === false };
-      saveToDb(next, widgetsVisible);
+      saveToDb(next, widgetsRef.current);
       return next;
     });
   }
@@ -404,7 +408,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   function toggleWidget(id: string) {
     setWidgetsVisible((prev) => {
       const next = { ...prev, [id]: prev[id] === false };
-      saveToDb(statsVisible, next);
+      saveToDb(statsRef.current, next);
       return next;
     });
   }

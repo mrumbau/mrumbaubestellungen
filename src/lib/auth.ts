@@ -31,6 +31,11 @@ export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> 
   return data as BenutzerProfil | null;
 });
 
+// Prüft ob das Profil eine der erlaubten Rollen hat
+export function requireRoles(profil: { rolle: Rolle } | null, ...rollen: Rolle[]): boolean {
+  return !!profil && rollen.includes(profil.rolle);
+}
+
 // Redirect-Pfad basierend auf Rolle
 export function getRedirectForRolle(rolle: Rolle): string {
   switch (rolle) {

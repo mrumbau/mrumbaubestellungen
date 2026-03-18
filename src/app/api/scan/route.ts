@@ -6,12 +6,20 @@ import { isValidUUID, isAllowedMimeType, isFileSizeOk, sanitizeFilename } from "
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 // POST /api/scan – Foto/PDF hochladen und per GPT-4o analysieren
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
       return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
+    }
+
+    // Rate-Limit: max 10 Scans pro Minute pro IP
+    const rlKey = getRateLimitKey(request, "scan");
+    const rl = checkRateLimit(rlKey, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Zu viele Anfragen. Bitte warten." }, { status: 429 });
     }
 
     // Auth-Check

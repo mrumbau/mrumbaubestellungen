@@ -5,6 +5,7 @@ import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { requireRoles } from "@/lib/auth";
 
 // POST /api/bestellungen/[id]/bezahlt – Rechnung als bezahlt markieren/entmarkieren
 export async function POST(
@@ -47,7 +48,7 @@ export async function POST(
     }
 
     // Nur Buchhaltung und Admin dürfen bezahlt setzen
-    if (profil.rolle !== "buchhaltung" && profil.rolle !== "admin") {
+    if (!requireRoles(profil, "buchhaltung", "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

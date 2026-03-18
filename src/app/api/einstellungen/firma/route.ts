@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 
 // GET /api/einstellungen/firma – Alle Firma-Einstellungen laden
 export async function GET() {
@@ -18,7 +19,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -61,7 +62,7 @@ export async function PUT(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

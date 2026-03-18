@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 
 // POST /api/kunden/[id]/bestaetigen – Auto-erkannten Kunden bestätigen
 export async function POST(
@@ -31,7 +32,7 @@ export async function POST(
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || (profil.rolle !== "admin" && profil.rolle !== "besteller")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

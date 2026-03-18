@@ -53,6 +53,7 @@ export function BuchhaltungClient({
   const [suche, setSuche] = useState("");
   const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
+  const [bezahltError, setBezahltError] = useState<string | null>(null);
   const [showDatev, setShowDatev] = useState(false);
   const [datevLoading, setDatevLoading] = useState(false);
   const [datevError, setDatevError] = useState<string | null>(null);
@@ -168,6 +169,7 @@ export function BuchhaltungClient({
 
   async function toggleBezahlt(bestellungId: string, aktuellBezahlt: boolean) {
     setBezahltLoading(bestellungId);
+    setBezahltError(null);
     try {
       const res = await fetch(`/api/bestellungen/${bestellungId}/bezahlt`, {
         method: "POST",
@@ -176,7 +178,7 @@ export function BuchhaltungClient({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
+        setBezahltError(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
         return;
       }
       const result = await res.json();
@@ -193,7 +195,7 @@ export function BuchhaltungClient({
         )
       );
     } catch {
-      alert("Netzwerkfehler beim Aktualisieren des Zahlungsstatus");
+      setBezahltError("Netzwerkfehler beim Aktualisieren des Zahlungsstatus");
     } finally {
       setBezahltLoading(null);
     }
@@ -201,6 +203,15 @@ export function BuchhaltungClient({
 
   return (
     <div>
+      {/* Bezahlt error banner */}
+      {bezahltError && (
+        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+          <span>{bezahltError}</span>
+          <button type="button" onClick={() => setBezahltError(null)} className="text-red-400 hover:text-red-600 shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       {/* DATEV Export Modal */}
       {showDatev && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDatev(false)}>

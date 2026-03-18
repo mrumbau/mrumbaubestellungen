@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidDomain, validateTextLength } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
+import { logError } from "@/lib/logger";
 
 // GET /api/haendler – Alle Händler laden
 export async function GET() {
@@ -23,7 +25,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -33,7 +35,7 @@ export async function GET() {
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("Händler Fehler:", error);
+      logError("/api/haendler", "Datenbankfehler", error);
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
     }
 
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -97,7 +99,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Händler Fehler:", error);
+      logError("/api/haendler", "Datenbankfehler", error);
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
     }
 

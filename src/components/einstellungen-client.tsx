@@ -159,13 +159,6 @@ export function EinstellungenClient({
 
   const PROJEKT_FARBEN = ["#570006", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 
-  // Passwort ändern
-  const [pwAktuell, setPwAktuell] = useState("");
-  const [pwNeu, setPwNeu] = useState("");
-  const [pwBestaetigung, setPwBestaetigung] = useState("");
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwMsg, setPwMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true);
     try {
@@ -295,38 +288,6 @@ export function EinstellungenClient({
       });
     } finally {
       setTestdatenLoading(false);
-    }
-  }
-
-  async function handlePasswortAendern(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pwNeu || !pwBestaetigung) {
-      setPwMsg({ type: "error", text: "Bitte alle Felder ausfüllen." });
-      return;
-    }
-    if (pwNeu !== pwBestaetigung) {
-      setPwMsg({ type: "error", text: "Passwörter stimmen nicht überein." });
-      return;
-    }
-    if (pwNeu.length < 8) {
-      setPwMsg({ type: "error", text: "Mindestens 8 Zeichen erforderlich." });
-      return;
-    }
-
-    setPwLoading(true);
-    setPwMsg(null);
-    try {
-      const supabase = createBrowserSupabaseClient();
-      const { error } = await supabase.auth.updateUser({ password: pwNeu });
-      if (error) throw new Error(error.message);
-      setPwMsg({ type: "success", text: "Passwort erfolgreich geändert." });
-      setPwAktuell("");
-      setPwNeu("");
-      setPwBestaetigung("");
-    } catch (err) {
-      setPwMsg({ type: "error", text: err instanceof Error ? err.message : "Fehler beim Ändern" });
-    } finally {
-      setPwLoading(false);
     }
   }
 
@@ -1326,66 +1287,6 @@ export function EinstellungenClient({
           </div>
         </div>
 
-        {/* ═══════════════════════════════════════════
-            5. PASSWORT ÄNDERN
-            ═══════════════════════════════════════════ */}
-        <div className="card p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
-              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Passwort ändern</h2>
-          </div>
-
-          {pwMsg && (
-            <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
-              pwMsg.type === "success"
-                ? "bg-green-50 border border-green-200 text-green-700"
-                : "bg-red-50 border border-red-200 text-red-700"
-            }`}>
-              {pwMsg.text}
-            </div>
-          )}
-
-          <form onSubmit={handlePasswortAendern} className="space-y-3">
-            <div>
-              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Aktuelles Passwort</label>
-              <input
-                type="password"
-                value={pwAktuell}
-                onChange={(e) => setPwAktuell(e.target.value)}
-                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Neues Passwort</label>
-              <input
-                type="password"
-                value={pwNeu}
-                onChange={(e) => setPwNeu(e.target.value)}
-                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1">Passwort bestätigen</label>
-              <input
-                type="password"
-                value={pwBestaetigung}
-                onChange={(e) => setPwBestaetigung(e.target.value)}
-                className="w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] bg-white focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={pwLoading}
-              className="w-full px-4 py-2.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors disabled:opacity-50"
-            >
-              {pwLoading ? "Wird geändert..." : "Passwort ändern"}
-            </button>
-          </form>
-        </div>
       </div>
 
       {/* ═══════════════════════════════════════════

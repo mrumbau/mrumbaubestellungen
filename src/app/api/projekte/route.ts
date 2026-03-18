@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 
 const ERLAUBTE_FARBEN = ["#570006", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0891b2"];
 
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || (profil.rolle !== "admin" && profil.rolle !== "besteller")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -57,6 +58,15 @@ export async function POST(request: NextRequest) {
 
     if (!name || typeof name !== "string" || name.trim().length < 2) {
       return NextResponse.json({ error: "Name muss mindestens 2 Zeichen lang sein" }, { status: 400 });
+    }
+    if (name.trim().length > 200) {
+      return NextResponse.json({ error: "Name darf maximal 200 Zeichen lang sein" }, { status: 400 });
+    }
+    if (beschreibung && typeof beschreibung === "string" && beschreibung.trim().length > 2000) {
+      return NextResponse.json({ error: "Beschreibung darf maximal 2000 Zeichen lang sein" }, { status: 400 });
+    }
+    if (kunde && typeof kunde === "string" && kunde.trim().length > 200) {
+      return NextResponse.json({ error: "Kunde darf maximal 200 Zeichen lang sein" }, { status: 400 });
     }
 
     const safeFarbe = ERLAUBTE_FARBEN.includes(farbe) ? farbe : "#570006";

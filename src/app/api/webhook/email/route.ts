@@ -453,9 +453,12 @@ export async function POST(request: NextRequest) {
 
       const storagePfad = `${bestellungId}/${analyse.typ}_${dateiName}`;
       const buffer = Buffer.from(base64, "base64");
-      await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("dokumente")
         .upload(storagePfad, buffer, { contentType: mime_type });
+      if (uploadError) {
+        logError("/api/webhook/email", `Storage upload fehlgeschlagen: ${storagePfad}`, uploadError);
+      }
 
       await supabase.from("dokumente").insert({
         bestellung_id: bestellungId,
@@ -653,11 +656,13 @@ export async function POST(request: NextRequest) {
         .select("id, name, beschreibung, adresse, adresse_keywords, kunden_id, besteller_affinitaet, kunden(name)")
         .in("status", ["aktiv", "pausiert"]);
 
-      type ProjektRow = { id: string; name: string; beschreibung: string | null; adresse: string | null; adresse_keywords: string[] | null; kunden_id: string | null; besteller_affinitaet: unknown; kunden: { name: string }[] | null };
-      const kundenName = (p: ProjektRow) => {
+      type KundenJoin = { name: string } | { name: string }[] | null;
+      type ProjektRow = { id: string; name: string; beschreibung: string | null; adresse: string | null; adresse_keywords: string[] | null; kunden_id: string | null; besteller_affinitaet: unknown; kunden: KundenJoin };
+      const kundenName = (p: ProjektRow): string | null => {
         const k = p.kunden;
+        if (!k) return null;
         if (Array.isArray(k)) return k[0]?.name || null;
-        if (k && typeof k === "object") return (k as { name: string }).name || null;
+        if (typeof k === "object" && "name" in k) return k.name || null;
         return null;
       };
 

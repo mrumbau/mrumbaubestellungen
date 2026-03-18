@@ -4,12 +4,21 @@ import { fasseBestellungZusammen } from "@/lib/openai";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { logError } from "@/lib/logger";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 // POST /api/ki/bestellung-zusammenfassung – KI-Zusammenfassung einer Bestellung
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
       return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
+    }
+
+    // Rate-Limit: max 10 KI-Calls pro Minute
+    const rlKey = getRateLimitKey(request, "ki-zusammenfassung");
+    const rl = checkRateLimit(rlKey, 10, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Zu viele Anfragen. Bitte warten." }, { status: 429 });
     }
 
     const supabase = await createServerSupabaseClient();
@@ -74,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ zusammenfassung });
   } catch (err) {
-    console.error("KI-Bestellung-Zusammenfassung Fehler:", err);
+    logError("/api/ki/bestellung-zusammenfassung", "Unerwarteter Fehler", err);
     return NextResponse.json(
       { error: "Zusammenfassung konnte nicht erstellt werden" },
       { status: 500 }

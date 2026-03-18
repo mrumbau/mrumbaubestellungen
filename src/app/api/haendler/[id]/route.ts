@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID, isValidDomain, validateTextLength } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
+import { logError } from "@/lib/logger";
 
 // PUT /api/haendler/[id] – Händler aktualisieren
 export async function PUT(
@@ -31,7 +33,7 @@ export async function PUT(
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -63,7 +65,7 @@ export async function PUT(
       .single();
 
     if (error) {
-      console.error("Händler Fehler:", error);
+      logError("/api/haendler/[id]", "Datenbankfehler", error);
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
     }
 
@@ -100,7 +102,7 @@ export async function DELETE(
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -111,7 +113,7 @@ export async function DELETE(
     const { error } = await supabase.from("haendler").delete().eq("id", id);
 
     if (error) {
-      console.error("Händler Fehler:", error);
+      logError("/api/haendler/[id]", "Datenbankfehler", error);
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
     }
 

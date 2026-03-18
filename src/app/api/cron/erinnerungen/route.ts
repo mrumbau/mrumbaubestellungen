@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { generiereErinnerungsmail } from "@/lib/openai";
+import { logError } from "@/lib/logger";
 
 // POST /api/cron/erinnerungen – Täglicher Job: Fehlende Lieferscheine erkennen
 // Aufruf durch Make.com oder Vercel Cron
@@ -41,10 +42,13 @@ export async function POST(request: NextRequest) {
       .map((b) => b.id);
 
     if (lsFehltIds.length > 0) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("bestellungen")
         .update({ status: "ls_fehlt", updated_at: new Date().toISOString() })
         .in("id", lsFehltIds);
+      if (updateError) {
+        logError("/api/cron/erinnerungen", "Batch-Update ls_fehlt fehlgeschlagen", updateError);
+      }
     }
 
     // Gruppiere nach Besteller
@@ -103,7 +107,7 @@ export async function POST(request: NextRequest) {
       erinnerungen,
     });
   } catch (err) {
-    console.error("Erinnerungen-Cron Fehler:", err);
+    logError("/api/cron/erinnerungen", "Unerwarteter Fehler", err);
 
     // Webhook-Log: Fehler
     try {

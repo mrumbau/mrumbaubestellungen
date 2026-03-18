@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
+import { logError } from "@/lib/logger";
 
 // GET /api/extension/haendler – Liefert alle Händler-Patterns für die Extension
 // Die Extension cached diese Liste und nutzt sie für Stufe 1 (sofortige Erkennung)
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     .not("url_muster", "eq", "{}");
 
   if (error) {
-    console.error("[Extension/Haendler] Fehler:", error);
+    logError("/api/extension/haendler", "Unerwarteter Fehler", error);
     return NextResponse.json({ error: "Interner Fehler" }, { status: 500 });
   }
 

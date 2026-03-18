@@ -3,6 +3,9 @@ import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 const TESTBESTELLUNGEN = [
   {
@@ -122,6 +125,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
+    // Rate-Limit: max 5 Requests pro Minute
+    const rlKey = getRateLimitKey(request, "testdaten");
+    const rl = checkRateLimit(rlKey, 5, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Zu viele Anfragen. Bitte warten." }, { status: 429 });
+    }
+
     // Admin-Check
     const supabaseAuth = await createServerSupabaseClient();
     const {
@@ -138,7 +148,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -192,7 +202,7 @@ async function createTestdaten(supabase: ReturnType<typeof createServiceClient>)
       .single();
 
     if (error || !bestellung) {
-      console.error("Fehler bei Bestellung:", error);
+      logError("/api/testdaten", "Fehler bei Testbestellung", error);
       continue;
     }
 

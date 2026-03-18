@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { generiereWochenzusammenfassung } from "@/lib/openai";
 import { ERRORS } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 
 // GET /api/ki/zusammenfassung – KI-Dashboard-Zusammenfassung
 export async function GET() {
@@ -101,7 +102,7 @@ export async function GET() {
 
     return NextResponse.json(zusammenfassung);
   } catch (err) {
-    console.error("KI-Zusammenfassung Fehler:", err);
+    logError("/api/ki/zusammenfassung", "Unerwarteter Fehler", err);
     return NextResponse.json(
       { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }

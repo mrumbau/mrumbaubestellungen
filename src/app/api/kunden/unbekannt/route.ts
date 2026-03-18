@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 
 // GET /api/kunden/unbekannt – Unbestätigte (auto-erkannte) Kunden
 export async function GET() {
@@ -17,7 +18,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || (profil.rolle !== "admin" && profil.rolle !== "besteller")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
