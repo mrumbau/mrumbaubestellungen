@@ -177,8 +177,10 @@ export function BuchhaltungClient({
         alert(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
         return;
       }
-      router.refresh();
-    } finally {
+      // Hard reload um Server Component Cache zu umgehen
+      window.location.reload();
+    } catch {
+      alert("Netzwerkfehler beim Aktualisieren des Zahlungsstatus");
       setBezahltLoading(null);
     }
   }
