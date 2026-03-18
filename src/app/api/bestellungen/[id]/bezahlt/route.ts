@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -50,8 +51,11 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
+    // Service-Client für Bestellungszugriff (Buchhaltung hat keine UPDATE-RLS-Policy)
+    const serviceClient = createServiceClient();
+
     // Bestellung prüfen
-    const { data: bestellung } = await supabase
+    const { data: bestellung } = await serviceClient
       .from("bestellungen")
       .select("id, status")
       .eq("id", id)
@@ -66,7 +70,7 @@ export async function POST(
       return NextResponse.json({ error: "Nur freigegebene Rechnungen können als bezahlt markiert werden" }, { status: 400 });
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await serviceClient
       .from("bestellungen")
       .update({
         bezahlt_am: bezahlt ? new Date().toISOString() : null,
