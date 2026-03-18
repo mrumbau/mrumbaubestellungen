@@ -4,6 +4,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardWidgets } from "@/components/dashboard-widgets";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");

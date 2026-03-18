@@ -84,7 +84,7 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, bezahlt });
+    return NextResponse.json({ success: true, bezahlt, bezahlt_von: bezahlt ? profil.name : null });
   } catch (err) {
     logError("/api/bestellungen/[id]/bezahlt", "Unerwarteter Fehler", err);
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });

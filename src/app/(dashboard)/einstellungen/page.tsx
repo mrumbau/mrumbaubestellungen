@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { EinstellungenClient } from "@/components/einstellungen-client";
 import { PasswortAendern } from "@/components/passwort-aendern";
 
+export const dynamic = "force-dynamic";
+
 export default async function EinstellungenPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");

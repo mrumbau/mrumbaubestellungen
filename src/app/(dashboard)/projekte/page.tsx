@@ -3,6 +3,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ProjekteClient } from "@/components/projekte-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProjektePage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");

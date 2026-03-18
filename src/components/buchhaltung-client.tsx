@@ -71,8 +71,10 @@ export function BuchhaltungClient({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const offeneRows = rows.filter((r) => !r.bezahlt_am);
-  const bezahlteRows = rows.filter((r) => !!r.bezahlt_am);
+  const [localRows, setLocalRows] = useState(rows);
+
+  const offeneRows = localRows.filter((r) => !r.bezahlt_am);
+  const bezahlteRows = localRows.filter((r) => !!r.bezahlt_am);
   const aktiveRows = tab === "offen" ? offeneRows : bezahlteRows;
 
   const gefiltert = aktiveRows.filter((r) => {
@@ -177,10 +179,22 @@ export function BuchhaltungClient({
         alert(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
         return;
       }
-      // Hard reload um Server Component Cache zu umgehen
-      window.location.reload();
+      const result = await res.json();
+      // Update local state — no page reload needed
+      setLocalRows((prev) =>
+        prev.map((r) =>
+          r.id === bestellungId
+            ? {
+                ...r,
+                bezahlt_am: result.bezahlt ? new Date().toISOString() : null,
+                bezahlt_von: result.bezahlt_von || null,
+              }
+            : r
+        )
+      );
     } catch {
       alert("Netzwerkfehler beim Aktualisieren des Zahlungsstatus");
+    } finally {
       setBezahltLoading(null);
     }
   }

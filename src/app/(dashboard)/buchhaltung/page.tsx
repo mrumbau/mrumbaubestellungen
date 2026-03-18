@@ -3,6 +3,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BuchhaltungClient } from "@/components/buchhaltung-client";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 20;
 
 export default async function BuchhaltungPage({

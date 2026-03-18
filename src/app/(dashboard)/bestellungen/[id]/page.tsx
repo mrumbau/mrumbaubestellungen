@@ -5,6 +5,8 @@ import Link from "next/link";
 import { BestelldetailClient } from "@/components/bestelldetail-client";
 import { getStatusConfig } from "@/lib/status-config";
 
+export const dynamic = "force-dynamic";
+
 function relativeZeit(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);

@@ -2,6 +2,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 20;
 
 export default async function BestellungenPage({
