@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BestelldetailClient } from "@/components/bestelldetail-client";
 import { getStatusConfig } from "@/lib/status-config";
 import { isValidUUID } from "@/lib/validation";
+import { DOKUMENT_CONFIG, type Bestellungsart } from "@/lib/bestellung-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -57,23 +58,30 @@ export default async function BestellungDetailPage({
     );
   }
 
-  // Alle 5 Queries parallel — keine Abhängigkeiten untereinander
+  // Alle Queries parallel — keine Abhängigkeiten untereinander
   const [
     { data: dokumente },
     { data: abgleich },
     { data: kommentare },
     { data: freigabe },
     { data: projekte },
+    { data: subunternehmerData },
   ] = await Promise.all([
     supabase.from("dokumente").select("*").eq("bestellung_id", id).order("created_at", { ascending: true }),
     supabase.from("abgleiche").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("kommentare").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: true }),
     supabase.from("freigaben").select("*").eq("bestellung_id", id).maybeSingle(),
     supabase.from("projekte").select("id, name, farbe, budget").in("status", ["aktiv", "pausiert"]).order("name"),
+    bestellung.subunternehmer_id
+      ? supabase.from("subunternehmer").select("id, firma, gewerk, ansprechpartner, telefon, email").eq("id", bestellung.subunternehmer_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const statusConfig = getStatusConfig(bestellung.status);
-  const dokCount = [bestellung.hat_bestellbestaetigung, bestellung.hat_lieferschein, bestellung.hat_rechnung].filter(Boolean).length;
+  const art: Bestellungsart = bestellung.bestellungsart || "material";
+  const pflichtDoks = DOKUMENT_CONFIG[art].filter((d) => d.erforderlich);
+  const dokCount = pflichtDoks.filter((d) => bestellung[d.flag as keyof typeof bestellung] === true).length;
+  const dokTotal = pflichtDoks.length;
   const projektFarbe = bestellung.projekt_id ? (projekte || []).find((p) => p.id === bestellung.projekt_id)?.farbe : undefined;
 
   return (
@@ -128,11 +136,11 @@ export default async function BestellungDetailPage({
               <span className="text-[#e0dedb]">·</span>
 
               {/* Dokument-Count */}
-              <span className={`inline-flex items-center gap-1 font-medium ${dokCount === 3 ? "text-green-600" : "text-amber-600"}`}>
+              <span className={`inline-flex items-center gap-1 font-medium ${dokCount === dokTotal ? "text-green-600" : "text-amber-600"}`}>
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
-                {dokCount}/3
+                {dokCount}/{dokTotal}
               </span>
               <span className="text-[#e0dedb]">·</span>
 
@@ -201,6 +209,7 @@ export default async function BestellungDetailPage({
         freigabe={freigabe}
         profil={profil}
         projekte={projekte || []}
+        subunternehmer={subunternehmerData || undefined}
       />
     </div>
   );

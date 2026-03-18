@@ -7,6 +7,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { updateBestellungStatus } from "@/lib/bestellung-utils";
 
 // POST /api/scan – Foto/PDF hochladen und per GPT-4o analysieren
 export async function POST(request: NextRequest) {
@@ -151,6 +152,10 @@ export async function POST(request: NextRequest) {
       updateFields.lieferschein_physisch = true;
     } else if (analyse.typ === "rechnung") {
       updateFields.hat_rechnung = true;
+    } else if (analyse.typ === "aufmass") {
+      updateFields.hat_aufmass = true;
+    } else if (analyse.typ === "leistungsnachweis") {
+      updateFields.hat_leistungsnachweis = true;
     }
 
     await supabase
@@ -158,14 +163,15 @@ export async function POST(request: NextRequest) {
       .update(updateFields)
       .eq("id", bestellung_id);
 
-    // Prüfe ob alle Dokumente vorhanden → KI-Abgleich starten
+    // Prüfe ob alle Dokumente vorhanden → KI-Abgleich starten (nur Material)
     const { data: bestellung } = await supabase
       .from("bestellungen")
-      .select("hat_bestellbestaetigung, hat_lieferschein, hat_rechnung")
+      .select("bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung")
       .eq("id", bestellung_id)
       .single();
 
     if (
+      bestellung?.bestellungsart !== "subunternehmer" &&
       bestellung?.hat_bestellbestaetigung &&
       bestellung?.hat_lieferschein &&
       bestellung?.hat_rechnung
@@ -205,6 +211,9 @@ export async function POST(request: NextRequest) {
         logError("/api/scan", "KI-Abgleich Fehler", err);
       }
     }
+
+    // Zentraler Status-Update (berücksichtigt Bestellungsart)
+    await updateBestellungStatus(supabase, bestellung_id);
 
     return NextResponse.json({
       success: true,

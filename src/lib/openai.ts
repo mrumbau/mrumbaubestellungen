@@ -35,7 +35,8 @@ function safeParseGptJson<T>(text: string, fallback: T): T {
 }
 
 export interface DokumentAnalyse {
-  typ: "bestellbestaetigung" | "lieferschein" | "rechnung";
+  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis";
+  vermutete_bestellungsart?: "material" | "subunternehmer";
   bestellnummer: string | null;
   haendler: string | null;
   datum: string | null;
@@ -91,11 +92,22 @@ export interface WochenzusammenfassungErgebnis {
 const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma analysiert.
 Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück, kein Text davor oder danach.
 
-Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, oder rechnung.
+Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, rechnung, aufmass, oder leistungsnachweis.
+
+Hinweise zur Typ-Erkennung:
+- "aufmass" = Aufmaß, Massenermittlung, Mengenaufstellung eines Subunternehmers (z.B. "Aufmaß Elektroinstallation", "Massenermittlung Trockenbau")
+- "leistungsnachweis" = Leistungsnachweis, Stundennachweis, Rapportzettel, Abnahmeprotokoll eines Subunternehmers
+
+Erkenne außerdem die "vermutete_bestellungsart":
+- "material" = Warenlieferung von einem Händler/Lieferant (Produkte, Baumaterial, Werkzeug)
+- "subunternehmer" = Dienstleistung/Arbeitsleistung von einem Subunternehmer (Handwerksleistung, Gewerk, Stundenlohn, Pauschalpreis für Arbeit)
+
+Signale für "subunternehmer": Stundensätze, Pauschalpreise für Arbeitsleistungen, Gewerk-Bezeichnungen (Elektro, Trockenbau, Sanitär, Maler etc.), Leistungsbeschreibungen statt Artikellisten, Begriffe wie "Montage", "Einbau", "Verlegung", "Installation".
 
 Gib folgende Struktur zurück:
 {
   "typ": "rechnung",
+  "vermutete_bestellungsart": "material",
   "bestellnummer": "#45231",
   "haendler": "Bauhaus GmbH",
   "datum": "2026-03-12",
@@ -367,6 +379,62 @@ Erkannter Händlername aus Dokument: ${erkannterHaendlerName || "nicht erkannt"}
       },
     ],
     max_tokens: 300,
+    temperature: 0.1,
+  }));
+
+  const text = response.choices[0]?.message?.content || "null";
+  if (text.trim() === "null") return null;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return null;
+  }
+}
+
+// 4b. Automatische Subunternehmer-Erkennung aus E-Mail/Rechnung
+export async function erkenneSubunternehmerAusEmail(
+  emailAbsender: string,
+  emailBetreff: string,
+  erkannterName: string | null,
+  dokumentText: string | null
+): Promise<{ firma: string; gewerk: string | null; email_muster: string; steuer_nr: string | null; iban: string | null } | null> {
+  const response = await withRetry(() => openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: `Du bist ein Assistent der Subunternehmer anhand von E-Mail-Daten und Rechnungsinhalten erkennt.
+Dies ist eine deutsche Baufirma (Innenausbau). Subunternehmer sind Handwerksbetriebe die Arbeitsleistungen erbringen.
+
+Extrahiere:
+- firma: Firmenname des Subunternehmers
+- gewerk: Das Gewerk/die Branche (eines von: Elektro, Sanitär/Heizung, Trockenbau, Maler/Lackierer, Estrich, Fliesen, Bodenbelag, Schreiner/Tischler, Schlosser/Metallbau, Fenster/Türen, Dachdecker, Reinigung, Abbruch/Entsorgung, Sonstiges)
+- email_muster: Die E-Mail-Adresse des Absenders
+- steuer_nr: Steuer-Nr oder USt-ID falls im Dokument erkennbar
+- iban: IBAN falls im Dokument erkennbar
+
+Gib NUR ein JSON-Objekt zurück:
+{
+  "firma": "Elektro Müller GmbH",
+  "gewerk": "Elektro",
+  "email_muster": "rechnung@elektro-mueller.de",
+  "steuer_nr": "DE123456789",
+  "iban": "DE89 3704 0044 0532 0130 00"
+}
+
+Falls du den Subunternehmer nicht erkennen kannst, gib null zurück.`,
+      },
+      {
+        role: "user",
+        content: `E-Mail-Absender: ${emailAbsender}
+Betreff: ${emailBetreff}
+Erkannter Firmenname aus Dokument: ${erkannterName || "nicht erkannt"}
+${dokumentText ? `\nDokument-Text (Auszug):\n${dokumentText.slice(0, 2000)}` : ""}`,
+      },
+    ],
+    max_tokens: 400,
     temperature: 0.1,
   }));
 

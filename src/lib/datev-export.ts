@@ -20,6 +20,7 @@ export interface FreigegebeneRechnung {
   updated_at: string | null;
   netto: number | null;
   mwst: number | null;
+  bestellungsart?: "material" | "subunternehmer" | null;
 }
 
 /**
@@ -192,7 +193,9 @@ export function exportiereAlsDATEV(
     const idx = haendlerIndex.get(name) ?? 0;
     const konto = generiereKreditorenkonto(idx);
     const kost1 = r.projekt_name || undefined;
-    return generiereZEILE(r, konto, gegenKonto, kost1);
+    // Subunternehmer: Gegenkonto 4800 (Fremdleistungen), Material: übergebenes Gegenkonto (Standard 4980)
+    const zeilenGegenKonto = r.bestellungsart === "subunternehmer" ? "4800" : gegenKonto;
+    return generiereZEILE(r, konto, zeilenGegenKonto, kost1);
   });
 
   const csv = [header, kopfzeile, ...zeilen].join("\r\n");

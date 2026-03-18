@@ -43,6 +43,7 @@ export default async function DashboardPage() {
     { data: neueHaendlerRoh },
     { data: kiVorschlaegeRoh },
     { data: neueKundenRoh },
+    { data: neueSubunternehmerRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen")),
@@ -77,6 +78,9 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("kunden").select("id, name, keywords, created_at").is("confirmed_at", null).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; name: string; keywords: string[] | null; created_at: string }[] }),
+    profil.rolle === "admin"
+      ? supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[] }),
   ]);
 
   // Dashboard-Config aus DB
@@ -104,6 +108,7 @@ export default async function DashboardPage() {
   const bestellerListe = bestellerRollen || [];
   const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
   const neueKunden = (neueKundenRoh || []) as { id: string; name: string; keywords: string[] | null; created_at: string }[];
+  const neueSubunternehmer = (neueSubunternehmerRoh || []) as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[];
 
   const kiVorschlaege = ((kiVorschlaegeRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[]).map((v) => {
     const projekt = (aktiveProjekte || []).find((p) => p.id === v.projekt_vorschlag_id);
@@ -165,6 +170,7 @@ export default async function DashboardPage() {
         unzugeordnet={unzugeordnet}
         bestellerListe={bestellerListe}
         neueHaendler={neueHaendler}
+        neueSubunternehmer={neueSubunternehmer}
         aktionenNoetig={aktionenNoetig}
         letzte={letzte}
         bestellerStats={bestellerStatsMap}

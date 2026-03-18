@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Freigegebene Bestellungen im Zeitraum laden
     let query = supabase
       .from("bestellungen")
-      .select("id, bestellnummer, haendler_name, betrag, projekt_name, created_at, updated_at")
+      .select("id, bestellnummer, haendler_name, betrag, projekt_name, created_at, updated_at, bestellungsart")
       .eq("status", "freigegeben")
       .gte("updated_at", `${von}T00:00:00`)
       .lte("updated_at", `${bis}T23:59:59`)
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
         updated_at: b.updated_at,
         netto: rechnung?.netto || null,
         mwst: rechnung?.mwst || null,
+        bestellungsart: b.bestellungsart || "material",
       };
     });
 

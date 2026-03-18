@@ -22,9 +22,9 @@ export default async function EinstellungenPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  // Besteller: nur Projekte, Kunden + Passwort
+  // Besteller: Projekte, Kunden, Subunternehmer (read-only) + Passwort
   if (profil.rolle === "besteller") {
-    const [{ data: projekte }, { data: kunden }] = await Promise.all([
+    const [{ data: projekte }, { data: kunden }, { data: subunternehmer }] = await Promise.all([
       supabase
         .from("projekte")
         .select("id, name, farbe, budget, status, beschreibung, kunde, adresse, adresse_keywords")
@@ -33,6 +33,10 @@ export default async function EinstellungenPage() {
         .from("kunden")
         .select("*")
         .order("name"),
+      supabase
+        .from("subunternehmer")
+        .select("*")
+        .order("firma"),
     ]);
 
     return (
@@ -45,6 +49,7 @@ export default async function EinstellungenPage() {
         webhookLogs={[]}
         projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
         kunden={(kunden || []) as { id: string; name: string; kuerzel: string | null; adresse: string | null; email: string | null; telefon: string | null; notizen: string | null; keywords: string[]; farbe: string; confirmed_at: string | null; created_at: string }[]}
+        subunternehmer={(subunternehmer || []) as { id: string; firma: string; ansprechpartner: string | null; gewerk: string | null; telefon: string | null; email: string | null; email_absender: string[]; steuer_nr: string | null; iban: string | null; notizen: string | null; confirmed_at: string | null; created_at: string }[]}
         rolle="besteller"
       />
     );
@@ -61,6 +66,7 @@ export default async function EinstellungenPage() {
     { data: projekte },
     { data: kunden },
     { data: firmaEinstellungen },
+    { data: subunternehmer },
   ] = await Promise.all([
     supabase.from("haendler").select("*").order("name", { ascending: true }),
     supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
@@ -86,6 +92,10 @@ export default async function EinstellungenPage() {
     supabase
       .from("firma_einstellungen")
       .select("schluessel, wert"),
+    supabase
+      .from("subunternehmer")
+      .select("*")
+      .order("firma"),
   ]);
 
   const statsMap: Record<string, { gesamt: number; letzte: string | null; abweichungen: number }> = {};
@@ -118,6 +128,7 @@ export default async function EinstellungenPage() {
       webhookLogs={(webhookLogs || []) as { id: string; typ: string; status: string; bestellnummer: string | null; fehler_text: string | null; created_at: string }[]}
       projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
       kunden={(kunden || []) as { id: string; name: string; kuerzel: string | null; adresse: string | null; email: string | null; telefon: string | null; notizen: string | null; keywords: string[]; farbe: string; confirmed_at: string | null; created_at: string }[]}
+      subunternehmer={(subunternehmer || []) as { id: string; firma: string; ansprechpartner: string | null; gewerk: string | null; telefon: string | null; email: string | null; email_absender: string[]; steuer_nr: string | null; iban: string | null; notizen: string | null; confirmed_at: string | null; created_at: string }[]}
       firmaEinstellungen={(firmaEinstellungen || []) as { schluessel: string; wert: string }[]}
       rolle="admin"
     />

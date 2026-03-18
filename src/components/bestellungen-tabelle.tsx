@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { BESTELLUNGSART_LABELS } from "@/lib/bestellung-utils";
+import type { Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Bestellung {
   id: string;
@@ -18,6 +20,8 @@ interface Bestellung {
   hat_bestellbestaetigung: boolean;
   hat_lieferschein: boolean;
   hat_rechnung: boolean;
+  bestellungsart?: Bestellungsart;
+  subunternehmer_name?: string | null;
   projekt_id: string | null;
   projekt_name: string | null;
   created_at: string;
@@ -58,6 +62,7 @@ export function BestellungenTabelle({
 }) {
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [bestellungsartFilter, setBestellungsartFilter] = useState("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
   useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
   const router = useRouter();
@@ -71,9 +76,10 @@ export function BestellungenTabelle({
       b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
 
     const statusMatch = !statusFilter || b.status === statusFilter;
+    const artMatch = !bestellungsartFilter || (b.bestellungsart || "material") === bestellungsartFilter;
     const projektMatch = !projektFilter || b.projekt_id === projektFilter;
 
-    return suchMatch && statusMatch && projektMatch;
+    return suchMatch && statusMatch && artMatch && projektMatch;
   });
 
   const projektFarbenMap = new Map(projekte.map((p) => [p.id, p.farbe]));
@@ -112,6 +118,16 @@ export function BestellungenTabelle({
           <option value="abweichung">Abweichung</option>
           <option value="ls_fehlt">LS fehlt</option>
           <option value="freigegeben">Freigegeben</option>
+        </select>
+        <select
+          value={bestellungsartFilter}
+          onChange={(e) => setBestellungsartFilter(e.target.value)}
+          className="px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+        >
+          <option value="">Alle Arten</option>
+          {Object.entries(BESTELLUNGSART_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
         {projekte.length > 0 && (
           <select
@@ -186,7 +202,14 @@ export function BestellungenTabelle({
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-[#1a1a1a]">
-                      {b.haendler_name || "–"}
+                      <div className="flex items-center gap-1.5">
+                        {b.haendler_name || "–"}
+                        {(b.bestellungsart || "material") === "subunternehmer" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-200">
+                            SUB
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       {b.projekt_name ? (
@@ -205,10 +228,22 @@ export function BestellungenTabelle({
                       {formatDatum(b.created_at)}
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_bestellbestaetigung} /></div>
+                      <div className="flex justify-center">
+                        {(b.bestellungsart || "material") === "subunternehmer" ? (
+                          <span className="text-[#c4c2bf]">&ndash;</span>
+                        ) : (
+                          <DokumentIcon vorhanden={b.hat_bestellbestaetigung} />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_lieferschein} /></div>
+                      <div className="flex justify-center">
+                        {(b.bestellungsart || "material") === "subunternehmer" ? (
+                          <span className="text-[#c4c2bf]">&ndash;</span>
+                        ) : (
+                          <DokumentIcon vorhanden={b.hat_lieferschein} />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} /></div>

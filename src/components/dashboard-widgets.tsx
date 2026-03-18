@@ -8,6 +8,7 @@ import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
 import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
 import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
 import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
+import { DashboardNeueSubunternehmer } from "@/components/dashboard-neue-subunternehmer";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 
@@ -62,6 +63,13 @@ interface NeuerKunde {
   created_at: string;
 }
 
+interface NeuerSubunternehmer {
+  id: string;
+  firma: string;
+  gewerk: string | null;
+  email_absender: string[];
+}
+
 interface Besteller {
   kuerzel: string;
   name: string;
@@ -103,6 +111,7 @@ export interface DashboardWidgetsProps {
   unzugeordnet: UnzugeordneteBestellung[];
   bestellerListe: Besteller[];
   neueHaendler: NeuerHaendler[];
+  neueSubunternehmer: NeuerSubunternehmer[];
   aktionenNoetig: BestellungItem[];
   letzte: BestellungItem[];
   bestellerStats: Record<string, number>;
@@ -138,6 +147,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "neue_kunden", label: "Neue Kunden", defaultVisible: true, adminOnly: true },
   { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
   { id: "neue_haendler", label: "Neue Händler", defaultVisible: true, adminOnly: true },
+  { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true, adminOnly: true },
   { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },
@@ -367,6 +377,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     unzugeordnet,
     bestellerListe,
     neueHaendler,
+    neueSubunternehmer,
     aktionenNoetig,
     letzte,
     bestellerStats,
@@ -545,6 +556,9 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
           )}
           {isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
             <DashboardNeueHaendler haendler={neueHaendler} />
+          )}
+          {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
+            <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
           )}
         </div>
       )}

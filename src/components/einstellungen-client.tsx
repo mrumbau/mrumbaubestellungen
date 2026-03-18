@@ -62,6 +62,21 @@ interface Kunde {
   created_at: string;
 }
 
+interface Subunternehmer {
+  id: string;
+  firma: string;
+  ansprechpartner: string | null;
+  gewerk: string | null;
+  telefon: string | null;
+  email: string | null;
+  email_absender: string[];
+  steuer_nr: string | null;
+  iban: string | null;
+  notizen: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+}
+
 interface HealthStatus {
   status: string;
   timestamp: string;
@@ -79,6 +94,7 @@ export function EinstellungenClient({
   webhookLogs: initialWebhookLogs,
   projekte: initialProjekte = [],
   kunden: initialKunden = [],
+  subunternehmer: initialSubunternehmer = [],
   firmaEinstellungen: initialFirmaEinstellungen = [],
   rolle = "admin",
 }: {
@@ -90,6 +106,7 @@ export function EinstellungenClient({
   webhookLogs: WebhookLog[];
   projekte?: Projekt[];
   kunden?: Kunde[];
+  subunternehmer?: Subunternehmer[];
   firmaEinstellungen?: { schluessel: string; wert: string }[];
   rolle?: string;
 }) {
@@ -146,6 +163,22 @@ export function EinstellungenClient({
   const [kundenFormKeywordInput, setKundenFormKeywordInput] = useState("");
   const [kundenFormFarbe, setKundenFormFarbe] = useState("#2563eb");
   const [kundenDeleteConfirm, setKundenDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
+  // Subunternehmer
+  const [suListe, setSuListe] = useState(initialSubunternehmer);
+  const [suEditId, setSuEditId] = useState<string | null>(null);
+  const [showSuForm, setShowSuForm] = useState(false);
+  const [suLoading, setSuLoading] = useState(false);
+  const [suFormFirma, setSuFormFirma] = useState("");
+  const [suFormAnsprechpartner, setSuFormAnsprechpartner] = useState("");
+  const [suFormGewerk, setSuFormGewerk] = useState("");
+  const [suFormTelefon, setSuFormTelefon] = useState("");
+  const [suFormEmail, setSuFormEmail] = useState("");
+  const [suFormEmailAbsender, setSuFormEmailAbsender] = useState("");
+  const [suFormSteuerNr, setSuFormSteuerNr] = useState("");
+  const [suFormIban, setSuFormIban] = useState("");
+  const [suFormNotizen, setSuFormNotizen] = useState("");
+  const [suDeleteConfirm, setSuDeleteConfirm] = useState<{ id: string; firma: string } | null>(null);
 
   // Projekt-Adresse (singular)
   const [projektFormAdresse, setProjektFormAdresse] = useState("");
@@ -475,6 +508,116 @@ export function EinstellungenClient({
         setKundenFormKeywords((prev) => [...prev, kw]);
       }
       setKundenFormKeywordInput("");
+    }
+  }
+
+  // Subunternehmer-Funktionen
+  const GEWERKE = ["Elektro", "Sanitär/Heizung", "Trockenbau", "Maler/Lackierer", "Estrich", "Fliesen", "Bodenbelag", "Schreiner/Tischler", "Schlosser/Metallbau", "Fenster/Türen", "Dachdecker", "Reinigung", "Abbruch/Entsorgung", "Sonstiges"];
+
+  function resetSuForm() {
+    setSuFormFirma("");
+    setSuFormAnsprechpartner("");
+    setSuFormGewerk("");
+    setSuFormTelefon("");
+    setSuFormEmail("");
+    setSuFormEmailAbsender("");
+    setSuFormSteuerNr("");
+    setSuFormIban("");
+    setSuFormNotizen("");
+    setSuEditId(null);
+    setShowSuForm(false);
+  }
+
+  function handleSuEdit(su: Subunternehmer) {
+    setSuFormFirma(su.firma);
+    setSuFormAnsprechpartner(su.ansprechpartner || "");
+    setSuFormGewerk(su.gewerk || "");
+    setSuFormTelefon(su.telefon || "");
+    setSuFormEmail(su.email || "");
+    setSuFormEmailAbsender((su.email_absender || []).join(", "));
+    setSuFormSteuerNr(su.steuer_nr || "");
+    setSuFormIban(su.iban || "");
+    setSuFormNotizen(su.notizen || "");
+    setSuEditId(su.id);
+    setShowSuForm(true);
+  }
+
+  async function handleSuSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!suFormFirma.trim()) return;
+    setSuLoading(true);
+    try {
+      const payload = {
+        firma: suFormFirma.trim(),
+        ansprechpartner: suFormAnsprechpartner.trim() || null,
+        gewerk: suFormGewerk || null,
+        telefon: suFormTelefon.trim() || null,
+        email: suFormEmail.trim() || null,
+        email_absender: suFormEmailAbsender
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        steuer_nr: suFormSteuerNr.trim() || null,
+        iban: suFormIban.trim() || null,
+        notizen: suFormNotizen.trim() || null,
+      };
+      if (suEditId) {
+        const res = await fetch(`/api/subunternehmer/${suEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setSuListe((prev) => prev.map((s) => (s.id === suEditId ? data.subunternehmer : s)));
+      } else {
+        const res = await fetch("/api/subunternehmer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setSuListe((prev) => [...prev, data.subunternehmer].sort((a, b) => a.firma.localeCompare(b.firma)));
+      }
+      resetSuForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setSuLoading(false);
+    }
+  }
+
+  async function handleSuDelete(id: string) {
+    setSuDeleteConfirm(null);
+    setSuLoading(true);
+    try {
+      const res = await fetch(`/api/subunternehmer/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuListe((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Löschen");
+    } finally {
+      setSuLoading(false);
+    }
+  }
+
+  async function handleSuBestaetigen(id: string) {
+    setSuLoading(true);
+    try {
+      const res = await fetch("/api/subunternehmer/bestaetigen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subunternehmer_id: id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuListe((prev) => prev.map((s) => (s.id === id ? { ...s, confirmed_at: new Date().toISOString() } : s)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Bestätigen");
+    } finally {
+      setSuLoading(false);
     }
   }
 
@@ -886,6 +1029,218 @@ export function EinstellungenClient({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
+          SUBUNTERNEHMER
+          ═══════════════════════════════════════════ */}
+      <div className="card p-6 mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#0891b2]/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-[#0891b2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Subunternehmer ({suListe.length})</h2>
+              <p className="text-[10px] text-[#c4c2bf] mt-0.5">Subunternehmer für Rechnungszuordnung</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { resetSuForm(); setShowSuForm(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#0891b2] rounded-lg hover:bg-[#0e7490] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            + Hinzufügen
+          </button>
+        </div>
+
+        {showSuForm && (
+          <form onSubmit={handleSuSubmit} className="mb-4 p-4 bg-[#fafaf9] rounded-lg border border-[#f0eeeb] space-y-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Firma *</label>
+              <input
+                type="text"
+                value={suFormFirma}
+                onChange={(e) => setSuFormFirma(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Ansprechpartner</label>
+              <input
+                type="text"
+                value={suFormAnsprechpartner}
+                onChange={(e) => setSuFormAnsprechpartner(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Gewerk</label>
+              <select
+                value={suFormGewerk}
+                onChange={(e) => setSuFormGewerk(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none bg-white"
+              >
+                <option value="">– Bitte wählen –</option>
+                {GEWERKE.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Telefon</label>
+                <input
+                  type="tel"
+                  value={suFormTelefon}
+                  onChange={(e) => setSuFormTelefon(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">E-Mail</label>
+                <input
+                  type="email"
+                  value={suFormEmail}
+                  onChange={(e) => setSuFormEmail(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">
+                E-Mail-Absender <span className="font-normal text-[#c4c2bf] normal-case tracking-normal">(kommagetrennt)</span>
+              </label>
+              <input
+                type="text"
+                value={suFormEmailAbsender}
+                onChange={(e) => setSuFormEmailAbsender(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+                placeholder="rechnung@firma.de, buchhaltung@firma.de"
+              />
+              <p className="text-[10px] text-[#c4c2bf] mt-1">Für automatische Erkennung eingehender Rechnungen</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Steuer-Nr</label>
+                <input
+                  type="text"
+                  value={suFormSteuerNr}
+                  onChange={(e) => setSuFormSteuerNr(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">IBAN</label>
+                <input
+                  type="text"
+                  value={suFormIban}
+                  onChange={(e) => setSuFormIban(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Notizen</label>
+              <textarea
+                value={suFormNotizen}
+                onChange={(e) => setSuFormNotizen(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-[#0891b2] focus:border-[#0891b2] outline-none resize-none"
+                rows={2}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={suLoading}
+                className="px-4 py-2 text-xs font-medium text-white bg-[#0891b2] rounded-lg hover:bg-[#0e7490] disabled:opacity-50 transition-colors"
+              >
+                {suLoading ? "Speichern..." : suEditId ? "Aktualisieren" : "Anlegen"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { resetSuForm(); setShowSuForm(false); }}
+                className="px-4 py-2 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        {suListe.length === 0 ? (
+          <p className="text-sm text-[#c4c2bf] py-4 text-center">Noch keine Subunternehmer angelegt.</p>
+        ) : (
+          <div className="space-y-2">
+            {suListe.map((su) => (
+              <div key={su.id} className="flex items-start justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-[#0891b2]/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <svg className="w-4 h-4 text-[#0891b2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-[#1a1a1a]">{su.firma}</span>
+                      {su.gewerk && (
+                        <span className="text-[10px] font-semibold text-[#0891b2] bg-[#0891b2]/10 px-1.5 py-0.5 rounded uppercase tracking-wide">{su.gewerk}</span>
+                      )}
+                      {!su.confirmed_at && (
+                        <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wide">Auto-erkannt</span>
+                      )}
+                    </div>
+                    {su.ansprechpartner && <p className="text-[11px] text-[#9a9a9a]">{su.ansprechpartner}</p>}
+                    {su.telefon && <p className="text-[11px] text-[#9a9a9a]">{su.telefon}</p>}
+                    {su.email_absender && su.email_absender.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {su.email_absender.map((ea, i) => (
+                          <span key={i} className="text-[10px] px-1.5 py-0.5 bg-[#0891b2]/5 text-[#0891b2] rounded">{ea}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  {!su.confirmed_at && (
+                    <button
+                      onClick={() => handleSuBestaetigen(su.id)}
+                      className="p-1.5 text-amber-500 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
+                      title="Bestätigen"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { handleSuEdit(su); setShowSuForm(true); }}
+                    className="p-1.5 text-[#c4c2bf] hover:text-[#0891b2] transition-colors rounded-lg hover:bg-[#f0eeeb]"
+                    title="Bearbeiten"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setSuDeleteConfirm({ id: su.id, firma: su.firma })}
+                    className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                    title="Löschen"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ═══════════════════════════════════════════
@@ -1499,6 +1854,15 @@ export function EinstellungenClient({
         variant="danger"
         onConfirm={() => kundenDeleteConfirm && handleKundenDelete(kundenDeleteConfirm.id)}
         onCancel={() => setKundenDeleteConfirm(null)}
+      />
+      <ConfirmDialog
+        open={!!suDeleteConfirm}
+        title="Subunternehmer löschen"
+        message={`Soll der Subunternehmer "${suDeleteConfirm?.firma}" gelöscht werden?`}
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={() => suDeleteConfirm && handleSuDelete(suDeleteConfirm.id)}
+        onCancel={() => setSuDeleteConfirm(null)}
       />
     </div>
   );

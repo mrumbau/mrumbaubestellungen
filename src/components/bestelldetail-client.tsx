@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { BenutzerProfil } from "@/lib/auth";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DOKUMENT_CONFIG, BESTELLUNGSART_LABELS, type Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Dokument {
   id: string;
@@ -47,12 +48,24 @@ interface ProjektOption {
   budget?: number | null;
 }
 
+interface SubunternehmerInfo {
+  id: string;
+  firma: string;
+  gewerk: string | null;
+  ansprechpartner: string | null;
+  telefon: string | null;
+  email: string | null;
+}
+
 interface Bestellung {
   id: string;
   status: string;
+  bestellungsart: Bestellungsart | null;
   hat_bestellbestaetigung: boolean;
   hat_lieferschein: boolean;
   hat_rechnung: boolean;
+  hat_aufmass?: boolean;
+  hat_leistungsnachweis?: boolean;
   besteller_kuerzel: string;
   projekt_id: string | null;
   projekt_name: string | null;
@@ -139,11 +152,24 @@ function CollapsibleWidget({
   );
 }
 
-const DOK_TABS: { key: string; label: string; icon: (props: { className?: string }) => React.JSX.Element }[] = [
-  { key: "bestellbestaetigung", label: "Bestätigung", icon: BestellIcon },
-  { key: "lieferschein", label: "Lieferschein", icon: LieferscheinIcon },
-  { key: "rechnung", label: "Rechnung", icon: RechnungIcon },
-];
+const DOK_ICON_MAP: Record<string, (props: { className?: string }) => React.JSX.Element> = {
+  bestellbestaetigung: BestellIcon,
+  lieferschein: LieferscheinIcon,
+  rechnung: RechnungIcon,
+  aufmass: RechnungIcon,
+  leistungsnachweis: LieferscheinIcon,
+};
+
+function getDokTabs(bestellungsart: Bestellungsart | null) {
+  const art: Bestellungsart = bestellungsart || "material";
+  return DOKUMENT_CONFIG[art].map((d) => ({
+    key: d.typ,
+    label: d.label,
+    kurzLabel: d.kurzLabel,
+    vorhanden: d.flag,
+    icon: DOK_ICON_MAP[d.typ] || RechnungIcon,
+  }));
+}
 
 // ─── Main Component ─────────────────────────────────────
 
@@ -155,6 +181,7 @@ export function BestelldetailClient({
   freigabe,
   profil,
   projekte = [],
+  subunternehmer,
 }: {
   bestellung: Bestellung;
   dokumente: Dokument[];
@@ -163,9 +190,13 @@ export function BestelldetailClient({
   freigabe: Freigabe | null;
   profil: BenutzerProfil;
   projekte?: ProjektOption[];
+  subunternehmer?: SubunternehmerInfo;
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState(DOK_TABS[0].key);
+  const dokTabs = useMemo(() => getDokTabs(bestellung.bestellungsart), [bestellung.bestellungsart]);
+  const [activeTab, setActiveTab] = useState(dokTabs[0].key);
+  const [bestellungsartLoading, setBestellungsartLoading] = useState(false);
+  const [aktuelleArt, setAktuelleArt] = useState<Bestellungsart>(bestellung.bestellungsart || "material");
   const [kommentarText, setKommentarText] = useState("");
   const [loading, setLoading] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
@@ -211,7 +242,7 @@ export function BestelldetailClient({
   const timeline = useMemo(() => {
     const items: { zeit: string; label: string; typ: "dok" | "abgleich" | "freigabe" | "kommentar"; farbe: string }[] = [];
     for (const d of dokumente) {
-      const typLabels: Record<string, string> = { bestellbestaetigung: "Bestellbestätigung", lieferschein: "Lieferschein", rechnung: "Rechnung" };
+      const typLabels: Record<string, string> = { bestellbestaetigung: "Bestellbestätigung", lieferschein: "Lieferschein", rechnung: "Rechnung", aufmass: "Aufmaß", leistungsnachweis: "Leistungsnachweis" };
       items.push({ zeit: d.created_at, label: `${typLabels[d.typ] || d.typ} eingegangen`, typ: "dok", farbe: "#2563eb" });
     }
     if (abgleich) items.push({ zeit: abgleich.erstellt_am, label: `KI-Abgleich: ${abgleich.status === "ok" ? "OK" : "Abweichung"}`, typ: "abgleich", farbe: abgleich.status === "ok" ? "#16a34a" : "#dc2626" });
@@ -344,6 +375,29 @@ export function BestelldetailClient({
     } catch { setActionError("Netzwerkfehler bei der Kategorisierung"); } finally { setKatLoading(false); }
   }
 
+  async function handleBestellungsartChange(neueArt: Bestellungsart) {
+    if (neueArt === aktuelleArt) return;
+    setBestellungsartLoading(true);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellung.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellungsart: neueArt }),
+      });
+      if (res.ok) {
+        setAktuelleArt(neueArt);
+        setActionError(null);
+        router.refresh();
+      } else {
+        setActionError("Bestellungsart konnte nicht geändert werden");
+      }
+    } catch {
+      setActionError("Netzwerkfehler beim Ändern der Bestellungsart");
+    } finally {
+      setBestellungsartLoading(false);
+    }
+  }
+
   async function handleScan(file: File) {
     if (file.size > 4 * 1024 * 1024) {
       setFileSizeError("Datei ist zu groß (max. 4 MB). Bitte eine kleinere Datei verwenden.");
@@ -468,6 +522,64 @@ export function BestelldetailClient({
           </p>
           {renderUploadArea()}
         </div>
+
+        {/* Bestellungsart */}
+        <div className="card p-4">
+          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Bestellungsart</h3>
+          {(profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel) ? (
+            <div className="relative">
+              <select
+                value={aktuelleArt}
+                onChange={(e) => handleBestellungsartChange(e.target.value as Bestellungsart)}
+                disabled={bestellungsartLoading}
+                className="w-full appearance-none bg-[#fafaf9] border border-[#e8e6e3] rounded-lg px-3 py-2 text-sm text-[#1a1a1a] pr-8 disabled:opacity-50 transition-colors hover:bg-[#f5f4f2] cursor-pointer"
+              >
+                <option value="material">Material (Händler/Lieferant)</option>
+                <option value="subunternehmer">Subunternehmer</option>
+              </select>
+              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+              {bestellungsartLoading && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <div className="spinner w-3 h-3" />
+                  <span className="text-[10px] text-[#9a9a9a]">Status wird neu berechnet...</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
+              aktuelleArt === "subunternehmer" ? "bg-cyan-50 text-cyan-700" : "bg-blue-50 text-blue-700"
+            }`}>
+              {BESTELLUNGSART_LABELS[aktuelleArt]}
+            </span>
+          )}
+        </div>
+
+        {/* ── Subunternehmer-Info ───────────────────── */}
+        {aktuelleArt === "subunternehmer" && subunternehmer && (
+          <div className="card p-4 border-l-[3px] border-l-[#0891b2]">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-md bg-cyan-50 flex items-center justify-center">
+                <svg className="w-3.5 h-3.5 text-[#0891b2]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-bold text-[#0891b2] tracking-widest uppercase">Subunternehmer</span>
+            </div>
+            <p className="text-sm font-medium text-[#1a1a1a]">{subunternehmer.firma}</p>
+            {subunternehmer.gewerk && (
+              <span className="inline-block mt-1 text-[10px] font-semibold text-[#0891b2] bg-[#0891b2]/10 px-1.5 py-0.5 rounded uppercase tracking-wide">{subunternehmer.gewerk}</span>
+            )}
+            {subunternehmer.ansprechpartner && (
+              <p className="text-[11px] text-[#6b6b6b] mt-1.5">{subunternehmer.ansprechpartner}</p>
+            )}
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+              {subunternehmer.telefon && <p className="text-[11px] text-[#9a9a9a]">{subunternehmer.telefon}</p>}
+              {subunternehmer.email && <p className="text-[11px] text-[#9a9a9a]">{subunternehmer.email}</p>}
+            </div>
+          </div>
+        )}
 
         {/* ── SECTION: Status (mitte) ───────────────────── */}
 
@@ -870,7 +982,7 @@ export function BestelldetailClient({
       <div className="flex-1 card flex flex-col overflow-hidden relative">
         {/* Tabs — bigger, with doc-type icons */}
         <div className="flex border-b border-[#e8e6e3]">
-          {DOK_TABS.map((tab) => {
+          {dokTabs.map((tab) => {
             const dok = dokumente.find((d) => d.typ === tab.key);
             const isActive = activeTab === tab.key;
             const IconComp = tab.icon;

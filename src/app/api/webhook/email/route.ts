@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel, extrahiereBestellerHinweise, erkenneProjektAusInhalt, berechneAffinitaet, aktualisiereBestellerAffinitaet, type ProjektMatchErgebnis } from "@/lib/openai";
+import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, erkenneSubunternehmerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel, extrahiereBestellerHinweise, erkenneProjektAusInhalt, berechneAffinitaet, aktualisiereBestellerAffinitaet, type ProjektMatchErgebnis } from "@/lib/openai";
 import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
@@ -96,6 +96,62 @@ export async function POST(request: NextRequest) {
 
     const haendlerDomain = haendler?.domain || extractDomain(email_absender);
     const emailText = body.email_text || body.email_body || "";
+
+    // =====================================================================
+    // SUBUNTERNEHMER-ERKENNUNG (vor Besteller-Zuordnung)
+    // =====================================================================
+    let erkannterSubunternehmer: { id: string; firma: string } | null = null;
+    let bestellungsart: "material" | "subunternehmer" = "material";
+
+    if (!haendler) {
+      // Subunternehmer-Liste laden und prüfen
+      const { data: suListe } = await supabase
+        .from("subunternehmer")
+        .select("*");
+
+      if (suListe && suListe.length > 0 && absenderAdresse) {
+        // 1. Exakter E-Mail-Match
+        const suMatch = suListe.find((su) =>
+          su.email_absender?.some(
+            (addr: string) => absenderAdresse.toLowerCase() === addr.toLowerCase()
+          )
+        );
+
+        if (suMatch) {
+          erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
+          bestellungsart = "subunternehmer";
+          logInfo("/api/webhook/email", `Bekannter Subunternehmer erkannt: ${suMatch.firma}`);
+        } else {
+          // 2. Domain-Fallback
+          const absenderDomain = absenderAdresse.split("@")[1]?.toLowerCase();
+          if (absenderDomain) {
+            const suDomainMatch = suListe.find((su) => {
+              const suEmailDomain = su.email?.split("@")[1]?.toLowerCase();
+              if (suEmailDomain && suEmailDomain === absenderDomain) return true;
+              return su.email_absender?.some((addr: string) => {
+                const addrDomain = addr.split("@")[1]?.toLowerCase();
+                return addrDomain && addrDomain === absenderDomain;
+              });
+            });
+
+            if (suDomainMatch) {
+              erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
+              bestellungsart = "subunternehmer";
+
+              // Auto-Learn: neue Absender-Adresse ergänzen
+              const bestehendeAdressen: string[] = suDomainMatch.email_absender || [];
+              if (!bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse.toLowerCase()) && bestehendeAdressen.length < 10) {
+                await supabase
+                  .from("subunternehmer")
+                  .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
+                  .eq("id", suDomainMatch.id);
+              }
+              logInfo("/api/webhook/email", `Subunternehmer per Domain erkannt: ${suDomainMatch.firma}`);
+            }
+          }
+        }
+      }
+    }
 
     // Zuordnungs-Methode für Logging
     let zuordnungsMethode = "";
@@ -412,16 +468,71 @@ export async function POST(request: NextRequest) {
         bestellungId = erwartet[0].id;
       } else {
         // 3. Neue Bestellung anlegen – bei Bestellnummer-Konflikt existierende verwenden
+        // KI-Fallback: vermutete_bestellungsart aus Dokumentanalyse
+        if (bestellungsart === "material" && ergebnisse.length > 0) {
+          const vermuteteArt = ergebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
+          if (vermuteteArt === "subunternehmer") {
+            bestellungsart = "subunternehmer";
+            logInfo("/api/webhook/email", "KI vermutete Bestellungsart: subunternehmer");
+
+            // Auto-Create Subunternehmer (unbestätigt)
+            try {
+              const erkannterName = ergebnisse.find((e) => e.analyse.haendler)?.analyse.haendler || null;
+              const dokumentText = ergebnisse.find((e) => e.analyse.volltext)?.analyse.volltext || null;
+              const neuerSU = await erkenneSubunternehmerAusEmail(
+                email_absender,
+                email_betreff,
+                erkannterName,
+                dokumentText
+              );
+
+              if (neuerSU) {
+                // Prüfe ob E-Mail-Absender schon existiert
+                const { data: existingSU } = await supabase
+                  .from("subunternehmer")
+                  .select("id, firma")
+                  .contains("email_absender", [neuerSU.email_muster])
+                  .limit(1);
+
+                if (!existingSU || existingSU.length === 0) {
+                  const { data: created } = await supabase
+                    .from("subunternehmer")
+                    .insert({
+                      firma: neuerSU.firma,
+                      gewerk: neuerSU.gewerk || null,
+                      email_absender: [neuerSU.email_muster],
+                      steuer_nr: neuerSU.steuer_nr || null,
+                      iban: neuerSU.iban || null,
+                    })
+                    .select("id, firma")
+                    .single();
+
+                  if (created) {
+                    erkannterSubunternehmer = { id: created.id, firma: created.firma };
+                    logInfo("/api/webhook/email", `Neuer Subunternehmer auto-angelegt: ${created.firma}`);
+                  }
+                } else {
+                  erkannterSubunternehmer = { id: existingSU[0].id, firma: existingSU[0].firma };
+                }
+              }
+            } catch (err) {
+              logError("/api/webhook/email", "SU Auto-Erkennung fehlgeschlagen", err);
+            }
+          }
+        }
+
         const { data: neue, error: insertError } = await supabase
           .from("bestellungen")
           .insert({
             bestellnummer: erkannteBestellnummer,
             haendler_id: haendler?.id || null,
-            haendler_name: haendler?.name || haendlerDomain,
+            haendler_name: erkannterSubunternehmer?.firma || haendler?.name || haendlerDomain,
             besteller_kuerzel: bestellerKuerzel,
             besteller_name: benutzer?.name || bestellerKuerzel,
             status: "offen",
             zuordnung_methode: zuordnungsMethode,
+            bestellungsart,
+            subunternehmer_id: erkannterSubunternehmer?.id || null,
           })
           .select()
           .single();
@@ -489,6 +600,10 @@ export async function POST(request: NextRequest) {
         updateFields.hat_lieferschein = true;
       } else if (analyse.typ === "rechnung") {
         updateFields.hat_rechnung = true;
+      } else if (analyse.typ === "aufmass") {
+        updateFields.hat_aufmass = true;
+      } else if (analyse.typ === "leistungsnachweis") {
+        updateFields.hat_leistungsnachweis = true;
       }
 
       if (analyse.bestellnummer) {
