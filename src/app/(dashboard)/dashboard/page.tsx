@@ -11,6 +11,14 @@ export default async function DashboardPage() {
 
   const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Besteller: nur eigene Bestellungen im Dashboard (RLS erlaubt auch freigegebene anderer)
+  const istBesteller = profil!.rolle === "besteller";
+  const kuerzel = profil!.kuerzel;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function eigene(query: any) {
+    return istBesteller ? query.eq("besteller_kuerzel", kuerzel) : query;
+  }
+
   // Dashboard-Config + alle Daten parallel laden
   const [
     { data: profilRow },
@@ -34,20 +42,20 @@ export default async function DashboardPage() {
     { data: neueKundenRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen"),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung"),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "ls_fehlt"),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "erwartet"),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "vollstaendig"),
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }),
-    supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null),
-    supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5),
-    supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10),
-    supabase.from("bestellungen").select("besteller_kuerzel"),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen")),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung")),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "ls_fehlt")),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben")),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "erwartet")),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "vollstaendig")),
+    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true })),
+    eigene(supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null)),
+    eigene(supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5)),
+    eigene(supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
+    eigene(supabase.from("bestellungen").select("besteller_kuerzel")),
     supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
-    supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null),
+    eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
     profil.rolle === "admin"
       ? supabase.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller")
       : Promise.resolve({ data: [] as { kuerzel: string; name: string }[] }),
@@ -82,8 +90,8 @@ export default async function DashboardPage() {
   const aktionenNoetig = aktionenNoetigRaw || [];
   const unzugeordnet = unzugeordnetRaw || [];
 
-  const freigegebenBetrag = (freigegebenBetraege || []).reduce((sum, b) => sum + Number(b.betrag), 0);
-  const gesamtVolumen = (projektBestellungen || []).reduce((s, b) => s + (Number(b.betrag) || 0), 0);
+  const freigegebenBetrag = (freigegebenBetraege || []).reduce((sum: number, b: { betrag: number | null }) => sum + Number(b.betrag), 0);
+  const gesamtVolumen = (projektBestellungen || []).reduce((s: number, b: { betrag: number | null }) => s + (Number(b.betrag) || 0), 0);
 
   const bestellerStatsMap: Record<string, number> = {};
   for (const b of bestellerKuerzelListe || []) {

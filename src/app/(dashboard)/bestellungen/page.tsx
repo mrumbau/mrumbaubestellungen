@@ -20,6 +20,12 @@ export default async function BestellungenPage({
   let countQuery = supabase.from("bestellungen").select("*", { count: "exact", head: true });
   let dataQuery = supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).range(from, to);
 
+  // Besteller: nur eigene Bestellungen anzeigen (RLS erlaubt auch freigegebene anderer)
+  if (profil?.rolle === "besteller") {
+    countQuery = countQuery.eq("besteller_kuerzel", profil.kuerzel);
+    dataQuery = dataQuery.eq("besteller_kuerzel", profil.kuerzel);
+  }
+
   if (projektIdParam) {
     countQuery = countQuery.eq("projekt_id", projektIdParam);
     dataQuery = dataQuery.eq("projekt_id", projektIdParam);
