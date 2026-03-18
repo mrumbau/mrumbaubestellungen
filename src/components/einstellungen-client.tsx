@@ -80,6 +80,7 @@ export function EinstellungenClient({
   projekte: initialProjekte = [],
   kunden: initialKunden = [],
   firmaEinstellungen: initialFirmaEinstellungen = [],
+  rolle = "admin",
 }: {
   haendler: Haendler[];
   benutzer: Benutzer[];
@@ -90,7 +91,9 @@ export function EinstellungenClient({
   projekte?: Projekt[];
   kunden?: Kunde[];
   firmaEinstellungen?: { schluessel: string; wert: string }[];
+  rolle?: string;
 }) {
+  const istAdmin = rolle === "admin";
   const [haendler, setHaendler] = useState(initialHaendler);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -597,7 +600,7 @@ export function EinstellungenClient({
       {/* ═══════════════════════════════════════════
           1. SYSTEM-STATUS WIDGET
           ═══════════════════════════════════════════ */}
-      <div className={`card p-5 mb-6 ${health && health.status !== "ok" ? "border-l-4 border-l-amber-400" : ""}`}>
+      <div className={`card p-5 mb-6 ${health && health.status !== "ok" ? "border-l-4 border-l-amber-400" : ""} ${!istAdmin ? "hidden" : ""}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
@@ -648,7 +651,7 @@ export function EinstellungenClient({
       {/* ═══════════════════════════════════════════
           FIRMA-EINSTELLUNGEN (KI-Erkennung)
           ═══════════════════════════════════════════ */}
-      <div className="mt-6 card p-6">
+      <div className={`mt-6 card p-6 ${!istAdmin ? "hidden" : ""}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
@@ -713,7 +716,7 @@ export function EinstellungenClient({
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 ${!istAdmin ? "hidden" : ""}`}>
         {/* ═══════════════════════════════════════════
             HÄNDLERLISTE + STATISTIKEN
             ═══════════════════════════════════════════ */}
@@ -1278,7 +1281,7 @@ export function EinstellungenClient({
       {/* ═══════════════════════════════════════════
           3. CHROME EXTENSION STATUS
           ═══════════════════════════════════════════ */}
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6 ${!istAdmin ? "hidden" : ""}`}>
         <div className="card p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -1388,7 +1391,7 @@ export function EinstellungenClient({
       {/* ═══════════════════════════════════════════
           4. WEBHOOK LOGS
           ═══════════════════════════════════════════ */}
-      <div className="mt-6 card p-6">
+      <div className={`mt-6 card p-6 ${!istAdmin ? "hidden" : ""}`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#570006]/5 flex items-center justify-center">
@@ -1497,7 +1500,7 @@ export function EinstellungenClient({
       </div>
 
       {/* Testdaten */}
-      <div className="mt-6 card border-amber-200 p-6">
+      <div className={`mt-6 card border-amber-200 p-6 ${!istAdmin ? "hidden" : ""}`}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
             <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

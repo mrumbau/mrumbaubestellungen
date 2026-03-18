@@ -33,7 +33,7 @@ export async function PUT(
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!profil || (profil.rolle !== "admin" && profil.rolle !== "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -110,7 +110,7 @@ export async function DELETE(
       .eq("user_id", user.id)
       .single();
 
-    if (!profil || profil.rolle !== "admin") {
+    if (!profil || (profil.rolle !== "admin" && profil.rolle !== "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

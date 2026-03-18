@@ -39,7 +39,7 @@ export default async function ProjektePage() {
     <ProjekteClient
       projekte={projekte || []}
       stats={statsMap}
-      istAdmin={profil.rolle === "admin"}
+      istAdmin={profil.rolle === "admin" || profil.rolle === "besteller"}
     />
   );
 }
