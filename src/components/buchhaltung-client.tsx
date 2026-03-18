@@ -51,6 +51,7 @@ export function BuchhaltungClient({
   rolle: Rolle;
 }) {
   const [suche, setSuche] = useState("");
+  const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
   const [showDatev, setShowDatev] = useState(false);
   const [datevLoading, setDatevLoading] = useState(false);
@@ -70,7 +71,11 @@ export function BuchhaltungClient({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const gefiltert = rows.filter((r) => {
+  const offeneRows = rows.filter((r) => !r.bezahlt_am);
+  const bezahlteRows = rows.filter((r) => !!r.bezahlt_am);
+  const aktiveRows = tab === "offen" ? offeneRows : bezahlteRows;
+
+  const gefiltert = aktiveRows.filter((r) => {
     if (!suche) return true;
     const s = suche.toLowerCase();
     return (
@@ -80,7 +85,8 @@ export function BuchhaltungClient({
     );
   });
 
-  const summeOffen = rows.filter((r) => !r.bezahlt_am).reduce((sum, r) => sum + (r.betrag || 0), 0);
+  const summeOffen = offeneRows.reduce((sum, r) => sum + (r.betrag || 0), 0);
+  const summeBezahlt = bezahlteRows.reduce((sum, r) => sum + (r.betrag || 0), 0);
   const summeMonat = rows
     .filter((r) => {
       if (!r.freigegeben_am) return false;
@@ -90,7 +96,7 @@ export function BuchhaltungClient({
     })
     .reduce((sum, r) => sum + (r.betrag || 0), 0);
 
-  const naechsteFaellig = rows
+  const naechsteFaellig = offeneRows
     .filter((r) => r.faelligkeitsdatum && new Date(r.faelligkeitsdatum).getTime() >= Date.now())
     .sort((a, b) => new Date(a.faelligkeitsdatum!).getTime() - new Date(b.faelligkeitsdatum!).getTime())[0];
 
@@ -343,13 +349,15 @@ export function BuchhaltungClient({
           <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeOffen)}
           </p>
+          <p className="text-[11px] text-[#9a9a9a] mt-1 relative">{offeneRows.length} Rechnung{offeneRows.length !== 1 ? "en" : ""}</p>
         </div>
         <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
           <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Diesen Monat</p>
+          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Bezahlt</p>
           <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
-            {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}
+            {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeBezahlt)}
           </p>
+          <p className="text-[11px] text-[#9a9a9a] mt-1 relative">{bezahlteRows.length} Rechnung{bezahlteRows.length !== 1 ? "en" : ""}</p>
         </div>
         <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #d97706" }}>
           <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #d97706, transparent)" }} />
@@ -357,11 +365,50 @@ export function BuchhaltungClient({
           <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
             {naechsteFaellig ? formatDatum(naechsteFaellig.faelligkeitsdatum) : "–"}
           </p>
+          <p className="text-[11px] text-[#9a9a9a] mt-1 relative">Diesen Monat: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}</p>
         </div>
       </div>
 
-      {/* Suche */}
-      <div className="mt-6 relative max-w-sm">
+      {/* Tabs + Suche */}
+      <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg">
+          <button
+            onClick={() => { setTab("offen"); setSuche(""); }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+              tab === "offen"
+                ? "bg-white text-[#1a1a1a] shadow-sm"
+                : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+            }`}
+          >
+            Offen
+            {offeneRows.length > 0 && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                tab === "offen" ? "bg-[#570006] text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+              }`}>
+                {offeneRows.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => { setTab("bezahlt"); setSuche(""); }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+              tab === "bezahlt"
+                ? "bg-white text-[#1a1a1a] shadow-sm"
+                : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+            }`}
+          >
+            Bezahlt
+            {bezahlteRows.length > 0 && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                tab === "bezahlt" ? "bg-emerald-600 text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+              }`}>
+                {bezahlteRows.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="relative max-w-sm w-full sm:w-auto">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -372,6 +419,7 @@ export function BuchhaltungClient({
           placeholder="Suche nach Bestellnummer, Händler..."
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
         />
+        </div>
       </div>
 
       {/* Tabelle */}
@@ -384,8 +432,8 @@ export function BuchhaltungClient({
               <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben von</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben am</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Fällig</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bezahlt</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">{tab === "offen" ? "Fällig" : "Fällig"}</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">{tab === "offen" ? "Bezahlt" : "Bezahlt am"}</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">PDF</th>
             </tr>
           </thead>
@@ -393,8 +441,10 @@ export function BuchhaltungClient({
             {gefiltert.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-[#9a9a9a]">
-                  {rows.length === 0
-                    ? "Noch keine freigegebenen Rechnungen."
+                  {aktiveRows.length === 0
+                    ? tab === "offen"
+                      ? "Keine offenen Rechnungen."
+                      : "Noch keine bezahlten Rechnungen."
                     : "Keine Rechnungen gefunden."}
                 </td>
               </tr>
@@ -428,33 +478,36 @@ export function BuchhaltungClient({
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-center">
-                    {kannBezahlen ? (
+                    {tab === "bezahlt" ? (
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[11px] text-emerald-600 font-medium">{formatDatum(r.bezahlt_am)}</span>
+                        <span className="text-[10px] text-[#9a9a9a]">{r.bezahlt_von}</span>
+                        {kannBezahlen && (
+                          <button
+                            type="button"
+                            onClick={() => toggleBezahlt(r.id, true)}
+                            disabled={bezahltLoading === r.id}
+                            className="text-[10px] text-[#c4c2bf] hover:text-red-500 transition-colors mt-0.5"
+                            title="Zahlung zurücksetzen"
+                          >
+                            {bezahltLoading === r.id ? "..." : "zurücksetzen"}
+                          </button>
+                        )}
+                      </div>
+                    ) : kannBezahlen ? (
                       <button
                         type="button"
-                        onClick={() => toggleBezahlt(r.id, !!r.bezahlt_am)}
+                        onClick={() => toggleBezahlt(r.id, false)}
                         disabled={bezahltLoading === r.id}
-                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all ${
-                          r.bezahlt_am
-                            ? "bg-emerald-500 border-emerald-500 text-white"
-                            : "border-[#d4d1cc] hover:border-[#570006]/40 text-transparent hover:text-[#570006]/20"
-                        } ${bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-                        title={r.bezahlt_am
-                          ? `Bezahlt von ${r.bezahlt_von} am ${formatDatum(r.bezahlt_am)}`
-                          : "Als bezahlt markieren"}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-[#d4d1cc] hover:border-emerald-400 text-transparent hover:text-emerald-400 ${
+                          bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"
+                        }`}
+                        title="Als bezahlt markieren"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       </button>
-                    ) : r.bezahlt_am ? (
-                      <span
-                        className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-500 text-white"
-                        title={`Bezahlt von ${r.bezahlt_von} am ${formatDatum(r.bezahlt_am)}`}
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </span>
                     ) : (
                       <span className="inline-flex items-center justify-center w-6 h-6 text-[#d4d1cc]">–</span>
                     )}
@@ -486,7 +539,7 @@ export function BuchhaltungClient({
       {/* Summenzeile + Paginierung */}
       <div className="mt-4 flex items-center justify-between text-sm">
         <span className="text-[#9a9a9a]">
-          {totalCount} Rechnung{totalCount !== 1 ? "en" : ""} gesamt
+          {gefiltert.length} {tab === "offen" ? "offen" : "bezahlt"}
           {gefiltert.length > 0 && (
             <span className="ml-2 font-mono-amount font-semibold text-[#1a1a1a]">
               Summe: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
