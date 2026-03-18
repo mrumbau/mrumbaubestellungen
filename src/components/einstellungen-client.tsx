@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { PasswortAendern } from "@/components/passwort-aendern";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 
 interface Haendler {
@@ -1488,6 +1489,11 @@ export function EinstellungenClient({
             </table>
           </div>
         )}
+      </div>
+
+      {/* Konto / Passwort */}
+      <div className="mt-6">
+        <PasswortAendern />
       </div>
 
       {/* Testdaten */}

@@ -73,17 +73,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (rolle) {
-    // Buchhaltung darf nur /buchhaltung sehen
-    if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung")) {
+    // Buchhaltung darf nur /buchhaltung und /einstellungen sehen
+    if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung") && !pathname.startsWith("/einstellungen")) {
       const url = request.nextUrl.clone();
       url.pathname = "/buchhaltung";
-      return NextResponse.redirect(url);
-    }
-
-    // Einstellungen nur für Admin
-    if (pathname.startsWith("/einstellungen") && rolle !== "admin") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/bestellungen";
       return NextResponse.redirect(url);
     }
   }

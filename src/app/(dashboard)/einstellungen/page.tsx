@@ -2,11 +2,21 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { EinstellungenClient } from "@/components/einstellungen-client";
+import { PasswortAendern } from "@/components/passwort-aendern";
 
 export default async function EinstellungenPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
-  if (profil.rolle !== "admin") redirect("/dashboard");
+
+  // Nicht-Admin: nur Passwort ändern anzeigen
+  if (profil.rolle !== "admin") {
+    return (
+      <div className="p-6 md:p-10 max-w-2xl">
+        <h1 className="text-2xl font-headline font-bold text-[#1a1a1a] mb-8">Einstellungen</h1>
+        <PasswortAendern />
+      </div>
+    );
+  }
 
   const supabase = await createServerSupabaseClient();
 
