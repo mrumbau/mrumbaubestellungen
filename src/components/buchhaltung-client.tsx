@@ -624,25 +624,32 @@ export function BuchhaltungClient({
                         <span className="text-[11px] text-emerald-600 font-medium">{formatDatum(r.bezahlt_am)}</span>
                         <span className="text-[10px] text-[#9a9a9a]">{r.bezahlt_von}</span>
                         {kannBezahlen && (
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex items-center justify-center gap-1.5 mt-1">
                             <button
                               type="button"
                               onClick={() => archivieren([r.id])}
                               disabled={archivLoading}
-                              className="text-[10px] text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors"
+                              className="p-1 rounded text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] transition-colors"
                               title="Ins Archiv verschieben"
                             >
-                              archivieren
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                              </svg>
                             </button>
-                            <span className="text-[#e8e6e3]">·</span>
                             <button
                               type="button"
                               onClick={() => toggleBezahlt(r.id, true)}
                               disabled={bezahltLoading === r.id}
-                              className="text-[10px] text-[#c4c2bf] hover:text-red-500 transition-colors"
+                              className="p-1 rounded text-[#d4d1cc] hover:text-red-500 hover:bg-red-50 transition-colors"
                               title="Zahlung zurücksetzen"
                             >
-                              {bezahltLoading === r.id ? "..." : "zurücksetzen"}
+                              {bezahltLoading === r.id ? (
+                                <span className="text-[10px]">...</span>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                                </svg>
+                              )}
                             </button>
                           </div>
                         )}
@@ -689,20 +696,34 @@ export function BuchhaltungClient({
         </table>
       </div>
 
-      {/* Bulk Action Bar */}
+      {/* Bulk Action Bar — sticky bottom */}
       {tab === "bezahlt" && kannBezahlen && selectedIds.size > 0 && (
-        <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#570006]/[0.04] border border-[#570006]/20 rounded-lg">
-          <span className="text-sm text-[#570006] font-medium">
-            {selectedIds.size} {selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt
-          </span>
-          <button
-            type="button"
-            onClick={() => archivieren(Array.from(selectedIds))}
-            disabled={archivLoading}
-            className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {archivLoading ? "Archiviere..." : `${selectedIds.size} archivieren`}
-          </button>
+        <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
+            <span className="text-sm font-medium">
+              {selectedIds.size} {selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={() => archivieren(Array.from(selectedIds))}
+                disabled={archivLoading}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+                {archivLoading ? "Archiviere..." : "Archivieren"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
