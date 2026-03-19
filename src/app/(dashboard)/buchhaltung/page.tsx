@@ -64,6 +64,7 @@ export default async function BuchhaltungPage({
       rechnung_id: rechnung?.id || null,
       bezahlt_am: b.bezahlt_am || null,
       bezahlt_von: b.bezahlt_von || null,
+      archiviert_am: b.archiviert_am || null,
       bestellungsart: b.bestellungsart || "material",
       hat_bestellbestaetigung: b.hat_bestellbestaetigung || false,
       hat_lieferschein: b.hat_lieferschein || false,

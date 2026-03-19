@@ -17,6 +17,7 @@ interface BuchhaltungRow {
   rechnung_id: string | null;
   bezahlt_am: string | null;
   bezahlt_von: string | null;
+  archiviert_am: string | null;
   bestellungsart?: "material" | "subunternehmer" | null;
   hat_bestellbestaetigung?: boolean;
   hat_lieferschein?: boolean;
@@ -57,6 +58,8 @@ export function BuchhaltungClient({
   const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
   const [bezahltError, setBezahltError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [archivLoading, setArchivLoading] = useState(false);
   const [showDatev, setShowDatev] = useState(false);
   const [datevLoading, setDatevLoading] = useState(false);
   const [datevError, setDatevError] = useState<string | null>(null);
@@ -79,7 +82,7 @@ export function BuchhaltungClient({
   const [artFilter, setArtFilter] = useState<"alle" | "material" | "subunternehmer">("alle");
 
   const offeneRows = localRows.filter((r) => !r.bezahlt_am);
-  const bezahlteRows = localRows.filter((r) => !!r.bezahlt_am);
+  const bezahlteRows = localRows.filter((r) => !!r.bezahlt_am && !r.archiviert_am);
   const aktiveRows = tab === "offen" ? offeneRows : bezahlteRows;
 
   const gefiltert = aktiveRows.filter((r) => {
@@ -203,6 +206,54 @@ export function BuchhaltungClient({
       setBezahltError("Netzwerkfehler beim Aktualisieren des Zahlungsstatus");
     } finally {
       setBezahltLoading(null);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === gefiltert.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(gefiltert.map((r) => r.id)));
+    }
+  }
+
+  async function archivieren(ids: string[]) {
+    if (ids.length === 0) return;
+    setArchivLoading(true);
+    setBezahltError(null);
+    try {
+      const res = await fetch("/api/bestellungen/archivieren", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setBezahltError(data.error || "Archivieren fehlgeschlagen");
+        return;
+      }
+      const result = await res.json();
+      // Update local state — mark as archived
+      setLocalRows((prev) =>
+        prev.map((r) =>
+          ids.includes(r.id)
+            ? { ...r, archiviert_am: new Date().toISOString() }
+            : r
+        )
+      );
+      setSelectedIds(new Set());
+    } catch {
+      setBezahltError("Netzwerkfehler beim Archivieren");
+    } finally {
+      setArchivLoading(false);
     }
   }
 
@@ -405,7 +456,7 @@ export function BuchhaltungClient({
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg">
           <button
-            onClick={() => { setTab("offen"); setSuche(""); }}
+            onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               tab === "offen"
                 ? "bg-white text-[#1a1a1a] shadow-sm"
@@ -422,7 +473,7 @@ export function BuchhaltungClient({
             )}
           </button>
           <button
-            onClick={() => { setTab("bezahlt"); setSuche(""); }}
+            onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               tab === "bezahlt"
                 ? "bg-white text-[#1a1a1a] shadow-sm"
@@ -470,6 +521,16 @@ export function BuchhaltungClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
+              {tab === "bezahlt" && kannBezahlen && (
+                <th className="px-3 py-3.5 w-10">
+                  <input
+                    type="checkbox"
+                    checked={gefiltert.length > 0 && selectedIds.size === gefiltert.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                  />
+                </th>
+              )}
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler / SU</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Best.</th>
@@ -485,7 +546,7 @@ export function BuchhaltungClient({
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-[#9a9a9a]">
+                <td colSpan={tab === "bezahlt" && kannBezahlen ? 11 : 10} className="px-4 py-12 text-center text-[#9a9a9a]">
                   {aktiveRows.length === 0
                     ? tab === "offen"
                       ? "Keine offenen Rechnungen."
@@ -495,7 +556,17 @@ export function BuchhaltungClient({
               </tr>
             ) : (
               gefiltert.map((r, i) => (
-                <tr key={r.id} className={`table-row-hover border-b border-[#f0eeeb] ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""}`}>
+                <tr key={r.id} className={`table-row-hover border-b border-[#f0eeeb] ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""} ${selectedIds.has(r.id) ? "bg-[#570006]/[0.03]" : ""}`}>
+                  {tab === "bezahlt" && kannBezahlen && (
+                    <td className="px-3 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(r.id)}
+                        onChange={() => toggleSelect(r.id)}
+                        className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3.5">
                     <span className="font-mono-amount font-semibold text-[#570006]">
                       {r.bestellnummer || "–"}
@@ -553,15 +624,27 @@ export function BuchhaltungClient({
                         <span className="text-[11px] text-emerald-600 font-medium">{formatDatum(r.bezahlt_am)}</span>
                         <span className="text-[10px] text-[#9a9a9a]">{r.bezahlt_von}</span>
                         {kannBezahlen && (
-                          <button
-                            type="button"
-                            onClick={() => toggleBezahlt(r.id, true)}
-                            disabled={bezahltLoading === r.id}
-                            className="text-[10px] text-[#c4c2bf] hover:text-red-500 transition-colors mt-0.5"
-                            title="Zahlung zurücksetzen"
-                          >
-                            {bezahltLoading === r.id ? "..." : "zurücksetzen"}
-                          </button>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => archivieren([r.id])}
+                              disabled={archivLoading}
+                              className="text-[10px] text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors"
+                              title="Ins Archiv verschieben"
+                            >
+                              archivieren
+                            </button>
+                            <span className="text-[#e8e6e3]">·</span>
+                            <button
+                              type="button"
+                              onClick={() => toggleBezahlt(r.id, true)}
+                              disabled={bezahltLoading === r.id}
+                              className="text-[10px] text-[#c4c2bf] hover:text-red-500 transition-colors"
+                              title="Zahlung zurücksetzen"
+                            >
+                              {bezahltLoading === r.id ? "..." : "zurücksetzen"}
+                            </button>
+                          </div>
                         )}
                       </div>
                     ) : kannBezahlen ? (
@@ -605,6 +688,23 @@ export function BuchhaltungClient({
           </tbody>
         </table>
       </div>
+
+      {/* Bulk Action Bar */}
+      {tab === "bezahlt" && kannBezahlen && selectedIds.size > 0 && (
+        <div className="mt-3 flex items-center justify-between px-4 py-3 bg-[#570006]/[0.04] border border-[#570006]/20 rounded-lg">
+          <span className="text-sm text-[#570006] font-medium">
+            {selectedIds.size} {selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt
+          </span>
+          <button
+            type="button"
+            onClick={() => archivieren(Array.from(selectedIds))}
+            disabled={archivLoading}
+            className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {archivLoading ? "Archiviere..." : `${selectedIds.size} archivieren`}
+          </button>
+        </div>
+      )}
 
       {/* Summenzeile + Paginierung */}
       <div className="mt-4 flex items-center justify-between text-sm">

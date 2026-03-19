@@ -460,12 +460,28 @@ export function BestelldetailClient({
     const pdfDokumente = dokumente.filter((d) => d.storage_pfad);
     if (pdfDokumente.length === 0) return;
 
-    const link = document.createElement("a");
-    link.href = `/api/pdfs/zip?bestellung_id=${bestellung.id}`;
-    link.download = "";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await fetch(`/api/pdfs/zip?bestellung_id=${bestellung.id}`);
+      if (!res.ok) {
+        let msg = "Download fehlgeschlagen";
+        try { const j = await res.json(); msg = j.error || msg; } catch {}
+        setActionError(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const disposition = res.headers.get("Content-Disposition");
+      const match = disposition?.match(/filename="?([^"]+)"?/);
+      link.download = match?.[1] || "Dokumente.zip";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      setActionError("Download fehlgeschlagen. Bitte erneut versuchen.");
+    }
   }
 
   // ─── Render: Sidebar content ──────────────────────────

@@ -19,7 +19,7 @@ export default async function ArchivPage() {
     .select(
       "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id"
     )
-    .not("bezahlt_am", "is", null)
+    .not("archiviert_am", "is", null)
     .eq("bestellungsart", "material")
     .order("bezahlt_am", { ascending: false })
     .limit(100);
@@ -29,7 +29,7 @@ export default async function ArchivPage() {
     .select(
       "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id"
     )
-    .not("bezahlt_am", "is", null)
+    .not("archiviert_am", "is", null)
     .eq("bestellungsart", "subunternehmer")
     .order("bezahlt_am", { ascending: false })
     .limit(100);
