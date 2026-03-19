@@ -121,19 +121,34 @@ function CollapsibleWidget({
   defaultOpen = false,
   badge,
   children,
+  widgetId,
+  openWidgetId,
+  onToggleWidget,
 }: {
   title: string;
   icon: React.ReactNode;
   defaultOpen?: boolean;
   badge?: React.ReactNode;
   children: React.ReactNode;
+  widgetId?: string;
+  openWidgetId?: string | null;
+  onToggleWidget?: (id: string) => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const isControlled = widgetId !== undefined && onToggleWidget !== undefined;
+  const open = isControlled ? openWidgetId === widgetId : localOpen;
+  const handleToggle = () => {
+    if (isControlled) {
+      onToggleWidget!(widgetId!);
+    } else {
+      setLocalOpen(!localOpen);
+    }
+  };
   return (
     <div className="card overflow-hidden">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#fafaf9] transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -145,7 +160,7 @@ function CollapsibleWidget({
       </button>
       {open && (
         <div className="px-4 pb-4 border-t border-[#f0eeeb]">
-          <div className="pt-3">{children}</div>
+          <div className="pt-3 max-h-[50vh] overflow-y-auto">{children}</div>
         </div>
       )}
     </div>
@@ -219,6 +234,8 @@ export function BestelldetailClient({
   const [showVorschlagKorrektur, setShowVorschlagKorrektur] = useState(false);
   const [artikelDrawerOpen, setArtikelDrawerOpen] = useState(false);
   const [mobileSection, setMobileSection] = useState<"dokumente" | "details" | "aktionen">("dokumente");
+  const [openWidgetId, setOpenWidgetId] = useState<string | null>(null);
+  const toggleWidget = (id: string) => setOpenWidgetId((prev) => (prev === id ? null : id));
   const [openAbweichungen, setOpenAbweichungen] = useState<Record<number, boolean>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -882,6 +899,9 @@ export function BestelldetailClient({
             title="Aktivitätsverlauf"
             icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
             badge={<span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{timeline.length}</span>}
+            widgetId="timeline"
+            openWidgetId={openWidgetId}
+            onToggleWidget={toggleWidget}
           >
             <div className="relative">
               <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#e8e6e3]" />
@@ -904,6 +924,9 @@ export function BestelldetailClient({
         <CollapsibleWidget
           title="KI-Tools"
           icon={<svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>}
+          widgetId="ki-tools"
+          openWidgetId={openWidgetId}
+          onToggleWidget={toggleWidget}
         >
           {/* Zusammenfassung */}
           <div className="mb-3">
@@ -954,9 +977,11 @@ export function BestelldetailClient({
         {/* Kommentare */}
         <CollapsibleWidget
           title="Kommentare"
-          defaultOpen={kommentare.length > 0}
           icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>}
           badge={kommentare.length > 0 ? <span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{kommentare.length}</span> : undefined}
+          widgetId="kommentare"
+          openWidgetId={openWidgetId}
+          onToggleWidget={toggleWidget}
         >
           {kommentare.length > 0 ? (
             <div className="space-y-3 mb-3">
@@ -1262,9 +1287,11 @@ export function BestelldetailClient({
             {timeline.length > 0 && (
               <CollapsibleWidget
                 title="Aktivitätsverlauf"
-                defaultOpen
                 icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 badge={<span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{timeline.length}</span>}
+                widgetId="m-timeline"
+                openWidgetId={openWidgetId}
+                onToggleWidget={toggleWidget}
               >
                 <div className="relative">
                   <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#e8e6e3]" />
@@ -1287,9 +1314,11 @@ export function BestelldetailClient({
             {kommentare.length > 0 && (
               <CollapsibleWidget
                 title="Kommentare"
-                defaultOpen
                 icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>}
                 badge={<span className="font-mono-amount text-[10px] font-bold text-[#9a9a9a] bg-[#f0eeeb] px-1.5 py-0.5 rounded">{kommentare.length}</span>}
+                widgetId="m-kommentare"
+                openWidgetId={openWidgetId}
+                onToggleWidget={toggleWidget}
               >
                 <div className="space-y-3">
                   {kommentare.map((k) => (
