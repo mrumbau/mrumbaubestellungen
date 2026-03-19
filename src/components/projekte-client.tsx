@@ -31,11 +31,11 @@ const FARBEN = [
   { hex: "#0891b2", label: "Cyan" },
 ];
 
-const STATUS_LABELS: Record<string, { label: string; bg: string; text: string }> = {
-  aktiv: { label: "Aktiv", bg: "bg-green-50", text: "text-green-700" },
-  abgeschlossen: { label: "Abgeschlossen", bg: "bg-gray-100", text: "text-gray-600" },
-  pausiert: { label: "Pausiert", bg: "bg-amber-50", text: "text-amber-700" },
-  archiviert: { label: "Archiviert", bg: "bg-red-50", text: "text-red-600" },
+const STATUS_LABELS: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  aktiv: { label: "Aktiv", bg: "bg-green-50", text: "text-green-700", border: "border-green-100" },
+  abgeschlossen: { label: "Abgeschlossen", bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
+  pausiert: { label: "Pausiert", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-100" },
+  archiviert: { label: "Archiviert", bg: "bg-red-50", text: "text-red-600", border: "border-red-100" },
 };
 
 export function ProjekteClient({
@@ -142,10 +142,8 @@ export function ProjekteClient({
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         if (data.archiviert) {
-          // Soft-delete: Status auf archiviert setzen
           setProjekte((prev) => prev.map((p) => (p.id === deleteId ? { ...p, status: "archiviert" } : p)));
         } else {
-          // Echtes Löschen: aus Liste entfernen
           setProjekte((prev) => prev.filter((p) => p.id !== deleteId));
         }
         setDeleteId(null);
@@ -176,17 +174,17 @@ export function ProjekteClient({
   return (
     <div>
       {/* Header */}
-      <div className="mb-8 flex items-end justify-between">
+      <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Projekte</h1>
           <p className="text-[#9a9a9a] text-sm mt-1">
-            {aktive.length} aktiv{archiviert.length > 0 ? `, ${archiviert.length} archiviert` : ""}
+            {aktive.length} aktiv{archiviert.length > 0 ? ` · ${archiviert.length} archiviert` : ""}
           </p>
         </div>
         {istAdmin && (
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
-            className="btn-primary px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+            className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -196,48 +194,68 @@ export function ProjekteClient({
         )}
       </div>
 
-      <div className="industrial-line my-4" />
+      {/* Error banner */}
+      {error && !showForm && (
+        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 shrink-0">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
-          <div className="card p-6 w-full max-w-lg">
-            <h2 className="font-headline text-lg mb-4">{editId ? "Projekt bearbeiten" : "Neues Projekt"}</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-[#e8e6e3]">
+              <div className="flex items-center justify-between">
+                <h2 className="font-headline text-lg text-[#1a1a1a] tracking-tight">{editId ? "Projekt bearbeiten" : "Neues Projekt"}</h2>
+                <button onClick={resetForm} className="p-1 text-[#9a9a9a] hover:text-[#1a1a1a] transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
-            <div className="space-y-4">
+            <div className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-wider">Name *</label>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Name *</label>
                 <input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm focus:outline-none focus:border-[#570006] bg-[#fafaf9]"
+                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
                   placeholder="z.B. Umbau Müller Garage"
+                  autoFocus
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-wider">Beschreibung</label>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Beschreibung</label>
                 <textarea
                   value={formBeschreibung}
                   onChange={(e) => setFormBeschreibung(e.target.value)}
                   rows={2}
-                  className="mt-1 w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm focus:outline-none focus:border-[#570006] bg-[#fafaf9] resize-none"
+                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 resize-none"
                   placeholder="Optionale Beschreibung..."
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-wider">Farbe</label>
-                <div className="flex gap-2 mt-1">
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Farbe</label>
+                <div className="flex gap-2">
                   {FARBEN.map((f) => (
                     <button
                       key={f.hex}
+                      type="button"
                       onClick={() => setFormFarbe(f.hex)}
-                      className="w-8 h-8 rounded-lg transition-all"
+                      className={`w-8 h-8 rounded-lg transition-all ${
+                        formFarbe === f.hex ? "ring-2 ring-offset-2" : "hover:scale-110"
+                      }`}
                       style={{
                         background: f.hex,
-                        outline: formFarbe === f.hex ? `3px solid ${f.hex}` : "none",
-                        outlineOffset: "2px",
+                        ...(formFarbe === f.hex ? { ["--tw-ring-color" as string]: f.hex } : {}),
                       }}
                       title={f.label}
                     />
@@ -246,12 +264,12 @@ export function ProjekteClient({
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-wider">Budget (EUR)</label>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Budget (EUR)</label>
                 <input
                   type="number"
                   value={formBudget}
                   onChange={(e) => setFormBudget(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm focus:outline-none focus:border-[#570006] bg-[#fafaf9]"
+                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] font-mono-amount focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
                   placeholder="Optional"
                   min="0"
                   step="0.01"
@@ -260,11 +278,11 @@ export function ProjekteClient({
 
               {editId && (
                 <div>
-                  <label className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-wider">Status</label>
+                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Status</label>
                   <select
                     value={formStatus}
                     onChange={(e) => setFormStatus(e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-[#e8e6e3] rounded-lg text-sm focus:outline-none focus:border-[#570006] bg-[#fafaf9]"
+                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
                   >
                     <option value="aktiv">Aktiv</option>
                     <option value="pausiert">Pausiert</option>
@@ -276,17 +294,17 @@ export function ProjekteClient({
               {error && <p className="text-red-600 text-sm">{error}</p>}
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="p-6 border-t border-[#e8e6e3] flex justify-end gap-3">
               <button
                 onClick={resetForm}
-                className="px-4 py-2 text-sm text-[#6b6b6b] hover:text-[#1a1a1a] transition-colors"
+                className="px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:text-[#1a1a1a] transition-colors"
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="btn-primary px-4 py-2 rounded-lg text-sm"
+                className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Speichert..." : editId ? "Speichern" : "Erstellen"}
               </button>
@@ -297,12 +315,17 @@ export function ProjekteClient({
 
       {/* Projekt-Grid */}
       {aktive.length === 0 ? (
-        <div className="card p-12 text-center">
-          <p className="text-[#9a9a9a]">Noch keine Projekte angelegt.</p>
+        <div className="card p-16 text-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#fafaf9] border border-[#e8e6e3] flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3H21m-3.75 3H21" />
+            </svg>
+          </div>
+          <p className="text-[#6b6b6b] font-medium mb-1">Noch keine Projekte</p>
           {istAdmin && (
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="mt-4 text-[#570006] hover:text-[#7a1a1f] text-sm font-medium transition-colors"
+              className="mt-3 text-[#570006] hover:text-[#7a1a1f] text-sm font-medium transition-colors"
             >
               Erstes Projekt erstellen
             </button>
@@ -318,95 +341,106 @@ export function ProjekteClient({
             return (
               <div
                 key={p.id}
-                className="card card-hover p-5 relative overflow-hidden"
+                className="card card-hover relative overflow-hidden"
                 style={{ borderLeft: `4px solid ${p.farbe}` }}
               >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-headline text-base text-[#1a1a1a] truncate">{p.name}</h3>
-                    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${statusCfg.bg} ${statusCfg.text} mt-1`}>
-                      {statusCfg.label}
-                    </span>
-                  </div>
-                  {istAdmin && (
-                    <div className="flex gap-1 ml-2">
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="p-1.5 rounded hover:bg-[#f5f4f2] transition-colors text-[#9a9a9a] hover:text-[#570006]"
-                        title="Bearbeiten"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(p.id)}
-                        className="p-1.5 rounded hover:bg-red-50 transition-colors text-[#9a9a9a] hover:text-red-600"
-                        title="Archivieren"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
-                        </svg>
-                      </button>
+                {/* Gradient overlay */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-20 opacity-[0.04] pointer-events-none"
+                  style={{ background: `linear-gradient(180deg, ${p.farbe}, transparent)` }}
+                />
+
+                <div className="p-5 relative">
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-headline text-base text-[#1a1a1a] truncate">{p.name}</h3>
                     </div>
+                    <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                      <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
+                        {statusCfg.label}
+                      </span>
+                      {istAdmin && (
+                        <div className="flex">
+                          <button
+                            onClick={() => openEdit(p)}
+                            className="p-1 rounded hover:bg-[#f5f4f2] transition-colors text-[#c4c2bf] hover:text-[#570006]"
+                            title="Bearbeiten"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setDeleteId(p.id)}
+                            className="p-1 rounded hover:bg-red-50 transition-colors text-[#c4c2bf] hover:text-red-600"
+                            title="Archivieren"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {p.beschreibung && (
+                    <p className="text-xs text-[#6b6b6b] line-clamp-2 mb-3">{p.beschreibung}</p>
                   )}
-                </div>
 
-                {/* Beschreibung */}
-                {p.beschreibung && (
-                  <p className="text-[#6b6b6b] text-xs mt-1 line-clamp-2">{p.beschreibung}</p>
-                )}
-
-                {/* Stats */}
-                <div className="flex items-center gap-4 mt-4 text-xs">
-                  <div>
-                    <span className="text-[#9a9a9a]">Bestellungen</span>
-                    <span className="ml-1 font-semibold text-[#1a1a1a]">{s.gesamt}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#9a9a9a]">Volumen</span>
-                    <span className="ml-1 font-mono-amount font-semibold text-[#1a1a1a]">{formatBetrag(s.volumen)}</span>
-                  </div>
-                  {s.offen > 0 && (
+                  {/* Stats — structured grid */}
+                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-[#fafaf9] rounded-lg border border-[#f0eeeb]">
                     <div>
-                      <span className="text-[#9a9a9a]">Offen</span>
-                      <span className="ml-1 font-semibold text-red-600">{s.offen}</span>
+                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Bestell.</p>
+                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{s.gesamt}</p>
                     </div>
-                  )}
-                </div>
-
-                {/* Budget Bar */}
-                {budgetPercent !== null && p.budget && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-[10px] text-[#9a9a9a] mb-1">
-                      <span>Budget</span>
-                      <span className="font-mono-amount">{formatBetrag(s.volumen)} / {formatBetrag(p.budget)}</span>
+                    <div>
+                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Volumen</p>
+                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{formatBetrag(s.volumen)}</p>
                     </div>
-                    <div className="h-1 bg-[#f0eeeb] rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${budgetPercent}%`,
-                          background: getBudgetColor(budgetPercent),
-                        }}
-                      />
+                    <div>
+                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Offen</p>
+                      <p className={`font-mono-amount text-sm font-semibold mt-0.5 ${s.offen > 0 ? "text-[#570006]" : "text-[#c4c2bf]"}`}>
+                        {s.offen}
+                      </p>
                     </div>
                   </div>
-                )}
 
-                {/* Link */}
-                <div className="mt-4 pt-3 border-t border-[#f0eeeb]">
-                  <Link
-                    href={`/bestellungen?projekt_id=${p.id}`}
-                    className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors"
-                  >
-                    Bestellungen anzeigen →
-                  </Link>
+                  {/* Budget Bar */}
+                  {budgetPercent !== null && p.budget && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="text-[#9a9a9a] uppercase tracking-wider font-semibold">Budget</span>
+                        <span className="font-mono-amount text-[#6b6b6b]">{formatBetrag(s.volumen)} / {formatBetrag(p.budget)}</span>
+                      </div>
+                      <div className="h-1.5 bg-[#e8e6e3] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${budgetPercent}%`,
+                            background: getBudgetColor(budgetPercent),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="mt-4 pt-3 border-t border-[#f0eeeb] flex items-center justify-between">
+                    <span className="text-[10px] text-[#c4c2bf]">{formatDatum(p.created_at)}</span>
+                    <Link
+                      href={`/bestellungen?projekt_id=${p.id}`}
+                      className="inline-flex items-center gap-1 text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors group/link"
+                    >
+                      Bestellungen
+                      <svg className="w-3 h-3 transition-transform group-hover/link:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </Link>
+                  </div>
                 </div>
-
-                {/* Erstelldatum */}
-                <p className="text-[10px] text-[#c4c2bf] mt-2">Erstellt: {formatDatum(p.created_at)}</p>
               </div>
             );
           })}
@@ -418,34 +452,50 @@ export function ProjekteClient({
         <div className="mt-8">
           <button
             onClick={() => setShowArchiv(!showArchiv)}
-            className="flex items-center gap-2 text-sm text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors"
+            className="flex items-center gap-2 text-sm text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors group"
           >
             <svg
-              className={`w-4 h-4 transition-transform ${showArchiv ? "rotate-90" : ""}`}
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${showArchiv ? "rotate-90" : ""}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
-            Archiv ({archiviert.length})
+            <span className="font-medium">Archiviert</span>
+            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#e8e6e3] text-[#6b6b6b]">{archiviert.length}</span>
           </button>
 
           {showArchiv && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4 opacity-60">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
               {archiviert.map((p) => {
                 const s = stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 };
                 const statusCfg = STATUS_LABELS[p.status] || STATUS_LABELS.archiviert;
                 return (
-                  <div key={p.id} className="card p-5" style={{ borderLeft: `4px solid ${p.farbe}` }}>
+                  <div
+                    key={p.id}
+                    className="card p-4 border-l-4"
+                    style={{ borderLeftColor: p.farbe }}
+                  >
                     <div className="flex items-center justify-between">
                       <h3 className="font-headline text-sm text-[#6b6b6b] truncate">{p.name}</h3>
-                      <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${statusCfg.bg} ${statusCfg.text}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
                         {statusCfg.label}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-[#9a9a9a]">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-[#9a9a9a]">
                       <span>{s.gesamt} Bestellungen</span>
+                      <span className="h-3 w-px bg-[#e8e6e3]" />
                       <span className="font-mono-amount">{formatBetrag(s.volumen)}</span>
                     </div>
+                    {istAdmin && (
+                      <div className="mt-2 pt-2 border-t border-[#f0eeeb]">
+                        <button
+                          onClick={() => openEdit(p)}
+                          className="text-[10px] text-[#9a9a9a] hover:text-[#570006] font-medium transition-colors"
+                        >
+                          Wiederherstellen
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
