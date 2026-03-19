@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
@@ -153,6 +154,10 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },
   { id: "besteller_stats", label: "Bestellungen pro Besteller", defaultVisible: true },
 ];
+
+// ─── Auto-Refresh Interval ──────────────────────────────
+
+const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // ─── Collapsible Card ────────────────────────────────────
 
@@ -362,6 +367,75 @@ function AktionIcon({ status }: { status: string }) {
   );
 }
 
+// ─── Quick Action Button ─────────────────────────────────
+
+function QuickAction({ bestellungId, status, onSuccess }: { bestellungId: string; status: string; onSuccess: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  if (status !== "vollstaendig") return null;
+
+  async function freigeben(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellungId}/freigeben`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) onSuccess();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={freigeben}
+      disabled={loading}
+      className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-50 transition-colors shrink-0"
+      title="Rechnung freigeben"
+    >
+      {loading ? (
+        <div className="spinner w-3 h-3" />
+      ) : (
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      )}
+      Freigeben
+    </button>
+  );
+}
+
+// ─── Live Refresh Indicator ─────────────────────────────
+
+function RefreshIndicator({ lastRefresh, onRefresh }: { lastRefresh: Date; onRefresh: () => void }) {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const diffMs = now.getTime() - lastRefresh.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const label = diffMin < 1 ? "gerade eben" : `vor ${diffMin} Min.`;
+
+  return (
+    <button
+      onClick={onRefresh}
+      className="flex items-center gap-1.5 text-[11px] text-[#c4c2bf] hover:text-[#9a9a9a] transition-colors"
+      title="Jetzt aktualisieren"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+      </svg>
+      <span>Aktualisiert {label}</span>
+    </button>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────
 
 export function DashboardWidgets(props: DashboardWidgetsProps) {
@@ -383,6 +457,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     bestellerStats,
   } = props;
 
+  const router = useRouter();
   const [statsVisible, setStatsVisible] = useState<Record<string, boolean>>(savedConfig.stats || {});
   const [widgetsVisible, setWidgetsVisible] = useState<Record<string, boolean>>(savedConfig.widgets || {});
   const statsRef = useRef(statsVisible);
@@ -390,6 +465,21 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   statsRef.current = statsVisible;
   widgetsRef.current = widgetsVisible;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // Live-Refresh: auto-reload every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+      setLastRefresh(new Date());
+    }, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [router]);
+
+  function manualRefresh() {
+    router.refresh();
+    setLastRefresh(new Date());
+  }
 
   // Debounced save to DB
   const saveToDb = useCallback((stats: Record<string, boolean>, widgets: Record<string, boolean>) => {
@@ -437,10 +527,14 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   const row2Stats = statCards.filter((s) => s.row === 2 && isStatVisible(s.id));
   const bestellerEntries = Object.entries(bestellerStats);
 
+  // Map kuerzel → name
+  const bestellerNameMap = new Map(bestellerListe.map((b) => [b.kuerzel, b.name]));
+
   return (
     <div>
-      {/* Settings */}
-      <div className="flex items-center justify-end mb-4">
+      {/* Settings + Live Refresh */}
+      <div className="flex items-center justify-between mb-4">
+        <RefreshIndicator lastRefresh={lastRefresh} onRefresh={manualRefresh} />
         <WidgetSettings
           statsVisible={statsVisible}
           widgetsVisible={widgetsVisible}
@@ -451,9 +545,9 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         />
       </div>
 
-      {/* Stat Cards Row 1 */}
+      {/* Stat Cards Row 1 — responsive grid */}
       {row1Stats.length > 0 && (
-        <div className={`grid gap-4 mb-4`} style={{ gridTemplateColumns: `repeat(${Math.min(row1Stats.length, 4)}, minmax(0, 1fr))` }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           {row1Stats.map((s) => (
             <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} />
           ))}
@@ -465,9 +559,9 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         <div className="industrial-line mb-4" />
       )}
 
-      {/* Stat Cards Row 2 */}
+      {/* Stat Cards Row 2 — responsive grid */}
       {row2Stats.length > 0 && (
-        <div className={`grid gap-4 mb-6`} style={{ gridTemplateColumns: `repeat(${Math.min(row2Stats.length, 4)}, minmax(0, 1fr))` }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {row2Stats.map((s) => (
             <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} />
           ))}
@@ -479,18 +573,18 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         <DashboardKIZusammenfassung />
       )}
 
-      {/* Volumen-Übersicht */}
+      {/* Volumen-Übersicht — bigger amounts */}
       {isWidgetVisible("volumen") && (
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
             <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
             <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Freigegebenes Volumen</p>
-            <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
+            <p className="font-mono-amount text-2xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
           </div>
           <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #2563eb" }}>
             <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #2563eb, transparent)" }} />
             <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Gesamt-Volumen</p>
-            <p className="font-mono-amount text-xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(gesamtVolumen)}</p>
+            <p className="font-mono-amount text-2xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(gesamtVolumen)}</p>
           </div>
         </div>
       )}
@@ -582,27 +676,39 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               ) : undefined}
             >
               {aktionenNoetig.length === 0 ? (
-                <p className="text-sm text-[#c4c2bf] py-2 text-center">Keine offenen Aktionen.</p>
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-[#c4c2bf]">Keine offenen Aktionen.</p>
+                </div>
               ) : (
                 <div className="space-y-1 max-h-64 overflow-y-auto">
                   {aktionenNoetig.slice(0, 10).map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
                       <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           <AktionIcon status={b.status} />
-                          <div>
-                            <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">
                               <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
                               <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "–"}</span>
                             </p>
                             <p className="text-[11px] text-[#c4c2bf]">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                           </div>
                         </div>
-                        <span className={`status-tag ${s.bg} ${s.text}`}>
-                          <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
-                          {s.label}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <QuickAction
+                            bestellungId={b.id}
+                            status={b.status}
+                            onSuccess={manualRefresh}
+                          />
+                          <span className={`status-tag ${s.bg} ${s.text}`}>
+                            <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
+                            {s.label}
+                          </span>
+                        </div>
                       </Link>
                     );
                   })}
@@ -626,23 +732,28 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               }
             >
               {letzte.length === 0 ? (
-                <p className="text-sm text-[#c4c2bf] py-2 text-center">Noch keine Bestellungen.</p>
+                <div className="flex flex-col items-center gap-2 py-6">
+                  <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <p className="text-sm text-[#c4c2bf]">Noch keine Bestellungen.</p>
+                </div>
               ) : (
                 <div className="space-y-1">
                   {letzte.map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
                       <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
-                        <div>
-                          <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">
                             <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
                             <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "–"}</span>
                           </p>
                           <p className="text-[11px] text-[#c4c2bf]">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 shrink-0 ml-2">
                           {b.betrag && (
-                            <span className="font-mono-amount text-sm font-semibold text-[#1a1a1a]">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
+                            <span className="font-mono-amount text-sm font-semibold text-[#1a1a1a] hidden sm:inline">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
                           )}
                           <span className={`status-tag ${s.bg} ${s.text}`}>
                             <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
@@ -666,7 +777,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Bestellungen pro Besteller */}
+      {/* Bestellungen pro Besteller — with full names */}
       {isWidgetVisible("besteller_stats") && bestellerEntries.length > 0 && (
         <div className="mb-6">
           <CollapsibleCard
@@ -677,16 +788,37 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               </svg>
             }
           >
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {bestellerEntries.map(([kuerzel, count]) => (
-                <div key={kuerzel} className="flex items-center gap-3 p-3 rounded-lg bg-[#fafaf9] border border-[#f0eeeb]">
-                  <div className="w-9 h-9 rounded-lg bg-[#570006] text-white flex items-center justify-center text-[11px] font-bold">{kuerzel}</div>
-                  <div>
-                    <p className="font-mono-amount text-lg font-bold text-[#1a1a1a]">{count}</p>
-                    <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wide">Bestellungen</p>
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {bestellerEntries
+                .sort((a, b) => b[1] - a[1])
+                .map(([kuerzel, count]) => {
+                  const name = bestellerNameMap.get(kuerzel);
+                  const maxCount = Math.max(...bestellerEntries.map(([, c]) => c));
+                  const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                  return (
+                    <div key={kuerzel} className="p-4 rounded-lg bg-[#fafaf9] border border-[#f0eeeb] relative overflow-hidden">
+                      {/* Background bar */}
+                      <div
+                        className="absolute bottom-0 left-0 h-1 bg-[#570006]/10 rounded-full"
+                        style={{ width: `${barWidth}%` }}
+                      />
+                      <div className="flex items-center gap-3 relative">
+                        <div className="w-10 h-10 rounded-lg bg-[#570006] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                          {kuerzel}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {name && (
+                            <p className="text-sm font-medium text-[#1a1a1a] truncate">{name}</p>
+                          )}
+                          <div className="flex items-baseline gap-1">
+                            <p className="font-mono-amount text-xl font-bold text-[#1a1a1a]">{count}</p>
+                            <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wide">Bestellungen</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </CollapsibleCard>
         </div>
