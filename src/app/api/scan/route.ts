@@ -9,6 +9,10 @@ import { logError } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 
+// Body-Limit auf 6 MB erhöhen (Base64 ist ~33% größer als die Originaldatei)
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 // POST /api/scan – Foto/PDF hochladen und per GPT-4o analysieren
 export async function POST(request: NextRequest) {
   try {

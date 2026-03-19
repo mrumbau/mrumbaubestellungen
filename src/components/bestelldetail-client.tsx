@@ -160,7 +160,7 @@ function CollapsibleWidget({
       </button>
       {open && (
         <div className="px-4 pb-4 border-t border-[#f0eeeb]">
-          <div className="pt-3 max-h-[50vh] overflow-y-auto">{children}</div>
+          <div className="pt-3">{children}</div>
         </div>
       )}
     </div>
@@ -432,7 +432,14 @@ export function BestelldetailClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ bestellung_id: bestellung.id, base64, mime_type: file.type, datei_name: file.name }),
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch {
+          setScanError(`Server-Fehler (${res.status}). Bitte kleinere Datei versuchen.`);
+          setScanLoading(false);
+          return;
+        }
         if (!res.ok) {
           setScanError(data.error || "Upload fehlgeschlagen");
           setScanLoading(false);
@@ -440,8 +447,9 @@ export function BestelldetailClient({
           router.refresh();
           setScanLoading(false);
         }
-      } catch {
-        setScanError("Netzwerkfehler beim Upload");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
+        setScanError(`Upload fehlgeschlagen: ${msg}`);
         setScanLoading(false);
       }
     };
@@ -1047,7 +1055,7 @@ export function BestelldetailClient({
         </div>
 
         {/* PDF Viewer or Empty State with integrated upload */}
-        <div className={`flex items-center justify-center bg-[#fafaf9] ${aktivesDokument?.storage_pfad ? "flex-1 min-h-[500px]" : "py-16"}`}>
+        <div className={`flex items-center justify-center bg-[#fafaf9] ${aktivesDokument?.storage_pfad ? "flex-1 min-h-[500px]" : "flex-1"}`}>
           {aktivesDokument?.storage_pfad ? (
             <iframe src={`/api/pdfs/${aktivesDokument.id}`} className="w-full h-full" title="PDF Vorschau" />
           ) : (
