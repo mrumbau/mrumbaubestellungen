@@ -517,46 +517,67 @@ export function BestelldetailClient({
           </div>
         ) : null}
 
-        {/* Upload */}
-        <div className="card p-4">
-          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Dokument hochladen</h3>
-          <p className="text-xs text-[#9a9a9a] mb-3 leading-relaxed">
-            Dokumenttyp wird automatisch erkannt.
-          </p>
-          {renderUploadArea()}
-        </div>
+        {/* Upload + Bestellungsart + Download (zusammengefasst) */}
+        <div className="card p-4 space-y-4">
+          <div>
+            <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Dokument hochladen</h3>
+            <p className="text-xs text-[#9a9a9a] mb-3 leading-relaxed">
+              Dokumenttyp wird automatisch erkannt.
+            </p>
+            {renderUploadArea()}
+          </div>
 
-        {/* Bestellungsart */}
-        <div className="card p-4">
-          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Bestellungsart</h3>
-          {(profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel) ? (
-            <div className="relative">
-              <select
-                value={aktuelleArt}
-                onChange={(e) => handleBestellungsartChange(e.target.value as Bestellungsart)}
-                disabled={bestellungsartLoading}
-                className="w-full appearance-none bg-[#fafaf9] border border-[#e8e6e3] rounded-lg px-3 py-2 text-sm text-[#1a1a1a] pr-8 disabled:opacity-50 transition-colors hover:bg-[#f5f4f2] cursor-pointer"
+          {/* PDF Download */}
+          {(() => {
+            const pdfCount = dokumente.filter((d) => d.storage_pfad).length;
+            if (pdfCount === 0) return null;
+            return (
+              <button
+                onClick={handleZipDownload}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-[#6b6b6b] bg-[#fafaf9] border border-[#e8e6e3] rounded-xl hover:bg-[#f5f4f2] transition-colors"
               >
-                <option value="material">Material (Händler/Lieferant)</option>
-                <option value="subunternehmer">Subunternehmer</option>
-              </select>
-              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-              {bestellungsartLoading && (
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <div className="spinner w-3 h-3" />
-                  <span className="text-[10px] text-[#9a9a9a]">Status wird neu berechnet...</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-              aktuelleArt === "subunternehmer" ? "bg-cyan-50 text-cyan-700" : "bg-blue-50 text-blue-700"
-            }`}>
-              {BESTELLUNGSART_LABELS[aktuelleArt]}
-            </span>
-          )}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                {pdfCount === 1 ? "PDF herunterladen" : `Alle ${pdfCount} PDFs herunterladen`}
+              </button>
+            );
+          })()}
+
+          <div className="h-px bg-[#f0eeeb]" />
+
+          {/* Bestellungsart */}
+          <div>
+            <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Bestellungsart</h3>
+            {(profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel) ? (
+              <div className="relative">
+                <select
+                  value={aktuelleArt}
+                  onChange={(e) => handleBestellungsartChange(e.target.value as Bestellungsart)}
+                  disabled={bestellungsartLoading}
+                  className="w-full appearance-none bg-[#fafaf9] border border-[#e8e6e3] rounded-lg px-3 py-2 text-sm text-[#1a1a1a] pr-8 disabled:opacity-50 transition-colors hover:bg-[#f5f4f2] cursor-pointer"
+                >
+                  <option value="material">Material (Händler/Lieferant)</option>
+                  <option value="subunternehmer">Subunternehmer</option>
+                </select>
+                <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+                {bestellungsartLoading && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <div className="spinner w-3 h-3" />
+                    <span className="text-[10px] text-[#9a9a9a]">Status wird neu berechnet...</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
+                aktuelleArt === "subunternehmer" ? "bg-cyan-50 text-cyan-700" : "bg-blue-50 text-blue-700"
+              }`}>
+                {BESTELLUNGSART_LABELS[aktuelleArt]}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ── Subunternehmer-Info ───────────────────── */}
@@ -879,29 +900,30 @@ export function BestelldetailClient({
           </CollapsibleWidget>
         )}
 
-        {/* KI-Zusammenfassung */}
+        {/* KI-Tools (Zusammenfassung + Analyse + Duplikat + Kategorien) */}
         <CollapsibleWidget
-          title="KI-Zusammenfassung"
+          title="KI-Tools"
           icon={<svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>}
         >
-          <div className="flex items-center justify-end mb-2">
-            <button onClick={handleKiZusammenfassung} disabled={kiLoading} className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 disabled:opacity-50 transition-colors">
-              {kiLoading ? "Lädt..." : "Generieren"}
-            </button>
+          {/* Zusammenfassung */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider">Zusammenfassung</span>
+              <button onClick={handleKiZusammenfassung} disabled={kiLoading} className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-[#570006] bg-[#570006]/5 rounded hover:bg-[#570006]/10 disabled:opacity-50 transition-colors">
+                {kiLoading ? "Lädt..." : "Generieren"}
+              </button>
+            </div>
+            {kiZusammenfassung ? (
+              <p className="text-xs text-[#6b6b6b] leading-relaxed">{kiZusammenfassung}</p>
+            ) : (
+              <p className="text-xs text-[#c4c2bf]">KI-Zusammenfassung der Bestellung generieren.</p>
+            )}
           </div>
-          {kiZusammenfassung ? (
-            <p className="text-xs text-[#6b6b6b] leading-relaxed">{kiZusammenfassung}</p>
-          ) : (
-            <p className="text-xs text-[#c4c2bf]">Klicke auf &quot;Generieren&quot; für eine KI-Zusammenfassung.</p>
-          )}
-        </CollapsibleWidget>
 
-        {/* KI-Analyse */}
-        <CollapsibleWidget
-          title="KI-Analyse"
-          icon={<svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" /></svg>}
-        >
-          <div className="flex gap-2 mb-3">
+          <div className="h-px bg-[#f0eeeb] mb-3" />
+
+          {/* Analyse-Aktionen */}
+          <div className="flex gap-2">
             <button onClick={handleDuplikatCheck} disabled={duplikatLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium bg-[#fafaf9] border border-[#e8e6e3] rounded-lg hover:bg-[#f5f4f2] disabled:opacity-50 transition-colors">
               <svg className="w-3.5 h-3.5 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.5a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
               {duplikatLoading ? "Prüft..." : "Duplikat?"}
@@ -912,13 +934,13 @@ export function BestelldetailClient({
             </button>
           </div>
           {duplikatResult && (
-            <div className={`rounded-lg p-2.5 text-xs mb-2 ${duplikatResult.ist_duplikat ? "bg-red-50" : "bg-green-50"}`}>
+            <div className={`rounded-lg p-2.5 text-xs mt-2 ${duplikatResult.ist_duplikat ? "bg-red-50" : "bg-green-50"}`}>
               <span className={`font-semibold ${duplikatResult.ist_duplikat ? "text-red-700" : "text-green-700"}`}>{duplikatResult.ist_duplikat ? "Mögliches Duplikat!" : "Kein Duplikat"}</span>
               <p className={`mt-1 ${duplikatResult.ist_duplikat ? "text-red-600" : "text-green-600"}`}>{duplikatResult.begruendung}</p>
             </div>
           )}
           {katResult && katResult.kategorien.length > 0 && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 mt-2">
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(katResult.zusammenfassung).map(([kat, anzahl]) => (
                   <span key={kat} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#570006]/5 text-[#570006]">{kat} ({anzahl})</span>
@@ -928,23 +950,6 @@ export function BestelldetailClient({
             </div>
           )}
         </CollapsibleWidget>
-
-        {/* Alle PDFs herunterladen */}
-        {(() => {
-          const pdfCount = dokumente.filter((d) => d.storage_pfad).length;
-          if (pdfCount === 0) return null;
-          return (
-            <button
-              onClick={handleZipDownload}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-[#6b6b6b] bg-[#fafaf9] border border-[#e8e6e3] rounded-xl hover:bg-[#f5f4f2] transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-              {pdfCount === 1 ? "PDF herunterladen" : `Alle ${pdfCount} PDFs herunterladen`}
-            </button>
-          );
-        })()}
 
         {/* Kommentare */}
         <CollapsibleWidget
