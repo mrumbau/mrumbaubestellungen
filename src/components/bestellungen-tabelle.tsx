@@ -264,17 +264,33 @@ export function BestellungenTabelle({
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <a
-                        href={`/api/pdfs/zip?bestellung_id=${b.id}`}
-                        download
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const res = await fetch(`/api/pdfs/zip?bestellung_id=${b.id}`);
+                            if (!res.ok) return;
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.href = url;
+                            const disposition = res.headers.get("Content-Disposition");
+                            const match = disposition?.match(/filename="?([^"]+)"?/);
+                            link.download = match?.[1] || "Dokumente.zip";
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          } catch { /* silent */ }
+                        }}
                         className="p-1.5 rounded-md text-[#9a9a9a] hover:text-[#570006] hover:bg-[#fafaf9] transition-colors inline-flex"
                         title="Alle Dokumente herunterladen"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 );

@@ -3,7 +3,10 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID, sanitizeFilename } from "@/lib/validation";
 import { ERRORS } from "@/lib/errors";
+import { logError } from "@/lib/logger";
 import JSZip from "jszip";
+
+export const maxDuration = 30;
 
 // GET /api/pdfs/zip?bestellung_id=... – Alle Dokumente als ZIP
 export async function GET(request: NextRequest) {
@@ -50,20 +53,31 @@ export async function GET(request: NextRequest) {
     // Dateien aus Storage laden
     const supabase = createServiceClient();
     const zip = new JSZip();
+    let addedFiles = 0;
 
     await Promise.all(
       mitPfad.map(async (dok) => {
-        const { data } = await supabase.storage
+        const { data, error } = await supabase.storage
           .from("dokumente")
           .download(dok.storage_pfad!);
 
-        if (!data) return;
+        if (error || !data) {
+          logError("/api/pdfs/zip", `Storage download failed: ${dok.storage_pfad}`, error);
+          return;
+        }
 
+        // Convert Blob to ArrayBuffer for JSZip compatibility
+        const arrayBuffer = await data.arrayBuffer();
         const ext = dok.storage_pfad!.endsWith(".pdf") ? ".pdf" : ".jpg";
         const filename = sanitizeFilename(`${dok.typ}${ext}`);
-        zip.file(filename, data);
+        zip.file(filename, arrayBuffer);
+        addedFiles++;
       })
     );
+
+    if (addedFiles === 0) {
+      return NextResponse.json({ error: "Keine Dateien konnten geladen werden" }, { status: 404 });
+    }
 
     const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
 
@@ -77,7 +91,8 @@ export async function GET(request: NextRequest) {
         "Content-Disposition": `attachment; filename="${zipName}"`,
       },
     });
-  } catch {
+  } catch (err) {
+    logError("/api/pdfs/zip", "Unerwarteter Fehler", err);
     return NextResponse.json(
       { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
