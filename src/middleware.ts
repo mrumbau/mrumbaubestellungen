@@ -74,6 +74,7 @@ export async function middleware(request: NextRequest) {
 
   if (rolle) {
     // Buchhaltung darf nur /buchhaltung, /einstellungen und API-Routes sehen
+    // Alle anderen Routen (/dashboard, /bestellungen, /projekte, /archiv) → nur admin + besteller
     if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung") && !pathname.startsWith("/einstellungen") && !pathname.startsWith("/api/")) {
       const url = request.nextUrl.clone();
       url.pathname = "/buchhaltung";
