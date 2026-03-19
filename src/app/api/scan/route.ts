@@ -101,6 +101,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // GPT-Ergebnisse sanitizen (ungültige Daten/Zahlen → null)
+    const safeDate = (v: unknown): string | null => {
+      if (!v || typeof v !== "string") return null;
+      return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null;
+    };
+    const safeNum = (v: unknown): number | null => {
+      if (v == null) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const safeTyp = (v: unknown): string => {
+      const allowed = ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis"];
+      return typeof v === "string" && allowed.includes(v) ? v : "rechnung";
+    };
+
     // Datei in Storage hochladen (Dateinamen sanitizen)
     const safeName = sanitizeFilename(datei_name || "dokument");
     const storagePfad = `${bestellung_id}/scan_${Date.now()}_${safeName}`;
@@ -119,18 +134,18 @@ export async function POST(request: NextRequest) {
       .from("dokumente")
       .insert({
         bestellung_id,
-        typ: analyse.typ,
+        typ: safeTyp(analyse.typ),
         quelle: mime_type.startsWith("image/") ? "scan_foto" : "scan_upload",
         storage_pfad: uploadError ? null : storagePfad,
         ki_roh_daten: analyse,
-        bestellnummer_erkannt: analyse.bestellnummer,
-        artikel: analyse.artikel,
-        gesamtbetrag: analyse.gesamtbetrag,
-        netto: analyse.netto,
-        mwst: analyse.mwst,
-        faelligkeitsdatum: analyse.faelligkeitsdatum,
-        lieferdatum: analyse.lieferdatum,
-        iban: analyse.iban,
+        bestellnummer_erkannt: analyse.bestellnummer || null,
+        artikel: analyse.artikel || null,
+        gesamtbetrag: safeNum(analyse.gesamtbetrag),
+        netto: safeNum(analyse.netto),
+        mwst: safeNum(analyse.mwst),
+        faelligkeitsdatum: safeDate(analyse.faelligkeitsdatum),
+        lieferdatum: safeDate(analyse.lieferdatum),
+        iban: typeof analyse.iban === "string" ? analyse.iban : null,
       })
       .select()
       .single();
@@ -145,16 +160,17 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (analyse.typ === "bestellbestaetigung") {
+    const cleanTyp = safeTyp(analyse.typ);
+    if (cleanTyp === "bestellbestaetigung") {
       updateFields.hat_bestellbestaetigung = true;
-    } else if (analyse.typ === "lieferschein") {
+    } else if (cleanTyp === "lieferschein") {
       updateFields.hat_lieferschein = true;
       updateFields.lieferschein_physisch = true;
-    } else if (analyse.typ === "rechnung") {
+    } else if (cleanTyp === "rechnung") {
       updateFields.hat_rechnung = true;
-    } else if (analyse.typ === "aufmass") {
+    } else if (cleanTyp === "aufmass") {
       updateFields.hat_aufmass = true;
-    } else if (analyse.typ === "leistungsnachweis") {
+    } else if (cleanTyp === "leistungsnachweis") {
       updateFields.hat_leistungsnachweis = true;
     }
 

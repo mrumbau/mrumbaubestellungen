@@ -174,12 +174,13 @@ export function BestellungenTabelle({
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">RE</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Status</th>
               <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase w-10"></th>
             </tr>
           </thead>
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-[#9a9a9a]">
+                <td colSpan={10} className="px-4 py-12 text-center text-[#9a9a9a]">
                   {bestellungen.length === 0
                     ? "Noch keine Bestellungen vorhanden."
                     : "Keine Bestellungen gefunden."}
@@ -261,6 +262,19 @@ export function BestellungenTabelle({
                       <span className="font-mono-amount font-semibold text-[#1a1a1a]">
                         {formatBetrag(b.betrag, b.waehrung)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <a
+                        href={`/api/pdfs/zip?bestellung_id=${b.id}`}
+                        download
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-md text-[#9a9a9a] hover:text-[#570006] hover:bg-[#fafaf9] transition-colors inline-flex"
+                        title="Alle Dokumente herunterladen"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                      </a>
                     </td>
                   </tr>
                 );
