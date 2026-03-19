@@ -1,5 +1,7 @@
 // MR Umbau Bestellerkennung – Background Service Worker (Manifest V3)
-importScripts("config.js");
+// ES Module — kompatibel mit Chrome + Safari
+// EXTENSION_SECRET muss mit config.js und .env.local übereinstimmen
+var EXTENSION_SECRET = "mrumbau-ext-2026";
 
 var BADGE_COLORS = {
   bekannt: "#570006",
