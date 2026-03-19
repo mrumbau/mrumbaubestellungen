@@ -160,7 +160,7 @@ function CollapsibleWidget({
       </button>
       {open && (
         <div className="px-4 pb-4 border-t border-[#f0eeeb]">
-          <div className="pt-3">{children}</div>
+          <div className="pt-3 max-h-[40vh] overflow-y-auto">{children}</div>
         </div>
       )}
     </div>
@@ -542,67 +542,141 @@ export function BestelldetailClient({
           </div>
         ) : null}
 
-        {/* Upload + Bestellungsart + Download (zusammengefasst) */}
-        <div className="card p-4 space-y-4">
-          <div>
-            <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Dokument hochladen</h3>
-            <p className="text-xs text-[#9a9a9a] mb-3 leading-relaxed">
-              Dokumenttyp wird automatisch erkannt.
-            </p>
-            {renderUploadArea()}
+        {/* Upload Card */}
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Dokument hochladen</h3>
+            {/* PDF Download als dezenter Icon-Link */}
+            {(() => {
+              const pdfCount = dokumente.filter((d) => d.storage_pfad).length;
+              if (pdfCount === 0) return null;
+              return (
+                <button
+                  onClick={handleZipDownload}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#9a9a9a] hover:text-[#570006] rounded-md hover:bg-[#fafaf9] transition-colors"
+                  title={pdfCount === 1 ? "PDF herunterladen" : `Alle ${pdfCount} PDFs herunterladen`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  {pdfCount}
+                </button>
+              );
+            })()}
           </div>
+          <p className="text-xs text-[#9a9a9a] mb-3 leading-relaxed">
+            Dokumenttyp wird automatisch erkannt.
+          </p>
+          {renderUploadArea()}
+        </div>
 
-          {/* PDF Download */}
-          {(() => {
-            const pdfCount = dokumente.filter((d) => d.storage_pfad).length;
-            if (pdfCount === 0) return null;
-            return (
-              <button
-                onClick={handleZipDownload}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-[#6b6b6b] bg-[#fafaf9] border border-[#e8e6e3] rounded-xl hover:bg-[#f5f4f2] transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                </svg>
-                {pdfCount === 1 ? "PDF herunterladen" : `Alle ${pdfCount} PDFs herunterladen`}
-              </button>
-            );
-          })()}
-
-          <div className="h-px bg-[#f0eeeb]" />
-
-          {/* Bestellungsart */}
-          <div>
-            <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Bestellungsart</h3>
+        {/* Metadaten: Bestellungsart + Projekt */}
+        <div className="card p-4 space-y-3">
+          {/* Bestellungsart — kompakte Zeile */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider">Art</span>
             {(profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel) ? (
               <div className="relative">
                 <select
                   value={aktuelleArt}
                   onChange={(e) => handleBestellungsartChange(e.target.value as Bestellungsart)}
                   disabled={bestellungsartLoading}
-                  className="w-full appearance-none bg-[#fafaf9] border border-[#e8e6e3] rounded-lg px-3 py-2 text-sm text-[#1a1a1a] pr-8 disabled:opacity-50 transition-colors hover:bg-[#f5f4f2] cursor-pointer"
+                  className="appearance-none bg-[#fafaf9] border border-[#e8e6e3] rounded-lg px-2.5 py-1.5 text-xs text-[#1a1a1a] pr-7 disabled:opacity-50 transition-colors hover:bg-[#f5f4f2] cursor-pointer"
                 >
-                  <option value="material">Material (Händler/Lieferant)</option>
+                  <option value="material">Material</option>
                   <option value="subunternehmer">Subunternehmer</option>
                 </select>
-                <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9a9a9a] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
-                {bestellungsartLoading && (
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <div className="spinner w-3 h-3" />
-                    <span className="text-[10px] text-[#9a9a9a]">Status wird neu berechnet...</span>
-                  </div>
-                )}
               </div>
             ) : (
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
+              <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-medium ${
                 aktuelleArt === "subunternehmer" ? "bg-cyan-50 text-cyan-700" : "bg-blue-50 text-blue-700"
               }`}>
                 {BESTELLUNGSART_LABELS[aktuelleArt]}
               </span>
             )}
           </div>
+          {bestellungsartLoading && (
+            <div className="flex items-center gap-1.5">
+              <div className="spinner w-3 h-3" />
+              <span className="text-[10px] text-[#9a9a9a]">Status wird neu berechnet...</span>
+            </div>
+          )}
+
+          <div className="h-px bg-[#f0eeeb]" />
+
+          {/* Projekt — kompakte Zeile */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider">Projekt</span>
+            {bestellung.projekt_name ? (
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 text-xs text-[#1a1a1a]">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: projekte.find((p) => p.id === bestellung.projekt_id)?.farbe || "#570006" }} />
+                  {bestellung.projekt_name}
+                </span>
+                <button onClick={() => handleProjektZuordnen(null)} disabled={projektLoading} className="text-[#c4c2bf] hover:text-red-600 transition-colors" title="Zuordnung entfernen">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ) : showProjektSelect ? (
+              <div className="flex-1 ml-3">
+                <div className="relative">
+                  <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={projektSuche}
+                    onChange={(e) => setProjektSuche(e.target.value)}
+                    placeholder="Suchen..."
+                    className="w-full pl-7 pr-2 py-1.5 text-xs bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-1 focus:ring-[#570006]/15 transition-colors"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-32 overflow-auto space-y-0.5 mt-1">
+                  {filteredProjekte.length === 0 ? (
+                    <p className="text-[10px] text-[#c4c2bf] py-1 text-center">Nicht gefunden</p>
+                  ) : (
+                    filteredProjekte.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleProjektZuordnen(p.id)}
+                        disabled={projektLoading}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs text-left rounded hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
+                        <span className="flex-1 truncate">{p.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <button onClick={() => { setShowProjektSelect(false); setProjektSuche(""); }} className="text-[10px] text-[#9a9a9a] hover:text-[#6b6b6b] mt-1 transition-colors">Abbrechen</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowProjektSelect(true)} className="text-[10px] font-medium text-[#570006] hover:text-[#7a1a1f] transition-colors">
+                Zuordnen
+              </button>
+            )}
+          </div>
+          {bestellung.projekt_name && projektStats?.budget != null && projektStats.budget_auslastung_prozent != null && (
+            <div>
+              <div className="flex items-center justify-between text-[10px] mb-1">
+                <span className="text-[#9a9a9a]">Budget</span>
+                <span className="font-mono-amount font-medium text-[#6b6b6b]">
+                  {projektStats.gesamt_ausgaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} / {projektStats.budget!.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                </span>
+              </div>
+              <div className="h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${projektStats.budget_auslastung_prozent >= 90 ? "bg-red-500" : projektStats.budget_auslastung_prozent >= 70 ? "bg-amber-500" : "bg-green-500"}`}
+                  style={{ width: `${Math.min(projektStats.budget_auslastung_prozent, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-[#c4c2bf] mt-0.5 font-mono-amount">{projektStats.budget_auslastung_prozent.toFixed(0)}% ausgelastet</p>
+            </div>
+          )}
         </div>
 
         {/* ── Subunternehmer-Info ───────────────────── */}
@@ -719,187 +793,7 @@ export function BestelldetailClient({
           </div>
         )}
 
-        {/* KI-Abgleich — Redesigned */}
-        <div className={`card overflow-hidden ${
-          abgleich?.status === "ok" ? "border-l-[3px] border-l-green-600" : abgleich?.status === "abweichung" ? "border-l-[3px] border-l-red-600" : ""
-        }`}>
-          {abgleich ? (
-            abgleich.status === "ok" ? (
-              /* Compact OK view */
-              <div className="flex items-center gap-3 px-4 py-3 bg-green-50">
-                <svg className="w-5 h-5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-green-700">Alle Dokumente stimmen überein</p>
-                  <p className="text-[10px] text-green-600/70 mt-0.5">Geprüft am {new Date(abgleich.erstellt_am).toLocaleString("de-DE")}</p>
-                </div>
-              </div>
-            ) : (
-              /* Abweichung view with action banner */
-              <div>
-                <div className="px-4 py-3 bg-red-50 border-b border-red-100">
-                  <div className="flex items-center gap-2 mb-1">
-                    <svg className="w-5 h-5 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-semibold text-red-700">
-                        {abgleich.abweichungen?.length === 1 ? "1 Abweichung gefunden" : `${abgleich.abweichungen?.length || 0} Abweichungen gefunden`}
-                      </p>
-                      <p className="text-[11px] text-red-600 mt-0.5">Bitte prüfe die markierten Positionen bevor du freigibst.</p>
-                    </div>
-                  </div>
-                </div>
-                {abgleich.abweichungen && abgleich.abweichungen.length > 0 && (
-                  <div className="p-3 space-y-1.5">
-                    {abgleich.abweichungen.map((a, i) => (
-                      <div key={i}>
-                        <button
-                          type="button"
-                          onClick={() => setOpenAbweichungen((prev) => ({ ...prev, [i]: !prev[i] }))}
-                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100/70 transition-colors text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${a.schwere === "hoch" ? "bg-red-600" : "bg-amber-500"}`} />
-                            <span className="font-semibold text-red-700">{a.feld}</span>
-                            {a.artikel && <span className="text-red-500">({a.artikel})</span>}
-                          </div>
-                          <ChevronIcon open={!!openAbweichungen[i]} className="text-red-400 w-3 h-3" />
-                        </button>
-                        {openAbweichungen[i] && (
-                          <div className="mx-3 mt-1 mb-2 px-3 py-2 bg-red-50/50 rounded-lg text-[11px] text-red-600 space-y-1">
-                            <div className="flex gap-4">
-                              <span>Erwartet: <span className="font-medium">{a.erwartet}</span></span>
-                              <span>Gefunden: <span className="font-medium">{a.gefunden}</span></span>
-                            </div>
-                            <div className="text-red-400">Dokument: {a.dokument} · Schwere: {a.schwere}</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {abgleich.ki_zusammenfassung && (
-                  <div className="px-4 pb-3">
-                    <p className="text-xs text-[#6b6b6b] leading-relaxed">{abgleich.ki_zusammenfassung}</p>
-                  </div>
-                )}
-                <div className="px-4 pb-3">
-                  <p className="text-[10px] text-[#c4c2bf]">Geprüft am {new Date(abgleich.erstellt_am).toLocaleString("de-DE")}</p>
-                </div>
-              </div>
-            )
-          ) : (
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight">KI-Abgleich</h3>
-              </div>
-              <p className="text-xs text-[#9a9a9a] mb-3">Startet automatisch sobald alle Dokumente vorliegen.</p>
-              <div className="space-y-2">
-                {[
-                  { key: "hat_bestellbestaetigung", label: "Bestellbestätigung" },
-                  { key: "hat_lieferschein", label: "Lieferschein" },
-                  { key: "hat_rechnung", label: "Rechnung" },
-                ].map((d) => {
-                  const vorhanden = bestellung[d.key as keyof Bestellung];
-                  return (
-                    <div key={d.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs ${vorhanden ? "bg-green-50" : "bg-[#fafaf9]"}`}>
-                      {vorhanden ? (
-                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                          <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                        </span>
-                      ) : (
-                        <span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-[#d1cfc9] shrink-0" />
-                      )}
-                      <span className={vorhanden ? "text-green-700 font-medium" : "text-[#9a9a9a]"}>{d.label}</span>
-                      {!vorhanden && <span className="text-[10px] text-[#c4c2bf] ml-auto">ausstehend</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Projekt-Zuordnung — Combobox */}
-        <div className="card p-4">
-          <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight mb-2">Projekt</h3>
-          {bestellung.projekt_name ? (
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-sm text-[#1a1a1a]">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projekte.find((p) => p.id === bestellung.projekt_id)?.farbe || "#570006" }} />
-                  {bestellung.projekt_name}
-                </span>
-                <button onClick={() => handleProjektZuordnen(null)} disabled={projektLoading} className="text-[10px] text-[#9a9a9a] hover:text-red-600 transition-colors" title="Zuordnung entfernen">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-              {projektStats?.budget != null && projektStats.budget_auslastung_prozent != null && (
-                <div className="mt-2.5">
-                  <div className="flex items-center justify-between text-[10px] mb-1">
-                    <span className="text-[#9a9a9a]">Budget</span>
-                    <span className="font-mono-amount font-medium text-[#6b6b6b]">
-                      {projektStats.gesamt_ausgaben.toLocaleString("de-DE", { minimumFractionDigits: 2 })} / {projektStats.budget!.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${projektStats.budget_auslastung_prozent >= 90 ? "bg-red-500" : projektStats.budget_auslastung_prozent >= 70 ? "bg-amber-500" : "bg-green-500"}`}
-                      style={{ width: `${Math.min(projektStats.budget_auslastung_prozent, 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-[#c4c2bf] mt-0.5 font-mono-amount">{projektStats.budget_auslastung_prozent.toFixed(0)}% ausgelastet</p>
-                </div>
-              )}
-            </div>
-          ) : showProjektSelect ? (
-            <div className="space-y-2">
-              <div className="relative">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-                <input
-                  type="text"
-                  value={projektSuche}
-                  onChange={(e) => setProjektSuche(e.target.value)}
-                  placeholder="Projekt suchen..."
-                  className="w-full pl-8 pr-3 py-2 text-xs bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-48 overflow-auto space-y-1">
-                {filteredProjekte.length === 0 ? (
-                  <p className="text-xs text-[#c4c2bf] py-2 text-center">Kein Projekt gefunden</p>
-                ) : (
-                  filteredProjekte.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => handleProjektZuordnen(p.id)}
-                      disabled={projektLoading}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left rounded-lg border border-[#e8e6e3] hover:bg-[#fafaf9] transition-colors disabled:opacity-50"
-                    >
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.farbe }} />
-                      <span className="flex-1">{p.name}</span>
-                      {p.budget && <span className="text-[10px] text-[#c4c2bf] font-mono-amount">{p.budget.toLocaleString("de-DE")} €</span>}
-                    </button>
-                  ))
-                )}
-              </div>
-              <button onClick={() => { setShowProjektSelect(false); setProjektSuche(""); }} className="text-xs text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors">Abbrechen</button>
-            </div>
-          ) : (
-            <button onClick={() => setShowProjektSelect(true)} className="text-xs font-medium text-[#570006] hover:text-[#7a1a1f] border border-[#570006]/20 rounded-lg px-3 py-2 transition-colors">
-              Projekt zuordnen
-            </button>
-          )}
-        </div>
-
-        {/* ── SECTION: Extras (collapsed) ───────────────── */}
+        {/* ── SECTION: Collapsible Widgets ───────────────── */}
 
         {/* Timeline */}
         {timeline.length > 0 && (
@@ -928,14 +822,102 @@ export function BestelldetailClient({
           </CollapsibleWidget>
         )}
 
-        {/* KI-Tools (Zusammenfassung + Analyse + Duplikat + Kategorien) */}
+        {/* KI-Tools (Abgleich + Zusammenfassung + Duplikat + Kategorien) */}
         <CollapsibleWidget
           title="KI-Tools"
           icon={<svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>}
+          badge={abgleich?.status === "ok"
+            ? <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+            : abgleich?.status === "abweichung"
+              ? <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+              : undefined}
           widgetId="ki-tools"
           openWidgetId={openWidgetId}
           onToggleWidget={toggleWidget}
         >
+          {/* KI-Abgleich (integriert) */}
+          {abgleich ? (
+            abgleich.status === "ok" ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg mb-3">
+                <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-green-700">Alle Dokumente stimmen überein</p>
+                  <p className="text-[10px] text-green-600/70">{new Date(abgleich.erstellt_am).toLocaleDateString("de-DE")}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-3">
+                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg">
+                  <svg className="w-4 h-4 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                  <p className="text-xs font-semibold text-red-700">
+                    {abgleich.abweichungen?.length === 1 ? "1 Abweichung" : `${abgleich.abweichungen?.length || 0} Abweichungen`}
+                  </p>
+                </div>
+                {abgleich.abweichungen && abgleich.abweichungen.length > 0 && (
+                  <div className="space-y-1 mt-2">
+                    {abgleich.abweichungen.map((a, i) => (
+                      <div key={i}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenAbweichungen((prev) => ({ ...prev, [i]: !prev[i] }))}
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded bg-red-50/70 hover:bg-red-100/50 transition-colors text-[11px]"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${a.schwere === "hoch" ? "bg-red-600" : "bg-amber-500"}`} />
+                            <span className="font-medium text-red-700">{a.feld}</span>
+                            {a.artikel && <span className="text-red-500 truncate max-w-[100px]">({a.artikel})</span>}
+                          </div>
+                          <ChevronIcon open={!!openAbweichungen[i]} className="text-red-400 w-3 h-3" />
+                        </button>
+                        {openAbweichungen[i] && (
+                          <div className="ml-4 mt-0.5 mb-1 px-2.5 py-1.5 bg-red-50/30 rounded text-[10px] text-red-600 space-y-0.5">
+                            <div className="flex gap-3">
+                              <span>Erwartet: <span className="font-medium">{a.erwartet}</span></span>
+                              <span>Gefunden: <span className="font-medium">{a.gefunden}</span></span>
+                            </div>
+                            <div className="text-red-400">{a.dokument} · {a.schwere}</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {abgleich.ki_zusammenfassung && (
+                  <p className="text-[11px] text-[#6b6b6b] mt-2 leading-relaxed">{abgleich.ki_zusammenfassung}</p>
+                )}
+              </div>
+            )
+          ) : (
+            <div className="mb-3">
+              <p className="text-[11px] text-[#9a9a9a] mb-2">Abgleich startet sobald alle Dokumente vorliegen.</p>
+              <div className="flex gap-1.5">
+                {[
+                  { key: "hat_bestellbestaetigung", label: "Best." },
+                  { key: "hat_lieferschein", label: "LS" },
+                  { key: "hat_rechnung", label: "RE" },
+                ].map((d) => {
+                  const vorhanden = bestellung[d.key as keyof Bestellung];
+                  return (
+                    <span key={d.key} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] ${vorhanden ? "bg-green-50 text-green-700 font-medium" : "bg-[#fafaf9] text-[#c4c2bf]"}`}>
+                      {vorhanden ? (
+                        <svg className="w-2.5 h-2.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      ) : (
+                        <span className="w-2.5 h-2.5 rounded-full border border-dashed border-[#d1cfc9]" />
+                      )}
+                      {d.label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="h-px bg-[#f0eeeb] mb-3" />
+
           {/* Zusammenfassung */}
           <div className="mb-3">
             <div className="flex items-center justify-between mb-2">
@@ -947,7 +929,7 @@ export function BestelldetailClient({
             {kiZusammenfassung ? (
               <p className="text-xs text-[#6b6b6b] leading-relaxed">{kiZusammenfassung}</p>
             ) : (
-              <p className="text-xs text-[#c4c2bf]">KI-Zusammenfassung der Bestellung generieren.</p>
+              <p className="text-xs text-[#c4c2bf]">KI-Zusammenfassung generieren.</p>
             )}
           </div>
 
