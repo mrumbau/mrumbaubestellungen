@@ -434,10 +434,13 @@ export function BestelldetailClient({
   async function handleZipDownload() {
     const pdfDokumente = dokumente.filter((d) => d.storage_pfad);
     if (pdfDokumente.length === 0) return;
-    // Open each PDF in new tab as fallback (real ZIP would need server-side endpoint)
-    for (const d of pdfDokumente) {
-      window.open(`/api/pdfs/${d.id}`, "_blank");
-    }
+
+    const link = document.createElement("a");
+    link.href = `/api/pdfs/zip?bestellung_id=${bestellung.id}`;
+    link.download = "";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // ─── Render: Sidebar content ──────────────────────────
