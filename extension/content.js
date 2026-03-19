@@ -111,6 +111,8 @@
       var schwelle_sicher = (serverConfig && serverConfig.score_sicher) || SCORE_SICHER;
       var schwelle_vielleicht = (serverConfig && serverConfig.score_vielleicht) || SCORE_VIELLEICHT;
 
+      console.debug("[MR Umbau] Score:", score, "| Schwellen: sicher=" + schwelle_sicher + ", vielleicht=" + schwelle_vielleicht, "| URL:", pathname);
+
       if (score >= schwelle_sicher) {
         console.log("[MR Umbau] Lokaler Score:", score, "→ Signal senden");
         sendeSignal(rootDomain, "lokal_score", extractBestellnummer(serverConfig));
@@ -134,6 +136,12 @@
       if (pathname.includes(pattern)) score += 3;
     });
 
+    // Negative URL-Patterns (-3 pro Treffer) — aktiver Checkout, nicht Bestätigung
+    var negUrlPatterns = (cfg && cfg.score_negative_url_patterns) || SCORE_NEGATIVE_URL_PATTERNS;
+    negUrlPatterns.forEach(function (pattern) {
+      if (pathname.includes(pattern)) score -= 3;
+    });
+
     // Titel-Keywords (+2 pro Treffer)
     var title = document.title.toLowerCase();
     var titleKeywords = (cfg && cfg.score_title_keywords) || SCORE_TITLE_KEYWORDS;
@@ -151,14 +159,40 @@
     });
     score += domScore;
 
-    // Seiteninhalt-Keywords (+1 pro Treffer, max 5)
+    // Negative DOM-Selektoren (-2 pro Treffer, max -6) — Checkout-Formulare noch aktiv
+    var negDomScore = 0;
+    var negDomSelectors = (cfg && cfg.score_negative_dom_selectors) || SCORE_NEGATIVE_DOM_SELECTORS;
+    negDomSelectors.forEach(function (selector) {
+      try {
+        if (negDomScore > -6 && document.querySelector(selector)) negDomScore -= 2;
+      } catch (e) { /* ungültiger Selektor */ }
+    });
+    score += negDomScore;
+
+    // Seiteninhalt extrahieren (einmal für alle Content-Checks)
     var bodyText = extractCompactText();
+
+    // Bestätigungs-spezifische Keywords (+4 pro Treffer) — starke Positivsignale
+    var confirmKeywords = (cfg && cfg.score_confirmation_keywords) || SCORE_CONFIRMATION_KEYWORDS;
+    confirmKeywords.forEach(function (keyword) {
+      if (bodyText.includes(keyword)) score += 4;
+    });
+
+    // Seiteninhalt-Keywords (+1 pro Treffer, max 5)
     var contentScore = 0;
     var contentKeywords = (cfg && cfg.score_content_keywords) || SCORE_CONTENT_KEYWORDS;
     contentKeywords.forEach(function (keyword) {
       if (contentScore < 5 && bodyText.includes(keyword)) contentScore += 1;
     });
     score += contentScore;
+
+    // Negative Seiteninhalt-Keywords (-2 pro Treffer, max -8) — "Jetzt bestellen" etc.
+    var negContentScore = 0;
+    var negContentKeywords = (cfg && cfg.score_negative_content_keywords) || SCORE_NEGATIVE_CONTENT_KEYWORDS;
+    negContentKeywords.forEach(function (keyword) {
+      if (negContentScore > -8 && bodyText.includes(keyword)) negContentScore -= 2;
+    });
+    score += negContentScore;
 
     return score;
   }

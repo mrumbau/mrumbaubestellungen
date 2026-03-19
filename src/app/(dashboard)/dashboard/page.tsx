@@ -55,7 +55,7 @@ export default async function DashboardPage() {
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true })),
     eigene(supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null)),
     eigene(supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5)),
-    eigene(supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
+    eigene(supabase.from("bestellungen").select("*").in("status", ["erwartet", "abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
     createServiceClient().from("bestellungen").select("besteller_kuerzel"),
     supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),

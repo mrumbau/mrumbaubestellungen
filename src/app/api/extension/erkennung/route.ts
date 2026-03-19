@@ -60,8 +60,11 @@ Antworte NUR mit einem JSON-Objekt, kein Text davor oder danach:
 }
 
 Wichtig:
-- ist_bestellung = true NUR wenn die Seite klar eine ABGESCHLOSSENE Bestellung/Kauf bestätigt
-- NICHT bei: Warenkorb, Checkout-Formular, Produktseiten, Registrierung, Newsletter-Bestätigung, Kontaktformular
+- ist_bestellung = true NUR wenn die Seite klar eine BEREITS ABGESCHLOSSENE Bestellung/Kauf bestätigt
+- Die Bestellung muss SCHON aufgegeben sein — die Seite zeigt eine Bestätigung/Danke-Nachricht
+- NICHT bei: Warenkorb, aktiver Checkout (Zahlungseingabe, Adresseingabe, Review-Seite), "Jetzt bestellen"-Button sichtbar, Produktseiten, Registrierung, Newsletter-Bestätigung, Kontaktformular
+- Ein klares Zeichen für eine Bestätigungsseite: Bestellnummer wird angezeigt, "Ihre Bestellung wurde aufgegeben", Bestätigungsmail-Hinweis
+- Ein klares Zeichen GEGEN eine Bestätigungsseite: "Jetzt bestellen", "Bestellung aufgeben", aktive Formularfelder für Zahlung/Adresse
 - haendler_domain: nur die Root-Domain (z.B. "bauhaus.de"), keine Subdomains
 - konfidenz: wie sicher du dir bist (0.0 = unsicher, 1.0 = absolut sicher)`,
         },

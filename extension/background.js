@@ -230,7 +230,56 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
     return true;
   }
 
-  // Manuelles Signal von Popup
+  // Händler merken von Popup (NUR Domain lernen, KEINE Bestellung)
+  if (message.type === "haendler_merken") {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (!tabs[0] || !tabs[0].url) {
+        sendResponse({ success: false, error: "Kein aktiver Tab" });
+        return;
+      }
+
+      var tab = tabs[0];
+      var url;
+      try {
+        url = new URL(tab.url);
+      } catch (e) {
+        sendResponse({ success: false, error: "Ungültige URL" });
+        return;
+      }
+
+      var parts = url.hostname.split(".");
+      var domain = parts.length <= 2 ? url.hostname : parts.slice(-2).join(".");
+
+      fetchWithTimeout("https://cloud.mrumbau.de/api/extension/haendler-merken", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          haendler_domain: domain,
+          seiten_url: tab.url,
+          secret: EXTENSION_SECRET,
+        }),
+      }, FETCH_TIMEOUT_MS)
+        .then(function (res) {
+          if (res.ok) return res.json();
+          throw new Error("Server-Fehler (" + res.status + ")");
+        })
+        .then(function (data) {
+          // Config neu laden damit der neue Händler sofort erkannt wird
+          setTimeout(ladeConfigVomServer, 1000);
+          sendResponse({ success: true, neu: data.neu, domain: domain });
+        })
+        .catch(function (err) {
+          if (err.name === "AbortError") {
+            sendResponse({ success: false, error: "Zeitüberschreitung" });
+          } else {
+            sendResponse({ success: false, error: err.message });
+          }
+        });
+    });
+    return true;
+  }
+
+  // Manuelles Signal von Popup (Bestellung melden → erwartet-Eintrag)
   if (message.type === "manuelles_signal") {
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       if (!tabs[0] || !tabs[0].url) {

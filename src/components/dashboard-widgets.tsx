@@ -340,6 +340,15 @@ function StatCard({ label, value, color, alert }: { label: string; value: number
 // ─── Action Icon ─────────────────────────────────────────
 
 function AktionIcon({ status }: { status: string }) {
+  if (status === "erwartet") {
+    return (
+      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+        <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+    );
+  }
   if (status === "abweichung") {
     return (
       <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
@@ -372,14 +381,17 @@ function AktionIcon({ status }: { status: string }) {
 function QuickAction({ bestellungId, status, onSuccess }: { bestellungId: string; status: string; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  if (status !== "vollstaendig") return null;
+  if (status !== "vollstaendig" && status !== "erwartet") return null;
 
-  async function freigeben(e: React.MouseEvent) {
+  async function handleAction(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     setLoading(true);
     try {
-      const res = await fetch(`/api/bestellungen/${bestellungId}/freigeben`, {
+      const endpoint = status === "erwartet"
+        ? `/api/bestellungen/${bestellungId}/verwerfen`
+        : `/api/bestellungen/${bestellungId}/freigeben`;
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -389,9 +401,29 @@ function QuickAction({ bestellungId, status, onSuccess }: { bestellungId: string
     }
   }
 
+  if (status === "erwartet") {
+    return (
+      <button
+        onClick={handleAction}
+        disabled={loading}
+        className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#9a9a9a] bg-[#f5f4f2] border border-[#e8e6e3] rounded-md hover:text-red-600 hover:bg-red-50 hover:border-red-200 disabled:opacity-50 transition-colors shrink-0"
+        title="Erwartete Bestellung verwerfen (keine Bestellung aufgegeben)"
+      >
+        {loading ? (
+          <div className="spinner w-3 h-3" />
+        ) : (
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        )}
+        Verwerfen
+      </button>
+    );
+  }
+
   return (
     <button
-      onClick={freigeben}
+      onClick={handleAction}
       disabled={loading}
       className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-50 transition-colors shrink-0"
       title="Rechnung freigeben"

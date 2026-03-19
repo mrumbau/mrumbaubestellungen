@@ -71,10 +71,60 @@ var SCORE_CONTENT_KEYWORDS = [
   "bestätigungsmail", "confirmation email", "bestätigungs-e-mail",
 ];
 
+// =====================================================================
+// NEGATIVE Signale – reduzieren den Score wenn noch im Bestellvorgang
+// =====================================================================
+
+// URL-Pfade die auf aktiven Checkout (NICHT Bestätigung) hindeuten (je -3 Punkte)
+var SCORE_NEGATIVE_URL_PATTERNS = [
+  "/checkout/payment", "/checkout/address", "/checkout/shipping",
+  "/checkout/review", "/checkout/cart", "/checkout/step",
+  "/checkout/login", "/checkout/register", "/checkout/delivery",
+  "/warenkorb", "/cart", "/basket", "/shopping-cart",
+  "/kasse", "/zahlung", "/payment", "/versand",
+  "/shipping", "/delivery", "/address", "/adresse",
+];
+
+// Seiteninhalt-Keywords die auf NICHT-abgeschlossenen Checkout hindeuten (je -2 Punkte)
+var SCORE_NEGATIVE_CONTENT_KEYWORDS = [
+  "jetzt bestellen", "jetzt kaufen", "kostenpflichtig bestellen",
+  "bestellung aufgeben", "bestellung abschließen", "bestellung absenden",
+  "order now", "place order", "buy now", "submit order", "complete purchase",
+  "zur kasse", "weiter zur zahlung", "weiter zum versand",
+  "zahlungsmethode auswählen", "zahlungsart wählen", "payment method",
+  "kreditkartennummer", "credit card number", "kartennummer",
+  "cvv", "cvc", "ablaufdatum", "expiry date",
+  "gutscheincode", "coupon code", "rabattcode",
+  "agb akzeptieren", "accept terms", "ich stimme zu",
+  "in den warenkorb", "add to cart", "zum warenkorb",
+];
+
+// DOM-Selektoren die auf aktiven Checkout hindeuten (je -2 Punkte)
+var SCORE_NEGATIVE_DOM_SELECTORS = [
+  "button[type='submit']:not([disabled])", // Aktiver Submit-Button = noch nicht abgeschickt
+  "form[action*='checkout']", "form[action*='payment']", "form[action*='order']",
+  "input[name*='card']", "input[name*='credit']", "input[name*='payment']",
+  "input[name*='cvv']", "input[name*='cvc']",
+  "[class*='checkout-step']", "[class*='checkoutStep']",
+  "[class*='payment-form']", "[class*='paymentForm']",
+  "[data-step]:not([data-step='confirmation']):not([data-step='complete'])",
+];
+
+// Bestätigungs-spezifische Keywords die STARK positiv zählen (+4 Punkte je)
+var SCORE_CONFIRMATION_KEYWORDS = [
+  "bestellung wurde aufgegeben", "bestellung erfolgreich aufgegeben",
+  "bestellung wurde erfolgreich", "ihre bestellung ist eingegangen",
+  "wir haben ihre bestellung erhalten", "bestellbestätigung",
+  "order has been placed", "order confirmed", "order is confirmed",
+  "your order has been", "we have received your order",
+  "bestätigungsmail", "confirmation email", "bestätigungs-e-mail",
+  "wird an sie versendet", "wurde an ihre e-mail",
+];
+
 // Schwellenwerte
-var SCORE_SICHER = 6;     // ≥6 Punkte → sofort Signal senden
-var SCORE_VIELLEICHT = 3; // 3-5 Punkte → KI fragen
-                          // <3 Punkte → ignorieren
+var SCORE_SICHER = 7;     // ≥7 Punkte → sofort Signal senden (erhöht von 6)
+var SCORE_VIELLEICHT = 4; // 4-6 Punkte → KI fragen (erhöht von 3)
+                          // <4 Punkte → ignorieren
 
 // =====================================================================
 // FILTER: Domains und Pfade die NIEMALS geprüft werden
