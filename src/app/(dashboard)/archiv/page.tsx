@@ -48,7 +48,7 @@ export default async function ArchivPage() {
     supabase
       .from("projekte")
       .select("id, name, beschreibung, farbe, budget, status, created_at")
-      .eq("status", "abgeschlossen")
+      .in("status", ["abgeschlossen", "archiviert"])
       .order("created_at", { ascending: false }),
     materialQuery,
     suQuery,

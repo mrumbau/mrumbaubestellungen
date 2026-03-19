@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
-import { BESTELLUNGSART_LABELS } from "@/lib/bestellung-utils";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Bestellung {
@@ -43,6 +42,18 @@ function DokumentIcon({ vorhanden }: { vorhanden: boolean }) {
   );
 }
 
+type ArtFilter = "" | "material" | "subunternehmer";
+
+const STATUS_OPTIONS = [
+  { value: "", label: "Alle Status" },
+  { value: "erwartet", label: "Erwartet" },
+  { value: "offen", label: "Offen" },
+  { value: "vollstaendig", label: "Vollständig" },
+  { value: "abweichung", label: "Abweichung" },
+  { value: "ls_fehlt", label: "LS fehlt" },
+  { value: "freigegeben", label: "Freigegeben" },
+];
+
 export function BestellungenTabelle({
   bestellungen,
   currentPage,
@@ -62,13 +73,14 @@ export function BestellungenTabelle({
 }) {
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [bestellungsartFilter, setBestellungsartFilter] = useState("");
+  const [artFilter, setArtFilter] = useState<ArtFilter>("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const gefiltert = bestellungen.filter((b) => {
+  const gefiltert = useMemo(() => bestellungen.filter((b) => {
     const suchMatch =
       !suche ||
       b.bestellnummer?.toLowerCase().includes(suche.toLowerCase()) ||
@@ -76,13 +88,25 @@ export function BestellungenTabelle({
       b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
 
     const statusMatch = !statusFilter || b.status === statusFilter;
-    const artMatch = !bestellungsartFilter || (b.bestellungsart || "material") === bestellungsartFilter;
+    const artMatch = !artFilter || (b.bestellungsart || "material") === artFilter;
     const projektMatch = !projektFilter || b.projekt_id === projektFilter;
 
     return suchMatch && statusMatch && artMatch && projektMatch;
-  });
+  }), [bestellungen, suche, statusFilter, artFilter, projektFilter]);
+
+  // Count per art for tab badges
+  const artCounts = useMemo(() => {
+    const counts = { material: 0, subunternehmer: 0 };
+    for (const b of bestellungen) {
+      const art = b.bestellungsart || "material";
+      if (art in counts) counts[art as keyof typeof counts]++;
+    }
+    return counts;
+  }, [bestellungen]);
 
   const projektFarbenMap = new Map(projekte.map((p) => [p.id, p.farbe]));
+
+  const hasFilters = suche || statusFilter || artFilter || projektFilter;
 
   function goToPage(page: number) {
     const params = new URLSearchParams(searchParams.toString());
@@ -90,63 +114,35 @@ export function BestellungenTabelle({
     router.push(`/bestellungen?${params.toString()}`);
   }
 
+  async function downloadZip(bestellungId: string) {
+    setDownloadingId(bestellungId);
+    try {
+      const res = await fetch(`/api/pdfs/zip?bestellung_id=${bestellungId}`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const disposition = res.headers.get("Content-Disposition");
+      const match = disposition?.match(/filename="?([^"]+)"?/);
+      link.download = match?.[1] || "Dokumente.zip";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch { /* silent */ }
+    finally { setDownloadingId(null); }
+  }
+
   return (
     <>
-      {/* Filter */}
-      <div className="flex gap-3 mt-6">
-        <div className="relative flex-1 max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            placeholder="Suche nach Bestellnummer, Händler..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
-        >
-          <option value="">Alle Status</option>
-          <option value="erwartet">Erwartet</option>
-          <option value="offen">Offen</option>
-          <option value="vollstaendig">Vollständig</option>
-          <option value="abweichung">Abweichung</option>
-          <option value="ls_fehlt">LS fehlt</option>
-          <option value="freigegeben">Freigegeben</option>
-        </select>
-        <select
-          value={bestellungsartFilter}
-          onChange={(e) => setBestellungsartFilter(e.target.value)}
-          className="px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
-        >
-          <option value="">Alle Arten</option>
-          {Object.entries(BESTELLUNGSART_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        {projekte.length > 0 && (
-          <select
-            value={projektFilter}
-            onChange={(e) => setProjektFilter(e.target.value)}
-            className="px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
-          >
-            <option value="">Alle Projekte</option>
-            {projekte.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
       {/* Projekt-Filter Banner */}
       {aktiverProjektName && aktiverProjektFilter && (
-        <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-sm">
-          <span className="text-[#9a9a9a]">Gefiltert nach:</span>
+        <div className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-sm">
+          <svg className="w-4 h-4 text-[#9a9a9a] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          <span className="text-[#9a9a9a]">Gefiltert nach Projekt:</span>
           <span className="font-semibold text-[#1a1a1a]">{aktiverProjektName}</span>
           <button
             onClick={() => router.push("/bestellungen")}
@@ -160,93 +156,226 @@ export function BestellungenTabelle({
         </div>
       )}
 
+      {/* Art-Tabs + Search + Filters */}
+      <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Pill-toggle tabs for Bestellungsart */}
+        <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg shrink-0">
+          {([
+            { key: "" as ArtFilter, label: "Alle" },
+            { key: "material" as ArtFilter, label: "Material" },
+            { key: "subunternehmer" as ArtFilter, label: "Subunternehmer" },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setArtFilter(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                artFilter === tab.key
+                  ? "bg-white text-[#1a1a1a] shadow-sm"
+                  : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+              }`}
+            >
+              {tab.label}
+              {tab.key && artCounts[tab.key] > 0 && (
+                <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                  artFilter === tab.key ? "bg-[#570006] text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+                }`}>
+                  {artCounts[tab.key]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Search + Dropdowns */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 min-w-0">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={suche}
+              onChange={(e) => setSuche(e.target.value)}
+              placeholder="Bestellnummer, Händler, Besteller..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="hidden md:block px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+          >
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {projekte.length > 0 && (
+            <select
+              value={projektFilter}
+              onChange={(e) => setProjektFilter(e.target.value)}
+              className="hidden md:block px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            >
+              <option value="">Alle Projekte</option>
+              {projekte.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => { setSuche(""); setStatusFilter(""); setArtFilter(""); setProjektFilter(""); }}
+              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-red-50 rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              title="Filter zurücksetzen"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile: Status + Projekt filter below */}
+      <div className="flex gap-3 mt-3 md:hidden">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="flex-1 px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+        >
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {projekte.length > 0 && (
+          <select
+            value={projektFilter}
+            onChange={(e) => setProjektFilter(e.target.value)}
+            className="flex-1 px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+          >
+            <option value="">Alle Projekte</option>
+            {projekte.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
       {/* Table */}
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
+            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Projekt</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Datum</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Best.</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">LS</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">RE</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler / Firma</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden lg:table-cell">Projekt</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden md:table-cell">Datum</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">Best.</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">LS</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">RE</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Status</th>
               <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase w-10"></th>
+              <th className="px-4 py-3.5 w-10"></th>
             </tr>
           </thead>
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-[#9a9a9a]">
-                  {bestellungen.length === 0
-                    ? "Noch keine Bestellungen vorhanden."
-                    : "Keine Bestellungen gefunden."}
+                <td colSpan={10} className="px-4 py-16 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                    <p className="text-[#9a9a9a] text-sm">
+                      {bestellungen.length === 0
+                        ? "Noch keine Bestellungen vorhanden."
+                        : "Keine Bestellungen gefunden."}
+                    </p>
+                    {hasFilters && (
+                      <button
+                        onClick={() => { setSuche(""); setStatusFilter(""); setArtFilter(""); setProjektFilter(""); }}
+                        className="text-[#570006] hover:text-[#7a1a1f] text-sm font-medium transition-colors"
+                      >
+                        Filter zurücksetzen
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
               gefiltert.map((b, i) => {
                 const status = getStatusConfig(b.status);
+                const isSub = (b.bestellungsart || "material") === "subunternehmer";
                 return (
                   <tr
                     key={b.id}
-                    className={`table-row-hover border-b border-[#f0eeeb] ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""}`}
+                    onClick={() => router.push(`/bestellungen/${b.id}`)}
+                    className={`table-row-hover border-b border-[#f0eeeb] cursor-pointer group ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""}`}
                   >
                     <td className="px-4 py-3.5">
                       <Link
                         href={`/bestellungen/${b.id}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="font-mono-amount font-semibold text-[#570006] hover:text-[#7a1a1f] transition-colors"
                       >
                         {b.bestellnummer || "–"}
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-[#1a1a1a]">
-                      <div className="flex items-center gap-1.5">
-                        {b.haendler_name || "–"}
-                        {(b.bestellungsart || "material") === "subunternehmer" && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700 border border-cyan-200">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate max-w-[150px]">{b.haendler_name || "–"}</span>
+                        {isSub && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                             SUB
                           </span>
                         )}
                       </div>
+                      {/* Mobile: show project inline */}
+                      {b.projekt_name && (
+                        <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[11px] text-[#6b6b6b]">
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
+                          />
+                          {b.projekt_name}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 hidden lg:table-cell">
                       {b.projekt_name ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-[#1a1a1a] max-w-[100px] truncate">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-[#1a1a1a] max-w-[120px]">
                           <span
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
                           />
-                          {b.projekt_name}
+                          <span className="truncate">{b.projekt_name}</span>
                         </span>
                       ) : (
-                        <span className="text-[#c4c2bf] text-xs">–</span>
+                        <span className="text-[#d4d1cc] text-xs">–</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-[#9a9a9a] text-xs">
+                    <td className="px-4 py-3.5 text-[#9a9a9a] text-xs hidden md:table-cell whitespace-nowrap">
                       {formatDatum(b.created_at)}
                     </td>
-                    <td className="px-4 py-3.5 text-center">
+                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
-                        {(b.bestellungsart || "material") === "subunternehmer" ? (
-                          <span className="text-[#c4c2bf]">&ndash;</span>
+                        {isSub ? (
+                          <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_bestellbestaetigung} />
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-center">
+                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
-                        {(b.bestellungsart || "material") === "subunternehmer" ? (
-                          <span className="text-[#c4c2bf]">&ndash;</span>
+                        {isSub ? (
+                          <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_lieferschein} />
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-center">
+                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} /></div>
                     </td>
                     <td className="px-4 py-3.5">
@@ -268,23 +397,14 @@ export function BestellungenTabelle({
                         type="button"
                         onClick={async (e) => {
                           e.stopPropagation();
-                          try {
-                            const res = await fetch(`/api/pdfs/zip?bestellung_id=${b.id}`);
-                            if (!res.ok) return;
-                            const blob = await res.blob();
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement("a");
-                            link.href = url;
-                            const disposition = res.headers.get("Content-Disposition");
-                            const match = disposition?.match(/filename="?([^"]+)"?/);
-                            link.download = match?.[1] || "Dokumente.zip";
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          } catch { /* silent */ }
+                          downloadZip(b.id);
                         }}
-                        className="p-1.5 rounded-md text-[#9a9a9a] hover:text-[#570006] hover:bg-[#fafaf9] transition-colors inline-flex"
+                        disabled={downloadingId === b.id}
+                        className={`p-1.5 rounded-md transition-colors inline-flex ${
+                          downloadingId === b.id
+                            ? "text-[#570006] animate-pulse"
+                            : "text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-[#570006] hover:!bg-[#570006]/[0.06]"
+                        }`}
                         title="Alle Dokumente herunterladen"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -306,23 +426,29 @@ export function BestellungenTabelle({
           <span className="text-[#9a9a9a]">
             {totalCount} Bestellung{totalCount !== 1 ? "en" : ""} gesamt
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage <= 1}
-              className="px-3 py-1.5 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-2 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Vorherige Seite"
             >
-              Vorherige
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
-            <span className="text-[#6b6b6b] font-medium px-2 font-mono-amount text-xs">
+            <span className="text-[#6b6b6b] font-medium px-3 font-mono-amount text-xs">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage >= totalPages}
-              className="px-3 py-1.5 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-2 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Nächste Seite"
             >
-              Nächste
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
         </div>
