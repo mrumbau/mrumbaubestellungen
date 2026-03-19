@@ -23,7 +23,7 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
-    // Auth prüfen
+    // Auth + Rolle prüfen
     const supabaseAuth = await createServerSupabaseClient();
     const { data: { user } } = await supabaseAuth.auth.getUser();
     if (!user) {
@@ -32,15 +32,31 @@ export async function POST(
 
     const supabase = createServiceClient();
 
+    // Benutzerprofil laden für Autorisierung
+    const { data: profil } = await supabase
+      .from("benutzer_rollen")
+      .select("kuerzel, rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profil) {
+      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
+    }
+
     // Bestellung laden und prüfen
     const { data: bestellung } = await supabase
       .from("bestellungen")
-      .select("id, status, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis")
+      .select("id, status, besteller_kuerzel, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis")
       .eq("id", id)
       .single();
 
     if (!bestellung) {
       return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
+    }
+
+    // Autorisierung: nur Admin oder eigener Besteller
+    if (profil.rolle !== "admin" && bestellung.besteller_kuerzel !== profil.kuerzel) {
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG || "Keine Berechtigung" }, { status: 403 });
     }
 
     if (bestellung.status !== "erwartet") {
@@ -63,6 +79,19 @@ export async function POST(
         { error: "Bestellung hat bereits Dokumente und kann nicht verworfen werden." },
         { status: 400 }
       );
+    }
+
+    // Storage-Dateien löschen (bevor DB-Records entfernt werden)
+    const { data: dokumente } = await supabase
+      .from("dokumente")
+      .select("storage_pfad")
+      .eq("bestellung_id", id);
+
+    if (dokumente && dokumente.length > 0) {
+      const pfade = dokumente.map((d) => d.storage_pfad).filter(Boolean);
+      if (pfade.length > 0) {
+        await supabase.storage.from("dokumente").remove(pfade);
+      }
     }
 
     // Abhängige Daten löschen

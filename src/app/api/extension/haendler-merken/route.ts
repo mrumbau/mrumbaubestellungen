@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       // Händler existiert → ggf. Pattern hinzufügen
       if (pattern) {
         const muster: string[] = existing[0].url_muster || [];
-        if (!muster.includes(pattern)) {
+        if (muster.length < 50 && pattern.length <= 200 && !muster.includes(pattern)) {
           await supabase
             .from("haendler")
             .update({ url_muster: [...muster, pattern] })

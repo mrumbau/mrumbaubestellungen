@@ -51,7 +51,20 @@ export async function POST(request: NextRequest) {
     // Zugehörige Signale als verarbeitet markieren
     // (Signale löschen wir nicht, nur die Bestellungen)
 
-    // Dokumente löschen (sollte keine geben, aber sicherheitshalber)
+    // Storage-Dateien löschen (bevor DB-Records entfernt werden)
+    const { data: dokumente } = await supabase
+      .from("dokumente")
+      .select("storage_pfad")
+      .in("bestellung_id", ids);
+
+    if (dokumente && dokumente.length > 0) {
+      const pfade = dokumente.map((d) => d.storage_pfad).filter(Boolean);
+      if (pfade.length > 0) {
+        await supabase.storage.from("dokumente").remove(pfade);
+      }
+    }
+
+    // Dokumente löschen
     await supabase.from("dokumente").delete().in("bestellung_id", ids);
 
     // Abgleiche löschen

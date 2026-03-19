@@ -24,6 +24,6 @@ export function checkCsrf(request: NextRequest): boolean {
     return ALLOWED_ORIGINS.some((allowed) => referer.startsWith(allowed));
   }
 
-  // Kein Origin/Referer = Server-zu-Server oder gleiche Origin (erlaubt)
-  return true;
+  // Kein Origin/Referer = unsicher, ablehnen
+  return false;
 }

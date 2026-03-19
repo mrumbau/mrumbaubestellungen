@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -23,6 +24,30 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
+    }
+
+    // Autorisierung: Bestellung muss dem User gehören (RLS) oder Admin
+    const serviceClient = createServiceClient();
+    const { data: profil } = await serviceClient
+      .from("benutzer_rollen")
+      .select("kuerzel, rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profil) {
+      return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 401 });
+    }
+
+    if (profil.rolle !== "admin") {
+      const { data: bestellung } = await serviceClient
+        .from("bestellungen")
+        .select("besteller_kuerzel")
+        .eq("id", id)
+        .single();
+
+      if (!bestellung || bestellung.besteller_kuerzel !== profil.kuerzel) {
+        return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
+      }
     }
 
     const body = await request.json();

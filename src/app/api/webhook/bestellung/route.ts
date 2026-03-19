@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidKuerzel, isValidDomain, validateTextLength } from "@/lib/validation";
-import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { checkRateLimit, checkGlobalRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 
 // POST /api/webhook/bestellung – Empfängt Signal von Chrome Extension
@@ -23,6 +23,12 @@ export async function POST(request: NextRequest) {
     // Secret prüfen
     if (secret !== process.env.EXTENSION_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Globales Rate-Limiting (über alle Instanzen)
+    const globalRl = await checkGlobalRateLimit("webhook-bestellung", 30, 60_000);
+    if (!globalRl.allowed) {
+      return NextResponse.json({ error: "Zu viele Anfragen. Bitte warten." }, { status: 429 });
     }
 
     if (!kuerzel || !haendler_domain) {
@@ -118,7 +124,7 @@ export async function POST(request: NextRequest) {
               .single();
 
             const muster: string[] = existing?.url_muster || [];
-            if (!muster.includes(pattern)) {
+            if (muster.length < 50 && pattern.length <= 200 && !muster.includes(pattern)) {
               await supabase
                 .from("haendler")
                 .update({ url_muster: [...muster, pattern] })
@@ -144,7 +150,7 @@ export async function POST(request: NextRequest) {
             } else {
               // Händler existiert, Pattern hinzufügen
               const muster: string[] = existingH[0].url_muster || [];
-              if (!muster.includes(pattern)) {
+              if (muster.length < 50 && pattern.length <= 200 && !muster.includes(pattern)) {
                 await supabase
                   .from("haendler")
                   .update({ url_muster: [...muster, pattern] })

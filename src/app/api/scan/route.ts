@@ -214,6 +214,9 @@ export async function POST(request: NextRequest) {
 
         const abgleich = await fuehreAbgleichDurch(bb, ls, re);
 
+        // Vorherige Abgleiche löschen (es soll nur einen pro Bestellung geben)
+        await supabase.from("abgleiche").delete().eq("bestellung_id", bestellung_id);
+
         await supabase.from("abgleiche").insert({
           bestellung_id,
           status: abgleich.status,

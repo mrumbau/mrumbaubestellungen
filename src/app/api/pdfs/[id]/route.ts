@@ -29,12 +29,23 @@ export async function GET(
     // Dokument-Metadaten laden (RLS filtert)
     const { data: dokument } = await supabaseAuth
       .from("dokumente")
-      .select("storage_pfad")
+      .select("storage_pfad, bestellung_id")
       .eq("id", id)
       .single();
 
     if (!dokument?.storage_pfad) {
       return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
+    }
+
+    // Verify bestellung access via RLS
+    const { data: bestellung } = await supabaseAuth
+      .from("bestellungen")
+      .select("id")
+      .eq("id", dokument.bestellung_id)
+      .single();
+
+    if (!bestellung) {
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     // Datei aus Storage laden (Service Client für Zugriff)

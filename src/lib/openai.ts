@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { logError } from "@/lib/logger";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -35,7 +36,7 @@ function safeParseGptJson<T>(text: string, fallback: T): T {
 }
 
 export interface DokumentAnalyse {
-  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis";
+  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "unbekannt";
   vermutete_bestellungsart?: "material" | "subunternehmer";
   bestellnummer: string | null;
   haendler: string | null;
@@ -50,6 +51,7 @@ export interface DokumentAnalyse {
   konfidenz: number;
   lieferadressen?: string[];
   volltext?: string;
+  parse_fehler?: boolean;
 }
 
 export interface AbgleichErgebnis {
@@ -178,7 +180,8 @@ export async function analysiereDokument(
       volltext: parsed.volltext || "",
     };
   } catch {
-    return { typ: "rechnung", bestellnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: text };
+    logError("openai/analysiereDokument", "JSON-Parse fehlgeschlagen", { text: text.slice(0, 500) });
+    return { typ: "unbekannt", bestellnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: text, parse_fehler: true };
   }
 }
 

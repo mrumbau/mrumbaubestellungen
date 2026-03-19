@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, erkenneSubunternehmerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel, extrahiereBestellerHinweise, erkenneProjektAusInhalt, berechneAffinitaet, aktualisiereBestellerAffinitaet, type ProjektMatchErgebnis } from "@/lib/openai";
 import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
-import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { checkRateLimit, checkGlobalRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
+
+// Vercel Serverless: max 60 Sekunden Laufzeit
+export const maxDuration = 60;
 
 // POST /api/webhook/email – Empfängt E-Mail-Daten von Make.com
 export async function POST(request: NextRequest) {
@@ -26,6 +29,38 @@ export async function POST(request: NextRequest) {
     // Secret prüfen
     if (secret !== process.env.MAKE_WEBHOOK_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Globales Rate-Limiting (über alle Instanzen)
+    const globalRl = await checkGlobalRateLimit("webhook-email", 60, 60_000);
+    if (!globalRl.allowed) {
+      return NextResponse.json({ error: "Zu viele Anfragen. Bitte warten." }, { status: 429 });
+    }
+
+    // Idempotenz: Hash aus Absender + Betreff + Datum prüfen
+    const idempotencyKey = `${email_absender || ""}|${email_betreff || ""}|${email_datum || ""}`;
+    const idempotencyHash = Buffer.from(idempotencyKey).toString("base64").slice(0, 64);
+
+    {
+      const supabaseCheck = createServiceClient();
+      const { data: existing } = await supabaseCheck
+        .from("webhook_logs")
+        .select("id")
+        .eq("typ", "email")
+        .eq("bestellnummer", idempotencyHash)
+        .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        return NextResponse.json({ success: true, deduplicated: true });
+      }
+
+      // Idempotenz-Marker sofort speichern (vor Verarbeitung)
+      await supabaseCheck.from("webhook_logs").insert({
+        typ: "email",
+        status: "processing",
+        bestellnummer: idempotencyHash,
+      });
     }
 
     // Input-Validierung
@@ -429,6 +464,7 @@ export async function POST(request: NextRequest) {
 
     // Bestehende Bestellung suchen oder neue anlegen (Race-Condition-sicher)
     let bestellungId: string;
+    let bestellungNeuErstellt = false;
 
     const erkannteBestellnummer = ergebnisse.find(
       (e) => e.analyse.bestellnummer
@@ -554,11 +590,13 @@ export async function POST(request: NextRequest) {
           throw new Error("Bestellung konnte nicht angelegt werden");
         } else {
           bestellungId = neue.id;
+          bestellungNeuErstellt = true;
         }
       }
     }
 
-    // Dokumente speichern
+    // Dokumente speichern (mit Rollback bei Fehler)
+    let dokumenteGespeichert = 0;
     for (const ergebnis of ergebnisse) {
       const { analyse, dateiName, base64, mime_type } = ergebnis;
 
@@ -617,6 +655,16 @@ export async function POST(request: NextRequest) {
         .from("bestellungen")
         .update(updateFields)
         .eq("id", bestellungId);
+
+      dokumenteGespeichert++;
+    }
+
+    // Rollback: Wenn keine Dokumente gespeichert und Bestellung neu erstellt wurde
+    if (dokumenteGespeichert === 0 && bestellungNeuErstellt) {
+      logError("/api/webhook/email", "Rollback: Keine Dokumente gespeichert, lösche neue Bestellung", { bestellungId });
+      await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
+      await supabase.from("bestellungen").delete().eq("id", bestellungId);
+      return NextResponse.json({ error: "Keine Dokumente konnten gespeichert werden" }, { status: 500 });
     }
 
     // === FEATURE 3: Anomalie-Erkennung bei Preisen ===
