@@ -93,28 +93,8 @@ export default async function ArchivPage() {
     projektStatsMap[order.projekt_id].volumen += Number(order.betrag) || 0;
   }
 
-  // Besteller sieht Projekte, bei denen er mindestens eine Bestellung hat
-  // (archiviert oder nicht — Projekt-Zugehörigkeit reicht)
-  let filteredProjekte = projekte || [];
-  if (istBesteller) {
-    // Zusätzlich alle Bestellungen des Bestellers mit projekt_id laden
-    const { data: bestellerProjektBestellungen } = await supabase
-      .from("bestellungen")
-      .select("projekt_id")
-      .eq("besteller_kuerzel", profil.kuerzel)
-      .not("projekt_id", "is", null);
-
-    const alleProjektIds = new Set<string>();
-    for (const b of bestellerProjektBestellungen || []) {
-      if (b.projekt_id) alleProjektIds.add(b.projekt_id);
-    }
-    // Auch IDs aus archivierten Orders hinzufügen
-    for (const id of bestellerProjektIds) {
-      alleProjektIds.add(id);
-    }
-
-    filteredProjekte = filteredProjekte.filter((p) => alleProjektIds.has(p.id));
-  }
+  // Alle archivierten/abgeschlossenen Projekte anzeigen (Admin + Besteller sehen alle)
+  const filteredProjekte = projekte || [];
 
   // SU-Map für Gewerk-Anreicherung
   const suMap: Record<string, { firma: string; gewerk: string | null }> = {};

@@ -179,7 +179,6 @@ export function ProjekteClient({
   const [formKundenId, setFormKundenId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [showArchiv, setShowArchiv] = useState(false);
   const [archivConfirmId, setArchivConfirmId] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
 
@@ -586,58 +585,21 @@ export function ProjekteClient({
         </div>
       )}
 
-      {/* Archiv Toggle */}
+      {/* Link zum Archiv */}
       {archiviert.length > 0 && (
         <div className="mt-8">
-          <button
-            onClick={() => setShowArchiv(!showArchiv)}
-            className="flex items-center gap-2 text-sm text-[#9a9a9a] hover:text-[#6b6b6b] transition-colors group"
+          <Link
+            href="/archiv"
+            className="flex items-center gap-2 text-sm text-[#9a9a9a] hover:text-[#570006] transition-colors group"
           >
-            <svg
-              className={`w-3.5 h-3.5 transition-transform duration-200 ${showArchiv ? "rotate-90" : ""}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+            </svg>
+            <span className="font-medium">{archiviert.length} archivierte Projekte im Archiv ansehen</span>
+            <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
-            <span className="font-medium">Archiviert / Abgeschlossen</span>
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#e8e6e3] text-[#6b6b6b]">{archiviert.length}</span>
-          </button>
-
-          {showArchiv && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-              {archiviert.map((p) => {
-                const s = stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 };
-                return (
-                  <div
-                    key={p.id}
-                    className="card p-4 border-l-4 opacity-75 hover:opacity-100 transition-opacity"
-                    style={{ borderLeftColor: p.farbe }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-headline text-sm text-[#6b6b6b] truncate">{p.name}</h3>
-                      {istAdmin ? (
-                        <StatusDropdown
-                          currentStatus={p.status}
-                          onSelect={(s) => handleStatusChange(p.id, s)}
-                          disabled={statusUpdating === p.id}
-                        />
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${getStatusCfg(p.status).bg} ${getStatusCfg(p.status).text} ${getStatusCfg(p.status).border}`}>
-                          <StatusIcon type={getStatusCfg(p.status).icon} className="w-2.5 h-2.5" />
-                          {p.status === "archiviert" ? "Archiviert" : getStatusCfg(p.status).label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-[#9a9a9a]">
-                      <span>{s.gesamt} Bestellungen</span>
-                      <span className="h-3 w-px bg-[#e8e6e3]" />
-                      <span className="font-mono-amount">{formatBetrag(s.volumen)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </Link>
         </div>
       )}
 
