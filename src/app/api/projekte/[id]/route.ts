@@ -47,7 +47,7 @@ export async function PUT(
     if (kunde !== undefined) updates.kunde = kunde?.trim() || null;
     if (farbe !== undefined) updates.farbe = ERLAUBTE_FARBEN.includes(farbe) ? farbe : "#570006";
     if (budget !== undefined) updates.budget = budget ? Number(budget) : null;
-    if (status !== undefined && ["aktiv", "abgeschlossen", "pausiert"].includes(status)) {
+    if (status !== undefined && ["aktiv", "abgeschlossen", "pausiert", "archiviert"].includes(status)) {
       updates.status = status;
     }
     if (adresse !== undefined) updates.adresse = typeof adresse === "string" ? adresse.trim() || null : null;
@@ -115,37 +115,17 @@ export async function DELETE(
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
-    // Prüfe ob Bestellungen zugeordnet sind
-    const { count } = await supabase
-      .from("bestellungen")
-      .select("*", { count: "exact", head: true })
-      .eq("projekt_id", id);
-
-    if (count && count > 0) {
-      // Soft-delete: archivieren statt löschen
-      const { error } = await supabase
-        .from("projekte")
-        .update({ status: "archiviert" })
-        .eq("id", id);
-
-      if (error) {
-        return NextResponse.json({ error: "Archivierung fehlgeschlagen" }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, archiviert: true, grund: `Hat ${count} Bestellung${count > 1 ? "en" : ""}` });
-    }
-
-    // Keine Bestellungen → echtes Löschen
+    // Immer Soft-Delete: Projekt archivieren (nie hart löschen)
     const { error } = await supabase
       .from("projekte")
-      .delete()
+      .update({ status: "archiviert" })
       .eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: "Löschen fehlgeschlagen" }, { status: 500 });
+      return NextResponse.json({ error: "Archivierung fehlgeschlagen" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, geloescht: true });
+    return NextResponse.json({ success: true, archiviert: true });
   } catch {
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }

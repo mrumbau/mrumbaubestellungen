@@ -14,24 +14,26 @@ export default async function ArchivPage() {
   const istBesteller = profil.rolle === "besteller";
 
   // Phase 1: Parallele Queries
+  // Archivierte Bestellungen: entweder explizit archiviert (archiviert_am)
+  // ODER bezahlt und einem archivierten/abgeschlossenen Projekt zugeordnet
   let materialQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id"
+      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
     )
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "material")
-    .order("bezahlt_am", { ascending: false })
+    .order("archiviert_am", { ascending: false })
     .limit(100);
 
   let suQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id"
+      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
     )
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "subunternehmer")
-    .order("bezahlt_am", { ascending: false })
+    .order("archiviert_am", { ascending: false })
     .limit(100);
 
   if (istBesteller) {
@@ -91,10 +93,27 @@ export default async function ArchivPage() {
     projektStatsMap[order.projekt_id].volumen += Number(order.betrag) || 0;
   }
 
-  // Besteller sieht nur Projekte mit eigenen bezahlten Orders
+  // Besteller sieht Projekte, bei denen er mindestens eine Bestellung hat
+  // (archiviert oder nicht — Projekt-Zugehörigkeit reicht)
   let filteredProjekte = projekte || [];
   if (istBesteller) {
-    filteredProjekte = filteredProjekte.filter((p) => bestellerProjektIds.has(p.id));
+    // Zusätzlich alle Bestellungen des Bestellers mit projekt_id laden
+    const { data: bestellerProjektBestellungen } = await supabase
+      .from("bestellungen")
+      .select("projekt_id")
+      .eq("besteller_kuerzel", profil.kuerzel)
+      .not("projekt_id", "is", null);
+
+    const alleProjektIds = new Set<string>();
+    for (const b of bestellerProjektBestellungen || []) {
+      if (b.projekt_id) alleProjektIds.add(b.projekt_id);
+    }
+    // Auch IDs aus archivierten Orders hinzufügen
+    for (const id of bestellerProjektIds) {
+      alleProjektIds.add(id);
+    }
+
+    filteredProjekte = filteredProjekte.filter((p) => alleProjektIds.has(p.id));
   }
 
   // SU-Map für Gewerk-Anreicherung

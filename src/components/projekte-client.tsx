@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatBetrag, formatDatum } from "@/lib/formatters";
@@ -31,12 +31,124 @@ const FARBEN = [
   { hex: "#0891b2", label: "Cyan" },
 ];
 
-const STATUS_LABELS: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  aktiv: { label: "Aktiv", bg: "bg-green-50", text: "text-green-700", border: "border-green-100" },
-  abgeschlossen: { label: "Abgeschlossen", bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
-  pausiert: { label: "Pausiert", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-100" },
-  archiviert: { label: "Archiviert", bg: "bg-red-50", text: "text-red-600", border: "border-red-100" },
-};
+const STATUS_OPTIONS = [
+  { value: "aktiv", label: "Aktiv", icon: "circle", color: "#059669", bg: "bg-green-50", text: "text-green-700", border: "border-green-100" },
+  { value: "pausiert", label: "Pausiert", icon: "pause", color: "#d97706", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-100" },
+  { value: "abgeschlossen", label: "Abgeschlossen", icon: "check", color: "#6b7280", bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
+  { value: "archiviert", label: "Archivieren", icon: "archive", color: "#dc2626", bg: "bg-red-50", text: "text-red-600", border: "border-red-100" },
+];
+
+function getStatusCfg(status: string) {
+  return STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
+}
+
+function StatusIcon({ type, className }: { type: string; className?: string }) {
+  const cls = className || "w-3 h-3";
+  switch (type) {
+    case "circle":
+      return (
+        <svg className={cls} viewBox="0 0 12 12" fill="currentColor">
+          <circle cx="6" cy="6" r="4" />
+        </svg>
+      );
+    case "pause":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      );
+    case "archive":
+      return (
+        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function StatusDropdown({
+  currentStatus,
+  onSelect,
+  disabled,
+}: {
+  currentStatus: string;
+  onSelect: (status: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const cfg = getStatusCfg(currentStatus);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        disabled={disabled}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border transition-all ${cfg.bg} ${cfg.text} ${cfg.border} ${disabled ? "opacity-50 cursor-not-allowed" : "hover:shadow-sm cursor-pointer"}`}
+      >
+        <StatusIcon type={cfg.icon} className="w-2.5 h-2.5" />
+        {cfg.value === "archiviert" ? "Archiviert" : cfg.label}
+        {!disabled && (
+          <svg className={`w-2.5 h-2.5 ml-0.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg shadow-lg border border-[#e8e6e3] py-1 min-w-[160px]">
+          {STATUS_OPTIONS.map((opt) => {
+            const isActive = opt.value === currentStatus;
+            return (
+              <button
+                key={opt.value}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  if (!isActive) onSelect(opt.value);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${
+                  isActive
+                    ? "bg-[#fafaf9] font-semibold text-[#1a1a1a]"
+                    : opt.value === "archiviert"
+                      ? "text-red-600 hover:bg-red-50"
+                      : "text-[#6b6b6b] hover:bg-[#fafaf9]"
+                }`}
+              >
+                <span style={{ color: opt.color }}>
+                  <StatusIcon type={opt.icon} className="w-3.5 h-3.5" />
+                </span>
+                <span>{opt.value === "archiviert" ? "Archivieren" : opt.label}</span>
+                {isActive && (
+                  <svg className="w-3 h-3 ml-auto text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ProjekteClient({
   projekte: initialProjekte,
@@ -55,11 +167,11 @@ export function ProjekteClient({
   const [formBeschreibung, setFormBeschreibung] = useState("");
   const [formFarbe, setFormFarbe] = useState("#570006");
   const [formBudget, setFormBudget] = useState("");
-  const [formStatus, setFormStatus] = useState("aktiv");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showArchiv, setShowArchiv] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [archivConfirmId, setArchivConfirmId] = useState<string | null>(null);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
 
   const aktive = projekte.filter((p) => p.status !== "archiviert" && p.status !== "abgeschlossen");
   const archiviert = projekte.filter((p) => p.status === "archiviert" || p.status === "abgeschlossen");
@@ -71,7 +183,6 @@ export function ProjekteClient({
     setFormBeschreibung("");
     setFormFarbe("#570006");
     setFormBudget("");
-    setFormStatus("aktiv");
     setError("");
   }, []);
 
@@ -81,7 +192,6 @@ export function ProjekteClient({
     setFormBeschreibung(p.beschreibung || "");
     setFormFarbe(p.farbe);
     setFormBudget(p.budget?.toString() || "");
-    setFormStatus(p.status);
     setShowForm(true);
   }, []);
 
@@ -99,7 +209,6 @@ export function ProjekteClient({
         beschreibung: formBeschreibung.trim() || null,
         farbe: formFarbe,
         budget: formBudget ? Number(formBudget) : null,
-        ...(editId ? { status: formStatus } : {}),
       };
 
       const res = await fetch(
@@ -135,28 +244,44 @@ export function ProjekteClient({
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const handleStatusChange = async (projektId: string, newStatus: string) => {
+    // Archivieren braucht Bestätigung
+    if (newStatus === "archiviert") {
+      setArchivConfirmId(projektId);
+      return;
+    }
+    await updateStatus(projektId, newStatus);
+  };
+
+  const updateStatus = async (projektId: string, newStatus: string) => {
+    setStatusUpdating(projektId);
     try {
-      const res = await fetch(`/api/projekte/${deleteId}`, { method: "DELETE" });
+      const res = await fetch(`/api/projekte/${projektId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
       if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.archiviert) {
-          setProjekte((prev) => prev.map((p) => (p.id === deleteId ? { ...p, status: "archiviert" } : p)));
-        } else {
-          setProjekte((prev) => prev.filter((p) => p.id !== deleteId));
-        }
-        setDeleteId(null);
+        const data = await res.json();
+        const saved = data.projekt as Projekt;
+        setProjekte((prev) => prev.map((p) => (p.id === projektId ? saved : p)));
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Projekt konnte nicht gelöscht werden");
-        setDeleteId(null);
+        setError(data.error || "Status konnte nicht geändert werden");
       }
     } catch {
-      setError("Netzwerkfehler beim Löschen");
-      setDeleteId(null);
+      setError("Netzwerkfehler");
+    } finally {
+      setStatusUpdating(null);
     }
+  };
+
+  const handleArchivConfirm = async () => {
+    if (!archivConfirmId) return;
+    await updateStatus(archivConfirmId, "archiviert");
+    setArchivConfirmId(null);
   };
 
   const getBudgetPercent = (projektId: string, budget: number | null) => {
@@ -204,7 +329,7 @@ export function ProjekteClient({
         </div>
       )}
 
-      {/* Form Modal */}
+      {/* Form Modal — no status field, status is managed via card dropdown */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
@@ -276,21 +401,6 @@ export function ProjekteClient({
                 />
               </div>
 
-              {editId && (
-                <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Status</label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
-                  >
-                    <option value="aktiv">Aktiv</option>
-                    <option value="pausiert">Pausiert</option>
-                    <option value="abgeschlossen">Abgeschlossen</option>
-                  </select>
-                </div>
-              )}
-
               {error && <p className="text-red-600 text-sm">{error}</p>}
             </div>
 
@@ -336,7 +446,6 @@ export function ProjekteClient({
           {aktive.map((p) => {
             const s = stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 };
             const budgetPercent = getBudgetPercent(p.id, p.budget);
-            const statusCfg = STATUS_LABELS[p.status] || STATUS_LABELS.aktiv;
 
             return (
               <div
@@ -357,11 +466,13 @@ export function ProjekteClient({
                       <h3 className="font-headline text-base text-[#1a1a1a] truncate">{p.name}</h3>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                      <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
-                        {statusCfg.label}
-                      </span>
-                      {istAdmin && (
-                        <div className="flex">
+                      {istAdmin ? (
+                        <>
+                          <StatusDropdown
+                            currentStatus={p.status}
+                            onSelect={(s) => handleStatusChange(p.id, s)}
+                            disabled={statusUpdating === p.id}
+                          />
                           <button
                             onClick={() => openEdit(p)}
                             className="p-1 rounded hover:bg-[#f5f4f2] transition-colors text-[#c4c2bf] hover:text-[#570006]"
@@ -371,16 +482,12 @@ export function ProjekteClient({
                               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => setDeleteId(p.id)}
-                            className="p-1 rounded hover:bg-red-50 transition-colors text-[#c4c2bf] hover:text-red-600"
-                            title="Archivieren"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
-                            </svg>
-                          </button>
-                        </div>
+                        </>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${getStatusCfg(p.status).bg} ${getStatusCfg(p.status).text} ${getStatusCfg(p.status).border}`}>
+                          <StatusIcon type={getStatusCfg(p.status).icon} className="w-2.5 h-2.5" />
+                          {getStatusCfg(p.status).label}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -460,7 +567,7 @@ export function ProjekteClient({
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
-            <span className="font-medium">Archiviert</span>
+            <span className="font-medium">Archiviert / Abgeschlossen</span>
             <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#e8e6e3] text-[#6b6b6b]">{archiviert.length}</span>
           </button>
 
@@ -468,34 +575,32 @@ export function ProjekteClient({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
               {archiviert.map((p) => {
                 const s = stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 };
-                const statusCfg = STATUS_LABELS[p.status] || STATUS_LABELS.archiviert;
                 return (
                   <div
                     key={p.id}
-                    className="card p-4 border-l-4"
+                    className="card p-4 border-l-4 opacity-75 hover:opacity-100 transition-opacity"
                     style={{ borderLeftColor: p.farbe }}
                   >
                     <div className="flex items-center justify-between">
                       <h3 className="font-headline text-sm text-[#6b6b6b] truncate">{p.name}</h3>
-                      <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
-                        {statusCfg.label}
-                      </span>
+                      {istAdmin ? (
+                        <StatusDropdown
+                          currentStatus={p.status}
+                          onSelect={(s) => handleStatusChange(p.id, s)}
+                          disabled={statusUpdating === p.id}
+                        />
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${getStatusCfg(p.status).bg} ${getStatusCfg(p.status).text} ${getStatusCfg(p.status).border}`}>
+                          <StatusIcon type={getStatusCfg(p.status).icon} className="w-2.5 h-2.5" />
+                          {p.status === "archiviert" ? "Archiviert" : getStatusCfg(p.status).label}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-2 text-xs text-[#9a9a9a]">
                       <span>{s.gesamt} Bestellungen</span>
                       <span className="h-3 w-px bg-[#e8e6e3]" />
                       <span className="font-mono-amount">{formatBetrag(s.volumen)}</span>
                     </div>
-                    {istAdmin && (
-                      <div className="mt-2 pt-2 border-t border-[#f0eeeb]">
-                        <button
-                          onClick={() => openEdit(p)}
-                          className="text-[10px] text-[#9a9a9a] hover:text-[#570006] font-medium transition-colors"
-                        >
-                          Wiederherstellen
-                        </button>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -504,13 +609,13 @@ export function ProjekteClient({
         </div>
       )}
 
-      {/* Delete Confirm */}
+      {/* Archiv Confirm */}
       <ConfirmDialog
-        open={!!deleteId}
-        onCancel={() => setDeleteId(null)}
-        onConfirm={handleDelete}
+        open={!!archivConfirmId}
+        onCancel={() => setArchivConfirmId(null)}
+        onConfirm={handleArchivConfirm}
         title="Projekt archivieren?"
-        message="Das Projekt wird archiviert. Bestehende Bestellungen behalten ihre Zuordnung."
+        message="Das Projekt wird archiviert und erscheint im Archiv. Bestehende Bestellungen behalten ihre Zuordnung. Du kannst den Status jederzeit zurücksetzen."
         confirmLabel="Archivieren"
       />
     </div>
