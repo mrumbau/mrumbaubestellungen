@@ -1442,7 +1442,7 @@ export function EinstellungenClient({
           <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Testdaten</h2>
         </div>
         <p className="text-sm text-[#9a9a9a] mb-4">
-          Testbestellungen anlegen um die Webapp zu testen. Testdaten sind an der Bestellnummer erkennbar (TEST-...) und können jederzeit vollständig entfernt werden.
+          Testdaten anlegen um alle Features zu testen: Material- &amp; Subunternehmer-Bestellungen, Versandstatus mit Tracking, Projekte, Kunden und unzugeordnete Einträge. Erkennbar an TEST-Präfix, jederzeit löschbar.
         </p>
 
         {testdatenMsg && (
@@ -1499,7 +1499,7 @@ export function EinstellungenClient({
       <ConfirmDialog
         open={testdatenConfirm === "create"}
         title="Testdaten anlegen"
-        message="8 Testbestellungen mit Dokumenten, Abgleichen und Kommentaren anlegen?"
+        message="12 Testbestellungen, 2 Projekte und 3 Kunden mit allen Dokumenttypen anlegen?"
         confirmLabel="Anlegen"
         onConfirm={() => handleTestdaten("create")}
         onCancel={() => setTestdatenConfirm(null)}
