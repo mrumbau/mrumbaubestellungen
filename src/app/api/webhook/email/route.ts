@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email_betreff, email_absender, email_datum, anhaenge, secret } =
+    const { email_betreff, email_absender, email_datum, secret } =
       body;
 
     // Secret prüfen
@@ -68,20 +68,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Betreff zu lang (max. 500 Zeichen)" }, { status: 400 });
     }
 
-    if (anhaenge && Array.isArray(anhaenge)) {
-      for (const anhang of anhaenge) {
-        if (anhang.mime_type && !isAllowedMimeType(anhang.mime_type)) {
-          return NextResponse.json(
-            { error: `MIME-Typ nicht erlaubt: ${anhang.mime_type}` },
-            { status: 400 }
-          );
-        }
-        if (anhang.base64 && !isFileSizeOk(anhang.base64)) {
-          return NextResponse.json(
-            { error: "Anhang zu groß (max. 4 MB)" },
-            { status: 413 }
-          );
-        }
+    // Anhänge normalisieren: Make.com/Microsoft 365 sendet contentBytes/contentType,
+    // unser internes Format nutzt base64/mime_type
+    const rawAnhaenge = body.anhaenge || [];
+    const anhaenge: { name: string; base64: string; mime_type: string }[] = Array.isArray(rawAnhaenge)
+      ? rawAnhaenge
+          .map((a: Record<string, unknown>) => ({
+            name: (a.name as string) || "anhang",
+            base64: (a.base64 as string) || (a.contentBytes as string) || "",
+            mime_type: (a.mime_type as string) || (a.contentType as string) || "application/octet-stream",
+          }))
+          .filter((a: { base64: string }) => a.base64.length > 0)
+      : [];
+
+    for (const anhang of anhaenge) {
+      if (!isAllowedMimeType(anhang.mime_type)) {
+        return NextResponse.json(
+          { error: `MIME-Typ nicht erlaubt: ${anhang.mime_type}` },
+          { status: 400 }
+        );
+      }
+      if (!isFileSizeOk(anhang.base64)) {
+        return NextResponse.json(
+          { error: "Anhang zu groß (max. 4 MB)" },
+          { status: 413 }
+        );
       }
     }
 
