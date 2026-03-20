@@ -32,6 +32,7 @@ export function DashboardUnzugeordnet({
   const [aktionId, setAktionId] = useState<string | null>(null);
   const [aktionModus, setAktionModus] = useState<AktionModus>(null);
   const [loading, setLoading] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
 
   if (items.length === 0) return null;
 
@@ -47,6 +48,7 @@ export function DashboardUnzugeordnet({
 
   async function zuordnen(bestellungId: string, kuerzel: string) {
     setLoading(true);
+    setFehler(null);
     try {
       const res = await fetch("/api/bestellungen/zuordnen", {
         method: "POST",
@@ -56,6 +58,8 @@ export function DashboardUnzugeordnet({
       if (res.ok) {
         setItems((prev) => prev.filter((b) => b.id !== bestellungId));
         closeAktion();
+      } else {
+        setFehler("Zuordnung fehlgeschlagen");
       }
     } finally {
       setLoading(false);
@@ -64,6 +68,7 @@ export function DashboardUnzugeordnet({
 
   async function verwerfen(bestellungId: string) {
     setLoading(true);
+    setFehler(null);
     try {
       const res = await fetch("/api/bestellungen/verwerfen", {
         method: "POST",
@@ -73,6 +78,8 @@ export function DashboardUnzugeordnet({
       if (res.ok) {
         setItems((prev) => prev.filter((b) => b.id !== bestellungId));
         closeAktion();
+      } else {
+        setFehler("Verwerfen fehlgeschlagen");
       }
     } finally {
       setLoading(false);
@@ -83,30 +90,32 @@ export function DashboardUnzugeordnet({
     setLoading(true);
     try {
       // 1. Domain auf Blacklist setzen
-      await fetch("/api/blacklist", {
+      const blRes = await fetch("/api/blacklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ muster: domain, typ: "domain", grund: "Manuell blockiert vom Dashboard" }),
       });
+      if (!blRes.ok) {
+        setFehler("Blacklist-Eintrag fehlgeschlagen");
+        return;
+      }
 
-      // 2. Diese Bestellung verwerfen
-      await fetch("/api/bestellungen/verwerfen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bestellung_id: bestellungId }),
-      });
-
-      // 3. Alle anderen Bestellungen mit gleicher Domain auch entfernen
-      const gleicheDomain = items.filter((b) => b.haendler_name === domain && b.id !== bestellungId);
-      for (const b of gleicheDomain) {
-        await fetch("/api/bestellungen/verwerfen", {
+      // 2. Alle Bestellungen mit dieser Domain verwerfen (inkl. aktuelle)
+      const zuVerwerfen = items.filter((b) => b.haendler_name === domain);
+      const verworfenIds: string[] = [];
+      for (const b of zuVerwerfen) {
+        const res = await fetch("/api/bestellungen/verwerfen", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ bestellung_id: b.id }),
         });
+        if (res.ok) verworfenIds.push(b.id);
       }
 
-      setItems((prev) => prev.filter((b) => b.haendler_name !== domain));
+      // UI aktualisieren — nur erfolgreich verworfene entfernen
+      if (verworfenIds.length > 0) {
+        setItems((prev) => prev.filter((b) => !verworfenIds.includes(b.id)));
+      }
       closeAktion();
     } finally {
       setLoading(false);
@@ -132,6 +141,10 @@ export function DashboardUnzugeordnet({
       <p className="text-xs text-[#9a9a9a] mb-3">
         Diese Bestellungen konnten keinem Besteller zugeordnet werden.
       </p>
+
+      {fehler && (
+        <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mb-2">{fehler}</p>
+      )}
 
       <div className="space-y-2">
         {items.map((b) => (

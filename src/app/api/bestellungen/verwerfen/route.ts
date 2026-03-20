@@ -47,7 +47,11 @@ export async function POST(request: NextRequest) {
     await supabase.from("abgleiche").delete().eq("bestellung_id", bestellung_id);
     await supabase.from("kommentare").delete().eq("bestellung_id", bestellung_id);
     await supabase.from("dokumente").delete().eq("bestellung_id", bestellung_id);
-    await supabase.from("bestellungen").delete().eq("id", bestellung_id);
+
+    const { error: delError } = await supabase.from("bestellungen").delete().eq("id", bestellung_id);
+    if (delError) {
+      return NextResponse.json({ error: "Bestellung konnte nicht gelöscht werden" }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch {
