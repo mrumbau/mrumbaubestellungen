@@ -175,7 +175,8 @@ export async function POST(request: NextRequest) {
     }
 
     const haendlerDomain = haendler?.domain || extractDomain(email_absender);
-    const emailText = body.email_text || body.email_body || "";
+    const rawEmailText = body.email_text || body.email_body || "";
+    const emailText = stripHtml(rawEmailText);
 
     // =====================================================================
     // SUBUNTERNEHMER-ERKENNUNG (vor Besteller-Zuordnung)
@@ -766,17 +767,23 @@ export async function POST(request: NextRequest) {
       dokumenteGespeichert++;
     }
 
-    // E-Mail-Body als zusätzliches Dokument analysieren wenn:
-    // - Substanzieller Body-Text vorhanden (>100 Zeichen)
-    // - Kein bekanntes Dokument aus Anhängen gespeichert wurde
-    // Typischer Fall: Böttcher AG — Bestelldetails im Body, Anhang nur Widerrufsformular
-    if (dokumenteGespeichert === 0 && emailText && emailText.length > 100) {
+    // E-Mail-Body IMMER zusätzlich analysieren wenn substanziell (>100 Zeichen).
+    // Viele Lieferanten senden Bestelldetails im Body (Böttcher, Amazon, etc.)
+    // UND ein PDF als Anhang (z.B. AGB, Widerrufsformular, oder dieselbe Rechnung).
+    // → Body-Analyse fängt Fälle ab wo der Anhang irrelevant ist oder
+    //   zusätzliche Infos enthält (z.B. Bestellnummer nur im Body).
+    const gespeicherteTypen = ergebnisse
+      .filter((e) => bekannteTypen.includes(e.analyse.typ))
+      .map((e) => e.analyse.typ);
+
+    if (emailText && emailText.length > 100) {
       try {
         const bodyBase64 = Buffer.from(emailText.slice(0, 10000)).toString("base64");
         const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
 
-        if (bekannteTypen.includes(bodyAnalyse.typ)) {
-          logInfo("/api/webhook/email", `E-Mail-Body als ${bodyAnalyse.typ} erkannt (kein nutzbarer Anhang)`, { bestellungId });
+        // Nur speichern wenn: bekannter Typ UND dieser Typ noch nicht aus Anhängen vorhanden
+        if (bekannteTypen.includes(bodyAnalyse.typ) && !gespeicherteTypen.includes(bodyAnalyse.typ)) {
+          logInfo("/api/webhook/email", `E-Mail-Body als ${bodyAnalyse.typ} erkannt (ergänzend zu ${dokumenteGespeichert} Anhang-Dokumenten)`, { bestellungId });
 
           const { error: bodyInsertError } = await supabase.from("dokumente").insert({
             bestellung_id: bestellungId,
@@ -824,6 +831,23 @@ export async function POST(request: NextRequest) {
             await supabase.from("bestellungen").update(bodyUpdateFields).eq("id", bestellungId);
             dokumenteGespeichert++;
           }
+        } else if (bekannteTypen.includes(bodyAnalyse.typ)) {
+          // Typ schon aus Anhang vorhanden, aber Body hat evtl. fehlende Felder
+          // → Bestellnummer/Betrag ergänzen wenn in Anhang-Analyse fehlend
+          const anhangAnalyse = ergebnisse.find((e) => e.analyse.typ === bodyAnalyse.typ)?.analyse;
+          if (anhangAnalyse) {
+            const ergaenzung: Record<string, unknown> = {};
+            if (!anhangAnalyse.bestellnummer && bodyAnalyse.bestellnummer && bodyAnalyse.typ !== "versandbestaetigung") {
+              ergaenzung.bestellnummer = bodyAnalyse.bestellnummer;
+            }
+            if (!anhangAnalyse.gesamtbetrag && bodyAnalyse.gesamtbetrag && bodyAnalyse.typ !== "versandbestaetigung") {
+              ergaenzung.betrag = bodyAnalyse.gesamtbetrag;
+            }
+            if (Object.keys(ergaenzung).length > 0) {
+              await supabase.from("bestellungen").update(ergaenzung).eq("id", bestellungId);
+              logInfo("/api/webhook/email", "Body-Analyse ergänzt fehlende Felder aus Anhang", { bestellungId, ergaenzung });
+            }
+          }
         }
       } catch (bodyErr) {
         logError("/api/webhook/email", "Body-Analyse fehlgeschlagen", bodyErr);
@@ -833,11 +857,37 @@ export async function POST(request: NextRequest) {
     // Wenn keine Dokumente gespeichert: E-Mail-Body als Fallback nutzen oder Rollback
     if (dokumenteGespeichert === 0) {
       if (emailText && emailText.length > 20) {
-        // E-Mail ohne Anhänge aber mit Body-Text: Typ anhand Betreff erkennen
+        // E-Mail ohne Anhänge aber mit Body-Text: Typ anhand Betreff + Body-Keywords erkennen
+        const betreffLower = (email_betreff || "").toLowerCase();
+        const bodyLower = emailText.toLowerCase();
+        const suchText = betreffLower + " " + bodyLower.slice(0, 500);
+
         const versandKeywords = ["versand", "versendet", "sendungsverfolgung", "tracking", "shipped", "dispatch", "paket", "zustellung", "unterwegs", "sendung"];
-        const istVersandEmail = versandKeywords.some((k) => email_betreff.toLowerCase().includes(k));
-        const fallbackTyp = istVersandEmail ? "versandbestaetigung" : "bestellbestaetigung";
-        const fallbackFlag = istVersandEmail ? "hat_versandbestaetigung" : "hat_bestellbestaetigung";
+        const rechnungKeywords = ["rechnung", "invoice", "zahlungsaufforderung", "fällig", "rechnungsnummer", "zahlungsziel"];
+        const lieferscheinKeywords = ["lieferschein", "lieferung", "delivery note", "warenausgang", "versandbestätigung ihrer lieferung"];
+        const bestellungKeywords = ["bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "auftragsbestaetigung", "order confirmation", "ihre bestellung", "bestellung eingegangen"];
+
+        let fallbackTyp: string;
+        let fallbackFlag: string;
+
+        if (versandKeywords.some((k) => suchText.includes(k))) {
+          fallbackTyp = "versandbestaetigung";
+          fallbackFlag = "hat_versandbestaetigung";
+        } else if (rechnungKeywords.some((k) => suchText.includes(k))) {
+          fallbackTyp = "rechnung";
+          fallbackFlag = "hat_rechnung";
+        } else if (lieferscheinKeywords.some((k) => suchText.includes(k))) {
+          fallbackTyp = "lieferschein";
+          fallbackFlag = "hat_lieferschein";
+        } else if (bestellungKeywords.some((k) => suchText.includes(k))) {
+          fallbackTyp = "bestellbestaetigung";
+          fallbackFlag = "hat_bestellbestaetigung";
+        } else {
+          fallbackTyp = "bestellbestaetigung";
+          fallbackFlag = "hat_bestellbestaetigung";
+        }
+
+        const istVersandEmail = fallbackTyp === "versandbestaetigung";
 
         logInfo("/api/webhook/email", `Keine Anhänge, aber E-Mail-Body vorhanden – speichere als ${fallbackTyp}`, { bestellungId });
 
@@ -1260,6 +1310,27 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/** HTML-Tags, Entities und überflüssigen Whitespace aus E-Mail-Body entfernen */
+function stripHtml(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")     // <style>-Blöcke entfernen
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")    // <script>-Blöcke entfernen
+    .replace(/<!--[\s\S]*?-->/g, "")                      // HTML-Kommentare
+    .replace(/<br\s*\/?>/gi, "\n")                         // <br> → Zeilenumbruch
+    .replace(/<\/(?:p|div|tr|li|h[1-6])>/gi, "\n")        // Block-Elemente → Zeilenumbruch
+    .replace(/<[^>]+>/g, "")                               // Alle übrigen Tags entfernen
+    .replace(/&nbsp;/gi, " ")                              // &nbsp;
+    .replace(/&amp;/gi, "&")                               // &amp;
+    .replace(/&lt;/gi, "<")                                // &lt;
+    .replace(/&gt;/gi, ">")                                // &gt;
+    .replace(/&quot;/gi, '"')                               // &quot;
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))  // Numerische Entities
+    .replace(/[ \t]+/g, " ")                               // Mehrfache Leerzeichen → eines
+    .replace(/\n{3,}/g, "\n\n")                            // Max 2 Zeilenumbrüche
+    .trim();
 }
 
 function extractDomain(email: string): string {
