@@ -251,6 +251,8 @@ export function BestelldetailClient({
   const [openWidgetId, setOpenWidgetId] = useState<string | null>(null);
   const toggleWidget = (id: string) => setOpenWidgetId((prev) => (prev === id ? null : id));
   const [openAbweichungen, setOpenAbweichungen] = useState<Record<number, boolean>>({});
+  const [showVerwerfenDialog, setShowVerwerfenDialog] = useState(false);
+  const [verwerfenLoading, setVerwerfenLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -315,6 +317,28 @@ export function BestelldetailClient({
       else { setActionError("Projekt-Bestätigung fehlgeschlagen"); }
     } catch { setActionError("Netzwerkfehler bei der Projekt-Bestätigung"); } finally {
       setVorschlagLoading(false);
+    }
+  }
+
+  async function handleVerwerfen() {
+    setVerwerfenLoading(true);
+    try {
+      const res = await fetch("/api/bestellungen/verwerfen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_id: bestellung.id }),
+      });
+      if (res.ok) {
+        router.push("/bestellungen");
+      } else {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.error || "Bestellung konnte nicht verworfen werden");
+      }
+    } catch {
+      setActionError("Netzwerkfehler beim Verwerfen");
+    } finally {
+      setVerwerfenLoading(false);
+      setShowVerwerfenDialog(false);
     }
   }
 
@@ -1060,6 +1084,21 @@ export function BestelldetailClient({
             <button type="submit" disabled={loading || !kommentarText.trim()} aria-label="Kommentar senden" className="px-3 py-2 text-xs font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors">Senden</button>
           </form>
         </CollapsibleWidget>
+
+        {/* Bestellung verwerfen — nur für Admin */}
+        {profil.rolle === "admin" && (
+          <button
+            type="button"
+            onClick={() => setShowVerwerfenDialog(true)}
+            disabled={verwerfenLoading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-200 hover:border-red-600 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+            Bestellung verwerfen
+          </button>
+        )}
       </>
     );
   }
@@ -1451,6 +1490,21 @@ export function BestelldetailClient({
                 <button type="submit" disabled={loading || !kommentarText.trim()} className="px-4 py-2 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors">Senden</button>
               </form>
             </div>
+
+            {/* Bestellung verwerfen — nur für Admin (mobile) */}
+            {profil.rolle === "admin" && (
+              <button
+                type="button"
+                onClick={() => setShowVerwerfenDialog(true)}
+                disabled={verwerfenLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-200 hover:border-red-600 rounded-xl transition-colors disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+                Bestellung verwerfen
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1482,6 +1536,14 @@ export function BestelldetailClient({
         confirmLabel="Freigeben"
         onConfirm={handleFreigabe}
         onCancel={() => setShowFreigabeDialog(false)}
+      />
+      <ConfirmDialog
+        open={showVerwerfenDialog}
+        title="Bestellung verwerfen"
+        message="Diese Bestellung und alle zugehörigen Dokumente, Abgleiche und Kommentare unwiderruflich löschen?"
+        confirmLabel="Endgültig löschen"
+        onConfirm={handleVerwerfen}
+        onCancel={() => setShowVerwerfenDialog(false)}
       />
     </>
   );
