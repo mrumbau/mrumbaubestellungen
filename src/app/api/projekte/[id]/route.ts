@@ -39,12 +39,12 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, beschreibung, kunde, farbe, budget, status, adresse, adresse_keywords } = body;
+    const { name, beschreibung, kunde, kunden_id, farbe, budget, status, adresse, adresse_keywords } = body;
 
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name.trim();
     if (beschreibung !== undefined) updates.beschreibung = beschreibung?.trim() || null;
-    if (kunde !== undefined) updates.kunde = kunde?.trim() || null;
+    if (kunde !== undefined && kunden_id === undefined) updates.kunde = kunde?.trim() || null;
     if (farbe !== undefined) updates.farbe = ERLAUBTE_FARBEN.includes(farbe) ? farbe : "#570006";
     if (budget !== undefined) updates.budget = budget ? Number(budget) : null;
     if (status !== undefined && ["aktiv", "abgeschlossen", "pausiert", "archiviert"].includes(status)) {
@@ -53,6 +53,25 @@ export async function PUT(
     if (adresse !== undefined) updates.adresse = typeof adresse === "string" ? adresse.trim() || null : null;
     if (adresse_keywords !== undefined && Array.isArray(adresse_keywords)) {
       updates.adresse_keywords = adresse_keywords.filter((k: unknown) => typeof k === "string" && k.trim().length > 0).map((k: string) => k.trim().toLowerCase());
+    }
+
+    // kunden_id Handling mit Denormalisierung
+    if (kunden_id !== undefined) {
+      if (kunden_id === null) {
+        updates.kunden_id = null;
+        updates.kunde = null;
+      } else {
+        if (!isValidUUID(kunden_id)) {
+          return NextResponse.json({ error: "Ungültige Kunden-ID" }, { status: 400 });
+        }
+        updates.kunden_id = kunden_id;
+        const { data: kundeRow } = await supabase
+          .from("kunden")
+          .select("name")
+          .eq("id", kunden_id)
+          .single();
+        if (kundeRow) updates.kunde = kundeRow.name;
+      }
     }
 
     if (Object.keys(updates).length === 0) {
@@ -75,6 +94,17 @@ export async function PUT(
       await supabase
         .from("bestellungen")
         .update({ projekt_name: updates.name as string })
+        .eq("projekt_id", id);
+    }
+
+    // Kunden-Denormalisierung in Bestellungen
+    if (kunden_id !== undefined) {
+      await supabase
+        .from("bestellungen")
+        .update({
+          kunden_id: (updates.kunden_id as string | null) || null,
+          kunden_name: (updates.kunde as string | null) || null,
+        })
         .eq("projekt_id", id);
     }
 

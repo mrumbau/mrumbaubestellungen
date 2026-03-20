@@ -12,13 +12,14 @@ export default async function ProjektePage() {
 
   const supabase = await createServerSupabaseClient();
 
-  // Projekte + Bestellungs-Stats parallel
-  const [{ data: projekte }, { data: bestellStats }] = await Promise.all([
+  // Projekte + Bestellungs-Stats + Kunden parallel
+  const [{ data: projekte }, { data: bestellStats }, { data: kunden }] = await Promise.all([
     supabase.from("projekte").select("*").order("created_at", { ascending: false }),
     supabase
       .from("bestellungen")
       .select("projekt_id, status, betrag")
       .not("projekt_id", "is", null),
+    supabase.from("kunden").select("id, name").order("name"),
   ]);
 
   // Stats pro Projekt aggregieren
@@ -39,6 +40,7 @@ export default async function ProjektePage() {
     <ProjekteClient
       projekte={projekte || []}
       stats={statsMap}
+      kunden={kunden || []}
       istAdmin={profil.rolle === "admin" || profil.rolle === "besteller"}
     />
   );

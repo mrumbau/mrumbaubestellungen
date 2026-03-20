@@ -86,7 +86,7 @@ export function DashboardNeueKunden({
                   OK
                 </button>
                 <Link
-                  href="/einstellungen"
+                  href="/kunden"
                   className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

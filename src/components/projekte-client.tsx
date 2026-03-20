@@ -13,7 +13,14 @@ interface Projekt {
   status: string;
   farbe: string;
   budget: number | null;
+  kunden_id: string | null;
+  kunde: string | null;
   created_at: string;
+}
+
+interface KundeOption {
+  id: string;
+  name: string;
 }
 
 interface ProjektStats {
@@ -153,10 +160,12 @@ function StatusDropdown({
 export function ProjekteClient({
   projekte: initialProjekte,
   stats,
+  kunden,
   istAdmin,
 }: {
   projekte: Projekt[];
   stats: Record<string, ProjektStats>;
+  kunden: KundeOption[];
   istAdmin: boolean;
 }) {
   const router = useRouter();
@@ -167,6 +176,7 @@ export function ProjekteClient({
   const [formBeschreibung, setFormBeschreibung] = useState("");
   const [formFarbe, setFormFarbe] = useState("#570006");
   const [formBudget, setFormBudget] = useState("");
+  const [formKundenId, setFormKundenId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [showArchiv, setShowArchiv] = useState(false);
@@ -183,6 +193,7 @@ export function ProjekteClient({
     setFormBeschreibung("");
     setFormFarbe("#570006");
     setFormBudget("");
+    setFormKundenId(null);
     setError("");
   }, []);
 
@@ -192,6 +203,7 @@ export function ProjekteClient({
     setFormBeschreibung(p.beschreibung || "");
     setFormFarbe(p.farbe);
     setFormBudget(p.budget?.toString() || "");
+    setFormKundenId(p.kunden_id);
     setShowForm(true);
   }, []);
 
@@ -209,6 +221,7 @@ export function ProjekteClient({
         beschreibung: formBeschreibung.trim() || null,
         farbe: formFarbe,
         budget: formBudget ? Number(formBudget) : null,
+        kunden_id: formKundenId || null,
       };
 
       const res = await fetch(
@@ -389,6 +402,20 @@ export function ProjekteClient({
               </div>
 
               <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Kunde</label>
+                <select
+                  value={formKundenId || ""}
+                  onChange={(e) => setFormKundenId(e.target.value || null)}
+                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                >
+                  <option value="">Kein Kunde zugeordnet</option>
+                  {kunden.map((k) => (
+                    <option key={k.id} value={k.id}>{k.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Budget (EUR)</label>
                 <input
                   type="number"
@@ -491,6 +518,11 @@ export function ProjekteClient({
                       )}
                     </div>
                   </div>
+
+                  {/* Kunde */}
+                  {p.kunde && (
+                    <p className="text-[11px] text-[#9a9a9a] mt-0.5 truncate">{p.kunde}</p>
+                  )}
 
                   {/* Description */}
                   {p.beschreibung && (

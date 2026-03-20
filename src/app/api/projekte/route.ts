@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, beschreibung, kunde, farbe, budget } = body;
+    const { name, beschreibung, kunde, kunden_id, farbe, budget } = body;
 
     if (!name || typeof name !== "string" || name.trim().length < 2) {
       return NextResponse.json({ error: "Name muss mindestens 2 Zeichen lang sein" }, { status: 400 });
@@ -65,8 +66,19 @@ export async function POST(request: NextRequest) {
     if (beschreibung && typeof beschreibung === "string" && beschreibung.trim().length > 2000) {
       return NextResponse.json({ error: "Beschreibung darf maximal 2000 Zeichen lang sein" }, { status: 400 });
     }
-    if (kunde && typeof kunde === "string" && kunde.trim().length > 200) {
-      return NextResponse.json({ error: "Kunde darf maximal 200 Zeichen lang sein" }, { status: 400 });
+    if (kunden_id && !isValidUUID(kunden_id)) {
+      return NextResponse.json({ error: "Ungültige Kunden-ID" }, { status: 400 });
+    }
+
+    // Kundenname aus kunden-Tabelle nachschlagen (für Denormalisierung)
+    let kundenName = kunde?.trim() || null;
+    if (kunden_id) {
+      const { data: kundeRow } = await supabase
+        .from("kunden")
+        .select("name")
+        .eq("id", kunden_id)
+        .single();
+      if (kundeRow) kundenName = kundeRow.name;
     }
 
     const safeFarbe = ERLAUBTE_FARBEN.includes(farbe) ? farbe : "#570006";
@@ -76,7 +88,8 @@ export async function POST(request: NextRequest) {
       .insert({
         name: name.trim(),
         beschreibung: beschreibung?.trim() || null,
-        kunde: kunde?.trim() || null,
+        kunde: kundenName,
+        kunden_id: kunden_id || null,
         farbe: safeFarbe,
         budget: budget ? Number(budget) : null,
         erstellt_von: user.id,
