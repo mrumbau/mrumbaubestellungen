@@ -31,6 +31,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Absender-Blacklist aus DB prüfen
+    {
+      const blClient = createServiceClient();
+      const { data: blacklist } = await blClient
+        .from("email_blacklist")
+        .select("muster, typ");
+
+      if (blacklist && blacklist.length > 0) {
+        const absenderLower = (email_absender || "").toLowerCase();
+        const absenderAdresseRaw = absenderLower.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] || "";
+        const absenderDomainRaw = absenderAdresseRaw.split("@")[1] || "";
+
+        const istBlockiert = blacklist.some((bl) => {
+          const muster = bl.muster.toLowerCase();
+          if (bl.typ === "adresse") return absenderAdresseRaw === muster;
+          // typ === "domain": Domain oder Subdomain matchen
+          return absenderDomainRaw === muster || absenderDomainRaw.endsWith("." + muster);
+        });
+
+        if (istBlockiert) {
+          return NextResponse.json({ success: true, skipped: true, reason: "blacklisted_sender" });
+        }
+      }
+    }
+
     // Globales Rate-Limiting (über alle Instanzen)
     const globalRl = await checkGlobalRateLimit("webhook-email", 60, 60_000);
     if (!globalRl.allowed) {
