@@ -565,8 +565,9 @@ export function KundenClient({
         onCancel={() => setDeleteConfirm(null)}
         onConfirm={handleDelete}
         title="Kunde löschen?"
-        message={`„${deleteConfirm?.name}" wird gelöscht. Zugehörige Projekte und Bestellungen behalten ihre Daten, verlieren aber die Kunden-Verknüpfung.`}
+        message={`„${deleteConfirm?.name}" wird gelöscht. Kunden mit zugeordneten Projekten oder Bestellungen können nicht gelöscht werden — zuerst die Zuordnungen entfernen.`}
         confirmLabel="Löschen"
+        variant="danger"
       />
     </div>
   );

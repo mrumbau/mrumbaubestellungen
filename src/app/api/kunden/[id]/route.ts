@@ -42,7 +42,13 @@ export async function PUT(
     const { name, kuerzel, adresse, email, telefon, notizen, keywords, farbe } = body;
 
     const updates: Record<string, unknown> = {};
-    if (name !== undefined) updates.name = name?.trim() || null;
+    if (name !== undefined) {
+      const trimmed = name?.trim();
+      if (!trimmed || trimmed.length < 2) {
+        return NextResponse.json({ error: "Name muss mindestens 2 Zeichen lang sein" }, { status: 400 });
+      }
+      updates.name = trimmed;
+    }
     if (kuerzel !== undefined) updates.kuerzel = kuerzel?.trim() || null;
     if (adresse !== undefined) updates.adresse = adresse?.trim() || null;
     if (email !== undefined) updates.email = email?.trim() || null;
@@ -68,6 +74,18 @@ export async function PUT(
 
     if (error || !kunde) {
       return NextResponse.json({ error: "Kunde nicht gefunden" }, { status: 404 });
+    }
+
+    // Denormalisierung: Name-Änderung auf projekte + bestellungen propagieren
+    if (updates.name && typeof updates.name === "string") {
+      await supabase
+        .from("projekte")
+        .update({ kunde: updates.name })
+        .eq("kunden_id", id);
+      await supabase
+        .from("bestellungen")
+        .update({ kunden_name: updates.name })
+        .eq("kunden_id", id);
     }
 
     return NextResponse.json({ kunde });
