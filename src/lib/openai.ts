@@ -151,25 +151,33 @@ export async function analysiereDokument(
   base64: string,
   mimeType: string
 ): Promise<DokumentAnalyse> {
-  // PDFs werden als file-Content gesendet, Bilder als image_url
+  // PDFs werden als file-Content gesendet, Bilder als image_url, Text als text
   const isPdf = mimeType === "application/pdf";
+  const isText = mimeType.startsWith("text/");
 
-  const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = isPdf
+  const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = isText
     ? [
         {
-          type: "file",
-          file: {
-            filename: "dokument.pdf",
-            file_data: `data:application/pdf;base64,${base64}`,
-          },
-        } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart,
-      ]
-    : [
-        {
-          type: "image_url",
-          image_url: { url: `data:${mimeType};base64,${base64}` },
+          type: "text",
+          text: Buffer.from(base64, "base64").toString("utf-8"),
         },
-      ];
+      ]
+    : isPdf
+      ? [
+          {
+            type: "file",
+            file: {
+              filename: "dokument.pdf",
+              file_data: `data:application/pdf;base64,${base64}`,
+            },
+          } as unknown as OpenAI.Chat.Completions.ChatCompletionContentPart,
+        ]
+      : [
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${base64}` },
+          },
+        ];
 
   const response = await withRetry(() =>
     openai.chat.completions.create({

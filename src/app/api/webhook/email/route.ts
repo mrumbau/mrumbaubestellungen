@@ -668,8 +668,16 @@ export async function POST(request: NextRequest) {
 
     // Dokumente speichern (mit Rollback bei Fehler)
     let dokumenteGespeichert = 0;
+    const bekannteTypen = ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"];
+
     for (const ergebnis of ergebnisse) {
       const { analyse, dateiName, base64, mime_type } = ergebnis;
+
+      // Unbekannte Dokumenttypen überspringen (z.B. Widerrufsformulare, AGB)
+      if (!bekannteTypen.includes(analyse.typ)) {
+        logInfo("/api/webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`, { bestellungId });
+        continue;
+      }
 
       const storagePfad = `${bestellungId}/${analyse.typ}_${dateiName}`;
       const buffer = Buffer.from(base64, "base64");
@@ -680,7 +688,7 @@ export async function POST(request: NextRequest) {
         logError("/api/webhook/email", `Storage upload fehlgeschlagen: ${storagePfad}`, uploadError);
       }
 
-      await supabase.from("dokumente").insert({
+      const { error: insertError } = await supabase.from("dokumente").insert({
         bestellung_id: bestellungId,
         typ: analyse.typ,
         quelle: "email",
@@ -698,6 +706,11 @@ export async function POST(request: NextRequest) {
         lieferdatum: analyse.lieferdatum,
         iban: analyse.iban,
       });
+
+      if (insertError) {
+        logError("/api/webhook/email", `Dokument-Insert fehlgeschlagen: typ="${analyse.typ}"`, insertError);
+        continue;
+      }
 
       const updateFields: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
@@ -743,6 +756,70 @@ export async function POST(request: NextRequest) {
         .eq("id", bestellungId);
 
       dokumenteGespeichert++;
+    }
+
+    // E-Mail-Body als zusätzliches Dokument analysieren wenn:
+    // - Substanzieller Body-Text vorhanden (>100 Zeichen)
+    // - Kein bekanntes Dokument aus Anhängen gespeichert wurde
+    // Typischer Fall: Böttcher AG — Bestelldetails im Body, Anhang nur Widerrufsformular
+    if (dokumenteGespeichert === 0 && emailText && emailText.length > 100) {
+      try {
+        const bodyBase64 = Buffer.from(emailText.slice(0, 10000)).toString("base64");
+        const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
+
+        if (bekannteTypen.includes(bodyAnalyse.typ)) {
+          logInfo("/api/webhook/email", `E-Mail-Body als ${bodyAnalyse.typ} erkannt (kein nutzbarer Anhang)`, { bestellungId });
+
+          const { error: bodyInsertError } = await supabase.from("dokumente").insert({
+            bestellung_id: bestellungId,
+            typ: bodyAnalyse.typ,
+            quelle: "email",
+            storage_pfad: null,
+            email_betreff,
+            email_absender,
+            email_datum,
+            ki_roh_daten: bodyAnalyse,
+            bestellnummer_erkannt: bodyAnalyse.bestellnummer,
+            artikel: bodyAnalyse.artikel,
+            gesamtbetrag: bodyAnalyse.gesamtbetrag,
+            netto: bodyAnalyse.netto,
+            mwst: bodyAnalyse.mwst,
+            faelligkeitsdatum: bodyAnalyse.faelligkeitsdatum,
+            lieferdatum: bodyAnalyse.lieferdatum,
+            iban: bodyAnalyse.iban,
+          });
+
+          if (!bodyInsertError) {
+            const bodyUpdateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+            if (bodyAnalyse.typ === "bestellbestaetigung") bodyUpdateFields.hat_bestellbestaetigung = true;
+            else if (bodyAnalyse.typ === "lieferschein") bodyUpdateFields.hat_lieferschein = true;
+            else if (bodyAnalyse.typ === "rechnung") bodyUpdateFields.hat_rechnung = true;
+            else if (bodyAnalyse.typ === "versandbestaetigung") {
+              bodyUpdateFields.hat_versandbestaetigung = true;
+              if (bodyAnalyse.tracking_nummer) bodyUpdateFields.tracking_nummer = bodyAnalyse.tracking_nummer;
+              if (bodyAnalyse.versanddienstleister) bodyUpdateFields.versanddienstleister = bodyAnalyse.versanddienstleister;
+              if (bodyAnalyse.tracking_url) {
+                bodyUpdateFields.tracking_url = bodyAnalyse.tracking_url;
+              } else if (bodyAnalyse.versanddienstleister && bodyAnalyse.tracking_nummer) {
+                const autoUrl = buildTrackingUrl(bodyAnalyse.versanddienstleister, bodyAnalyse.tracking_nummer);
+                if (autoUrl) bodyUpdateFields.tracking_url = autoUrl;
+              }
+              if (bodyAnalyse.voraussichtliche_lieferung) bodyUpdateFields.voraussichtliche_lieferung = bodyAnalyse.voraussichtliche_lieferung;
+            }
+
+            if (bodyAnalyse.typ !== "versandbestaetigung") {
+              if (bodyAnalyse.bestellnummer) bodyUpdateFields.bestellnummer = bodyAnalyse.bestellnummer;
+              if (bodyAnalyse.gesamtbetrag) bodyUpdateFields.betrag = bodyAnalyse.gesamtbetrag;
+            }
+
+            await supabase.from("bestellungen").update(bodyUpdateFields).eq("id", bestellungId);
+            dokumenteGespeichert++;
+          }
+        }
+      } catch (bodyErr) {
+        logError("/api/webhook/email", "Body-Analyse fehlgeschlagen", bodyErr);
+      }
     }
 
     // Wenn keine Dokumente gespeichert: E-Mail-Body als Fallback nutzen oder Rollback
