@@ -19,6 +19,7 @@ export const DOKUMENT_CONFIG: Record<Bestellungsart, DokumentAnforderung[]> = {
     { flag: "hat_bestellbestaetigung", typ: "bestellbestaetigung", label: "Bestätigung", kurzLabel: "Best.", erforderlich: true },
     { flag: "hat_lieferschein", typ: "lieferschein", label: "Lieferschein", kurzLabel: "LS", erforderlich: true },
     { flag: "hat_rechnung", typ: "rechnung", label: "Rechnung", kurzLabel: "RE", erforderlich: true },
+    { flag: "hat_versandbestaetigung", typ: "versandbestaetigung", label: "Versand", kurzLabel: "VS", erforderlich: false },
   ],
   subunternehmer: [
     { flag: "hat_rechnung", typ: "rechnung", label: "Rechnung", kurzLabel: "RE", erforderlich: true },
@@ -66,7 +67,7 @@ export async function updateBestellungStatus(
 ): Promise<string> {
   const { data: bestellung } = await supabase
     .from("bestellungen")
-    .select("status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis")
+    .select("status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
     .eq("id", bestellungId)
     .maybeSingle();
 

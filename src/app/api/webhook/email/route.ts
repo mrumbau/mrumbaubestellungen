@@ -5,6 +5,7 @@ import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/valid
 import { checkRateLimit, checkGlobalRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
+import { buildTrackingUrl } from "@/lib/tracking-urls";
 
 // Vercel Serverless: max 60 Sekunden Laufzeit
 export const maxDuration = 60;
@@ -712,13 +713,28 @@ export async function POST(request: NextRequest) {
         updateFields.hat_aufmass = true;
       } else if (analyse.typ === "leistungsnachweis") {
         updateFields.hat_leistungsnachweis = true;
+      } else if (analyse.typ === "versandbestaetigung") {
+        updateFields.hat_versandbestaetigung = true;
+        if (analyse.tracking_nummer) updateFields.tracking_nummer = analyse.tracking_nummer;
+        if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;
+        if (analyse.tracking_url) {
+          updateFields.tracking_url = analyse.tracking_url;
+        } else if (analyse.versanddienstleister && analyse.tracking_nummer) {
+          const autoUrl = buildTrackingUrl(analyse.versanddienstleister, analyse.tracking_nummer);
+          if (autoUrl) updateFields.tracking_url = autoUrl;
+        }
+        if (analyse.voraussichtliche_lieferung) updateFields.voraussichtliche_lieferung = analyse.voraussichtliche_lieferung;
       }
 
-      if (analyse.bestellnummer) {
-        updateFields.bestellnummer = analyse.bestellnummer;
-      }
-      if (analyse.gesamtbetrag) {
-        updateFields.betrag = analyse.gesamtbetrag;
+      // Versandbestätigungen: Bestellnummer/Betrag NICHT überschreiben
+      // (Sendungsnummern ≠ Bestellnummern, Versandkosten ≠ Bestellbetrag)
+      if (analyse.typ !== "versandbestaetigung") {
+        if (analyse.bestellnummer) {
+          updateFields.bestellnummer = analyse.bestellnummer;
+        }
+        if (analyse.gesamtbetrag) {
+          updateFields.betrag = analyse.gesamtbetrag;
+        }
       }
 
       await supabase
@@ -732,18 +748,54 @@ export async function POST(request: NextRequest) {
     // Wenn keine Dokumente gespeichert: E-Mail-Body als Fallback nutzen oder Rollback
     if (dokumenteGespeichert === 0) {
       if (emailText && emailText.length > 20) {
-        // E-Mail ohne Anhänge aber mit Body-Text: als Info-Dokument speichern
-        logInfo("/api/webhook/email", "Keine Anhänge, aber E-Mail-Body vorhanden – speichere als email_text Dokument", { bestellungId });
+        // E-Mail ohne Anhänge aber mit Body-Text: Typ anhand Betreff erkennen
+        const versandKeywords = ["versand", "versendet", "sendungsverfolgung", "tracking", "shipped", "dispatch", "paket", "zustellung", "unterwegs", "sendung"];
+        const istVersandEmail = versandKeywords.some((k) => email_betreff.toLowerCase().includes(k));
+        const fallbackTyp = istVersandEmail ? "versandbestaetigung" : "bestellbestaetigung";
+        const fallbackFlag = istVersandEmail ? "hat_versandbestaetigung" : "hat_bestellbestaetigung";
+
+        logInfo("/api/webhook/email", `Keine Anhänge, aber E-Mail-Body vorhanden – speichere als ${fallbackTyp}`, { bestellungId });
+
+        // Bei Versand-Emails: Tracking-Daten aus Body extrahieren
+        const bestellungUpdate: Record<string, unknown> = { [fallbackFlag]: true, updated_at: new Date().toISOString() };
+        if (istVersandEmail) {
+          // Einfache Regex-Extraktion aus Body-Text (schneller als GPT-Call)
+          const trackingMatch = emailText.match(/(?:sendungsnummer|tracking[- ]?(?:nr|nummer|number|id|code)|paketnummer|trackingnr)[:\s]*([A-Z0-9]{8,30})/i);
+          if (trackingMatch) bestellungUpdate.tracking_nummer = trackingMatch[1];
+
+          const carrierPatterns = [
+            { name: "DHL", pattern: /\bDHL\b/i },
+            { name: "DPD", pattern: /\bDPD\b/i },
+            { name: "Hermes", pattern: /\bHermes\b/i },
+            { name: "UPS", pattern: /\bUPS\b/i },
+            { name: "GLS", pattern: /\bGLS\b/i },
+            { name: "FedEx", pattern: /\bFedEx\b/i },
+            { name: "Deutsche Post", pattern: /\bDeutsche Post\b/i },
+            { name: "GO!", pattern: /\bGO!\b/i },
+            { name: "Trans-o-flex", pattern: /\bTrans-o-flex\b/i },
+          ];
+          const carrier = carrierPatterns.find((c) => c.pattern.test(emailText));
+          if (carrier) bestellungUpdate.versanddienstleister = carrier.name;
+
+          // Tracking-URL aus Body extrahieren
+          const urlMatch = emailText.match(/https?:\/\/[^\s"'<>]+(?:track|sendung|parcel|verfolg)[^\s"'<>]*/i);
+          if (urlMatch) {
+            bestellungUpdate.tracking_url = urlMatch[0];
+          } else if (carrier && trackingMatch) {
+            const autoUrl = buildTrackingUrl(carrier.name, trackingMatch[1]);
+            if (autoUrl) bestellungUpdate.tracking_url = autoUrl;
+          }
+        }
 
         await supabase.from("dokumente").insert({
           bestellung_id: bestellungId,
-          typ: "bestellbestaetigung",
+          typ: fallbackTyp,
           quelle: "email",
           storage_pfad: null,
           email_betreff,
           email_absender,
           email_datum,
-          ki_roh_daten: { typ: "bestellbestaetigung", quelle: "email_body", email_text: emailText.slice(0, 5000) },
+          ki_roh_daten: { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000) },
           bestellnummer_erkannt: null,
           artikel: null,
           gesamtbetrag: null,
@@ -756,7 +808,7 @@ export async function POST(request: NextRequest) {
 
         await supabase
           .from("bestellungen")
-          .update({ hat_bestellbestaetigung: true, updated_at: new Date().toISOString() })
+          .update(bestellungUpdate)
           .eq("id", bestellungId);
 
         dokumenteGespeichert = 1;

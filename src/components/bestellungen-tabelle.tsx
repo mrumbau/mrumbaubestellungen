@@ -21,6 +21,7 @@ interface Bestellung {
   hat_rechnung: boolean;
   bestellungsart?: Bestellungsart;
   subunternehmer_name?: string | null;
+  hat_versandbestaetigung?: boolean;
   projekt_id: string | null;
   projekt_name: string | null;
   created_at: string;
@@ -273,6 +274,7 @@ export function BestellungenTabelle({
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">Best.</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">LS</th>
               <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">RE</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">VS</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Status</th>
               <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
               <th className="px-4 py-3.5 w-10"></th>
@@ -377,6 +379,15 @@ export function BestellungenTabelle({
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} /></div>
+                    </td>
+                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
+                      <div className="flex justify-center">
+                        {isSub ? (
+                          <span className="text-[#d4d1cc]">&ndash;</span>
+                        ) : (
+                          <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <span

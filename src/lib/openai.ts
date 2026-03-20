@@ -36,7 +36,7 @@ function safeParseGptJson<T>(text: string, fallback: T): T {
 }
 
 export interface DokumentAnalyse {
-  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "unbekannt";
+  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "versandbestaetigung" | "unbekannt";
   vermutete_bestellungsart?: "material" | "subunternehmer";
   bestellnummer: string | null;
   haendler: string | null;
@@ -52,6 +52,10 @@ export interface DokumentAnalyse {
   lieferadressen?: string[];
   volltext?: string;
   parse_fehler?: boolean;
+  tracking_nummer?: string | null;
+  versanddienstleister?: string | null;
+  tracking_url?: string | null;
+  voraussichtliche_lieferung?: string | null;
 }
 
 export interface AbgleichErgebnis {
@@ -94,11 +98,12 @@ export interface WochenzusammenfassungErgebnis {
 const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma analysiert.
 Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück, kein Text davor oder danach.
 
-Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, rechnung, aufmass, oder leistungsnachweis.
+Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, rechnung, aufmass, leistungsnachweis, oder versandbestaetigung.
 
 Hinweise zur Typ-Erkennung:
 - "aufmass" = Aufmaß, Massenermittlung, Mengenaufstellung eines Subunternehmers (z.B. "Aufmaß Elektroinstallation", "Massenermittlung Trockenbau")
 - "leistungsnachweis" = Leistungsnachweis, Stundennachweis, Rapportzettel, Abnahmeprotokoll eines Subunternehmers
+- "versandbestaetigung" = Versandbestätigung, Versandmitteilung, Sendungsverfolgung, Tracking-Info, Paketversand-Benachrichtigung, Lieferankündigung. Enthält typischerweise Sendungsnummer/Tracking-Nummer und Versanddienstleister (DHL, DPD, Hermes, UPS, GLS, FedEx, Deutsche Post, GO!, Trans-o-flex).
 
 Erkenne außerdem die "vermutete_bestellungsart":
 - "material" = Warenlieferung von einem Händler/Lieferant (Produkte, Baumaterial, Werkzeug)
@@ -124,12 +129,20 @@ Gib folgende Struktur zurück:
   "iban": "DE12 3456 7890 1234 5678 90",
   "konfidenz": 0.95,
   "lieferadressen": ["Kernstraße 14, 81671 München"],
-  "volltext": "Kompletter erkannter Text des Dokuments..."
+  "volltext": "Kompletter erkannter Text des Dokuments...",
+  "tracking_nummer": null,
+  "versanddienstleister": null,
+  "tracking_url": null,
+  "voraussichtliche_lieferung": null
 }
 
 Extrahiere auch:
 - "lieferadressen": Array aller Lieferadressen, Versandadressen und Empfängeradressen die du im Dokument findest (Lieferschein-Header, Rechnungsadresse, Versandadresse). Leeres Array wenn keine gefunden.
 - "volltext": Der gesamte erkannte Text des Dokuments als String.
+- "tracking_nummer": Sendungsnummer / Tracking-Nummer / Paketnummer falls vorhanden (nur bei Versandbestätigungen).
+- "versanddienstleister": Name des Versanddienstleisters (z.B. "DHL", "DPD", "Hermes", "UPS", "GLS"). Normalisiert als Kurzname.
+- "tracking_url": Direkte URL zur Sendungsverfolgung falls im Dokument vorhanden.
+- "voraussichtliche_lieferung": Voraussichtliches Lieferdatum im Format "YYYY-MM-DD" falls angegeben.
 
 Falls ein Feld nicht erkennbar ist, setze null.`;
 

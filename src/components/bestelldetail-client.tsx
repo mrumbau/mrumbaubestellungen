@@ -77,6 +77,11 @@ interface Bestellung {
   projekt_vorschlag_methode: string | null;
   projekt_vorschlag_begruendung: string | null;
   projekt_bestaetigt: boolean;
+  hat_versandbestaetigung?: boolean;
+  tracking_nummer?: string | null;
+  versanddienstleister?: string | null;
+  tracking_url?: string | null;
+  voraussichtliche_lieferung?: string | null;
 }
 
 // ─── Icons ──────────────────────────────────────────────
@@ -109,6 +114,14 @@ function RechnungIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+    </svg>
+  );
+}
+
+function VersandIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-2.25-1.313M21 7.5v2.25m0-2.25l-2.25 1.313M3 7.5l2.25-1.313M3 7.5l2.25 1.313M3 7.5v2.25m9 3l2.25-1.313M12 12.75l-2.25-1.313M12 12.75V15m0 6.75l2.25-1.313M12 21.75V19.5m0 2.25l-2.25-1.313m0-16.875L12 2.25l2.25 1.313M21 14.25v2.25l-2.25 1.313m-13.5 0L3 16.5v-2.25" />
     </svg>
   );
 }
@@ -173,6 +186,7 @@ const DOK_ICON_MAP: Record<string, (props: { className?: string }) => React.JSX.
   rechnung: RechnungIcon,
   aufmass: RechnungIcon,
   leistungsnachweis: LieferscheinIcon,
+  versandbestaetigung: VersandIcon,
 };
 
 function getDokTabs(bestellungsart: Bestellungsart | null) {
@@ -259,7 +273,7 @@ export function BestelldetailClient({
   const timeline = useMemo(() => {
     const items: { zeit: string; label: string; typ: "dok" | "abgleich" | "freigabe" | "kommentar"; farbe: string }[] = [];
     for (const d of dokumente) {
-      const typLabels: Record<string, string> = { bestellbestaetigung: "Bestellbestätigung", lieferschein: "Lieferschein", rechnung: "Rechnung", aufmass: "Aufmaß", leistungsnachweis: "Leistungsnachweis" };
+      const typLabels: Record<string, string> = { bestellbestaetigung: "Bestellbestätigung", lieferschein: "Lieferschein", rechnung: "Rechnung", aufmass: "Aufmaß", leistungsnachweis: "Leistungsnachweis", versandbestaetigung: "Versandbestätigung" };
       items.push({ zeit: d.created_at, label: `${typLabels[d.typ] || d.typ} eingegangen`, typ: "dok", farbe: "#2563eb" });
     }
     if (abgleich) items.push({ zeit: abgleich.erstellt_am, label: `KI-Abgleich: ${abgleich.status === "ok" ? "OK" : "Abweichung"}`, typ: "abgleich", farbe: abgleich.status === "ok" ? "#16a34a" : "#dc2626" });
@@ -717,6 +731,42 @@ export function BestelldetailClient({
               {subunternehmer.telefon && <p className="text-[11px] text-[#9a9a9a]">{subunternehmer.telefon}</p>}
               {subunternehmer.email && <p className="text-[11px] text-[#9a9a9a]">{subunternehmer.email}</p>}
             </div>
+          </div>
+        )}
+
+        {/* ── Versand-Info ─────────────────────────── */}
+        {aktuelleArt === "material" && bestellung.hat_versandbestaetigung && (
+          <div className="card p-4 border-l-[3px] border-l-[#8b5cf6]">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-md bg-violet-50 flex items-center justify-center">
+                <VersandIcon className="w-3.5 h-3.5 text-[#8b5cf6]" />
+              </div>
+              <span className="text-[10px] font-bold text-[#8b5cf6] tracking-widest uppercase">Versand</span>
+            </div>
+            {bestellung.versanddienstleister && (
+              <p className="text-sm font-medium text-[#1a1a1a]">{bestellung.versanddienstleister}</p>
+            )}
+            {bestellung.tracking_nummer && (
+              <p className="text-xs text-[#6b6b6b] font-mono-amount mt-1">{bestellung.tracking_nummer}</p>
+            )}
+            {bestellung.tracking_url && (
+              <a
+                href={bestellung.tracking_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-[#570006] hover:underline mt-2"
+              >
+                Sendung verfolgen
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
+            )}
+            {bestellung.voraussichtliche_lieferung && (
+              <p className="text-[10px] text-[#9a9a9a] mt-1.5">
+                Voraussichtlich: {new Date(bestellung.voraussichtliche_lieferung).toLocaleDateString("de-DE")}
+              </p>
+            )}
           </div>
         )}
 
