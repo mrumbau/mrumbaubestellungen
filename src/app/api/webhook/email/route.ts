@@ -496,23 +496,57 @@ export async function POST(request: NextRequest) {
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
     } else {
-      // 2. Suche per Signal (erwartet-Status)
-      const { data: erwartet } = signal
-        ? await supabase
+      // 2. Suche per Signal (erwartet-Status) — mehrere Strategien
+      let erwartetBestellung: { id: string } | null = null;
+
+      if (signal) {
+        // 2a. Exakter haendler_name Match
+        const { data: erwartetExakt } = await supabase
+          .from("bestellungen")
+          .select("id")
+          .eq("besteller_kuerzel", bestellerKuerzel)
+          .eq("status", "erwartet")
+          .eq("haendler_name", haendler?.name || haendlerDomain)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        erwartetBestellung = erwartetExakt?.[0] || null;
+
+        // 2b. Fallback: haendler_id Match (falls Händler umbenannt wurde)
+        if (!erwartetBestellung && haendler?.id) {
+          const { data: erwartetById } = await supabase
             .from("bestellungen")
             .select("id")
             .eq("besteller_kuerzel", bestellerKuerzel)
             .eq("status", "erwartet")
-            .eq(
-              "haendler_name",
-              haendler?.name || haendlerDomain
-            )
+            .eq("haendler_id", haendler.id)
             .order("created_at", { ascending: false })
-            .limit(1)
-        : { data: null };
+            .limit(1);
+          erwartetBestellung = erwartetById?.[0] || null;
+        }
 
-      if (erwartet?.[0]) {
-        bestellungId = erwartet[0].id;
+        // 2c. Fallback: Domain im haendler_name (z.B. "bueromarkt-ag.de" als Name)
+        if (!erwartetBestellung && haendlerDomain) {
+          const { data: erwartetByDomain } = await supabase
+            .from("bestellungen")
+            .select("id")
+            .eq("besteller_kuerzel", bestellerKuerzel)
+            .eq("status", "erwartet")
+            .eq("haendler_name", haendlerDomain)
+            .order("created_at", { ascending: false })
+            .limit(1);
+          erwartetBestellung = erwartetByDomain?.[0] || null;
+        }
+      }
+
+      if (erwartetBestellung) {
+        bestellungId = erwartetBestellung.id;
+        // Händlername aktualisieren falls veraltet
+        if (haendler?.name) {
+          await supabase
+            .from("bestellungen")
+            .update({ haendler_name: haendler.name, haendler_id: haendler.id })
+            .eq("id", bestellungId);
+        }
       } else {
         // 3. Neue Bestellung anlegen – bei Bestellnummer-Konflikt existierende verwenden
         // KI-Fallback: vermutete_bestellungsart aus Dokumentanalyse
@@ -670,12 +704,63 @@ export async function POST(request: NextRequest) {
       dokumenteGespeichert++;
     }
 
-    // Rollback: Wenn keine Dokumente gespeichert und Bestellung neu erstellt wurde
-    if (dokumenteGespeichert === 0 && bestellungNeuErstellt) {
-      logError("/api/webhook/email", "Rollback: Keine Dokumente gespeichert, lösche neue Bestellung", { bestellungId });
-      await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
-      await supabase.from("bestellungen").delete().eq("id", bestellungId);
-      return NextResponse.json({ error: "Keine Dokumente konnten gespeichert werden" }, { status: 500 });
+    // Wenn keine Dokumente gespeichert: E-Mail-Body als Fallback nutzen oder Rollback
+    if (dokumenteGespeichert === 0) {
+      if (emailText && emailText.length > 20) {
+        // E-Mail ohne Anhänge aber mit Body-Text: als Info-Dokument speichern
+        logInfo("/api/webhook/email", "Keine Anhänge, aber E-Mail-Body vorhanden – speichere als email_text Dokument", { bestellungId });
+
+        await supabase.from("dokumente").insert({
+          bestellung_id: bestellungId,
+          typ: "bestellbestaetigung",
+          quelle: "email",
+          storage_pfad: null,
+          email_betreff,
+          email_absender,
+          email_datum,
+          ki_roh_daten: { typ: "bestellbestaetigung", quelle: "email_body", email_text: emailText.slice(0, 5000) },
+          bestellnummer_erkannt: null,
+          artikel: null,
+          gesamtbetrag: null,
+          netto: null,
+          mwst: null,
+          faelligkeitsdatum: null,
+          lieferdatum: null,
+          iban: null,
+        });
+
+        await supabase
+          .from("bestellungen")
+          .update({ hat_bestellbestaetigung: true, updated_at: new Date().toISOString() })
+          .eq("id", bestellungId);
+
+        dokumenteGespeichert = 1;
+      } else if (bestellungNeuErstellt) {
+        // Weder Anhänge noch Body → Rollback nur wenn neue Bestellung
+        logError("/api/webhook/email", "Rollback: Keine Dokumente und kein E-Mail-Body", {
+          bestellungId, email_absender, email_betreff, anhaenge_count: anhaenge.length,
+        });
+
+        await supabase.from("webhook_logs").insert({
+          typ: "email",
+          status: "error",
+          bestellung_id: bestellungId,
+          fehler_text: `Rollback: Keine Dokumente gespeichert. Anhänge: ${anhaenge.length}, Body-Länge: ${emailText.length}. Absender: ${email_absender}, Betreff: ${email_betreff}`,
+        });
+
+        await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
+        await supabase.from("bestellungen").delete().eq("id", bestellungId);
+        return NextResponse.json({
+          error: "Keine Dokumente konnten gespeichert werden",
+          debug: {
+            anhaenge_empfangen: anhaenge.length,
+            email_text_laenge: emailText.length,
+            email_absender,
+            email_betreff,
+          },
+        }, { status: 500 });
+      }
+      // Wenn !bestellungNeuErstellt und kein Body → existierende Bestellung bleibt unverändert, kein Fehler
     }
 
     // === FEATURE 3: Anomalie-Erkennung bei Preisen ===
