@@ -32,6 +32,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Vorfilter von Make.com: Keyword-basierte Klassifikation (ja/nein/unklar)
+    // Bei "nein" sofort abweisen — spart GPT-Kosten
+    const vorfilter = body.vorfilter || "";
+    if (vorfilter === "nein") {
+      logInfo("/api/webhook/email", "Vorfilter: als irrelevant erkannt", { email_betreff, email_absender });
+      return NextResponse.json({ success: true, skipped: true, reason: "vorfilter_nein" });
+    }
+
     // Absender-Blacklist aus DB prüfen
     {
       const blClient = createServiceClient();
