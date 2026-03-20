@@ -557,7 +557,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
 
   const row1Stats = statCards.filter((s) => s.row === 1 && isStatVisible(s.id));
   const row2Stats = statCards.filter((s) => s.row === 2 && isStatVisible(s.id));
-  const bestellerEntries = Object.entries(bestellerStats);
+  // UNBEKANNT rausfiltern (wird im Unzugeordnet-Widget angezeigt)
+  const bestellerEntries = Object.entries(bestellerStats).filter(([k]) => k !== "UNBEKANNT");
 
   // Map kuerzel → name
   const bestellerNameMap = new Map(bestellerListe.map((b) => [b.kuerzel, b.name]));
@@ -839,9 +840,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                           {kuerzel}
                         </div>
                         <div className="flex-1 min-w-0">
-                          {name && (
-                            <p className="text-sm font-medium text-[#1a1a1a] truncate">{name}</p>
-                          )}
+                          <p className="text-sm font-medium text-[#1a1a1a] truncate">{name || kuerzel}</p>
                           <div className="flex items-baseline gap-1">
                             <p className="font-mono-amount text-xl font-bold text-[#1a1a1a]">{count}</p>
                             <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wide">Bestellungen</p>
