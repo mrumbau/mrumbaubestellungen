@@ -19,9 +19,15 @@ export function checkCsrf(request: NextRequest): boolean {
     return ALLOWED_ORIGINS.some((allowed) => origin === allowed);
   }
 
-  // Fallback: Referer-Header prüfen
+  // Fallback: Referer-Header prüfen (URL parsen für exakten Host-Vergleich)
   if (referer) {
-    return ALLOWED_ORIGINS.some((allowed) => referer.startsWith(allowed));
+    try {
+      const refererUrl = new URL(referer);
+      const refererOrigin = refererUrl.origin;
+      return ALLOWED_ORIGINS.some((allowed) => refererOrigin === allowed);
+    } catch {
+      return false;
+    }
   }
 
   // Kein Origin/Referer = unsicher, ablehnen

@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Keine gültige Bestellungs-ID" }, { status: 400 });
     }
 
+    if (ids.length > 50) {
+      return NextResponse.json({ error: "Maximal 50 Bestellungen pro Anfrage" }, { status: 400 });
+    }
+
     const supabase = createServiceClient();
 
     // Besteller dürfen nur eigene Bestellungen verwerfen
@@ -74,7 +78,12 @@ export async function POST(request: NextRequest) {
       await supabase.from("dokumente").delete().eq("bestellung_id", id);
     }
 
-    const { error: delError } = await supabase.from("bestellungen").delete().in("id", ids);
+    // Defense-in-depth: Besteller-Filter auch im DELETE (zusätzlich zum Check oben)
+    let deleteQuery = supabase.from("bestellungen").delete().in("id", ids);
+    if (profil!.rolle === "besteller") {
+      deleteQuery = deleteQuery.eq("besteller_kuerzel", profil!.kuerzel);
+    }
+    const { error: delError } = await deleteQuery;
     if (delError) {
       return NextResponse.json({ error: "Bestellungen konnten nicht gelöscht werden" }, { status: 500 });
     }

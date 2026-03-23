@@ -70,9 +70,9 @@ export async function checkGlobalRateLimit(
       .gte("created_at", since);
 
     if (error) {
-      // Bei DB-Fehler: durchlassen (fail-open) aber loggen
+      // Bei DB-Fehler: sperren (fail-closed) — sicherer als durchlassen
       logError("rate-limit", "Globales Rate-Limit-Check fehlgeschlagen", error);
-      return { allowed: true, count: 0 };
+      return { allowed: false, count: maxRequests };
     }
 
     const currentCount = count || 0;
@@ -89,8 +89,8 @@ export async function checkGlobalRateLimit(
 
     return { allowed: true, count: currentCount + 1 };
   } catch {
-    // Fail-open: bei Fehler durchlassen
-    return { allowed: true, count: 0 };
+    // Fail-closed: bei Fehler sperren
+    return { allowed: false, count: maxRequests };
   }
 }
 

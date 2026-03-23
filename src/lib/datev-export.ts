@@ -1,6 +1,15 @@
 // DATEV Buchungsstapel Export – Utility-Bibliothek
 // Format: EXTF Version 700, Semicolon-separiert, UTF-8 mit BOM
 
+/** Sanitize CSV-Feld: interne Anführungszeichen escapen + Formula-Injection verhindern */
+function csvSafe(value: string): string {
+  // Formula-Injection: Zeichen die Excel als Formel interpretiert entfernen
+  let safe = value.replace(/^[=+\-@\t\r]/g, "'");
+  // Interne Anführungszeichen verdoppeln (CSV-Standard)
+  safe = safe.replace(/"/g, '""');
+  return safe;
+}
+
 export interface DATEVExportOptions {
   von: string; // ISO date
   bis: string; // ISO date
@@ -132,13 +141,13 @@ export function generiereZEILE(
   const datum = new Date(rechnung.updated_at || rechnung.created_at);
   const belegDatum = formatiereDatum(datum, "TTMM");
 
-  const belegfeld1 = (rechnung.bestellnummer || "").slice(0, 12);
+  const belegfeld1 = csvSafe((rechnung.bestellnummer || "").slice(0, 12));
 
   let buchungstext = rechnung.haendler_name || "Unbekannt";
   if (rechnung.projekt_name) {
     buchungstext += ` / ${rechnung.projekt_name}`;
   }
-  buchungstext = buchungstext.slice(0, 60);
+  buchungstext = csvSafe(buchungstext.slice(0, 60));
 
   // Felder bis KOST1 (39 Felder total)
   const felder = [
@@ -153,7 +162,7 @@ export function generiereZEILE(
     '""', '""', '""', '""', '""',
     '""', '""', '""', '""',
     // KOST1, KOST2, KOST-Menge
-    kost1 ? `"${kost1.slice(0, 36)}"` : '""',
+    kost1 ? `"${csvSafe(kost1.slice(0, 36))}"` : '""',
     '""', '""',
   ];
 

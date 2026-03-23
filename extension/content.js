@@ -33,9 +33,13 @@
 
   var rootDomain = extractRootDomain(hostname);
 
-  // Duplikat-Schutz
+  // Duplikat-Schutz (sessionStorage + localStorage mit 10-Min-TTL)
   var signalKey = "mr_signal_" + rootDomain + "_" + pathname;
   if (sessionStorage.getItem(signalKey)) return;
+  try {
+    var lsEntry = localStorage.getItem(signalKey);
+    if (lsEntry && (Date.now() - parseInt(lsEntry, 10)) < 600000) return; // 10 Min
+  } catch (e) { /* localStorage nicht verfügbar */ }
 
   // Fetch mit Timeout
   function fetchWithTimeout(url, options, timeoutMs) {
@@ -347,6 +351,7 @@
         .then(function (res) {
           if (res.ok) {
             sessionStorage.setItem(signalKey, "1");
+            try { localStorage.setItem(signalKey, String(Date.now())); } catch (e) { /* ok */ }
             console.log(
               "[MR Umbau] Signal gesendet:",
               domain, "(" + kuerzel + ")", "[" + quelle + "]"

@@ -58,9 +58,19 @@ export async function GET(
       return NextResponse.json({ error: "Datei nicht gefunden" }, { status: 404 });
     }
 
-    const contentType = dokument.storage_pfad.endsWith(".pdf")
-      ? "application/pdf"
-      : "image/jpeg";
+    // Content-Type aus Dateiendung ableiten (nur erlaubte Typen)
+    const ext = dokument.storage_pfad.split(".").pop()?.toLowerCase() || "";
+    const MIME_MAP: Record<string, string> = {
+      pdf: "application/pdf",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      webp: "image/webp",
+      gif: "image/gif",
+      tiff: "image/tiff",
+      bmp: "image/bmp",
+    };
+    const contentType = MIME_MAP[ext] || "application/octet-stream";
 
     const rawFilename = dokument.storage_pfad.split("/").pop() || "dokument";
     const safeFilename = sanitizeFilename(rawFilename);

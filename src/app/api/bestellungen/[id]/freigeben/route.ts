@@ -84,11 +84,12 @@ export async function POST(
       return NextResponse.json({ error: "Freigabe konnte nicht gespeichert werden" }, { status: 500 });
     }
 
-    // Status auf freigegeben setzen
-    const { error: updateError } = await supabase
+    // Status atomar auf freigegeben setzen (nur wenn noch nicht freigegeben → Doppelklick-Schutz)
+    const { error: updateError, count } = await supabase
       .from("bestellungen")
       .update({ status: "freigegeben", updated_at: new Date().toISOString() })
-      .eq("id", id);
+      .eq("id", id)
+      .neq("status", "freigegeben");
 
     if (updateError) {
       // Rollback: Freigabe-Eintrag wieder löschen für konsistenten Zustand

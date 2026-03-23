@@ -279,7 +279,8 @@ export async function POST(request: NextRequest) {
     // 2. Domain-Match (nur vorwärts: Absender-Domain enthält Händler-Domain)
     if (!haendler && absenderDomain) {
       haendler = haendlerListe?.find((h) => {
-        const hDomain = h.domain.toLowerCase();
+        const hDomain = h.domain?.toLowerCase();
+        if (!hDomain) return false;
         // Exakter Match oder Subdomain-Match (z.B. mail.bauhaus.de enthält bauhaus.de)
         return absenderDomain === hDomain || absenderDomain.endsWith("." + hDomain);
       }) || null;
@@ -631,9 +632,9 @@ export async function POST(request: NextRequest) {
     for (const ergebnis of analyseErgebnisse) {
       const { analyse, dateiName, base64, mime_type } = ergebnis;
 
-      // Unbekannte Dokumenttypen überspringen
-      if (!bekannteTypen.includes(analyse.typ)) {
-        logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
+      // Unbekannte Dokumenttypen oder GPT-Parse-Fehler überspringen
+      if (!bekannteTypen.includes(analyse.typ) || analyse.parse_fehler) {
+        logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", parse_fehler=${!!analyse.parse_fehler}, datei="${dateiName}"`);
         continue;
       }
 
@@ -646,14 +647,15 @@ export async function POST(request: NextRequest) {
 
       if (uploadError) {
         logError("webhook/email", `Storage Upload fehlgeschlagen: ${storagePfad}`, uploadError);
-        // Trotzdem Dokument speichern (ohne Storage-Pfad)
+        // Ohne Datei kein Dokument speichern — Ghost-Einträge vermeiden
+        continue;
       }
 
       const { error: insertError } = await supabase.from("dokumente").insert({
         bestellung_id: bestellungId,
         typ: analyse.typ,
         quelle: "email",
-        storage_pfad: uploadError ? null : storagePfad,
+        storage_pfad: storagePfad,
         email_betreff,
         email_absender,
         email_datum,
@@ -762,9 +764,18 @@ export async function POST(request: NextRequest) {
             if (flagMap[bodyAnalyse.typ]) bodyUpdate[flagMap[bodyAnalyse.typ]] = true;
             if (bodyAnalyse.typ !== "versandbestaetigung") {
               if (bodyAnalyse.bestellnummer) bodyUpdate.bestellnummer = bodyAnalyse.bestellnummer;
-              // Betrag nur von Rechnung übernehmen (maßgeblich), andere Typen nur wenn noch kein Betrag
+              // Betrag: Rechnung ist maßgeblich, andere Typen nur wenn noch kein Betrag in DB
               if (bodyAnalyse.gesamtbetrag && bodyAnalyse.typ === "rechnung") {
                 bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
+              } else if (bodyAnalyse.gesamtbetrag) {
+                const { data: existing } = await supabase
+                  .from("bestellungen")
+                  .select("betrag")
+                  .eq("id", bestellungId)
+                  .maybeSingle();
+                if (existing && !existing.betrag) {
+                  bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
+                }
               }
             }
 

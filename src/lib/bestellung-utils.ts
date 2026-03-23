@@ -75,9 +75,9 @@ export async function updateBestellungStatus(
     return "offen";
   }
 
-  // Nicht überschreiben: freigegeben und abweichung sind manuelle/KI-gesetzte Zustände
-  const geschuetzteStatus = ["freigegeben", "abweichung"];
-  if (geschuetzteStatus.includes(bestellung.status)) {
+  // Nur "freigegeben" nie automatisch überschreiben (manueller Workflow-Schritt).
+  // "abweichung" darf überschrieben werden, wenn alle Dokumente neu eingehen.
+  if (bestellung.status === "freigegeben") {
     return bestellung.status;
   }
 
