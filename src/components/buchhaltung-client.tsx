@@ -58,6 +58,7 @@ export function BuchhaltungClient({
   const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
   const [bezahltError, setBezahltError] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [archivLoading, setArchivLoading] = useState(false);
   const [showDatev, setShowDatev] = useState(false);
@@ -250,6 +251,7 @@ export function BuchhaltungClient({
         )
       );
       setSelectedIds(new Set());
+      setSelectionMode(false);
     } catch {
       setBezahltError("Netzwerkfehler beim Archivieren");
     } finally {
@@ -456,7 +458,7 @@ export function BuchhaltungClient({
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg">
           <button
-            onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); }}
+            onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               tab === "offen"
                 ? "bg-white text-[#1a1a1a] shadow-sm"
@@ -473,7 +475,7 @@ export function BuchhaltungClient({
             )}
           </button>
           <button
-            onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); }}
+            onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               tab === "bezahlt"
                 ? "bg-white text-[#1a1a1a] shadow-sm"
@@ -513,6 +515,18 @@ export function BuchhaltungClient({
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
             />
           </div>
+          {tab === "bezahlt" && kannBezahlen && !selectionMode && (
+            <button
+              type="button"
+              onClick={() => setSelectionMode(true)}
+              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              title="Auswahl-Modus"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -521,7 +535,7 @@ export function BuchhaltungClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
-              {tab === "bezahlt" && kannBezahlen && (
+              {selectionMode && (
                 <th className="px-3 py-3.5 w-10">
                   <input
                     type="checkbox"
@@ -546,7 +560,7 @@ export function BuchhaltungClient({
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={tab === "bezahlt" && kannBezahlen ? 11 : 10} className="px-4 py-12 text-center text-[#9a9a9a]">
+                <td colSpan={selectionMode ? 11 : 10} className="px-4 py-12 text-center text-[#9a9a9a]">
                   {aktiveRows.length === 0
                     ? tab === "offen"
                       ? "Keine offenen Rechnungen."
@@ -557,7 +571,7 @@ export function BuchhaltungClient({
             ) : (
               gefiltert.map((r, i) => (
                 <tr key={r.id} className={`table-row-hover border-b border-[#f0eeeb] ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""} ${selectedIds.has(r.id) ? "bg-[#570006]/[0.03]" : ""}`}>
-                  {tab === "bezahlt" && kannBezahlen && (
+                  {selectionMode && (
                     <td className="px-3 py-3.5">
                       <input
                         type="checkbox"
@@ -697,31 +711,35 @@ export function BuchhaltungClient({
       </div>
 
       {/* Bulk Action Bar — sticky bottom */}
-      {tab === "bezahlt" && kannBezahlen && selectedIds.size > 0 && (
+      {selectionMode && (
         <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
           <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
             <span className="text-sm font-medium">
-              {selectedIds.size} {selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt
+              {selectedIds.size > 0
+                ? `${selectedIds.size} ${selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt`
+                : "Rechnungen auswählen"}
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedIds(new Set())}
-                className="px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white transition-colors"
+                onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}
+                className="px-3 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
               >
                 Abbrechen
               </button>
-              <button
-                type="button"
-                onClick={() => archivieren(Array.from(selectedIds))}
-                disabled={archivLoading}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
-                {archivLoading ? "Archiviere..." : "Archivieren"}
-              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => archivieren(Array.from(selectedIds))}
+                  disabled={archivLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  {archivLoading ? "Archiviere..." : "Archivieren"}
+                </button>
+              )}
             </div>
           </div>
         </div>
