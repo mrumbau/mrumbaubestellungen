@@ -16,6 +16,12 @@ interface Dokument {
   netto: number | null;
   mwst: number | null;
   created_at: string;
+  bestellnummer_erkannt: string | null;
+  iban: string | null;
+  email_betreff: string | null;
+  email_absender: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ki_roh_daten: Record<string, any> | null;
 }
 
 interface Abgleich {
@@ -1141,10 +1147,110 @@ export function BestelldetailClient({
           })}
         </div>
 
-        {/* PDF Viewer or Empty State with integrated upload */}
+        {/* PDF Viewer, KI-Daten, or Empty State */}
         <div className={`flex items-center justify-center bg-[#fafaf9] ${aktivesDokument?.storage_pfad ? "flex-1 min-h-[500px]" : "flex-1"}`}>
           {aktivesDokument?.storage_pfad ? (
             <iframe src={`/api/pdfs/${aktivesDokument.id}`} className="w-full h-full" title="PDF Vorschau" />
+          ) : aktivesDokument && !aktivesDokument.storage_pfad ? (
+            /* Dokument existiert in DB aber kein PDF — zeige extrahierte Daten */
+            <div className="w-full h-full overflow-auto p-6">
+              <div className="max-w-lg mx-auto space-y-4">
+                <div className="flex items-center gap-2 text-amber-700 bg-amber-50 px-3 py-2 rounded-lg text-xs">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  <span>Kein PDF vorhanden — Daten aus E-Mail-Text extrahiert</span>
+                </div>
+
+                {/* Erkannte Metadaten */}
+                <div className="bg-white rounded-lg border border-[#e8e6e3] divide-y divide-[#f0eeeb]">
+                  {aktivesDokument.bestellnummer_erkannt && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Bestellnummer</span>
+                      <span className="font-medium text-[#1a1a1a]">{aktivesDokument.bestellnummer_erkannt}</span>
+                    </div>
+                  )}
+                  {aktivesDokument.gesamtbetrag && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Gesamtbetrag</span>
+                      <span className="font-medium text-[#1a1a1a]">{Number(aktivesDokument.gesamtbetrag).toFixed(2)} EUR</span>
+                    </div>
+                  )}
+                  {aktivesDokument.netto && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Netto</span>
+                      <span className="text-[#6b6b6b]">{Number(aktivesDokument.netto).toFixed(2)} EUR</span>
+                    </div>
+                  )}
+                  {aktivesDokument.mwst && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">MwSt</span>
+                      <span className="text-[#6b6b6b]">{Number(aktivesDokument.mwst).toFixed(2)} EUR</span>
+                    </div>
+                  )}
+                  {aktivesDokument.iban && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">IBAN</span>
+                      <span className="font-mono text-[#6b6b6b] text-[10px]">{aktivesDokument.iban}</span>
+                    </div>
+                  )}
+                  {aktivesDokument.email_betreff && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">E-Mail Betreff</span>
+                      <span className="text-[#6b6b6b] text-right max-w-[60%] truncate">{aktivesDokument.email_betreff}</span>
+                    </div>
+                  )}
+                  {aktivesDokument.email_absender && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Absender</span>
+                      <span className="text-[#6b6b6b]">{aktivesDokument.email_absender}</span>
+                    </div>
+                  )}
+                  {/* Tracking-Info bei Versandbestätigungen */}
+                  {aktivesDokument.ki_roh_daten?.tracking_nummer && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Sendungsnummer</span>
+                      <span className="font-mono text-[#1a1a1a]">{aktivesDokument.ki_roh_daten.tracking_nummer}</span>
+                    </div>
+                  )}
+                  {aktivesDokument.ki_roh_daten?.versanddienstleister && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Versanddienstleister</span>
+                      <span className="text-[#1a1a1a]">{aktivesDokument.ki_roh_daten.versanddienstleister}</span>
+                    </div>
+                  )}
+                  {aktivesDokument.ki_roh_daten?.tracking_url && (
+                    <div className="flex justify-between px-4 py-2.5 text-xs">
+                      <span className="text-[#9a9a9a]">Tracking</span>
+                      <a href={aktivesDokument.ki_roh_daten.tracking_url} target="_blank" rel="noopener noreferrer" className="text-[#1E4D8C] hover:underline">Sendung verfolgen</a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload-Buttons */}
+                <div className="flex gap-2 justify-center pt-2">
+                  <button onClick={() => cameraInputRef.current?.click()} disabled={scanLoading} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                    </svg>
+                    PDF scannen
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={scanLoading} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    PDF hochladen
+                  </button>
+                </div>
+                {scanLoading && (
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="spinner w-3 h-3" />
+                    <span className="text-xs text-[#570006] font-medium">Wird analysiert...</span>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="text-center px-6 max-w-xs">
               <div className="w-14 h-14 rounded-xl bg-[#f0eeeb] flex items-center justify-center mx-auto mb-3">

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-import { analysiereDokument, erkenneBestellerIntelligent, erkenneHaendlerAusEmail, erkenneSubunternehmerAusEmail, pruefePreisanomalien, pruefeDuplikat, kategorisiereArtikel, extrahiereBestellerHinweise, erkenneProjektAusInhalt, berechneAffinitaet, aktualisiereBestellerAffinitaet, type ProjektMatchErgebnis } from "@/lib/openai";
-import { validateTextLength, isAllowedMimeType, isFileSizeOk } from "@/lib/validation";
-import { checkRateLimit, checkGlobalRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { analysiereDokument, erkenneHaendlerAusEmail, type DokumentAnalyse } from "@/lib/openai";
+import { isFileSizeOk } from "@/lib/validation";
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
 import { buildTrackingUrl } from "@/lib/tracking-urls";
@@ -10,74 +10,184 @@ import { buildTrackingUrl } from "@/lib/tracking-urls";
 // Vercel Serverless: max 60 Sekunden Laufzeit
 export const maxDuration = 60;
 
-// POST /api/webhook/email – Empfängt E-Mail-Daten von Make.com
+// =====================================================================
+// ERLAUBTE MIME-TYPEN (erweitert für Microsoft 365 / Make.com)
+// =====================================================================
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/tiff",
+  "image/bmp",
+  "application/octet-stream", // M365 sendet PDFs manchmal so
+]);
+
+// MIME-Typen die als PDF behandelt werden sollen
+const PDF_MIME_ALIASES = new Set([
+  "application/pdf",
+  "application/x-pdf",
+  "application/octet-stream", // wenn Dateiname .pdf hat
+]);
+
+function effectiveMimeType(mimeType: string, fileName: string): string {
+  if (PDF_MIME_ALIASES.has(mimeType) && fileName.toLowerCase().endsWith(".pdf")) {
+    return "application/pdf";
+  }
+  // image/jpg → image/jpeg normalisieren
+  if (mimeType === "image/jpg") return "image/jpeg";
+  return mimeType;
+}
+
+// =====================================================================
+// SPAM-SCHUTZ: Offensichtlich irrelevante Absender-Domains
+// =====================================================================
+const IRRELEVANT_DOMAINS = new Set([
+  // Tracking/Versand (erstellen keine eigenständigen Bestellungen)
+  // → werden weiter unten speziell behandelt
+
+  // Offensichtlich keine Händler
+  "gmx.de", "gmx.net", "web.de", "t-online.de", "freenet.de",
+  "gmail.com", "googlemail.com", "yahoo.com", "yahoo.de",
+  "outlook.com", "outlook.de", "hotmail.com", "hotmail.de",
+  "icloud.com", "me.com", "mac.com",
+  "protonmail.com", "proton.me",
+
+  // Interne/Service-Domains
+  "zapier.com", "send.zapier.com", "make.com",
+  "mailchimp.com", "sendinblue.com", "brevo.com",
+  "hubspot.com", "salesforce.com",
+  "plancraft.com", // Projektmanagement, keine Bestellungen
+
+  // Social/Marketing
+  "linkedin.com", "facebook.com", "twitter.com", "instagram.com",
+  "newsletter.de",
+]);
+
+// Versand-Domains: Tracking-Emails, keine eigenen Bestellungen
+const VERSAND_DOMAINS = new Set([
+  "dhl.de", "dhl.com",
+  "dpd.de", "dpd.com",
+  "hermes-logistik.de", "hermesworld.com", "myhermes.de",
+  "ups.com",
+  "gls-group.eu", "gls-group.com",
+  "fedex.com",
+  "trans-o-flex.com",
+  "go-express.com",
+  "deutschepost.de",
+]);
+
+function extractEmailAddress(raw: string): string {
+  if (!raw) return "";
+  const match = raw.match(/[\w.+-]+@[\w.-]+\.\w+/);
+  return match ? match[0].toLowerCase() : raw.toLowerCase();
+}
+
+function extractDomain(raw: string): string {
+  const addr = extractEmailAddress(raw);
+  return addr.split("@")[1] || "";
+}
+
+function isIrrelevantDomain(domain: string): boolean {
+  if (IRRELEVANT_DOMAINS.has(domain)) return true;
+  // Subdomain-Check: z.B. "mail.gmx.de" → "gmx.de"
+  for (const d of IRRELEVANT_DOMAINS) {
+    if (domain.endsWith("." + d)) return true;
+  }
+  return false;
+}
+
+function isVersandDomain(domain: string): boolean {
+  if (VERSAND_DOMAINS.has(domain)) return true;
+  for (const d of VERSAND_DOMAINS) {
+    if (domain.endsWith("." + d)) return true;
+  }
+  return false;
+}
+
+// =====================================================================
+// HTML-Stripping
+// =====================================================================
+function stripHtml(html: string): string {
+  if (!html || typeof html !== "string") return "";
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#\d+;/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// =====================================================================
+// HAUPTLOGIK
+// =====================================================================
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
-    // Rate-Limiting: max 20 Requests/Minute pro IP
+    // Rate-Limiting
     const rlKey = getRateLimitKey(request, "webhook-email");
     const rl = checkRateLimit(rlKey, 20, 60_000);
     if (!rl.allowed) {
       return NextResponse.json(
-        { error: "Zu viele Anfragen. Bitte warten." },
+        { error: "Zu viele Anfragen." },
         { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
       );
     }
 
     const body = await request.json();
-    const { email_betreff, email_absender, email_datum, secret } =
-      body;
+    const { email_betreff, email_absender, email_datum, secret } = body;
 
-    // Secret prüfen
+    // 1. Secret prüfen
     if (secret !== process.env.MAKE_WEBHOOK_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Vorfilter von Make.com: Keyword-basierte Klassifikation (ja/nein/unklar)
-    // Bei "nein" sofort abweisen — spart GPT-Kosten
+    // 2. Vorfilter von Make.com
     const vorfilter = body.vorfilter || "";
     if (vorfilter === "nein") {
-      logInfo("/api/webhook/email", "Vorfilter: als irrelevant erkannt", { email_betreff, email_absender });
+      logInfo("webhook/email", "Vorfilter: irrelevant", { email_betreff, email_absender });
       return NextResponse.json({ success: true, skipped: true, reason: "vorfilter_nein" });
     }
 
-    // Absender-Blacklist aus DB prüfen
-    {
-      const blClient = createServiceClient();
-      const { data: blacklist } = await blClient
-        .from("email_blacklist")
-        .select("muster, typ");
+    const absenderAdresse = extractEmailAddress(email_absender);
+    const absenderDomain = extractDomain(email_absender);
 
-      if (blacklist && blacklist.length > 0) {
-        const absenderLower = (email_absender || "").toLowerCase();
-        const absenderAdresseRaw = absenderLower.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] || "";
-        const absenderDomainRaw = absenderAdresseRaw.split("@")[1] || "";
+    // 3. Irrelevante Domains sofort abweisen
+    if (isIrrelevantDomain(absenderDomain)) {
+      logInfo("webhook/email", `Irrelevante Domain: ${absenderDomain}`, { email_betreff });
+      return NextResponse.json({ success: true, skipped: true, reason: "irrelevant_domain" });
+    }
 
-        const istBlockiert = blacklist.some((bl) => {
-          const muster = bl.muster.toLowerCase();
-          if (bl.typ === "adresse") return absenderAdresseRaw === muster;
-          // typ === "domain": Domain oder Subdomain matchen
-          return absenderDomainRaw === muster || absenderDomainRaw.endsWith("." + muster);
-        });
+    const supabase = createServiceClient();
 
-        if (istBlockiert) {
-          return NextResponse.json({ success: true, skipped: true, reason: "blacklisted_sender" });
-        }
+    // 4. Absender-Blacklist aus DB prüfen
+    const { data: blacklist } = await supabase.from("email_blacklist").select("muster, typ");
+    if (blacklist && blacklist.length > 0) {
+      const istBlockiert = blacklist.some((bl) => {
+        const muster = bl.muster.toLowerCase();
+        if (bl.typ === "adresse") return absenderAdresse === muster;
+        return absenderDomain === muster || absenderDomain.endsWith("." + muster);
+      });
+      if (istBlockiert) {
+        return NextResponse.json({ success: true, skipped: true, reason: "blacklisted" });
       }
     }
 
-    // Globales Rate-Limiting (über alle Instanzen)
-    const globalRl = await checkGlobalRateLimit("webhook-email", 60, 60_000);
-    if (!globalRl.allowed) {
-      return NextResponse.json({ error: "Zu viele Anfragen. Bitte warten." }, { status: 429 });
-    }
-
-    // Idempotenz: Hash aus Absender + Betreff + Datum prüfen
+    // 5. Idempotenz-Check
     const idempotencyKey = `${email_absender || ""}|${email_betreff || ""}|${email_datum || ""}`;
     const idempotencyHash = Buffer.from(idempotencyKey).toString("base64").slice(0, 64);
-
     {
-      const supabaseCheck = createServiceClient();
-      const { data: existing } = await supabaseCheck
+      const { data: existing } = await supabase
         .from("webhook_logs")
         .select("id")
         .eq("typ", "email")
@@ -89,159 +199,178 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, deduplicated: true });
       }
 
-      // Idempotenz-Marker sofort speichern (vor Verarbeitung)
-      await supabaseCheck.from("webhook_logs").insert({
+      await supabase.from("webhook_logs").insert({
         typ: "email",
         status: "processing",
         bestellnummer: idempotencyHash,
       });
     }
 
-    // Input-Validierung
-    if (email_betreff && !validateTextLength(email_betreff, 500)) {
-      return NextResponse.json({ error: "Betreff zu lang (max. 500 Zeichen)" }, { status: 400 });
+    // 6. Betreff-Validierung
+    if (email_betreff && email_betreff.length > 500) {
+      return NextResponse.json({ error: "Betreff zu lang" }, { status: 400 });
     }
 
-    // Anhänge normalisieren: Make.com/Microsoft 365 sendet contentBytes/contentType,
-    // unser internes Format nutzt base64/mime_type
+    // =====================================================================
+    // ANHÄNGE NORMALISIEREN + FILTERN (nicht rejecten!)
+    // =====================================================================
     const rawAnhaenge = body.anhaenge || [];
-    const anhaenge: { name: string; base64: string; mime_type: string }[] = Array.isArray(rawAnhaenge)
-      ? rawAnhaenge
-          .map((a: Record<string, unknown>) => ({
-            name: (a.name as string) || "anhang",
-            base64: (a.base64 as string) || (a.contentBytes as string) || "",
-            mime_type: (a.mime_type as string) || (a.contentType as string) || "application/octet-stream",
-          }))
-          .filter((a: { base64: string }) => a.base64.length > 0)
-      : [];
+    const anhaenge: { name: string; base64: string; mime_type: string }[] = [];
 
-    for (const anhang of anhaenge) {
-      if (!isAllowedMimeType(anhang.mime_type)) {
-        return NextResponse.json(
-          { error: `MIME-Typ nicht erlaubt: ${anhang.mime_type}` },
-          { status: 400 }
-        );
-      }
-      if (!isFileSizeOk(anhang.base64)) {
-        return NextResponse.json(
-          { error: "Anhang zu groß (max. 4 MB)" },
-          { status: 413 }
-        );
-      }
-    }
+    if (Array.isArray(rawAnhaenge)) {
+      for (const a of rawAnhaenge) {
+        const raw = a as Record<string, unknown>;
+        const name = (raw.name as string) || (raw.fileName as string) || "anhang";
+        const base64 = (raw.base64 as string) || (raw.contentBytes as string) || "";
+        let mimeType = (raw.mime_type as string) || (raw.contentType as string) || "application/octet-stream";
 
-    const supabase = createServiceClient();
+        if (!base64 || base64.length < 100) continue; // Leere/winzige Anhänge skippen
 
-    // Händler anhand der Absender-E-Mail erkennen
-    const { data: haendlerListe } = await supabase
-      .from("haendler")
-      .select("*");
+        // MIME-Typ normalisieren
+        mimeType = effectiveMimeType(mimeType, name);
 
-    // 1. Exakter Match über bekannte E-Mail-Adressen
-    let haendler = haendlerListe?.find((h) =>
-      h.email_absender?.some(
-        (addr: string) =>
-          email_absender?.toLowerCase().includes(addr.toLowerCase())
-      )
-    ) || null;
-
-    const absenderAdresse = extractEmailAddress(email_absender);
-
-    // 2. Fallback: Domain-Match (z.B. @bauhaus.de → bauhaus.de)
-    if (!haendler && absenderAdresse) {
-      const absenderDomain = absenderAdresse.split("@")[1]?.toLowerCase();
-      if (absenderDomain) {
-        haendler = haendlerListe?.find((h) =>
-          absenderDomain.includes(h.domain.toLowerCase()) ||
-          h.domain.toLowerCase().includes(absenderDomain)
-        ) || null;
-
-        // Neue Absender-Adresse automatisch hinzufügen
-        if (haendler && absenderAdresse) {
-          const bestehendeAdressen: string[] = haendler.email_absender || [];
-          const bereitsVorhanden = bestehendeAdressen.some(
-            (a: string) => a.toLowerCase() === absenderAdresse.toLowerCase()
-          );
-
-          if (!bereitsVorhanden && bestehendeAdressen.length < 10) {
-            await supabase
-              .from("haendler")
-              .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
-              .eq("id", haendler.id);
-            logInfo("/api/webhook/email", `Neue Absender-Adresse für ${haendler.name}: ${absenderAdresse}`);
-          }
+        // Unbekannte MIME-Typen SKIPPEN (nicht rejecten!)
+        if (!ALLOWED_MIME_TYPES.has(mimeType) && !mimeType.startsWith("image/")) {
+          logInfo("webhook/email", `Anhang übersprungen (MIME: ${mimeType}): ${name}`);
+          continue;
         }
+
+        // Größe prüfen – zu große skippen
+        if (!isFileSizeOk(base64)) {
+          logInfo("webhook/email", `Anhang zu groß (>4MB): ${name}`);
+          continue;
+        }
+
+        anhaenge.push({ name, base64, mime_type: mimeType });
       }
     }
 
-    const haendlerDomain = haendler?.domain || extractDomain(email_absender);
+    // =====================================================================
+    // E-MAIL BODY EXTRAHIEREN
+    // =====================================================================
     const rawEmailText = body.email_text || body.email_body || "";
     const emailText = stripHtml(rawEmailText);
 
     // =====================================================================
-    // SUBUNTERNEHMER-ERKENNUNG (vor Besteller-Zuordnung)
+    // VERSAND-EMAILS SPEZIELL BEHANDELN
+    // =====================================================================
+    const istVersandDomain = isVersandDomain(absenderDomain);
+
+    if (istVersandDomain) {
+      // Versand-Emails: An existierende Bestellung anhängen, KEINE neue erstellen
+      return await handleVersandEmail(supabase, {
+        email_betreff,
+        email_absender,
+        email_datum,
+        emailText,
+        anhaenge,
+        absenderDomain,
+        startTime,
+      });
+    }
+
+    // =====================================================================
+    // HÄNDLER ERKENNEN
+    // =====================================================================
+    const { data: haendlerListe } = await supabase.from("haendler").select("*");
+
+    // 1. Exakter E-Mail-Match
+    let haendler = haendlerListe?.find((h) =>
+      h.email_absender?.some((addr: string) =>
+        absenderAdresse.includes(addr.toLowerCase()) || addr.toLowerCase().includes(absenderAdresse)
+      )
+    ) || null;
+
+    // 2. Domain-Match
+    if (!haendler && absenderDomain) {
+      haendler = haendlerListe?.find((h) =>
+        absenderDomain.includes(h.domain.toLowerCase()) ||
+        h.domain.toLowerCase().includes(absenderDomain)
+      ) || null;
+
+      // Auto-learn: Absender-Adresse ergänzen
+      if (haendler && absenderAdresse) {
+        const bestehendeAdressen: string[] = haendler.email_absender || [];
+        if (!bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
+          await supabase
+            .from("haendler")
+            .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
+            .eq("id", haendler.id);
+        }
+      }
+    }
+
+    const haendlerDomain = haendler?.domain || absenderDomain;
+    const haendlerName = haendler?.name || absenderDomain;
+
+    // =====================================================================
+    // SUBUNTERNEHMER PRÜFEN (nur DB-Lookup, kein GPT)
     // =====================================================================
     let erkannterSubunternehmer: { id: string; firma: string } | null = null;
     let bestellungsart: "material" | "subunternehmer" = "material";
 
     if (!haendler) {
-      // Subunternehmer-Liste laden und prüfen
-      const { data: suListe } = await supabase
-        .from("subunternehmer")
-        .select("*");
-
-      if (suListe && suListe.length > 0 && absenderAdresse) {
-        // 1. Exakter E-Mail-Match
+      const { data: suListe } = await supabase.from("subunternehmer").select("*");
+      if (suListe && suListe.length > 0) {
+        // Exakter E-Mail-Match
         const suMatch = suListe.find((su) =>
-          su.email_absender?.some(
-            (addr: string) => absenderAdresse.toLowerCase() === addr.toLowerCase()
-          )
+          su.email_absender?.some((addr: string) => absenderAdresse === addr.toLowerCase())
         );
-
         if (suMatch) {
           erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
           bestellungsart = "subunternehmer";
-          logInfo("/api/webhook/email", `Bekannter Subunternehmer erkannt: ${suMatch.firma}`);
         } else {
-          // 2. Domain-Fallback
-          const absenderDomain = absenderAdresse.split("@")[1]?.toLowerCase();
-          if (absenderDomain) {
-            const suDomainMatch = suListe.find((su) => {
-              const suEmailDomain = su.email?.split("@")[1]?.toLowerCase();
-              if (suEmailDomain && suEmailDomain === absenderDomain) return true;
-              return su.email_absender?.some((addr: string) => {
-                const addrDomain = addr.split("@")[1]?.toLowerCase();
-                return addrDomain && addrDomain === absenderDomain;
-              });
-            });
-
-            if (suDomainMatch) {
-              erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
-              bestellungsart = "subunternehmer";
-
-              // Auto-Learn: neue Absender-Adresse ergänzen
-              const bestehendeAdressen: string[] = suDomainMatch.email_absender || [];
-              if (!bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse.toLowerCase()) && bestehendeAdressen.length < 10) {
-                await supabase
-                  .from("subunternehmer")
-                  .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
-                  .eq("id", suDomainMatch.id);
-              }
-              logInfo("/api/webhook/email", `Subunternehmer per Domain erkannt: ${suDomainMatch.firma}`);
-            }
+          // Domain-Fallback
+          const suDomainMatch = suListe.find((su) => {
+            const suDomain = su.email?.split("@")[1]?.toLowerCase();
+            if (suDomain === absenderDomain) return true;
+            return su.email_absender?.some((addr: string) => addr.split("@")[1]?.toLowerCase() === absenderDomain);
+          });
+          if (suDomainMatch) {
+            erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
+            bestellungsart = "subunternehmer";
           }
         }
       }
     }
 
-    // Zuordnungs-Methode für Logging
+    // =====================================================================
+    // ANHÄNGE PARALLEL ANALYSIEREN (GPT-4o) — max 3 gleichzeitig
+    // =====================================================================
+    const analyseErgebnisse: { analyse: DokumentAnalyse; dateiName: string; base64: string; mime_type: string }[] = [];
+
+    if (anhaenge.length > 0) {
+      // Maximal 3 Anhänge parallel analysieren
+      const batch = anhaenge.slice(0, 3);
+      const analysePromises = batch.map(async (anhang) => {
+        try {
+          const analyse = await analysiereDokument(anhang.base64, anhang.mime_type);
+          return { analyse, dateiName: anhang.name, base64: anhang.base64, mime_type: anhang.mime_type };
+        } catch (err) {
+          logError("webhook/email", `Analyse fehlgeschlagen: ${anhang.name}`, err);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(analysePromises);
+      for (const r of results) {
+        if (r) analyseErgebnisse.push(r);
+      }
+
+      logInfo("webhook/email", `${analyseErgebnisse.length}/${batch.length} Anhänge analysiert`, {
+        dauer_ms: Date.now() - startTime,
+      });
+    }
+
+    // =====================================================================
+    // BESTELLER ZUORDNEN (leichtgewichtig, kein extra GPT-Call)
+    // =====================================================================
+    let bestellerKuerzel = "";
     let zuordnungsMethode = "";
 
-    // =====================================================================
-    // STUFE 1: Signal ±60 Minuten (Chrome Extension)
-    // =====================================================================
     const emailZeit = new Date(email_datum || Date.now()).getTime();
 
+    // STUFE 1: Chrome Extension Signal ±60 min
     const { data: signale60 } = await supabase
       .from("bestellung_signale")
       .select("*")
@@ -253,15 +382,12 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     let signal = signale60?.[0] || null;
-    let bestellerKuerzel = signal?.kuerzel || "";
-
-    if (bestellerKuerzel) {
+    if (signal) {
+      bestellerKuerzel = signal.kuerzel;
       zuordnungsMethode = "signal_60min";
     }
 
-    // =====================================================================
-    // STUFE 2: Signal ±24 Stunden (erweitertes Zeitfenster)
-    // =====================================================================
+    // STUFE 2: Signal ±24h
     if (!bestellerKuerzel) {
       const { data: signale24h } = await supabase
         .from("bestellung_signale")
@@ -277,195 +403,63 @@ export async function POST(request: NextRequest) {
         signal = signale24h[0];
         bestellerKuerzel = signal.kuerzel;
         zuordnungsMethode = "signal_24h";
-        logInfo("/api/webhook/email", `Signal im erweiterten Zeitfenster (±24h) gefunden: ${bestellerKuerzel}`);
       }
     }
 
-    // Anhänge verarbeiten (benötigt für Stufe 4, 5, 6)
-    const ergebnisse = [];
-    for (const anhang of anhaenge || []) {
-      const { base64, mime_type, name: dateiName } = anhang;
-      const analyse = await analysiereDokument(base64, mime_type);
-      ergebnisse.push({ analyse, dateiName, base64, mime_type });
-    }
-
-    // =====================================================================
-    // STUFE 3: Händler-Affinität (wer bestellt am häufigsten hier?)
-    // =====================================================================
+    // STUFE 3: Händler-Affinität (DB-basiert, kein GPT)
     if (!bestellerKuerzel) {
-      try {
-        const haendlerName = haendler?.name || haendlerDomain;
-        const { data: affinitaet } = await supabase
-          .from("bestellungen")
-          .select("besteller_kuerzel")
-          .eq("haendler_name", haendlerName)
-          .neq("besteller_kuerzel", "UNBEKANNT")
-          .order("created_at", { ascending: false })
-          .limit(50);
+      const { data: affinitaet } = await supabase
+        .from("bestellungen")
+        .select("besteller_kuerzel")
+        .eq("haendler_name", haendlerName)
+        .neq("besteller_kuerzel", "UNBEKANNT")
+        .order("created_at", { ascending: false })
+        .limit(50);
 
-        if (affinitaet && affinitaet.length >= 3) {
-          // Häufigster Besteller bei diesem Händler
-          const zaehler = new Map<string, number>();
-          for (const b of affinitaet) {
-            zaehler.set(b.besteller_kuerzel, (zaehler.get(b.besteller_kuerzel) || 0) + 1);
-          }
-
-          const sortiert = [...zaehler.entries()].sort((a, b) => b[1] - a[1]);
-          const [topKuerzel, topAnzahl] = sortiert[0];
-          const anteil = topAnzahl / affinitaet.length;
-
-          // Nur zuordnen wenn >60% der Bestellungen von einem Besteller kommen
-          if (anteil > 0.6) {
-            bestellerKuerzel = topKuerzel;
-            zuordnungsMethode = "haendler_affinitaet";
-            logInfo("/api/webhook/email", `Händler-Affinität: ${topKuerzel} bestellt ${Math.round(anteil * 100)}% bei ${haendlerName} (${topAnzahl}/${affinitaet.length})`);
-          }
+      if (affinitaet && affinitaet.length >= 3) {
+        const zaehler = new Map<string, number>();
+        for (const b of affinitaet) {
+          zaehler.set(b.besteller_kuerzel, (zaehler.get(b.besteller_kuerzel) || 0) + 1);
         }
-      } catch (err) {
-        logError("/api/webhook/email", "Händler-Affinität fehlgeschlagen", err);
+        const sortiert = [...zaehler.entries()].sort((a, b) => b[1] - a[1]);
+        const [topKuerzel, topAnzahl] = sortiert[0];
+        if (topAnzahl / affinitaet.length > 0.6) {
+          bestellerKuerzel = topKuerzel;
+          zuordnungsMethode = "haendler_affinitaet";
+        }
       }
     }
 
-    // =====================================================================
-    // STUFE 4: E-Mail-Body + Dokument-Analyse (Name, Adresse, Kundennr.)
-    // =====================================================================
-    if (!bestellerKuerzel && (emailText || ergebnisse.length > 0)) {
-      try {
-        const { data: benutzerListe } = await supabase
-          .from("benutzer_rollen")
-          .select("kuerzel, name, email")
-          .eq("rolle", "besteller");
+    // STUFE 4: Name im Text suchen (kein GPT)
+    if (!bestellerKuerzel) {
+      const { data: benutzerListe } = await supabase
+        .from("benutzer_rollen")
+        .select("kuerzel, name, email")
+        .in("rolle", ["besteller", "admin"]);
 
-        if (benutzerListe && benutzerListe.length > 0) {
-          // Schnelle Textsuche: Name direkt im E-Mail-Text oder Dokumenten?
-          const suchTexte = [
-            emailText,
-            email_betreff || "",
-            ...ergebnisse.map((e) => JSON.stringify(e.analyse)),
-          ].join(" ").toLowerCase();
+      if (benutzerListe) {
+        const suchTexte = [
+          emailText,
+          email_betreff || "",
+          ...analyseErgebnisse.map((e) => e.analyse.volltext || ""),
+          ...analyseErgebnisse.map((e) => JSON.stringify(e.analyse.lieferadressen || [])),
+        ].join(" ").toLowerCase();
 
-          let schnellTreffer = "";
-          for (const benutzer of benutzerListe) {
-            const namen = benutzer.name.toLowerCase().split(" ");
-            // Vor- UND Nachname müssen vorkommen
-            if (namen.length >= 2 && namen.every((n: string) => suchTexte.includes(n))) {
-              schnellTreffer = benutzer.kuerzel;
-              break;
-            }
-          }
-
-          if (schnellTreffer) {
-            bestellerKuerzel = schnellTreffer;
+        for (const benutzer of benutzerListe) {
+          const namen = benutzer.name.toLowerCase().split(" ");
+          if (namen.length >= 2 && namen.every((n: string) => suchTexte.includes(n))) {
+            bestellerKuerzel = benutzer.kuerzel;
             zuordnungsMethode = "name_im_text";
-            logInfo("/api/webhook/email", `Name im Text gefunden: ${schnellTreffer}`);
-          } else if (emailText.length > 20) {
-            // KI-basierte Analyse wenn E-Mail-Text vorhanden
-            const dokumentTexte = ergebnisse.map((e) =>
-              [e.analyse.haendler, e.analyse.bestellnummer, JSON.stringify(e.analyse.artikel?.slice(0, 5))]
-                .filter(Boolean)
-                .join(" | ")
-            );
-
-            const hinweise = await extrahiereBestellerHinweise(
-              emailText,
-              email_betreff || "",
-              dokumentTexte,
-              benutzerListe.map((b) => ({ kuerzel: b.kuerzel, name: b.name, email: b.email }))
-            );
-
-            if (hinweise.vorgeschlagenes_kuerzel && hinweise.konfidenz >= 0.6) {
-              bestellerKuerzel = hinweise.vorgeschlagenes_kuerzel;
-              zuordnungsMethode = "email_body_ki";
-              logInfo("/api/webhook/email", `E-Mail-Body KI-Analyse: ${hinweise.vorgeschlagenes_kuerzel} (${hinweise.konfidenz})`, {
-                hinweise: hinweise.gefundene_hinweise,
-                begruendung: hinweise.begruendung,
-              });
-            }
+            break;
           }
         }
-      } catch (err) {
-        logError("/api/webhook/email", "E-Mail-Body Analyse fehlgeschlagen", err);
       }
     }
 
-    // =====================================================================
-    // STUFE 5: KI-Historien-Matching (Artikel + Händler-Muster)
-    // =====================================================================
-    if (!bestellerKuerzel && ergebnisse.length > 0) {
-      try {
-        const artikelAusEmail = ergebnisse
-          .flatMap((e) => e.analyse.artikel || [])
-          .map((a) => ({ name: a.name, menge: a.menge, einzelpreis: a.einzelpreis }));
-
-        const { data: benutzerListe } = await supabase
-          .from("benutzer_rollen")
-          .select("kuerzel, name")
-          .eq("rolle", "besteller");
-
-        const bestellerHistorie = [];
-        for (const benutzer of benutzerListe || []) {
-          const { data: bestellungen } = await supabase
-            .from("bestellungen")
-            .select("id, haendler_name")
-            .eq("besteller_kuerzel", benutzer.kuerzel)
-            .limit(30);
-
-          const bestellIds = (bestellungen || []).map((b) => b.id);
-          let artikelNamen: string[] = [];
-
-          if (bestellIds.length > 0) {
-            const { data: bisherigeDokumente } = await supabase
-              .from("dokumente")
-              .select("artikel, bestellung_id")
-              .in("bestellung_id", bestellIds)
-              .limit(50);
-
-            artikelNamen = (bisherigeDokumente || [])
-              .flatMap((d) => {
-                const art = d.artikel as { name: string }[] | null;
-                return art ? art.map((a) => a.name) : [];
-              });
-          }
-
-          const haendlerNamen = [...new Set((bestellungen || []).map((b) => b.haendler_name).filter(Boolean))] as string[];
-
-          bestellerHistorie.push({
-            kuerzel: benutzer.kuerzel,
-            name: benutzer.name,
-            artikel_namen: artikelNamen,
-            haendler: haendlerNamen,
-          });
-        }
-
-        if (bestellerHistorie.length > 0 && artikelAusEmail.length > 0) {
-          const erkennung = await erkenneBestellerIntelligent(
-            artikelAusEmail,
-            haendler?.name || haendlerDomain,
-            bestellerHistorie
-          );
-
-          if (erkennung.kuerzel !== "UNBEKANNT" && erkennung.konfidenz >= 0.5) {
-            bestellerKuerzel = erkennung.kuerzel;
-            zuordnungsMethode = "ki_historien";
-            logInfo("/api/webhook/email", `KI-Besteller-Erkennung: ${erkennung.kuerzel} (${erkennung.konfidenz})`, { begruendung: erkennung.begruendung });
-          }
-        }
-      } catch (err) {
-        logError("/api/webhook/email", "KI-Besteller-Erkennung fehlgeschlagen", err);
-      }
-    }
-
-    // =====================================================================
-    // STUFE 6: Fallback → UNBEKANNT + Admin-Benachrichtigung
-    // =====================================================================
+    // STUFE 5: Fallback → UNBEKANNT
     if (!bestellerKuerzel) {
       bestellerKuerzel = "UNBEKANNT";
       zuordnungsMethode = "unbekannt";
-      logInfo("/api/webhook/email", `Keine Zuordnung möglich für ${haendlerDomain}`, {
-        email_absender,
-        email_betreff,
-        haendler: haendler?.name,
-      });
     }
 
     // Besteller-Name holen
@@ -475,46 +469,13 @@ export async function POST(request: NextRequest) {
       .eq("kuerzel", bestellerKuerzel)
       .maybeSingle();
 
-    // === FEATURE 4: Automatische Händler-Erkennung ===
-    if (!haendler && ergebnisse.length > 0) {
-      try {
-        const erkannterHaendlerName = ergebnisse.find((e) => e.analyse.haendler)?.analyse.haendler || null;
-        const neuerHaendler = await erkenneHaendlerAusEmail(
-          email_absender,
-          email_betreff,
-          erkannterHaendlerName
-        );
-
-        if (neuerHaendler) {
-          // Prüfe ob Domain schon existiert
-          const { data: existing } = await supabase
-            .from("haendler")
-            .select("id")
-            .eq("domain", neuerHaendler.domain)
-            .limit(1);
-
-          if (!existing || existing.length === 0) {
-            await supabase.from("haendler").insert({
-              name: neuerHaendler.name,
-              domain: neuerHaendler.domain,
-              email_absender: [neuerHaendler.email_muster],
-              url_muster: [],
-            });
-            logInfo("/api/webhook/email", `Neuer Händler erkannt: ${neuerHaendler.name}`, { domain: neuerHaendler.domain });
-          }
-        }
-      } catch (err) {
-        logError("/api/webhook/email", "Händler-Erkennung fehlgeschlagen", err);
-      }
-    }
-
-    // Bestehende Bestellung suchen oder neue anlegen (Race-Condition-sicher)
+    // =====================================================================
+    // BESTELLUNG FINDEN ODER ERSTELLEN
+    // =====================================================================
     let bestellungId: string;
     let bestellungNeuErstellt = false;
 
-    const erkannteBestellnummer = ergebnisse.find(
-      (e) => e.analyse.bestellnummer
-    )?.analyse.bestellnummer;
+    const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
 
     // 1. Suche per Bestellnummer
     let existierendeBestellung = null;
@@ -531,22 +492,20 @@ export async function POST(request: NextRequest) {
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
     } else {
-      // 2. Suche per Signal (erwartet-Status) — mehrere Strategien
+      // 2. Suche per Signal (erwartet-Status)
       let erwartetBestellung: { id: string } | null = null;
-
       if (signal) {
-        // 2a. Exakter haendler_name Match
-        const { data: erwartetExakt } = await supabase
+        const matchName = haendler?.name || haendlerDomain;
+        const { data: erwartet } = await supabase
           .from("bestellungen")
           .select("id")
           .eq("besteller_kuerzel", bestellerKuerzel)
           .eq("status", "erwartet")
-          .eq("haendler_name", haendler?.name || haendlerDomain)
+          .or(`haendler_name.eq.${matchName},haendler_name.eq.${haendlerDomain}`)
           .order("created_at", { ascending: false })
           .limit(1);
-        erwartetBestellung = erwartetExakt?.[0] || null;
+        erwartetBestellung = erwartet?.[0] || null;
 
-        // 2b. Fallback: haendler_id Match (falls Händler umbenannt wurde)
         if (!erwartetBestellung && haendler?.id) {
           const { data: erwartetById } = await supabase
             .from("bestellungen")
@@ -558,24 +517,10 @@ export async function POST(request: NextRequest) {
             .limit(1);
           erwartetBestellung = erwartetById?.[0] || null;
         }
-
-        // 2c. Fallback: Domain im haendler_name (z.B. "bueromarkt-ag.de" als Name)
-        if (!erwartetBestellung && haendlerDomain) {
-          const { data: erwartetByDomain } = await supabase
-            .from("bestellungen")
-            .select("id")
-            .eq("besteller_kuerzel", bestellerKuerzel)
-            .eq("status", "erwartet")
-            .eq("haendler_name", haendlerDomain)
-            .order("created_at", { ascending: false })
-            .limit(1);
-          erwartetBestellung = erwartetByDomain?.[0] || null;
-        }
       }
 
       if (erwartetBestellung) {
         bestellungId = erwartetBestellung.id;
-        // Händlername aktualisieren falls veraltet
         if (haendler?.name) {
           await supabase
             .from("bestellungen")
@@ -583,58 +528,11 @@ export async function POST(request: NextRequest) {
             .eq("id", bestellungId);
         }
       } else {
-        // 3. Neue Bestellung anlegen – bei Bestellnummer-Konflikt existierende verwenden
-        // KI-Fallback: vermutete_bestellungsart aus Dokumentanalyse
-        if (bestellungsart === "material" && ergebnisse.length > 0) {
-          const vermuteteArt = ergebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
-          if (vermuteteArt === "subunternehmer") {
-            bestellungsart = "subunternehmer";
-            logInfo("/api/webhook/email", "KI vermutete Bestellungsart: subunternehmer");
-
-            // Auto-Create Subunternehmer (unbestätigt)
-            try {
-              const erkannterName = ergebnisse.find((e) => e.analyse.haendler)?.analyse.haendler || null;
-              const dokumentText = ergebnisse.find((e) => e.analyse.volltext)?.analyse.volltext || null;
-              const neuerSU = await erkenneSubunternehmerAusEmail(
-                email_absender,
-                email_betreff,
-                erkannterName,
-                dokumentText
-              );
-
-              if (neuerSU) {
-                // Prüfe ob E-Mail-Absender schon existiert
-                const { data: existingSU } = await supabase
-                  .from("subunternehmer")
-                  .select("id, firma")
-                  .contains("email_absender", [neuerSU.email_muster])
-                  .limit(1);
-
-                if (!existingSU || existingSU.length === 0) {
-                  const { data: created } = await supabase
-                    .from("subunternehmer")
-                    .insert({
-                      firma: neuerSU.firma,
-                      gewerk: neuerSU.gewerk || null,
-                      email_absender: [neuerSU.email_muster],
-                      steuer_nr: neuerSU.steuer_nr || null,
-                      iban: neuerSU.iban || null,
-                    })
-                    .select("id, firma")
-                    .single();
-
-                  if (created) {
-                    erkannterSubunternehmer = { id: created.id, firma: created.firma };
-                    logInfo("/api/webhook/email", `Neuer Subunternehmer auto-angelegt: ${created.firma}`);
-                  }
-                } else {
-                  erkannterSubunternehmer = { id: existingSU[0].id, firma: existingSU[0].firma };
-                }
-              }
-            } catch (err) {
-              logError("/api/webhook/email", "SU Auto-Erkennung fehlgeschlagen", err);
-            }
-          }
+        // 3. Neue Bestellung anlegen
+        // Bestellungsart aus GPT-Analyse übernehmen
+        if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
+          const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
+          if (vermuteteArt === "subunternehmer") bestellungsart = "subunternehmer";
         }
 
         const { data: neue, error: insertError } = await supabase
@@ -642,7 +540,7 @@ export async function POST(request: NextRequest) {
           .insert({
             bestellnummer: erkannteBestellnummer,
             haendler_id: haendler?.id || null,
-            haendler_name: erkannterSubunternehmer?.firma || haendler?.name || haendlerDomain,
+            haendler_name: erkannterSubunternehmer?.firma || haendlerName,
             besteller_kuerzel: bestellerKuerzel,
             besteller_name: benutzer?.name || bestellerKuerzel,
             status: "offen",
@@ -654,7 +552,6 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (insertError && erkannteBestellnummer) {
-          // Duplikat erkannt – existierende Bestellung verwenden
           const { data: fallback } = await supabase
             .from("bestellungen")
             .select("id")
@@ -675,33 +572,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Dokumente speichern (mit Rollback bei Fehler)
+    // =====================================================================
+    // DOKUMENTE SPEICHERN
+    // =====================================================================
     let dokumenteGespeichert = 0;
     const bekannteTypen = ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"];
+    const gespeicherteTypen: string[] = [];
 
-    for (const ergebnis of ergebnisse) {
+    for (const ergebnis of analyseErgebnisse) {
       const { analyse, dateiName, base64, mime_type } = ergebnis;
 
-      // Unbekannte Dokumenttypen überspringen (z.B. Widerrufsformulare, AGB)
+      // Unbekannte Dokumenttypen überspringen
       if (!bekannteTypen.includes(analyse.typ)) {
-        logInfo("/api/webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`, { bestellungId });
+        logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
         continue;
       }
 
-      const storagePfad = `${bestellungId}/${analyse.typ}_${dateiName}`;
+      // Storage Upload
+      const storagePfad = `${bestellungId}/${analyse.typ}_${Date.now()}_${dateiName}`;
       const buffer = Buffer.from(base64, "base64");
       const { error: uploadError } = await supabase.storage
         .from("dokumente")
-        .upload(storagePfad, buffer, { contentType: mime_type });
+        .upload(storagePfad, buffer, { contentType: mime_type, upsert: true });
+
       if (uploadError) {
-        logError("/api/webhook/email", `Storage upload fehlgeschlagen: ${storagePfad}`, uploadError);
+        logError("webhook/email", `Storage Upload fehlgeschlagen: ${storagePfad}`, uploadError);
+        // Trotzdem Dokument speichern (ohne Storage-Pfad)
       }
 
       const { error: insertError } = await supabase.from("dokumente").insert({
         bestellung_id: bestellungId,
         typ: analyse.typ,
         quelle: "email",
-        storage_pfad: storagePfad,
+        storage_pfad: uploadError ? null : storagePfad,
         email_betreff,
         email_absender,
         email_datum,
@@ -717,26 +620,29 @@ export async function POST(request: NextRequest) {
       });
 
       if (insertError) {
-        logError("/api/webhook/email", `Dokument-Insert fehlgeschlagen: typ="${analyse.typ}"`, insertError);
+        logError("webhook/email", `Dokument-Insert fehlgeschlagen`, insertError);
         continue;
       }
 
-      const updateFields: Record<string, unknown> = {
-        updated_at: new Date().toISOString(),
+      // Bestellung updaten
+      const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+      // Dokument-Flags setzen
+      const flagMap: Record<string, string> = {
+        bestellbestaetigung: "hat_bestellbestaetigung",
+        lieferschein: "hat_lieferschein",
+        rechnung: "hat_rechnung",
+        aufmass: "hat_aufmass",
+        leistungsnachweis: "hat_leistungsnachweis",
+        versandbestaetigung: "hat_versandbestaetigung",
       };
 
-      if (analyse.typ === "bestellbestaetigung") {
-        updateFields.hat_bestellbestaetigung = true;
-      } else if (analyse.typ === "lieferschein") {
-        updateFields.hat_lieferschein = true;
-      } else if (analyse.typ === "rechnung") {
-        updateFields.hat_rechnung = true;
-      } else if (analyse.typ === "aufmass") {
-        updateFields.hat_aufmass = true;
-      } else if (analyse.typ === "leistungsnachweis") {
-        updateFields.hat_leistungsnachweis = true;
-      } else if (analyse.typ === "versandbestaetigung") {
-        updateFields.hat_versandbestaetigung = true;
+      if (flagMap[analyse.typ]) {
+        updateFields[flagMap[analyse.typ]] = true;
+      }
+
+      // Versandbestätigung: Tracking-Daten setzen, aber Bestellnummer/Betrag NICHT überschreiben
+      if (analyse.typ === "versandbestaetigung") {
         if (analyse.tracking_nummer) updateFields.tracking_nummer = analyse.tracking_nummer;
         if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;
         if (analyse.tracking_url) {
@@ -746,140 +652,125 @@ export async function POST(request: NextRequest) {
           if (autoUrl) updateFields.tracking_url = autoUrl;
         }
         if (analyse.voraussichtliche_lieferung) updateFields.voraussichtliche_lieferung = analyse.voraussichtliche_lieferung;
+      } else {
+        // Bestellnummer und Betrag aus Nicht-Versand-Dokumenten übernehmen
+        if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
+        if (analyse.gesamtbetrag) updateFields.betrag = analyse.gesamtbetrag;
       }
 
-      // Versandbestätigungen: Bestellnummer/Betrag NICHT überschreiben
-      // (Sendungsnummern ≠ Bestellnummern, Versandkosten ≠ Bestellbetrag)
-      if (analyse.typ !== "versandbestaetigung") {
-        if (analyse.bestellnummer) {
-          updateFields.bestellnummer = analyse.bestellnummer;
-        }
-        if (analyse.gesamtbetrag) {
-          updateFields.betrag = analyse.gesamtbetrag;
-        }
-      }
+      await supabase.from("bestellungen").update(updateFields).eq("id", bestellungId);
 
-      await supabase
-        .from("bestellungen")
-        .update(updateFields)
-        .eq("id", bestellungId);
-
+      gespeicherteTypen.push(analyse.typ);
       dokumenteGespeichert++;
     }
 
-    // E-Mail-Body IMMER zusätzlich analysieren wenn substanziell (>100 Zeichen).
-    // Viele Lieferanten senden Bestelldetails im Body (Böttcher, Amazon, etc.)
-    // UND ein PDF als Anhang (z.B. AGB, Widerrufsformular, oder dieselbe Rechnung).
-    // → Body-Analyse fängt Fälle ab wo der Anhang irrelevant ist oder
-    //   zusätzliche Infos enthält (z.B. Bestellnummer nur im Body).
-    const gespeicherteTypen = ergebnisse
-      .filter((e) => bekannteTypen.includes(e.analyse.typ))
-      .map((e) => e.analyse.typ);
-
+    // =====================================================================
+    // E-MAIL BODY ALS ERGÄNZUNG ANALYSIEREN
+    // =====================================================================
     if (emailText && emailText.length > 100) {
       try {
-        const bodyBase64 = Buffer.from(emailText.slice(0, 10000)).toString("base64");
-        const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
+        // Nur wenn noch Zeit übrig ist (< 45s verbraucht)
+        if (Date.now() - startTime < 45_000) {
+          const bodyBase64 = Buffer.from(emailText.slice(0, 8000)).toString("base64");
+          const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
 
-        // Nur speichern wenn: bekannter Typ UND dieser Typ noch nicht aus Anhängen vorhanden
-        if (bekannteTypen.includes(bodyAnalyse.typ) && !gespeicherteTypen.includes(bodyAnalyse.typ)) {
-          logInfo("/api/webhook/email", `E-Mail-Body als ${bodyAnalyse.typ} erkannt (ergänzend zu ${dokumenteGespeichert} Anhang-Dokumenten)`, { bestellungId });
+          if (bekannteTypen.includes(bodyAnalyse.typ) && !gespeicherteTypen.includes(bodyAnalyse.typ)) {
+            // Neuer Typ aus Body → speichern
+            await supabase.from("dokumente").insert({
+              bestellung_id: bestellungId,
+              typ: bodyAnalyse.typ,
+              quelle: "email",
+              storage_pfad: null,
+              email_betreff,
+              email_absender,
+              email_datum,
+              ki_roh_daten: bodyAnalyse,
+              bestellnummer_erkannt: bodyAnalyse.bestellnummer,
+              artikel: bodyAnalyse.artikel,
+              gesamtbetrag: bodyAnalyse.gesamtbetrag,
+              netto: bodyAnalyse.netto,
+              mwst: bodyAnalyse.mwst,
+              faelligkeitsdatum: bodyAnalyse.faelligkeitsdatum,
+              lieferdatum: bodyAnalyse.lieferdatum,
+              iban: bodyAnalyse.iban,
+            });
 
-          const { error: bodyInsertError } = await supabase.from("dokumente").insert({
-            bestellung_id: bestellungId,
-            typ: bodyAnalyse.typ,
-            quelle: "email",
-            storage_pfad: null,
-            email_betreff,
-            email_absender,
-            email_datum,
-            ki_roh_daten: bodyAnalyse,
-            bestellnummer_erkannt: bodyAnalyse.bestellnummer,
-            artikel: bodyAnalyse.artikel,
-            gesamtbetrag: bodyAnalyse.gesamtbetrag,
-            netto: bodyAnalyse.netto,
-            mwst: bodyAnalyse.mwst,
-            faelligkeitsdatum: bodyAnalyse.faelligkeitsdatum,
-            lieferdatum: bodyAnalyse.lieferdatum,
-            iban: bodyAnalyse.iban,
-          });
-
-          if (!bodyInsertError) {
-            const bodyUpdateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
-
-            if (bodyAnalyse.typ === "bestellbestaetigung") bodyUpdateFields.hat_bestellbestaetigung = true;
-            else if (bodyAnalyse.typ === "lieferschein") bodyUpdateFields.hat_lieferschein = true;
-            else if (bodyAnalyse.typ === "rechnung") bodyUpdateFields.hat_rechnung = true;
-            else if (bodyAnalyse.typ === "versandbestaetigung") {
-              bodyUpdateFields.hat_versandbestaetigung = true;
-              if (bodyAnalyse.tracking_nummer) bodyUpdateFields.tracking_nummer = bodyAnalyse.tracking_nummer;
-              if (bodyAnalyse.versanddienstleister) bodyUpdateFields.versanddienstleister = bodyAnalyse.versanddienstleister;
-              if (bodyAnalyse.tracking_url) {
-                bodyUpdateFields.tracking_url = bodyAnalyse.tracking_url;
-              } else if (bodyAnalyse.versanddienstleister && bodyAnalyse.tracking_nummer) {
-                const autoUrl = buildTrackingUrl(bodyAnalyse.versanddienstleister, bodyAnalyse.tracking_nummer);
-                if (autoUrl) bodyUpdateFields.tracking_url = autoUrl;
-              }
-              if (bodyAnalyse.voraussichtliche_lieferung) bodyUpdateFields.voraussichtliche_lieferung = bodyAnalyse.voraussichtliche_lieferung;
-            }
-
+            const bodyUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+            const flagMap: Record<string, string> = {
+              bestellbestaetigung: "hat_bestellbestaetigung",
+              lieferschein: "hat_lieferschein",
+              rechnung: "hat_rechnung",
+              versandbestaetigung: "hat_versandbestaetigung",
+            };
+            if (flagMap[bodyAnalyse.typ]) bodyUpdate[flagMap[bodyAnalyse.typ]] = true;
             if (bodyAnalyse.typ !== "versandbestaetigung") {
-              if (bodyAnalyse.bestellnummer) bodyUpdateFields.bestellnummer = bodyAnalyse.bestellnummer;
-              if (bodyAnalyse.gesamtbetrag) bodyUpdateFields.betrag = bodyAnalyse.gesamtbetrag;
+              if (bodyAnalyse.bestellnummer) bodyUpdate.bestellnummer = bodyAnalyse.bestellnummer;
+              if (bodyAnalyse.gesamtbetrag) bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
             }
 
-            await supabase.from("bestellungen").update(bodyUpdateFields).eq("id", bestellungId);
+            await supabase.from("bestellungen").update(bodyUpdate).eq("id", bestellungId);
             dokumenteGespeichert++;
-          }
-        } else if (bekannteTypen.includes(bodyAnalyse.typ)) {
-          // Typ schon aus Anhang vorhanden, aber Body hat evtl. fehlende Felder
-          // → Bestellnummer/Betrag ergänzen wenn in Anhang-Analyse fehlend
-          const anhangAnalyse = ergebnisse.find((e) => e.analyse.typ === bodyAnalyse.typ)?.analyse;
-          if (anhangAnalyse) {
+            gespeicherteTypen.push(bodyAnalyse.typ);
+          } else if (bekannteTypen.includes(bodyAnalyse.typ)) {
+            // Typ schon aus Anhang vorhanden → fehlende Felder ergänzen
             const ergaenzung: Record<string, unknown> = {};
-            if (!anhangAnalyse.bestellnummer && bodyAnalyse.bestellnummer && bodyAnalyse.typ !== "versandbestaetigung") {
-              ergaenzung.bestellnummer = bodyAnalyse.bestellnummer;
+            if (bodyAnalyse.bestellnummer && bodyAnalyse.typ !== "versandbestaetigung") {
+              // Bestellnummer nur ergänzen wenn noch keine da
+              const { data: check } = await supabase
+                .from("bestellungen")
+                .select("bestellnummer")
+                .eq("id", bestellungId)
+                .maybeSingle();
+              if (check && !check.bestellnummer) ergaenzung.bestellnummer = bodyAnalyse.bestellnummer;
             }
-            if (!anhangAnalyse.gesamtbetrag && bodyAnalyse.gesamtbetrag && bodyAnalyse.typ !== "versandbestaetigung") {
-              ergaenzung.betrag = bodyAnalyse.gesamtbetrag;
+            if (bodyAnalyse.gesamtbetrag && bodyAnalyse.typ !== "versandbestaetigung") {
+              const { data: check } = await supabase
+                .from("bestellungen")
+                .select("betrag")
+                .eq("id", bestellungId)
+                .maybeSingle();
+              if (check && !check.betrag) ergaenzung.betrag = bodyAnalyse.gesamtbetrag;
             }
             if (Object.keys(ergaenzung).length > 0) {
               await supabase.from("bestellungen").update(ergaenzung).eq("id", bestellungId);
-              logInfo("/api/webhook/email", "Body-Analyse ergänzt fehlende Felder aus Anhang", { bestellungId, ergaenzung });
             }
           }
+        } else {
+          logInfo("webhook/email", "Body-Analyse übersprungen (Timeout-Schutz)", {
+            dauer_ms: Date.now() - startTime,
+          });
         }
       } catch (bodyErr) {
-        logError("/api/webhook/email", "Body-Analyse fehlgeschlagen", bodyErr);
+        logError("webhook/email", "Body-Analyse fehlgeschlagen", bodyErr);
       }
     }
 
-    // Wenn keine Dokumente gespeichert: E-Mail-Body als Fallback nutzen oder Rollback
+    // =====================================================================
+    // FALLBACK: Kein Dokument gespeichert
+    // =====================================================================
     if (dokumenteGespeichert === 0) {
       if (emailText && emailText.length > 20) {
-        // E-Mail ohne Anhänge aber mit Body-Text: Typ anhand Betreff + Body-Keywords erkennen
-        const betreffLower = (email_betreff || "").toLowerCase();
-        const bodyLower = emailText.toLowerCase();
-        const suchText = betreffLower + " " + bodyLower.slice(0, 500);
-
-        const versandKeywords = ["versand", "versendet", "sendungsverfolgung", "tracking", "shipped", "dispatch", "paket", "zustellung", "unterwegs", "sendung"];
-        const rechnungKeywords = ["rechnung", "invoice", "zahlungsaufforderung", "fällig", "rechnungsnummer", "zahlungsziel"];
-        const lieferscheinKeywords = ["lieferschein", "lieferung", "delivery note", "warenausgang", "versandbestätigung ihrer lieferung"];
-        const bestellungKeywords = ["bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "auftragsbestaetigung", "order confirmation", "ihre bestellung", "bestellung eingegangen"];
+        // Keyword-basierte Typ-Erkennung (kein GPT, instant)
+        const suchText = ((email_betreff || "") + " " + emailText.slice(0, 500)).toLowerCase();
 
         let fallbackTyp: string;
         let fallbackFlag: string;
 
-        if (versandKeywords.some((k) => suchText.includes(k))) {
+        const versandKw = ["versand", "versendet", "sendungsverfolgung", "tracking", "shipped", "paket", "zustellung", "unterwegs", "sendung"];
+        const rechnungKw = ["rechnung", "invoice", "zahlungsaufforderung", "fällig", "rechnungsnummer", "zahlungsziel"];
+        const lieferscheinKw = ["lieferschein", "lieferung", "delivery note", "warenausgang"];
+        const bestellungKw = ["bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "order confirmation", "ihre bestellung", "bestellung eingegangen"];
+
+        if (versandKw.some((k) => suchText.includes(k))) {
           fallbackTyp = "versandbestaetigung";
           fallbackFlag = "hat_versandbestaetigung";
-        } else if (rechnungKeywords.some((k) => suchText.includes(k))) {
+        } else if (rechnungKw.some((k) => suchText.includes(k))) {
           fallbackTyp = "rechnung";
           fallbackFlag = "hat_rechnung";
-        } else if (lieferscheinKeywords.some((k) => suchText.includes(k))) {
+        } else if (lieferscheinKw.some((k) => suchText.includes(k))) {
           fallbackTyp = "lieferschein";
           fallbackFlag = "hat_lieferschein";
-        } else if (bestellungKeywords.some((k) => suchText.includes(k))) {
+        } else if (bestellungKw.some((k) => suchText.includes(k))) {
           fallbackTyp = "bestellbestaetigung";
           fallbackFlag = "hat_bestellbestaetigung";
         } else {
@@ -887,36 +778,29 @@ export async function POST(request: NextRequest) {
           fallbackFlag = "hat_bestellbestaetigung";
         }
 
-        const istVersandEmail = fallbackTyp === "versandbestaetigung";
+        // Tracking-Daten extrahieren bei Versand-Emails
+        const bestellungUpdate: Record<string, unknown> = {
+          [fallbackFlag]: true,
+          updated_at: new Date().toISOString(),
+        };
 
-        logInfo("/api/webhook/email", `Keine Anhänge, aber E-Mail-Body vorhanden – speichere als ${fallbackTyp}`, { bestellungId });
-
-        // Bei Versand-Emails: Tracking-Daten aus Body extrahieren
-        const bestellungUpdate: Record<string, unknown> = { [fallbackFlag]: true, updated_at: new Date().toISOString() };
-        if (istVersandEmail) {
-          // Einfache Regex-Extraktion aus Body-Text (schneller als GPT-Call)
-          const trackingMatch = emailText.match(/(?:sendungsnummer|tracking[- ]?(?:nr|nummer|number|id|code)|paketnummer|trackingnr)[:\s]*([A-Z0-9]{8,30})/i);
+        if (fallbackTyp === "versandbestaetigung") {
+          const trackingMatch = emailText.match(/(?:sendungsnummer|tracking[- ]?(?:nr|nummer|number|id|code)|paketnummer)[:\s]*([A-Z0-9]{8,30})/i);
           if (trackingMatch) bestellungUpdate.tracking_nummer = trackingMatch[1];
 
-          const carrierPatterns = [
+          const carriers = [
             { name: "DHL", pattern: /\bDHL\b/i },
             { name: "DPD", pattern: /\bDPD\b/i },
             { name: "Hermes", pattern: /\bHermes\b/i },
             { name: "UPS", pattern: /\bUPS\b/i },
             { name: "GLS", pattern: /\bGLS\b/i },
-            { name: "FedEx", pattern: /\bFedEx\b/i },
-            { name: "Deutsche Post", pattern: /\bDeutsche Post\b/i },
-            { name: "GO!", pattern: /\bGO!\b/i },
-            { name: "Trans-o-flex", pattern: /\bTrans-o-flex\b/i },
           ];
-          const carrier = carrierPatterns.find((c) => c.pattern.test(emailText));
+          const carrier = carriers.find((c) => c.pattern.test(emailText));
           if (carrier) bestellungUpdate.versanddienstleister = carrier.name;
 
-          // Tracking-URL aus Body extrahieren
           const urlMatch = emailText.match(/https?:\/\/[^\s"'<>]+(?:track|sendung|parcel|verfolg)[^\s"'<>]*/i);
-          if (urlMatch) {
-            bestellungUpdate.tracking_url = urlMatch[0];
-          } else if (carrier && trackingMatch) {
+          if (urlMatch) bestellungUpdate.tracking_url = urlMatch[0];
+          else if (carrier && trackingMatch) {
             const autoUrl = buildTrackingUrl(carrier.name, trackingMatch[1]);
             if (autoUrl) bestellungUpdate.tracking_url = autoUrl;
           }
@@ -941,338 +825,74 @@ export async function POST(request: NextRequest) {
           iban: null,
         });
 
-        await supabase
-          .from("bestellungen")
-          .update(bestellungUpdate)
-          .eq("id", bestellungId);
-
+        await supabase.from("bestellungen").update(bestellungUpdate).eq("id", bestellungId);
         dokumenteGespeichert = 1;
       } else if (bestellungNeuErstellt) {
-        // Weder Anhänge noch Body → Rollback nur wenn neue Bestellung
-        logError("/api/webhook/email", "Rollback: Keine Dokumente und kein E-Mail-Body", {
-          bestellungId, email_absender, email_betreff, anhaenge_count: anhaenge.length,
-        });
-
-        await supabase.from("webhook_logs").insert({
-          typ: "email",
-          status: "error",
-          bestellung_id: bestellungId,
-          fehler_text: `Rollback: Keine Dokumente gespeichert. Anhänge: ${anhaenge.length}, Body-Länge: ${emailText.length}. Absender: ${email_absender}, Betreff: ${email_betreff}`,
-        });
-
+        // Rollback: Keine Daten → Bestellung löschen
+        logError("webhook/email", "Rollback: Keine Dokumente", { bestellungId, email_absender, email_betreff });
         await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
         await supabase.from("bestellungen").delete().eq("id", bestellungId);
         return NextResponse.json({
           error: "Keine Dokumente konnten gespeichert werden",
-          debug: {
-            anhaenge_empfangen: anhaenge.length,
-            email_text_laenge: emailText.length,
-            email_absender,
-            email_betreff,
-          },
+          debug: { anhaenge_empfangen: anhaenge.length, email_text_laenge: emailText.length },
         }, { status: 500 });
       }
-      // Wenn !bestellungNeuErstellt und kein Body → existierende Bestellung bleibt unverändert, kein Fehler
     }
 
-    // === FEATURE 3: Anomalie-Erkennung bei Preisen ===
-    const aktuelleArtikel = ergebnisse
-      .flatMap((e) => e.analyse.artikel || [])
-      .map((a) => ({ name: a.name, einzelpreis: a.einzelpreis, menge: a.menge }));
-
-    if (aktuelleArtikel.length > 0) {
+    // =====================================================================
+    // HÄNDLER AUTO-ERKENNUNG (nur wenn noch nicht bekannt + noch Zeit)
+    // =====================================================================
+    if (!haendler && analyseErgebnisse.length > 0 && (Date.now() - startTime) < 50_000) {
       try {
-        // Historische Preise laden
-        const { data: alleDokumente } = await supabase
-          .from("dokumente")
-          .select("artikel")
-          .neq("bestellung_id", bestellungId)
-          .not("artikel", "is", null)
-          .limit(50);
+        const erkannterHaendlerName = analyseErgebnisse.find((e) => e.analyse.haendler)?.analyse.haendler || null;
+        const neuerHaendler = await erkenneHaendlerAusEmail(email_absender, email_betreff, erkannterHaendlerName);
 
-        const preisMap = new Map<string, number[]>();
-        for (const dok of alleDokumente || []) {
-          const art = dok.artikel as { name: string; einzelpreis: number }[] | null;
-          if (!art) continue;
-          for (const a of art) {
-            if (!a.name || !a.einzelpreis) continue;
-            const key = a.name.toLowerCase();
-            if (!preisMap.has(key)) preisMap.set(key, []);
-            preisMap.get(key)!.push(a.einzelpreis);
-          }
-        }
+        if (neuerHaendler) {
+          const { data: existing } = await supabase
+            .from("haendler")
+            .select("id")
+            .eq("domain", neuerHaendler.domain)
+            .limit(1);
 
-        const historischePreise = aktuelleArtikel
-          .map((a) => ({
-            name: a.name,
-            preise: preisMap.get(a.name.toLowerCase()) || [],
-          }))
-          .filter((h) => h.preise.length > 0);
-
-        if (historischePreise.length > 0) {
-          const anomalien = await pruefePreisanomalien(aktuelleArtikel, historischePreise);
-
-          if (anomalien.hat_anomalie) {
-            // Preiswarnung als Kommentar speichern
-            await supabase.from("kommentare").insert({
-              bestellung_id: bestellungId,
-              autor_kuerzel: "KI",
-              autor_name: "KI-Preisüberwachung",
-              text: `Preiswarnung: ${anomalien.zusammenfassung}`,
+          if (!existing || existing.length === 0) {
+            await supabase.from("haendler").insert({
+              name: neuerHaendler.name,
+              domain: neuerHaendler.domain,
+              email_absender: [neuerHaendler.email_muster],
+              url_muster: [],
             });
-            logInfo("/api/webhook/email", `Preisanomalie erkannt`, { bestellungId, zusammenfassung: anomalien.zusammenfassung });
+
+            // Bestellung mit neuem Händlernamen updaten
+            await supabase
+              .from("bestellungen")
+              .update({ haendler_name: neuerHaendler.name })
+              .eq("id", bestellungId);
+
+            logInfo("webhook/email", `Neuer Händler: ${neuerHaendler.name}`, { domain: neuerHaendler.domain });
           }
         }
       } catch (err) {
-        logError("/api/webhook/email", "Preisanomalie-Prüfung fehlgeschlagen", err);
+        logError("webhook/email", "Händler-Erkennung fehlgeschlagen", err);
       }
     }
 
-    // === FEATURE: Duplikat-Erkennung ===
-    if (aktuelleArtikel.length > 0) {
-      try {
-        const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { data: aehnliche } = await supabase
-          .from("bestellungen")
-          .select("id, bestellnummer, haendler_name, betrag, created_at")
-          .eq("haendler_name", haendler?.name || haendlerDomain)
-          .neq("id", bestellungId)
-          .gte("created_at", siebenTageZurueck)
-          .limit(10);
-
-        if (aehnliche && aehnliche.length > 0) {
-          const aehnlicheIds = aehnliche.map((b) => b.id);
-          const { data: aehnlicheDoks } = await supabase
-            .from("dokumente")
-            .select("bestellung_id, artikel")
-            .in("bestellung_id", aehnlicheIds)
-            .not("artikel", "is", null);
-
-          const artikelMap = new Map<string, { name: string; menge: number; einzelpreis: number }[]>();
-          for (const dok of aehnlicheDoks || []) {
-            const art = dok.artikel as { name: string; menge: number; einzelpreis: number }[] | null;
-            if (art) {
-              const existing = artikelMap.get(dok.bestellung_id) || [];
-              artikelMap.set(dok.bestellung_id, [...existing, ...art]);
-            }
-          }
-
-          const existierendeBestellungen = aehnliche.map((b) => ({
-            bestellnummer: b.bestellnummer || "Ohne Nr.",
-            haendler: b.haendler_name || "–",
-            betrag: Number(b.betrag) || null,
-            artikel: artikelMap.get(b.id) || [],
-            datum: new Date(b.created_at).toLocaleDateString("de-DE"),
-          }));
-
-          const duplikat = await pruefeDuplikat(
-            {
-              haendler: haendler?.name || haendlerDomain,
-              betrag: ergebnisse[0]?.analyse.gesamtbetrag ?? null,
-              artikel: aktuelleArtikel,
-            },
-            existierendeBestellungen
-          );
-
-          if (duplikat.ist_duplikat && duplikat.konfidenz >= 0.7) {
-            await supabase.from("kommentare").insert({
-              bestellung_id: bestellungId,
-              autor_kuerzel: "KI",
-              autor_name: "KI-Duplikat-Erkennung",
-              text: `⚠ Mögliches Duplikat: ${duplikat.begruendung}`,
-            });
-            logInfo("/api/webhook/email", "Duplikat erkannt", { bestellungId, duplikat_von: duplikat.duplikat_von, konfidenz: duplikat.konfidenz });
-          }
-        }
-      } catch (err) {
-        logError("/api/webhook/email", "Duplikat-Prüfung fehlgeschlagen", err);
-      }
-    }
-
-    // === FEATURE: Automatische Artikel-Kategorisierung ===
-    if (aktuelleArtikel.length > 0) {
-      try {
-        const kategorisierung = await kategorisiereArtikel(aktuelleArtikel);
-        if (kategorisierung.kategorien.length > 0) {
-          // Kategorien als JSONB in der Bestellung speichern
-          await supabase
-            .from("bestellungen")
-            .update({ artikel_kategorien: kategorisierung.zusammenfassung })
-            .eq("id", bestellungId);
-          logInfo("/api/webhook/email", "Artikel kategorisiert", { bestellungId, kategorien: kategorisierung.zusammenfassung });
-        }
-      } catch (err) {
-        logError("/api/webhook/email", "Kategorisierung fehlgeschlagen", err);
-      }
-    }
-
-    // === FEATURE: Intelligente Baustellen-Erkennung (5-Stufen-Kette) ===
-    try {
-      // 1. Volltext + Lieferadressen aus Scan-Ergebnissen sammeln
-      const dokumentTexte = ergebnisse.map((e) => e.analyse.volltext || "").filter(Boolean);
-      const lieferadressen = ergebnisse.flatMap((e) => e.analyse.lieferadressen || []).filter(Boolean);
-
-      // 2. Büro-Adresse + Konfidenz-Schwellwerte laden
-      const { data: firmaSettings } = await supabase
-        .from("firma_einstellungen")
-        .select("schluessel, wert")
-        .in("schluessel", ["buero_adresse", "konfidenz_direkt", "konfidenz_vorschlag"]);
-      const bueroAdresse = firmaSettings?.find((s: { schluessel: string }) => s.schluessel === "buero_adresse")?.wert || "";
-      const schwelleDirekt = parseFloat(firmaSettings?.find((s: { schluessel: string }) => s.schluessel === "konfidenz_direkt")?.wert || "0.85");
-      const schwelleVorschlag = parseFloat(firmaSettings?.find((s: { schluessel: string }) => s.schluessel === "konfidenz_vorschlag")?.wert || "0.60");
-
-      // 3. Aktive Projekte mit Kunden-Info laden
-      const { data: aktiveProjekte } = await supabase
-        .from("projekte")
-        .select("id, name, beschreibung, adresse, adresse_keywords, kunden_id, besteller_affinitaet, kunden(name)")
-        .in("status", ["aktiv", "pausiert"]);
-
-      type KundenJoin = { name: string } | { name: string }[] | null;
-      type ProjektRow = { id: string; name: string; beschreibung: string | null; adresse: string | null; adresse_keywords: string[] | null; kunden_id: string | null; besteller_affinitaet: unknown; kunden: KundenJoin };
-      const kundenName = (p: ProjektRow): string | null => {
-        const k = p.kunden;
-        if (!k) return null;
-        if (Array.isArray(k)) return k[0]?.name || null;
-        if (typeof k === "object" && "name" in k) return k.name || null;
-        return null;
-      };
-
-      // 4. Letzte Bestellung pro Projekt laden (für Recency-Boost)
-      const projektIds = (aktiveProjekte || []).map((p: { id: string }) => p.id);
-      let letzteBestellungMap: Record<string, string> = {};
-      if (projektIds.length > 0) {
-        const { data: letzteBestellungen } = await supabase
-          .from("bestellungen")
-          .select("projekt_id, created_at")
-          .in("projekt_id", projektIds)
-          .order("created_at", { ascending: false });
-        for (const b of letzteBestellungen || []) {
-          if (b.projekt_id && !letzteBestellungMap[b.projekt_id]) {
-            letzteBestellungMap[b.projekt_id] = b.created_at;
-          }
-        }
-      }
-
-      // 5. STUFE 0: Affinität prüfen (kostenlos, kein API-Call)
-      let projektErgebnis: ProjektMatchErgebnis | null = null;
-      let affinitaetsMatch: ProjektMatchErgebnis | null = null;
-      if (bestellerKuerzel && bestellerKuerzel !== "UNBEKANNT" && aktiveProjekte) {
-        affinitaetsMatch = berechneAffinitaet(
-          bestellerKuerzel,
-          (aktiveProjekte as ProjektRow[]).map((p) => ({
-            id: p.id,
-            name: p.name,
-            besteller_affinitaet: p.besteller_affinitaet as Record<string, number> | null,
-            letzte_bestellung: letzteBestellungMap[p.id] || null,
-          }))
-        );
-      }
-
-      if (affinitaetsMatch && affinitaetsMatch.konfidenz >= schwelleDirekt) {
-        // Affinität allein reicht für Direkt-Zuordnung → GPT überspringen
-        projektErgebnis = affinitaetsMatch;
-        logInfo("/api/webhook/email", `Affinität-Shortcut: GPT übersprungen (${Math.round(affinitaetsMatch.konfidenz * 100)}%)`, { bestellungId });
-      } else {
-        // 6. Stufen 1-3: GPT-4o Erkennung
-        const gptErgebnis = await erkenneProjektAusInhalt({
-          email_betreff: email_betreff || "",
-          email_body: emailText,
-          dokument_texte: dokumentTexte,
-          lieferadressen,
-          buero_adresse: bueroAdresse,
-          aktive_projekte: ((aktiveProjekte || []) as ProjektRow[]).map((p) => ({
-            id: p.id,
-            name: p.name,
-            beschreibung: p.beschreibung,
-            adresse: p.adresse,
-            adresse_keywords: p.adresse_keywords || [],
-            kunden_name: kundenName(p),
-          })),
-        });
-
-        // 7. Bestes Ergebnis nehmen: max(GPT, Affinität), mindestens schwelleVorschlag
-        const best = (gptErgebnis && affinitaetsMatch)
-          ? (gptErgebnis.konfidenz >= affinitaetsMatch.konfidenz ? gptErgebnis : affinitaetsMatch)
-          : (gptErgebnis || affinitaetsMatch);
-        if (best && best.konfidenz >= schwelleVorschlag) {
-          projektErgebnis = best;
-        }
-      }
-
-      // 6. Speichern
-      const updateDaten: Record<string, unknown> = {
-        lieferadresse_erkannt: projektErgebnis?.extrahierte_lieferadresse || lieferadressen[0] || null,
-      };
-
-      if (projektErgebnis && projektErgebnis.projekt_id) {
-        const direktZuordnen = projektErgebnis.konfidenz >= schwelleDirekt;
-
-        // Projekt-Name nachschlagen
-        const matchProjekt = (aktiveProjekte as ProjektRow[])?.find((p) => p.id === projektErgebnis!.projekt_id);
-        const projektName = matchProjekt?.name || "";
-
-        if (direktZuordnen) {
-          updateDaten.projekt_id = projektErgebnis.projekt_id;
-          updateDaten.projekt_name = projektName;
-          updateDaten.projekt_vorschlag_id = null;
-          updateDaten.projekt_vorschlag_konfidenz = projektErgebnis.konfidenz;
-          updateDaten.projekt_vorschlag_methode = projektErgebnis.methode;
-          updateDaten.projekt_vorschlag_begruendung = projektErgebnis.begruendung;
-          updateDaten.projekt_bestaetigt = true;
-        } else {
-          updateDaten.projekt_vorschlag_id = projektErgebnis.projekt_id;
-          updateDaten.projekt_vorschlag_konfidenz = projektErgebnis.konfidenz;
-          updateDaten.projekt_vorschlag_methode = projektErgebnis.methode;
-          updateDaten.projekt_vorschlag_begruendung = projektErgebnis.begruendung;
-          updateDaten.projekt_bestaetigt = false;
-        }
-
-        logInfo("/api/webhook/email", `Projekt-Match: ${projektName} (${Math.round(projektErgebnis.konfidenz * 100)}%, ${projektErgebnis.methode})`, { bestellungId, direkt: direktZuordnen });
-      }
-
-      await supabase
-        .from("bestellungen")
-        .update(updateDaten)
-        .eq("id", bestellungId);
-
-      // 7. Self-Learning bei Direkt-Zuordnung
-      if (projektErgebnis && projektErgebnis.projekt_id && projektErgebnis.konfidenz >= schwelleDirekt) {
-        await aktualisiereBestellerAffinitaet(supabase, projektErgebnis.projekt_id);
-      }
-    } catch (err) {
-      logError("/api/webhook/email", "Baustellen-Erkennung fehlgeschlagen", err);
-      // Pipeline läuft trotzdem weiter
-    }
-
-    // Status aktualisieren (zentralisiert)
+    // =====================================================================
+    // STATUS AKTUALISIEREN
+    // =====================================================================
     await updateBestellungStatus(supabase, bestellungId);
 
     // Signal als verarbeitet markieren
     if (signal) {
-      await supabase
-        .from("bestellung_signale")
-        .update({ verarbeitet: true })
-        .eq("id", signal.id);
+      await supabase.from("bestellung_signale").update({ verarbeitet: true }).eq("id", signal.id);
     }
 
-    // Admin-Benachrichtigung bei UNBEKANNT: Kommentar anlegen
+    // Admin-Hinweis bei UNBEKANNT
     if (bestellerKuerzel === "UNBEKANNT") {
-      const erkannteArtikel = ergebnisse
-        .flatMap((e) => e.analyse.artikel || [])
-        .slice(0, 5)
-        .map((a) => a.name)
-        .join(", ");
-
       await supabase.from("kommentare").insert({
         bestellung_id: bestellungId,
         autor_kuerzel: "SYSTEM",
         autor_name: "Zuordnungs-Assistent",
-        text: `Bestellung konnte keinem Besteller zugeordnet werden.\n` +
-          `Händler: ${haendler?.name || haendlerDomain}\n` +
-          `Absender: ${email_absender}\n` +
-          `Betreff: ${email_betreff || "–"}\n` +
-          (erkannteArtikel ? `Artikel: ${erkannteArtikel}\n` : "") +
-          `\nBitte manuell zuordnen über: Bestelldetail → "Besteller zuordnen"`,
+        text: `Bestellung konnte keinem Besteller zugeordnet werden.\nHändler: ${haendlerName}\nAbsender: ${email_absender}\nBetreff: ${email_betreff || "–"}\n\nBitte manuell zuordnen.`,
       });
     }
 
@@ -1284,72 +904,185 @@ export async function POST(request: NextRequest) {
       bestellnummer: erkannteBestellnummer || null,
     });
 
+    const dauer = Date.now() - startTime;
+    logInfo("webhook/email", `Fertig in ${dauer}ms`, {
+      bestellungId,
+      dokumente: dokumenteGespeichert,
+      besteller: bestellerKuerzel,
+      methode: zuordnungsMethode,
+      haendler: haendlerName,
+    });
+
     return NextResponse.json({
       success: true,
       bestellung_id: bestellungId,
-      zuordnung: {
-        methode: zuordnungsMethode,
-        kuerzel: bestellerKuerzel,
-      },
+      zuordnung: { methode: zuordnungsMethode, kuerzel: bestellerKuerzel },
+      dokumente_gespeichert: dokumenteGespeichert,
+      dauer_ms: dauer,
     });
   } catch (err) {
-    logError("/api/webhook/email", "Webhook Fehler", err);
-
-    // Webhook-Log: Fehler
+    logError("webhook/email", "Webhook Fehler", err);
     try {
       const supabase = createServiceClient();
       await supabase.from("webhook_logs").insert({
         typ: "email",
         status: "error",
-        fehler_text: err instanceof Error ? err.message : "Unbekannter Fehler",
+        fehler_text: err instanceof Error ? err.message : String(err),
       });
-    } catch { /* Log-Fehler nicht weiter propagieren */ }
+    } catch { /* ignore */ }
 
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      { error: "Interner Fehler", message: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }
 }
 
-/** HTML-Tags, Entities und überflüssigen Whitespace aus E-Mail-Body entfernen */
-function stripHtml(html: string): string {
-  if (!html) return "";
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")     // <style>-Blöcke entfernen
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")    // <script>-Blöcke entfernen
-    .replace(/<!--[\s\S]*?-->/g, "")                      // HTML-Kommentare
-    .replace(/<br\s*\/?>/gi, "\n")                         // <br> → Zeilenumbruch
-    .replace(/<\/(?:p|div|tr|li|h[1-6])>/gi, "\n")        // Block-Elemente → Zeilenumbruch
-    .replace(/<[^>]+>/g, "")                               // Alle übrigen Tags entfernen
-    .replace(/&nbsp;/gi, " ")                              // &nbsp;
-    .replace(/&amp;/gi, "&")                               // &amp;
-    .replace(/&lt;/gi, "<")                                // &lt;
-    .replace(/&gt;/gi, ">")                                // &gt;
-    .replace(/&quot;/gi, '"')                               // &quot;
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))  // Numerische Entities
-    .replace(/[ \t]+/g, " ")                               // Mehrfache Leerzeichen → eines
-    .replace(/\n{3,}/g, "\n\n")                            // Max 2 Zeilenumbrüche
-    .trim();
-}
-
-function extractDomain(email: string): string {
-  const match = email?.match(/@([^>\s]+)/);
-  return match ? match[1] : "unbekannt";
-}
-
-function extractEmailAddress(raw: string): string {
-  // "Bauhaus <bestellung@bauhaus.de>" → "bestellung@bauhaus.de"
-  const match = raw?.match(/[\w.+-]+@[\w.-]+\.\w+/);
-  return match ? match[0].toLowerCase() : "";
-}
-
-function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
+// =====================================================================
+// VERSAND-EMAILS: An existierende Bestellung anhängen
+// =====================================================================
+async function handleVersandEmail(
+  supabase: ReturnType<typeof createServiceClient>,
+  params: {
+    email_betreff: string;
+    email_absender: string;
+    email_datum: string;
+    emailText: string;
+    anhaenge: { name: string; base64: string; mime_type: string }[];
+    absenderDomain: string;
+    startTime: number;
   }
-  return hash;
+) {
+  const { email_betreff, email_absender, email_datum, emailText, anhaenge, absenderDomain, startTime } = params;
+
+  logInfo("webhook/email", `Versand-Email von ${absenderDomain}`, { email_betreff });
+
+  // Tracking-Daten aus Body extrahieren (kein GPT nötig)
+  let trackingNummer: string | null = null;
+  let versanddienstleister: string | null = null;
+  let trackingUrl: string | null = null;
+
+  // Tracking-Nummer
+  const trackingMatch = emailText.match(/(?:sendungsnummer|tracking[- ]?(?:nr|nummer|number|id|code)|paketnummer|shipment)[:\s]*([A-Z0-9]{8,30})/i);
+  if (trackingMatch) trackingNummer = trackingMatch[1];
+
+  // Carrier
+  const carriers = [
+    { name: "DHL", pattern: /\bDHL\b/i },
+    { name: "DPD", pattern: /\bDPD\b/i },
+    { name: "Hermes", pattern: /\bHermes\b/i },
+    { name: "UPS", pattern: /\bUPS\b/i },
+    { name: "GLS", pattern: /\bGLS\b/i },
+    { name: "FedEx", pattern: /\bFedEx\b/i },
+    { name: "Deutsche Post", pattern: /\bDeutsche Post\b/i },
+  ];
+  const carrier = carriers.find((c) => c.pattern.test(emailText));
+  if (carrier) versanddienstleister = carrier.name;
+  else if (absenderDomain.includes("dhl")) versanddienstleister = "DHL";
+  else if (absenderDomain.includes("dpd")) versanddienstleister = "DPD";
+  else if (absenderDomain.includes("hermes")) versanddienstleister = "Hermes";
+  else if (absenderDomain.includes("ups")) versanddienstleister = "UPS";
+  else if (absenderDomain.includes("gls")) versanddienstleister = "GLS";
+
+  // Tracking-URL
+  const urlMatch = emailText.match(/https?:\/\/[^\s"'<>]+(?:track|sendung|parcel|verfolg)[^\s"'<>]*/i);
+  if (urlMatch) trackingUrl = urlMatch[0];
+  else if (versanddienstleister && trackingNummer) {
+    trackingUrl = buildTrackingUrl(versanddienstleister, trackingNummer) || null;
+  }
+
+  // Bestellnummer aus Betreff oder Body extrahieren
+  const bestellnrMatch = emailText.match(/(?:bestellnummer|bestellung|order|auftrag)[:\s#]*([A-Z0-9-]{4,30})/i)
+    || (email_betreff || "").match(/(?:bestellnummer|bestellung|order|auftrag)[:\s#]*([A-Z0-9-]{4,30})/i);
+
+  let bestellungId: string | null = null;
+
+  // Zuordnung: Bestellnummer-Match oder neueste offene Bestellung
+  if (bestellnrMatch) {
+    const { data } = await supabase
+      .from("bestellungen")
+      .select("id")
+      .eq("bestellnummer", bestellnrMatch[1])
+      .limit(1)
+      .maybeSingle();
+    if (data) bestellungId = data.id;
+  }
+
+  if (!bestellungId) {
+    // Letzte offene Bestellung (neueste zuerst)
+    const { data: letzte } = await supabase
+      .from("bestellungen")
+      .select("id")
+      .in("status", ["offen", "erwartet", "vollstaendig"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (letzte?.[0]) {
+      bestellungId = letzte[0].id;
+    }
+  }
+
+  if (!bestellungId) {
+    // Keine passende Bestellung → Tracking-Info ohne Bestellung loggen und verwerfen
+    logInfo("webhook/email", "Versand-Email ohne zugehörige Bestellung verworfen", {
+      tracking: trackingNummer,
+      carrier: versanddienstleister,
+    });
+    return NextResponse.json({ success: true, skipped: true, reason: "versand_ohne_bestellung" });
+  }
+
+  // Tracking-Daten in Bestellung speichern
+  const update: Record<string, unknown> = {
+    hat_versandbestaetigung: true,
+    updated_at: new Date().toISOString(),
+  };
+  if (trackingNummer) update.tracking_nummer = trackingNummer;
+  if (versanddienstleister) update.versanddienstleister = versanddienstleister;
+  if (trackingUrl) update.tracking_url = trackingUrl;
+
+  await supabase.from("bestellungen").update(update).eq("id", bestellungId);
+
+  // Dokument speichern
+  await supabase.from("dokumente").insert({
+    bestellung_id: bestellungId,
+    typ: "versandbestaetigung",
+    quelle: "email",
+    storage_pfad: null,
+    email_betreff,
+    email_absender,
+    email_datum,
+    ki_roh_daten: { typ: "versandbestaetigung", tracking_nummer: trackingNummer, versanddienstleister, tracking_url: trackingUrl },
+    bestellnummer_erkannt: bestellnrMatch?.[1] || null,
+    artikel: null,
+    gesamtbetrag: null,
+    netto: null,
+    mwst: null,
+    faelligkeitsdatum: null,
+    lieferdatum: null,
+    iban: null,
+  });
+
+  // Wenn Anhänge vorhanden (z.B. Versandlabel als PDF) → speichern
+  for (const anhang of anhaenge.slice(0, 1)) {
+    const storagePfad = `${bestellungId}/versand_${Date.now()}_${anhang.name}`;
+    const buffer = Buffer.from(anhang.base64, "base64");
+    await supabase.storage
+      .from("dokumente")
+      .upload(storagePfad, buffer, { contentType: anhang.mime_type, upsert: true });
+  }
+
+  await updateBestellungStatus(supabase, bestellungId);
+
+  logInfo("webhook/email", `Versand-Info gespeichert`, {
+    bestellungId,
+    tracking: trackingNummer,
+    carrier: versanddienstleister,
+    dauer_ms: Date.now() - startTime,
+  });
+
+  return NextResponse.json({
+    success: true,
+    bestellung_id: bestellungId,
+    versand: { tracking_nummer: trackingNummer, versanddienstleister, tracking_url: trackingUrl },
+  });
 }
