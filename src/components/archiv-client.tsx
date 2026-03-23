@@ -162,9 +162,12 @@ export function ArchivClient({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
   const [localMaterial, setLocalMaterial] = useState(materialOrders);
   const [localSU, setLocalSU] = useState(suOrders);
+  const [localProjekte, setLocalProjekte] = useState(projekte);
   const router = useRouter();
 
   const toggleExpand = (id: string) => {
@@ -200,32 +203,73 @@ export function ArchivClient({
   async function handleBulkDelete() {
     setDeleteLoading(true);
     try {
-      const res = await fetch("/api/bestellungen/verwerfen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bestellung_ids: Array.from(selectedIds) }),
-      });
-      if (res.ok) {
-        // Remove from local state
-        setLocalMaterial((prev) => prev.filter((o) => !selectedIds.has(o.id)));
-        setLocalSU((prev) => prev.filter((o) => !selectedIds.has(o.id)));
-        setSelectedIds(new Set());
-        setSelectionMode(false);
-        setShowDeleteDialog(false);
-        router.refresh();
+      if (activeTab === "projekte") {
+        // Soft-delete projects (set status to "archiviert")
+        const results = await Promise.all(
+          Array.from(selectedIds).map((id) =>
+            fetch(`/api/projekte/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+            })
+          )
+        );
+        if (results.every((r) => r.ok)) {
+          setLocalProjekte((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+          setSelectedIds(new Set());
+          setSelectionMode(false);
+          setShowDeleteDialog(false);
+          router.refresh();
+        }
+      } else {
+        const res = await fetch("/api/bestellungen/verwerfen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bestellung_ids: Array.from(selectedIds) }),
+        });
+        if (res.ok) {
+          setLocalMaterial((prev) => prev.filter((o) => !selectedIds.has(o.id)));
+          setLocalSU((prev) => prev.filter((o) => !selectedIds.has(o.id)));
+          setSelectedIds(new Set());
+          setSelectionMode(false);
+          setShowDeleteDialog(false);
+          router.refresh();
+        }
       }
     } catch { /* silent */ }
     finally { setDeleteLoading(false); }
   }
 
+  async function handleBulkReactivate() {
+    setReactivateLoading(true);
+    try {
+      const results = await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          fetch(`/api/projekte/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "aktiv" }),
+          })
+        )
+      );
+      if (results.every((r) => r.ok)) {
+        setLocalProjekte((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+        setSelectedIds(new Set());
+        setSelectionMode(false);
+        setShowReactivateDialog(false);
+        router.refresh();
+      }
+    } catch { /* silent */ }
+    finally { setReactivateLoading(false); }
+  }
+
   // Filtered data
   const filteredProjekte = useMemo(() => {
-    return projekte.filter((p) => {
+    return localProjekte.filter((p) => {
       if (searchQuery && !matchesSearchProjekt(p, searchQuery)) return false;
       if ((dateFrom || dateTo) && !inDateRange(p.created_at, dateFrom, dateTo)) return false;
       return true;
     });
-  }, [projekte, searchQuery, dateFrom, dateTo]);
+  }, [localProjekte, searchQuery, dateFrom, dateTo]);
 
   const filteredMaterial = useMemo(() => {
     return localMaterial.filter((o) => {
@@ -354,7 +398,7 @@ export function ArchivClient({
               </svg>
             </button>
           )}
-          {activeTab !== "projekte" && !selectionMode && (
+          {!selectionMode && (
             <button
               type="button"
               onClick={() => setSelectionMode(true)}
@@ -378,6 +422,9 @@ export function ArchivClient({
             allOrders={allOrders}
             expandedIds={expandedIds}
             toggleExpand={toggleExpand}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            toggleSelect={toggleSelect}
           />
         )}
 
@@ -429,6 +476,19 @@ export function ArchivClient({
               >
                 Abbrechen
               </button>
+              {selectedIds.size > 0 && activeTab === "projekte" && (
+                <button
+                  type="button"
+                  onClick={() => setShowReactivateDialog(true)}
+                  disabled={reactivateLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                  </svg>
+                  {reactivateLoading ? "..." : "Reaktivieren"}
+                </button>
+              )}
               {selectedIds.size > 0 && (
                 <button
                   type="button"
@@ -452,10 +512,23 @@ export function ArchivClient({
         open={showDeleteDialog}
         onCancel={() => { setShowDeleteDialog(false); setDeleteLoading(false); }}
         onConfirm={handleBulkDelete}
-        title="Archivierte Einträge löschen"
-        message={`${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} und alle zugehörigen Dokumente unwiderruflich löschen?`}
+        title={activeTab === "projekte" ? "Projekte löschen" : "Archivierte Einträge löschen"}
+        message={activeTab === "projekte"
+          ? `${selectedIds.size} ${selectedIds.size === 1 ? "Projekt" : "Projekte"} endgültig archivieren? Die zugehörigen Bestellungen bleiben erhalten.`
+          : `${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} und alle zugehörigen Dokumente unwiderruflich löschen?`}
         confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
         variant="danger"
+      />
+
+      {/* Confirm Reactivate Dialog */}
+      <ConfirmDialog
+        open={showReactivateDialog}
+        onCancel={() => { setShowReactivateDialog(false); setReactivateLoading(false); }}
+        onConfirm={handleBulkReactivate}
+        title="Projekte reaktivieren"
+        message={`${selectedIds.size} ${selectedIds.size === 1 ? "Projekt" : "Projekte"} wieder auf „Aktiv" setzen?`}
+        confirmLabel={reactivateLoading ? "..." : "Reaktivieren"}
+        variant="default"
       />
     </div>
   );
@@ -496,12 +569,18 @@ function ProjekteTab({
   allOrders,
   expandedIds,
   toggleExpand,
+  selectionMode = false,
+  selectedIds = new Set(),
+  toggleSelect,
 }: {
   projekte: ArchivedProjekt[];
   projektStats: Record<string, ProjektStats>;
   allOrders: PaidBestellung[];
   expandedIds: Set<string>;
   toggleExpand: (id: string) => void;
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  toggleSelect?: (id: string) => void;
 }) {
   if (projekte.length === 0) return <EmptyState type="projekte" />;
 
@@ -528,7 +607,17 @@ function ProjekteTab({
             <div className="p-5 relative">
               {/* Header */}
               <div className="flex items-start justify-between mb-2">
-                <h3 className="font-headline text-base text-[#1a1a1a] leading-tight pr-2">{p.name}</h3>
+                <div className="flex items-start gap-2.5 min-w-0">
+                  {selectionMode && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p.id)}
+                      onChange={() => toggleSelect?.(p.id)}
+                      className="w-4 h-4 mt-0.5 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer shrink-0"
+                    />
+                  )}
+                  <h3 className="font-headline text-base text-[#1a1a1a] leading-tight pr-2">{p.name}</h3>
+                </div>
                 <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap uppercase tracking-wide">
                   Abgeschlossen
                 </span>
