@@ -33,27 +33,36 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { bestellung_id } = body;
+    const { bestellung_id, bestellung_ids } = body;
 
-    if (!bestellung_id || !isValidUUID(bestellung_id)) {
-      return NextResponse.json({ error: "Ungültige Bestellungs-ID" }, { status: 400 });
+    // Bulk oder Einzel
+    const ids: string[] = bestellung_ids
+      ? (bestellung_ids as string[]).filter((id: string) => isValidUUID(id))
+      : bestellung_id && isValidUUID(bestellung_id)
+        ? [bestellung_id]
+        : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: "Keine gültige Bestellungs-ID" }, { status: 400 });
     }
 
     const supabase = createServiceClient();
 
     // Zugehörige Daten löschen (Reihenfolge: FK-Abhängigkeiten zuerst)
-    await supabase.from("webhook_logs").delete().eq("bestellung_id", bestellung_id);
-    await supabase.from("freigaben").delete().eq("bestellung_id", bestellung_id);
-    await supabase.from("abgleiche").delete().eq("bestellung_id", bestellung_id);
-    await supabase.from("kommentare").delete().eq("bestellung_id", bestellung_id);
-    await supabase.from("dokumente").delete().eq("bestellung_id", bestellung_id);
-
-    const { error: delError } = await supabase.from("bestellungen").delete().eq("id", bestellung_id);
-    if (delError) {
-      return NextResponse.json({ error: "Bestellung konnte nicht gelöscht werden" }, { status: 500 });
+    for (const id of ids) {
+      await supabase.from("webhook_logs").delete().eq("bestellung_id", id);
+      await supabase.from("freigaben").delete().eq("bestellung_id", id);
+      await supabase.from("abgleiche").delete().eq("bestellung_id", id);
+      await supabase.from("kommentare").delete().eq("bestellung_id", id);
+      await supabase.from("dokumente").delete().eq("bestellung_id", id);
     }
 
-    return NextResponse.json({ success: true });
+    const { error: delError } = await supabase.from("bestellungen").delete().in("id", ids);
+    if (delError) {
+      return NextResponse.json({ error: "Bestellungen konnten nicht gelöscht werden" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, deleted: ids.length });
   } catch {
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Bestellung {
@@ -63,6 +64,7 @@ export function BestellungenTabelle({
   projekte = [],
   aktiverProjektFilter,
   aktiverProjektName,
+  isAdmin = false,
 }: {
   bestellungen: Bestellung[];
   currentPage: number;
@@ -71,15 +73,22 @@ export function BestellungenTabelle({
   projekte?: ProjektOption[];
   aktiverProjektFilter?: string | null;
   aktiverProjektName?: string | null;
+  isAdmin?: boolean;
 }) {
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [artFilter, setArtFilter] = useState<ArtFilter>("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Clear selection when filters change
+  useEffect(() => { setSelected(new Set()); }, [suche, statusFilter, artFilter, projektFilter]);
 
   const gefiltert = useMemo(() => bestellungen.filter((b) => {
     const suchMatch =
@@ -133,6 +142,40 @@ export function BestellungenTabelle({
       URL.revokeObjectURL(url);
     } catch { /* silent */ }
     finally { setDownloadingId(null); }
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === gefiltert.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(gefiltert.map((b) => b.id)));
+    }
+  }
+
+  async function handleBulkDelete() {
+    setDeleteLoading(true);
+    try {
+      const res = await fetch("/api/bestellungen/verwerfen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_ids: Array.from(selected) }),
+      });
+      if (res.ok) {
+        setSelected(new Set());
+        setShowDeleteDialog(false);
+        router.refresh();
+      }
+    } catch { /* silent */ }
+    finally { setDeleteLoading(false); }
   }
 
   return (
@@ -262,11 +305,47 @@ export function BestellungenTabelle({
         )}
       </div>
 
+      {/* Bulk Action Bar */}
+      {isAdmin && selected.size > 0 && (
+        <div className="mt-4 flex items-center gap-3 px-4 py-3 bg-[#570006]/5 border border-[#570006]/20 rounded-lg">
+          <span className="text-sm font-medium text-[#570006]">
+            {selected.size} ausgewählt
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowDeleteDialog(true)}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Entfernen
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="px-3 py-1.5 text-xs font-medium text-[#6b6b6b] bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] transition-colors"
+          >
+            Abbrechen
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+              {isAdmin && (
+                <th className="px-3 py-3.5 w-10">
+                  <input
+                    type="checkbox"
+                    checked={gefiltert.length > 0 && selected.size === gefiltert.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                  />
+                </th>
+              )}
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler / Firma</th>
               <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden lg:table-cell">Projekt</th>
@@ -283,7 +362,7 @@ export function BestellungenTabelle({
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-16 text-center">
+                <td colSpan={isAdmin ? 11 : 10} className="px-4 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -312,8 +391,18 @@ export function BestellungenTabelle({
                   <tr
                     key={b.id}
                     onClick={() => router.push(`/bestellungen/${b.id}`)}
-                    className={`table-row-hover border-b border-[#f0eeeb] cursor-pointer group ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""}`}
+                    className={`table-row-hover border-b border-[#f0eeeb] cursor-pointer group ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""} ${selected.has(b.id) ? "bg-[#570006]/[0.03]" : ""}`}
                   >
+                    {isAdmin && (
+                      <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(b.id)}
+                          onChange={() => toggleSelect(b.id)}
+                          className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3.5">
                       <Link
                         href={`/bestellungen/${b.id}`}
@@ -464,6 +553,17 @@ export function BestellungenTabelle({
           </div>
         </div>
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onCancel={() => { setShowDeleteDialog(false); setDeleteLoading(false); }}
+        onConfirm={handleBulkDelete}
+        title="Bestellungen entfernen"
+        message={`${selected.size} Bestellung${selected.size !== 1 ? "en" : ""} und alle zugehörigen Dokumente unwiderruflich löschen?`}
+        confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
+        variant="danger"
+      />
     </>
   );
 }

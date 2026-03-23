@@ -88,6 +88,7 @@ export default async function BestellungenPage({
         projekte={(projekte || []) as { id: string; name: string; farbe: string }[]}
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
+        isAdmin={profil?.rolle === "admin"}
       />
     </div>
   );
