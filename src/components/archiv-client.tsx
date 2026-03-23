@@ -2,8 +2,10 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -157,6 +159,13 @@ export function ArchivClient({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [localMaterial, setLocalMaterial] = useState(materialOrders);
+  const [localSU, setLocalSU] = useState(suOrders);
+  const router = useRouter();
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -175,6 +184,40 @@ export function ArchivClient({
     setDateTo("");
   };
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkDelete() {
+    setDeleteLoading(true);
+    try {
+      const res = await fetch("/api/bestellungen/verwerfen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_ids: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        // Remove from local state
+        setLocalMaterial((prev) => prev.filter((o) => !selectedIds.has(o.id)));
+        setLocalSU((prev) => prev.filter((o) => !selectedIds.has(o.id)));
+        setSelectedIds(new Set());
+        setSelectionMode(false);
+        setShowDeleteDialog(false);
+        router.refresh();
+      }
+    } catch { /* silent */ }
+    finally { setDeleteLoading(false); }
+  }
+
   // Filtered data
   const filteredProjekte = useMemo(() => {
     return projekte.filter((p) => {
@@ -185,22 +228,22 @@ export function ArchivClient({
   }, [projekte, searchQuery, dateFrom, dateTo]);
 
   const filteredMaterial = useMemo(() => {
-    return materialOrders.filter((o) => {
+    return localMaterial.filter((o) => {
       if (searchQuery && !matchesSearchOrder(o, searchQuery)) return false;
       if ((dateFrom || dateTo) && !inDateRange(o.bezahlt_am, dateFrom, dateTo)) return false;
       return true;
     });
-  }, [materialOrders, searchQuery, dateFrom, dateTo]);
+  }, [localMaterial, searchQuery, dateFrom, dateTo]);
 
   const filteredSU = useMemo(() => {
-    return suOrders.filter((o) => {
+    return localSU.filter((o) => {
       if (searchQuery && !matchesSearchOrder(o, searchQuery)) return false;
       if ((dateFrom || dateTo) && !inDateRange(o.bezahlt_am, dateFrom, dateTo)) return false;
       return true;
     });
-  }, [suOrders, searchQuery, dateFrom, dateTo]);
+  }, [localSU, searchQuery, dateFrom, dateTo]);
 
-  const allOrders = useMemo(() => [...materialOrders, ...suOrders], [materialOrders, suOrders]);
+  const allOrders = useMemo(() => [...localMaterial, ...localSU], [localMaterial, localSU]);
 
   const tabCounts: Record<TabKey, number> = {
     projekte: filteredProjekte.length,
@@ -253,7 +296,7 @@ export function ArchivClient({
           ]).map((tab) => (
             <button
               key={tab.key}
-              onClick={() => { setActiveTab(tab.key); setExpandedIds(new Set()); }}
+              onClick={() => { setActiveTab(tab.key); setExpandedIds(new Set()); exitSelectionMode(); }}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                 activeTab === tab.key
                   ? "bg-white text-[#1a1a1a] shadow-sm"
@@ -311,6 +354,18 @@ export function ArchivClient({
               </svg>
             </button>
           )}
+          {activeTab !== "projekte" && !selectionMode && (
+            <button
+              type="button"
+              onClick={() => setSelectionMode(true)}
+              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              title="Auswahl-Modus"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -335,6 +390,9 @@ export function ArchivClient({
             type="material"
             limitReached={limitReached.material}
             istAdmin={istAdmin}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            toggleSelect={toggleSelect}
           />
         )}
 
@@ -347,9 +405,58 @@ export function ArchivClient({
             type="subunternehmer"
             limitReached={limitReached.su}
             istAdmin={istAdmin}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            toggleSelect={toggleSelect}
           />
         )}
       </div>
+
+      {/* Floating Bulk Action Bar */}
+      {selectionMode && (
+        <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
+            <span className="text-sm font-medium">
+              {selectedIds.size > 0
+                ? `${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} ausgewählt`
+                : "Einträge auswählen"}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={exitSelectionMode}
+                className="px-3 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
+              >
+                Abbrechen
+              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={deleteLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {deleteLoading ? "Lösche..." : "Entfernen"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onCancel={() => { setShowDeleteDialog(false); setDeleteLoading(false); }}
+        onConfirm={handleBulkDelete}
+        title="Archivierte Einträge löschen"
+        message={`${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} und alle zugehörigen Dokumente unwiderruflich löschen?`}
+        confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
+        variant="danger"
+      />
     </div>
   );
 }
@@ -556,6 +663,9 @@ function OrdersTab({
   type,
   limitReached,
   istAdmin,
+  selectionMode = false,
+  selectedIds = new Set(),
+  toggleSelect,
 }: {
   orders: PaidBestellung[];
   dokumenteMap: Record<string, Dokument[]>;
@@ -564,6 +674,9 @@ function OrdersTab({
   type: "material" | "subunternehmer";
   limitReached: boolean;
   istAdmin: boolean;
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  toggleSelect?: (id: string) => void;
 }) {
   const monthGroups = useMemo(() => groupByMonth(orders, "bezahlt_am"), [orders]);
   const dokConfig = DOKUMENT_CONFIG[type];
@@ -590,6 +703,25 @@ function OrdersTab({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+                  {selectionMode && (
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={group.items.length > 0 && group.items.every((o) => selectedIds.has(o.id))}
+                        onChange={() => {
+                          const allSelected = group.items.every((o) => selectedIds.has(o.id));
+                          const next = new Set(selectedIds);
+                          group.items.forEach((o) => { if (allSelected) next.delete(o.id); else next.add(o.id); });
+                          // We need to call toggleSelect for each — but since we have direct set access via parent, use a workaround
+                          group.items.forEach((o) => {
+                            if (allSelected && selectedIds.has(o.id)) toggleSelect?.(o.id);
+                            else if (!allSelected && !selectedIds.has(o.id)) toggleSelect?.(o.id);
+                          });
+                        }}
+                        className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
                   <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">
                     {type === "subunternehmer" ? "Firma" : "Händler"}
@@ -621,6 +753,9 @@ function OrdersTab({
                       type={type}
                       istAdmin={istAdmin}
                       isOdd={i % 2 === 1}
+                      selectionMode={selectionMode}
+                      isSelected={selectedIds.has(order.id)}
+                      toggleSelect={toggleSelect}
                     />
                   );
                 })}
@@ -663,6 +798,9 @@ function OrderRow({
   type,
   istAdmin,
   isOdd,
+  selectionMode = false,
+  isSelected = false,
+  toggleSelect,
 }: {
   order: PaidBestellung;
   docs: Dokument[];
@@ -672,13 +810,26 @@ function OrderRow({
   type: "material" | "subunternehmer";
   istAdmin: boolean;
   isOdd: boolean;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  toggleSelect?: (id: string) => void;
 }) {
   return (
     <>
       <tr
-        className={`table-row-hover border-b border-[#f0eeeb] ${isOdd ? "bg-[#fdfcfb]" : ""}`}
+        className={`table-row-hover border-b border-[#f0eeeb] ${isOdd ? "bg-[#fdfcfb]" : ""} ${isSelected ? "bg-[#570006]/[0.03]" : ""}`}
         onClick={() => toggleExpand(order.id)}
       >
+        {selectionMode && (
+          <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => toggleSelect?.(order.id)}
+              className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+            />
+          </td>
+        )}
         <td className="px-4 py-3.5">
           <span className="font-mono-amount font-semibold text-[#570006]">
             {order.bestellnummer || "–"}

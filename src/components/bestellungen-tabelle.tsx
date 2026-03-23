@@ -279,7 +279,7 @@ export function BestellungenTabelle({
               </svg>
             </button>
           )}
-          {isAdmin && !selectionMode && (
+          {!selectionMode && (
             <button
               type="button"
               onClick={() => setSelectionMode(true)}

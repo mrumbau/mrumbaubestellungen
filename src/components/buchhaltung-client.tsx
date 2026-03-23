@@ -515,7 +515,7 @@ export function BuchhaltungClient({
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
             />
           </div>
-          {tab === "bezahlt" && kannBezahlen && !selectionMode && (
+          {tab === "bezahlt" && !selectionMode && (
             <button
               type="button"
               onClick={() => setSelectionMode(true)}

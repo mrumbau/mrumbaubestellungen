@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 403 });
     }
 
-    // Nur Buchhaltung und Admin dürfen archivieren
-    if (!requireRoles(profil, "buchhaltung", "admin")) {
+    // Alle authentifizierten Benutzer dürfen archivieren
+    if (!requireRoles(profil, "besteller", "buchhaltung", "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
