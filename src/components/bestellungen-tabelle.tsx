@@ -80,6 +80,7 @@ export function BestellungenTabelle({
   const [artFilter, setArtFilter] = useState<ArtFilter>("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -88,7 +89,7 @@ export function BestellungenTabelle({
   const searchParams = useSearchParams();
 
   // Clear selection when filters change
-  useEffect(() => { setSelected(new Set()); }, [suche, statusFilter, artFilter, projektFilter]);
+  useEffect(() => { setSelected(new Set()); setSelectionMode(false); }, [suche, statusFilter, artFilter, projektFilter]);
 
   const gefiltert = useMemo(() => bestellungen.filter((b) => {
     const suchMatch =
@@ -171,6 +172,7 @@ export function BestellungenTabelle({
       });
       if (res.ok) {
         setSelected(new Set());
+        setSelectionMode(false);
         setShowDeleteDialog(false);
         router.refresh();
       }
@@ -277,6 +279,18 @@ export function BestellungenTabelle({
               </svg>
             </button>
           )}
+          {isAdmin && !selectionMode && (
+            <button
+              type="button"
+              onClick={() => setSelectionMode(true)}
+              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              title="Auswahl-Modus"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -305,38 +319,12 @@ export function BestellungenTabelle({
         )}
       </div>
 
-      {/* Bulk Action Bar */}
-      {isAdmin && selected.size > 0 && (
-        <div className="mt-4 flex items-center gap-3 px-4 py-3 bg-[#570006]/5 border border-[#570006]/20 rounded-lg">
-          <span className="text-sm font-medium text-[#570006]">
-            {selected.size} ausgewählt
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowDeleteDialog(true)}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Entfernen
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="px-3 py-1.5 text-xs font-medium text-[#6b6b6b] bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] transition-colors"
-          >
-            Abbrechen
-          </button>
-        </div>
-      )}
-
       {/* Table */}
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
-              {isAdmin && (
+              {selectionMode && (
                 <th className="px-3 py-3.5 w-10">
                   <input
                     type="checkbox"
@@ -362,7 +350,7 @@ export function BestellungenTabelle({
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin ? 11 : 10} className="px-4 py-16 text-center">
+                <td colSpan={selectionMode ? 12 : 11} className="px-4 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -393,7 +381,7 @@ export function BestellungenTabelle({
                     onClick={() => router.push(`/bestellungen/${b.id}`)}
                     className={`table-row-hover border-b border-[#f0eeeb] cursor-pointer group ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""} ${selected.has(b.id) ? "bg-[#570006]/[0.03]" : ""}`}
                   >
-                    {isAdmin && (
+                    {selectionMode && (
                       <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -550,6 +538,41 @@ export function BestellungenTabelle({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bulk Action Bar — matching Buchhaltung archive style */}
+      {selectionMode && (
+        <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
+            <span className="text-sm font-medium">
+              {selected.size > 0
+                ? `${selected.size} ${selected.size === 1 ? "Bestellung" : "Bestellungen"} ausgewählt`
+                : "Bestellungen auswählen"}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setSelectionMode(false); setSelected(new Set()); }}
+                className="px-3 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
+              >
+                Abbrechen
+              </button>
+              {selected.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={deleteLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {deleteLoading ? "Lösche..." : "Entfernen"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
