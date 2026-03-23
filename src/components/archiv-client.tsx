@@ -204,10 +204,10 @@ export function ArchivClient({
     setDeleteLoading(true);
     try {
       if (activeTab === "projekte") {
-        // Soft-delete projects (set status to "archiviert")
+        // Hard-delete: Projekte im Archiv endgültig löschen
         const results = await Promise.all(
           Array.from(selectedIds).map((id) =>
-            fetch(`/api/projekte/${id}`, {
+            fetch(`/api/projekte/${id}?hard=true`, {
               method: "DELETE",
               headers: { "Content-Type": "application/json" },
             })

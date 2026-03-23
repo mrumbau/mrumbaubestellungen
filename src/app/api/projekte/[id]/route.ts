@@ -145,7 +145,50 @@ export async function DELETE(
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
-    // Immer Soft-Delete: Projekt archivieren (nie hart löschen)
+    // hard=true → echtes Löschen (nur für bereits archivierte Projekte)
+    const url = new URL(request.url);
+    const hard = url.searchParams.get("hard") === "true";
+
+    if (hard) {
+      // Nur Admin darf hart löschen
+      if (!requireRoles(profil, "admin")) {
+        return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
+      }
+
+      // Prüfen ob Projekt archiviert ist (nur archivierte dürfen hart gelöscht werden)
+      const { data: projekt } = await supabase
+        .from("projekte")
+        .select("status")
+        .eq("id", id)
+        .single();
+
+      if (!projekt) {
+        return NextResponse.json({ error: "Projekt nicht gefunden" }, { status: 404 });
+      }
+
+      if (projekt.status !== "archiviert") {
+        return NextResponse.json({ error: "Nur archivierte Projekte können endgültig gelöscht werden" }, { status: 400 });
+      }
+
+      // Projekt-Referenzen in Bestellungen entfernen
+      await supabase
+        .from("bestellungen")
+        .update({ projekt_id: null, projekt_name: null })
+        .eq("projekt_id", id);
+
+      const { error } = await supabase
+        .from("projekte")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        return NextResponse.json({ error: "Löschen fehlgeschlagen" }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, deleted: true });
+    }
+
+    // Soft-Delete: Projekt archivieren
     const { error } = await supabase
       .from("projekte")
       .update({ status: "archiviert" })
