@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
+import { safeCompare } from "@/lib/safe-compare";
 
 // GET /api/extension/config – Liefert dynamische Konfiguration für die Extension
 // Enthält Händler-Patterns, Score-Keywords und Schwellenwerte
 export async function GET(request: NextRequest) {
   const secret = request.headers.get("x-extension-secret");
-  if (secret !== process.env.EXTENSION_SECRET) {
+  if (!safeCompare(secret, process.env.EXTENSION_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

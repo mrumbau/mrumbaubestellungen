@@ -115,10 +115,19 @@ export async function POST(request: NextRequest) {
       const n = Number(v);
       return Number.isFinite(n) ? n : null;
     };
-    const safeTyp = (v: unknown): string => {
-      const allowed = ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis"];
-      return typeof v === "string" && allowed.includes(v) ? v : "rechnung";
+    const safeTyp = (v: unknown): string | null => {
+      const allowed = ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"];
+      return typeof v === "string" && allowed.includes(v) ? v : null;
     };
+
+    // Dokumenttyp validieren — bei unbekanntem Typ abbrechen statt falsch zuzuordnen
+    const erkannterTyp = safeTyp(analyse.typ);
+    if (!erkannterTyp) {
+      return NextResponse.json(
+        { error: "Dokumenttyp konnte nicht erkannt werden. Bitte prüfen Sie das Dokument.", analyse },
+        { status: 422 }
+      );
+    }
 
     // Datei in Storage hochladen (Dateinamen sanitizen)
     const safeName = sanitizeFilename(datei_name || "dokument");
@@ -138,7 +147,7 @@ export async function POST(request: NextRequest) {
       .from("dokumente")
       .insert({
         bestellung_id,
-        typ: safeTyp(analyse.typ),
+        typ: erkannterTyp,
         quelle: mime_type.startsWith("image/") ? "scan_foto" : "scan_upload",
         storage_pfad: uploadError ? null : storagePfad,
         ki_roh_daten: analyse,
@@ -164,17 +173,16 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const cleanTyp = safeTyp(analyse.typ);
-    if (cleanTyp === "bestellbestaetigung") {
+    if (erkannterTyp === "bestellbestaetigung") {
       updateFields.hat_bestellbestaetigung = true;
-    } else if (cleanTyp === "lieferschein") {
+    } else if (erkannterTyp === "lieferschein") {
       updateFields.hat_lieferschein = true;
       updateFields.lieferschein_physisch = true;
-    } else if (cleanTyp === "rechnung") {
+    } else if (erkannterTyp === "rechnung") {
       updateFields.hat_rechnung = true;
-    } else if (cleanTyp === "aufmass") {
+    } else if (erkannterTyp === "aufmass") {
       updateFields.hat_aufmass = true;
-    } else if (cleanTyp === "leistungsnachweis") {
+    } else if (erkannterTyp === "leistungsnachweis") {
       updateFields.hat_leistungsnachweis = true;
     }
 

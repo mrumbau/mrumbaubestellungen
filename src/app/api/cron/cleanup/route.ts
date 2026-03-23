@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { logError } from "@/lib/logger";
+import { safeCompare } from "@/lib/safe-compare";
 
 // POST /api/cron/cleanup – Täglicher Job: Verwaiste "erwartet"-Bestellungen aufräumen
 // Bestellungen mit Status "erwartet" die nach 48h kein einziges Dokument erhalten haben,
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
 
-    if (body.secret !== process.env.MAKE_WEBHOOK_SECRET) {
+    if (!safeCompare(body.secret, process.env.MAKE_WEBHOOK_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

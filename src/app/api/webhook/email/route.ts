@@ -6,6 +6,8 @@ import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
 import { buildTrackingUrl } from "@/lib/tracking-urls";
+import { IRRELEVANT_DOMAINS as IRRELEVANT_DOMAINS_LIST, VERSAND_DOMAINS as VERSAND_DOMAINS_LIST } from "@/lib/blacklist-constants";
+import { safeCompare } from "@/lib/safe-compare";
 
 // Vercel Serverless: max 60 Sekunden Laufzeit
 export const maxDuration = 60;
@@ -44,40 +46,10 @@ function effectiveMimeType(mimeType: string, fileName: string): string {
 // =====================================================================
 // SPAM-SCHUTZ: Offensichtlich irrelevante Absender-Domains
 // =====================================================================
-const IRRELEVANT_DOMAINS = new Set([
-  // Tracking/Versand (erstellen keine eigenständigen Bestellungen)
-  // → werden weiter unten speziell behandelt
-
-  // Offensichtlich keine Händler
-  "gmx.de", "gmx.net", "web.de", "t-online.de", "freenet.de",
-  "gmail.com", "googlemail.com", "yahoo.com", "yahoo.de",
-  "outlook.com", "outlook.de", "hotmail.com", "hotmail.de",
-  "icloud.com", "me.com", "mac.com",
-  "protonmail.com", "proton.me",
-
-  // Interne/Service-Domains
-  "zapier.com", "send.zapier.com", "make.com",
-  "mailchimp.com", "sendinblue.com", "brevo.com",
-  "hubspot.com", "salesforce.com",
-  "plancraft.com", // Projektmanagement, keine Bestellungen
-
-  // Social/Marketing
-  "linkedin.com", "facebook.com", "twitter.com", "instagram.com",
-  "newsletter.de",
-]);
+const IRRELEVANT_DOMAINS = new Set(IRRELEVANT_DOMAINS_LIST);
 
 // Versand-Domains: Tracking-Emails, keine eigenen Bestellungen
-const VERSAND_DOMAINS = new Set([
-  "dhl.de", "dhl.com",
-  "dpd.de", "dpd.com",
-  "hermes-logistik.de", "hermesworld.com", "myhermes.de",
-  "ups.com",
-  "gls-group.eu", "gls-group.com",
-  "fedex.com",
-  "trans-o-flex.com",
-  "go-express.com",
-  "deutschepost.de",
-]);
+const VERSAND_DOMAINS = new Set(VERSAND_DOMAINS_LIST);
 
 function extractEmailAddress(raw: string): string {
   if (!raw) return "";
@@ -148,7 +120,7 @@ export async function POST(request: NextRequest) {
     const { email_betreff, email_absender, email_datum, secret } = body;
 
     // 1. Secret prüfen
-    if (secret !== process.env.MAKE_WEBHOOK_SECRET) {
+    if (!safeCompare(secret, process.env.MAKE_WEBHOOK_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -162,13 +134,29 @@ export async function POST(request: NextRequest) {
     const absenderAdresse = extractEmailAddress(email_absender);
     const absenderDomain = extractDomain(email_absender);
 
-    // 3. Irrelevante Domains sofort abweisen
-    if (isIrrelevantDomain(absenderDomain)) {
-      logInfo("webhook/email", `Irrelevante Domain: ${absenderDomain}`, { email_betreff });
-      return NextResponse.json({ success: true, skipped: true, reason: "irrelevant_domain" });
-    }
-
     const supabase = createServiceClient();
+
+    // 3. Irrelevante Domains abweisen — ABER erst prüfen ob der Absender
+    //    als Händler oder Subunternehmer bekannt ist (z.B. feistbaur@t-online.de)
+    if (isIrrelevantDomain(absenderDomain)) {
+      const { data: bekannterHaendler } = await supabase
+        .from("haendler")
+        .select("id")
+        .contains("email_absender", [absenderAdresse])
+        .limit(1);
+      const { data: bekannterSU } = await supabase
+        .from("subunternehmer")
+        .select("id")
+        .contains("email_absender", [absenderAdresse])
+        .limit(1);
+
+      if ((!bekannterHaendler || bekannterHaendler.length === 0) &&
+          (!bekannterSU || bekannterSU.length === 0)) {
+        logInfo("webhook/email", `Irrelevante Domain: ${absenderDomain}`, { email_betreff });
+        return NextResponse.json({ success: true, skipped: true, reason: "irrelevant_domain" });
+      }
+      logInfo("webhook/email", `Irrelevante Domain ${absenderDomain} übersprungen — Absender ist bekannt`, { email_betreff, absenderAdresse });
+    }
 
     // 4. Absender-Blacklist aus DB prüfen
     const { data: blacklist } = await supabase.from("email_blacklist").select("muster, typ");
@@ -183,16 +171,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Idempotenz-Check
+    // 5. Idempotenz-Check (24h-Fenster, SHA-256 für kollisionsarmen Hash)
     const idempotencyKey = `${email_absender || ""}|${email_betreff || ""}|${email_datum || ""}`;
-    const idempotencyHash = Buffer.from(idempotencyKey).toString("base64").slice(0, 64);
+    const { createHash } = await import("crypto");
+    const idempotencyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 64);
     {
       const { data: existing } = await supabase
         .from("webhook_logs")
         .select("id")
         .eq("typ", "email")
         .eq("bestellnummer", idempotencyHash)
-        .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+        .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .limit(1);
 
       if (existing && existing.length > 0) {
@@ -274,19 +263,26 @@ export async function POST(request: NextRequest) {
     // =====================================================================
     const { data: haendlerListe } = await supabase.from("haendler").select("*");
 
-    // 1. Exakter E-Mail-Match
+    // 1. E-Mail-Match (exakt oder Wildcard *@domain.de)
     let haendler = haendlerListe?.find((h) =>
-      h.email_absender?.some((addr: string) =>
-        absenderAdresse.includes(addr.toLowerCase()) || addr.toLowerCase().includes(absenderAdresse)
-      )
+      h.email_absender?.some((addr: string) => {
+        const normalized = addr.toLowerCase().trim();
+        // Wildcard: *@domain.de matcht alle Adressen von dieser Domain
+        if (normalized.startsWith("*@")) {
+          const wildcardDomain = normalized.slice(2);
+          return absenderAdresse.endsWith("@" + wildcardDomain);
+        }
+        return absenderAdresse === normalized;
+      })
     ) || null;
 
-    // 2. Domain-Match
+    // 2. Domain-Match (nur vorwärts: Absender-Domain enthält Händler-Domain)
     if (!haendler && absenderDomain) {
-      haendler = haendlerListe?.find((h) =>
-        absenderDomain.includes(h.domain.toLowerCase()) ||
-        h.domain.toLowerCase().includes(absenderDomain)
-      ) || null;
+      haendler = haendlerListe?.find((h) => {
+        const hDomain = h.domain.toLowerCase();
+        // Exakter Match oder Subdomain-Match (z.B. mail.bauhaus.de enthält bauhaus.de)
+        return absenderDomain === hDomain || absenderDomain.endsWith("." + hDomain);
+      }) || null;
 
       // Auto-learn: Absender-Adresse ergänzen
       if (haendler && absenderAdresse) {
@@ -312,9 +308,15 @@ export async function POST(request: NextRequest) {
     if (!haendler) {
       const { data: suListe } = await supabase.from("subunternehmer").select("*");
       if (suListe && suListe.length > 0) {
-        // Exakter E-Mail-Match
+        // E-Mail-Match (exakt oder Wildcard *@domain.de)
         const suMatch = suListe.find((su) =>
-          su.email_absender?.some((addr: string) => absenderAdresse === addr.toLowerCase())
+          su.email_absender?.some((addr: string) => {
+            const normalized = addr.toLowerCase().trim();
+            if (normalized.startsWith("*@")) {
+              return absenderAdresse.endsWith("@" + normalized.slice(2));
+            }
+            return absenderAdresse === normalized;
+          })
         );
         if (suMatch) {
           erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
@@ -371,6 +373,7 @@ export async function POST(request: NextRequest) {
     const emailZeit = new Date(email_datum || Date.now()).getTime();
 
     // STUFE 1: Chrome Extension Signal ±60 min
+    // Atomar claimen: Signal sofort als verarbeitet markieren um Race Conditions zu vermeiden
     const { data: signale60 } = await supabase
       .from("bestellung_signale")
       .select("*")
@@ -383,8 +386,20 @@ export async function POST(request: NextRequest) {
 
     let signal = signale60?.[0] || null;
     if (signal) {
-      bestellerKuerzel = signal.kuerzel;
-      zuordnungsMethode = "signal_60min";
+      // Sofort als verarbeitet markieren (atomar — verhindert dass parallele Requests dasselbe Signal claimen)
+      const { data: claimed } = await supabase
+        .from("bestellung_signale")
+        .update({ verarbeitet: true })
+        .eq("id", signal.id)
+        .eq("verarbeitet", false) // Nur wenn noch nicht geclaimed
+        .select("id");
+      if (claimed && claimed.length > 0) {
+        bestellerKuerzel = signal.kuerzel;
+        zuordnungsMethode = "signal_60min";
+      } else {
+        // Signal wurde bereits von einem parallelen Request geclaimed
+        signal = null;
+      }
     }
 
     // STUFE 2: Signal ±24h
@@ -400,9 +415,18 @@ export async function POST(request: NextRequest) {
         .limit(1);
 
       if (signale24h?.[0]) {
-        signal = signale24h[0];
-        bestellerKuerzel = signal.kuerzel;
-        zuordnungsMethode = "signal_24h";
+        // Atomar claimen
+        const { data: claimed } = await supabase
+          .from("bestellung_signale")
+          .update({ verarbeitet: true })
+          .eq("id", signale24h[0].id)
+          .eq("verarbeitet", false)
+          .select("id");
+        if (claimed && claimed.length > 0) {
+          signal = signale24h[0];
+          bestellerKuerzel = signal.kuerzel;
+          zuordnungsMethode = "signal_24h";
+        }
       }
     }
 
@@ -477,16 +501,41 @@ export async function POST(request: NextRequest) {
 
     const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
 
-    // 1. Suche per Bestellnummer
+    // 1. Suche per Bestellnummer (mit Händler-Filter um Kollisionen zu vermeiden)
     let existierendeBestellung = null;
     if (erkannteBestellnummer) {
-      const { data } = await supabase
-        .from("bestellungen")
-        .select("id")
-        .eq("bestellnummer", erkannteBestellnummer)
-        .limit(1)
-        .maybeSingle();
-      existierendeBestellung = data;
+      // Erst mit Händler-Einschränkung suchen (verschiedene Händler können gleiche Bestellnummern haben)
+      if (haendler?.id) {
+        const { data } = await supabase
+          .from("bestellungen")
+          .select("id")
+          .eq("bestellnummer", erkannteBestellnummer)
+          .eq("haendler_id", haendler.id)
+          .limit(1)
+          .maybeSingle();
+        existierendeBestellung = data;
+      }
+      if (!existierendeBestellung && haendlerName) {
+        const { data } = await supabase
+          .from("bestellungen")
+          .select("id")
+          .eq("bestellnummer", erkannteBestellnummer)
+          .eq("haendler_name", haendlerName)
+          .limit(1)
+          .maybeSingle();
+        existierendeBestellung = data;
+      }
+      // Fallback ohne Händler-Filter nur wenn SU-Bestellung (SU-Bestellnummern sind typisch eindeutig)
+      if (!existierendeBestellung && erkannterSubunternehmer) {
+        const { data } = await supabase
+          .from("bestellungen")
+          .select("id")
+          .eq("bestellnummer", erkannteBestellnummer)
+          .eq("subunternehmer_id", erkannterSubunternehmer.id)
+          .limit(1)
+          .maybeSingle();
+        existierendeBestellung = data;
+      }
     }
 
     if (existierendeBestellung) {
@@ -501,7 +550,7 @@ export async function POST(request: NextRequest) {
           .select("id")
           .eq("besteller_kuerzel", bestellerKuerzel)
           .eq("status", "erwartet")
-          .or(`haendler_name.eq.${matchName},haendler_name.eq.${haendlerDomain}`)
+          .in("haendler_name", [matchName, haendlerDomain].filter(Boolean))
           .order("created_at", { ascending: false })
           .limit(1);
         erwartetBestellung = erwartet?.[0] || null;
@@ -653,9 +702,15 @@ export async function POST(request: NextRequest) {
         }
         if (analyse.voraussichtliche_lieferung) updateFields.voraussichtliche_lieferung = analyse.voraussichtliche_lieferung;
       } else {
-        // Bestellnummer und Betrag aus Nicht-Versand-Dokumenten übernehmen
+        // Bestellnummer aus Nicht-Versand-Dokumenten übernehmen
         if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
-        if (analyse.gesamtbetrag) updateFields.betrag = analyse.gesamtbetrag;
+        // Betrag nur von Rechnungen übernehmen (Rechnungsbetrag ist maßgeblich, nicht Bestellbestätigung)
+        if (analyse.gesamtbetrag && analyse.typ === "rechnung") {
+          updateFields.betrag = analyse.gesamtbetrag;
+        } else if (analyse.gesamtbetrag && !updateFields.betrag) {
+          // Bestellbestätigung/Lieferschein: nur setzen wenn noch kein Betrag vorhanden
+          updateFields.betrag = analyse.gesamtbetrag;
+        }
       }
 
       await supabase.from("bestellungen").update(updateFields).eq("id", bestellungId);
@@ -700,12 +755,17 @@ export async function POST(request: NextRequest) {
               bestellbestaetigung: "hat_bestellbestaetigung",
               lieferschein: "hat_lieferschein",
               rechnung: "hat_rechnung",
+              aufmass: "hat_aufmass",
+              leistungsnachweis: "hat_leistungsnachweis",
               versandbestaetigung: "hat_versandbestaetigung",
             };
             if (flagMap[bodyAnalyse.typ]) bodyUpdate[flagMap[bodyAnalyse.typ]] = true;
             if (bodyAnalyse.typ !== "versandbestaetigung") {
               if (bodyAnalyse.bestellnummer) bodyUpdate.bestellnummer = bodyAnalyse.bestellnummer;
-              if (bodyAnalyse.gesamtbetrag) bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
+              // Betrag nur von Rechnung übernehmen (maßgeblich), andere Typen nur wenn noch kein Betrag
+              if (bodyAnalyse.gesamtbetrag && bodyAnalyse.typ === "rechnung") {
+                bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
+              }
             }
 
             await supabase.from("bestellungen").update(bodyUpdate).eq("id", bestellungId);
@@ -881,10 +941,7 @@ export async function POST(request: NextRequest) {
     // =====================================================================
     await updateBestellungStatus(supabase, bestellungId);
 
-    // Signal als verarbeitet markieren
-    if (signal) {
-      await supabase.from("bestellung_signale").update({ verarbeitet: true }).eq("id", signal.id);
-    }
+    // Signal wurde bereits oben atomar als verarbeitet markiert (Race-Condition-Schutz)
 
     // Admin-Hinweis bei UNBEKANNT
     if (bestellerKuerzel === "UNBEKANNT") {
@@ -932,7 +989,7 @@ export async function POST(request: NextRequest) {
     } catch { /* ignore */ }
 
     return NextResponse.json(
-      { error: "Interner Fehler", message: err instanceof Error ? err.message : String(err) },
+      { error: "Interner Fehler" },
       { status: 500 }
     );
   }
@@ -997,7 +1054,7 @@ async function handleVersandEmail(
 
   let bestellungId: string | null = null;
 
-  // Zuordnung: Bestellnummer-Match oder neueste offene Bestellung
+  // Zuordnung: Bestellnummer-Match
   if (bestellnrMatch) {
     const { data } = await supabase
       .from("bestellungen")
@@ -1009,11 +1066,16 @@ async function handleVersandEmail(
   }
 
   if (!bestellungId) {
-    // Letzte offene Bestellung (neueste zuerst)
+    // Fallback: Letzte offene Bestellung die zum Versanddienstleister-Kontext passt.
+    // Wir suchen nur Bestellungen der letzten 7 Tage und bevorzugen solche
+    // die bereits Material-Bestellungen sind (Versand ist für SU-Leistungen irrelevant).
+    const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: letzte } = await supabase
       .from("bestellungen")
       .select("id")
       .in("status", ["offen", "erwartet", "vollstaendig"])
+      .eq("bestellungsart", "material")
+      .gte("created_at", siebenTageZurueck)
       .order("created_at", { ascending: false })
       .limit(1);
 

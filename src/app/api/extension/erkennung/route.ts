@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
+import { safeCompare } from "@/lib/safe-compare";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     const body: ErkennungPayload = await request.json();
     const { url, title, text, secret, kuerzel } = body;
 
-    if (secret !== process.env.EXTENSION_SECRET) {
+    if (!safeCompare(secret, process.env.EXTENSION_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

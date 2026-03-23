@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase";
 import { isValidKuerzel, isValidDomain, validateTextLength } from "@/lib/validation";
 import { checkRateLimit, checkGlobalRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
+import { safeCompare } from "@/lib/safe-compare";
 
 // POST /api/webhook/bestellung – Empfängt Signal von Chrome Extension
 export async function POST(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     const { kuerzel, haendler_domain, zeitstempel, secret, erkennung, bestellnummer, seiten_url } = body;
 
     // Secret prüfen
-    if (secret !== process.env.EXTENSION_SECRET) {
+    if (!safeCompare(secret, process.env.EXTENSION_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

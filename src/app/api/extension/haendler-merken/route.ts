@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase";
 import { isValidDomain } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
+import { safeCompare } from "@/lib/safe-compare";
 
 // POST /api/extension/haendler-merken – Nur Händler-Domain + URL-Pattern lernen, KEINE Bestellung anlegen
 export async function POST(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { haendler_domain, seiten_url, secret } = body;
 
-    if (secret !== process.env.EXTENSION_SECRET) {
+    if (!safeCompare(secret, process.env.EXTENSION_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -24,11 +24,11 @@ export async function POST(request: NextRequest) {
 
     const { data: profil } = await supabaseAuth
       .from("benutzer_rollen")
-      .select("rolle")
+      .select("rolle, kuerzel")
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin", "besteller", "buchhaltung")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -47,6 +47,23 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServiceClient();
+
+    // Besteller dürfen nur eigene Bestellungen verwerfen
+    if (profil!.rolle === "besteller") {
+      const { data: eigene } = await supabase
+        .from("bestellungen")
+        .select("id")
+        .in("id", ids)
+        .eq("besteller_kuerzel", profil!.kuerzel);
+      const eigeneIds = new Set((eigene || []).map((b) => b.id));
+      const fremde = ids.filter((id) => !eigeneIds.has(id));
+      if (fremde.length > 0) {
+        return NextResponse.json(
+          { error: "Keine Berechtigung für fremde Bestellungen" },
+          { status: 403 }
+        );
+      }
+    }
 
     // Zugehörige Daten löschen (Reihenfolge: FK-Abhängigkeiten zuerst)
     for (const id of ids) {

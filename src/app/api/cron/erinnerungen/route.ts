@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { generiereErinnerungsmail } from "@/lib/openai";
 import { logError } from "@/lib/logger";
+import { safeCompare } from "@/lib/safe-compare";
 
 // POST /api/cron/erinnerungen – Täglicher Job: Fehlende Lieferscheine erkennen
 // Aufruf durch Make.com oder Vercel Cron
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
 
     // Secret prüfen
-    if (body.secret !== process.env.MAKE_WEBHOOK_SECRET) {
+    if (!safeCompare(body.secret, process.env.MAKE_WEBHOOK_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

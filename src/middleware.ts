@@ -49,28 +49,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Rollenprüfung: erst aus Cookie lesen, nur bei Fehlen aus DB laden
-  let rolle = request.cookies.get("x-user-rolle")?.value || "";
+  // Rollenprüfung: immer aus DB laden (Cookie-Cache war spoofbar)
+  const { data: profil } = await supabase
+    .from("benutzer_rollen")
+    .select("rolle")
+    .eq("user_id", user.id)
+    .single();
 
-  if (!rolle) {
-    const { data: profil } = await supabase
-      .from("benutzer_rollen")
-      .select("rolle")
-      .eq("user_id", user.id)
-      .single();
-
-    rolle = profil?.rolle || "";
-
-    // Rolle für 5 Minuten im Cookie cachen (nicht httpOnly — nur für Middleware-Routing)
-    if (rolle) {
-      response.cookies.set("x-user-rolle", rolle, {
-        path: "/",
-        maxAge: 300,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      });
-    }
-  }
+  const rolle = profil?.rolle || "";
 
   if (rolle) {
     // Buchhaltung darf nur /buchhaltung, /einstellungen und API-Routes sehen

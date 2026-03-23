@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PasswortAendern } from "@/components/passwort-aendern";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
+import { IRRELEVANT_DOMAINS, VERSAND_DOMAINS } from "@/lib/blacklist-constants";
 
 interface Haendler {
   id: string;
@@ -81,6 +82,7 @@ export function EinstellungenClient({
   projekte: initialProjekte = [],
   subunternehmer: initialSubunternehmer = [],
   firmaEinstellungen: initialFirmaEinstellungen = [],
+  emailBlacklist: initialEmailBlacklist = [],
   rolle = "admin",
 }: {
   haendler: Haendler[];
@@ -92,6 +94,7 @@ export function EinstellungenClient({
   projekte?: Projekt[];
   subunternehmer?: Subunternehmer[];
   firmaEinstellungen?: { schluessel: string; wert: string }[];
+  emailBlacklist?: { muster: string; typ: string; grund: string | null; erstellt_am: string }[];
   rolle?: string;
 }) {
   const istAdmin = rolle === "admin";
@@ -150,6 +153,15 @@ export function EinstellungenClient({
 
   // Projekt-Adresse (singular)
   const [projektFormAdresse, setProjektFormAdresse] = useState("");
+
+  // E-Mail Blacklist
+  const [blacklist, setBlacklist] = useState(initialEmailBlacklist);
+  const [showBlacklistForm, setShowBlacklistForm] = useState(false);
+  const [blMuster, setBlMuster] = useState("");
+  const [blTyp, setBlTyp] = useState<"domain" | "adresse">("domain");
+  const [blGrund, setBlGrund] = useState("");
+  const [blLoading, setBlLoading] = useState(false);
+  const [blDeleteConfirm, setBlDeleteConfirm] = useState<string | null>(null);
 
   // Firma-Einstellungen
   const [bueroAdresse, setBueroAdresse] = useState(initialFirmaEinstellungen.find((e) => e.schluessel === "buero_adresse")?.wert || "");
@@ -494,6 +506,57 @@ export function EinstellungenClient({
   }
 
   // startProjektEdit() setzt bereits projektFormAdresse
+
+  // Blacklist-Funktionen
+  async function handleBlacklistAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!blMuster.trim()) return;
+    setBlLoading(true);
+    try {
+      const res = await fetch("/api/blacklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muster: blMuster.trim(), typ: blTyp, grund: blGrund.trim() || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+      setBlacklist((prev) => [
+        { muster: blMuster.trim().toLowerCase(), typ: blTyp, grund: blGrund.trim() || null, erstellt_am: new Date().toISOString() },
+        ...prev,
+      ]);
+      setBlMuster("");
+      setBlGrund("");
+      setBlTyp("domain");
+      setShowBlacklistForm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Hinzufügen");
+    } finally {
+      setBlLoading(false);
+    }
+  }
+
+  async function handleBlacklistDelete(muster: string) {
+    setBlLoading(true);
+    try {
+      const res = await fetch("/api/blacklist", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muster }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+      setBlacklist((prev) => prev.filter((bl) => bl.muster !== muster));
+      setBlDeleteConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Löschen");
+    } finally {
+      setBlLoading(false);
+    }
+  }
 
   // Webhook-Logs refresh
   async function refreshWebhookLogs() {
@@ -1116,6 +1179,159 @@ export function EinstellungenClient({
       </div>
 
       {/* ═══════════════════════════════════════════
+          E-MAIL BLACKLIST
+          ═══════════════════════════════════════════ */}
+      <div className={`card p-6 mt-6 ${!istAdmin ? "hidden" : ""}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+              <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">E-Mail Blacklist ({blacklist.length})</h2>
+              <p className="text-[10px] text-[#c4c2bf] mt-0.5">Blockierte Absender-Domains und E-Mail-Adressen</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowBlacklistForm(!showBlacklistForm)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            + Hinzufügen
+          </button>
+        </div>
+
+        {showBlacklistForm && (
+          <form onSubmit={handleBlacklistAdd} className="mb-4 p-4 bg-[#fafaf9] rounded-lg border border-[#f0eeeb] space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Typ</label>
+                <select
+                  value={blTyp}
+                  onChange={(e) => setBlTyp(e.target.value as "domain" | "adresse")}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-red-400 focus:border-red-400 outline-none bg-white"
+                >
+                  <option value="domain">Domain (z.B. newsletter.de)</option>
+                  <option value="adresse">E-Mail-Adresse (z.B. spam@firma.de)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">
+                  {blTyp === "domain" ? "Domain *" : "E-Mail-Adresse *"}
+                </label>
+                <input
+                  type="text"
+                  value={blMuster}
+                  onChange={(e) => setBlMuster(e.target.value)}
+                  placeholder={blTyp === "domain" ? "newsletter.beispiel.de" : "spam@firma.de"}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-red-400 focus:border-red-400 outline-none"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Grund <span className="font-normal text-[#c4c2bf] normal-case tracking-normal">(optional)</span></label>
+              <input
+                type="text"
+                value={blGrund}
+                onChange={(e) => setBlGrund(e.target.value)}
+                placeholder="z.B. Newsletter, Werbung, irrelevant"
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-red-400 focus:border-red-400 outline-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={blLoading}
+                className="px-4 py-2 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {blLoading ? "Speichern..." : "Blockieren"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowBlacklistForm(false); setBlMuster(""); setBlGrund(""); }}
+                className="px-4 py-2 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Manuell hinzugefügte Blacklist-Einträge (aus DB) */}
+        {blacklist.length > 0 && (
+          <div className="space-y-2 mb-4">
+            <p className="text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider">Manuell blockiert ({blacklist.length})</p>
+            {blacklist.map((bl) => (
+              <div key={bl.muster} className="flex items-center justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${bl.typ === "domain" ? "bg-red-50" : "bg-orange-50"}`}>
+                    <svg className={`w-4 h-4 ${bl.typ === "domain" ? "text-red-400" : "text-orange-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      {bl.typ === "domain" ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      )}
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-[#1a1a1a] font-mono">{bl.muster}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                        bl.typ === "domain" ? "text-red-600 bg-red-50" : "text-orange-600 bg-orange-50"
+                      }`}>{bl.typ}</span>
+                    </div>
+                    {bl.grund && <p className="text-[11px] text-[#9a9a9a]">{bl.grund}</p>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBlDeleteConfirm(bl.muster)}
+                  className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 shrink-0"
+                  title="Entsperren"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* System-Domains (hardcodiert, nicht löschbar) */}
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider py-2 hover:text-[#6b6b6b] transition-colors select-none">
+            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+            System-Domains ({IRRELEVANT_DOMAINS.length + VERSAND_DOMAINS.length} automatisch blockiert)
+          </summary>
+          <div className="mt-2 space-y-3">
+            <div>
+              <p className="text-[10px] text-[#c4c2bf] mb-1.5">Irrelevante Absender (Freemail, Marketing, Social Media)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {IRRELEVANT_DOMAINS.map((d) => (
+                  <span key={d} className="text-[11px] font-mono px-2 py-1 bg-[#fafaf9] border border-[#f0eeeb] rounded text-[#6b6b6b]">{d}</span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] text-[#c4c2bf] mb-1.5">Versand-Domains (DHL, DPD, Hermes etc. — werden als Versandbenachrichtigung verarbeitet)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {VERSAND_DOMAINS.map((d) => (
+                  <span key={d} className="text-[11px] font-mono px-2 py-1 bg-blue-50 border border-blue-100 rounded text-blue-600">{d}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {/* ═══════════════════════════════════════════
           PROJEKT-VERWALTUNG
           ═══════════════════════════════════════════ */}
       <div className="mt-6 card p-6">
@@ -1530,6 +1746,15 @@ export function EinstellungenClient({
         variant="danger"
         onConfirm={() => suDeleteConfirm && handleSuDelete(suDeleteConfirm.id)}
         onCancel={() => setSuDeleteConfirm(null)}
+      />
+      <ConfirmDialog
+        open={!!blDeleteConfirm}
+        title="Blacklist-Eintrag entfernen"
+        message={`„${blDeleteConfirm}" entsperren? E-Mails von diesem Absender werden dann wieder verarbeitet.`}
+        confirmLabel="Entsperren"
+        variant="danger"
+        onConfirm={() => blDeleteConfirm && handleBlacklistDelete(blDeleteConfirm)}
+        onCancel={() => setBlDeleteConfirm(null)}
       />
     </div>
   );

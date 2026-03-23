@@ -61,6 +61,7 @@ export default async function EinstellungenPage() {
     { data: projekte },
     { data: firmaEinstellungen },
     { data: subunternehmer },
+    { data: emailBlacklist },
   ] = await Promise.all([
     supabase.from("haendler").select("*").order("name", { ascending: true }),
     supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
@@ -86,6 +87,10 @@ export default async function EinstellungenPage() {
       .from("subunternehmer")
       .select("*")
       .order("firma"),
+    supabase
+      .from("email_blacklist")
+      .select("muster, typ, grund, erstellt_am")
+      .order("erstellt_am", { ascending: false }),
   ]);
 
   const statsMap: Record<string, { gesamt: number; letzte: string | null; abweichungen: number }> = {};
@@ -119,6 +124,7 @@ export default async function EinstellungenPage() {
       projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
       subunternehmer={(subunternehmer || []) as { id: string; firma: string; ansprechpartner: string | null; gewerk: string | null; telefon: string | null; email: string | null; email_absender: string[]; steuer_nr: string | null; iban: string | null; notizen: string | null; confirmed_at: string | null; created_at: string }[]}
       firmaEinstellungen={(firmaEinstellungen || []) as { schluessel: string; wert: string }[]}
+      emailBlacklist={(emailBlacklist || []) as { muster: string; typ: string; grund: string | null; erstellt_am: string }[]}
       rolle="admin"
     />
   );
