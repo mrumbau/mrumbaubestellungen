@@ -364,6 +364,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Plancraft-Spezialbehandlung: SU schickt Rechnungen über Plancraft ──
+    if (!haendler && !erkannterSubunternehmer &&
+        (absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com")) {
+      bestellungsart = "subunternehmer";
+      // Versuche SU-Name aus Betreff/Body zu extrahieren (z.B. "Georg Hutter - Prometheus Haustechnik GbR")
+      // GPT-Analyse der Anhänge wird den SU-Namen aus der Rechnung extrahieren
+    }
+
+    // ── PayPal-Spezialbehandlung: Zahlungsbestätigungen zu Bestellungen ──
+    // PayPal-Emails werden normal verarbeitet, GPT erkennt den Händler aus dem Zahlungstext
+
     const haendlerDomain = haendler?.domain || absenderDomain;
     const haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
 

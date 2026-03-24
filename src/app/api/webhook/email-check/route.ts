@@ -40,7 +40,6 @@ const SYSTEM_DOMAINS = new Set([
   "3cx.net", "3cx.com",
   "creditreform.de", "muenchen.creditreform.de",
   "all-inkl.com",
-  "plancraft.com",
 ]);
 
 // Marketing/Transaktions-Mails von Händlern die KEINE Geschäftsdokumente sind
@@ -110,6 +109,25 @@ export async function POST(request: NextRequest) {
     // ── 2c. Interne mrumbau.de Emails (Lesebestätigungen, Weiterleitungen etc.) ──
     if (absenderDomain === "mrumbau.de" || absenderDomain === "reuter-mr.de") {
       return NextResponse.json({ relevant: false, grund: "intern" });
+    }
+
+    // ── 2d. PayPal — Zahlungsbestätigungen sind relevant (Besteller zahlt per PayPal) ──
+    if (absenderDomain === "paypal.com" || absenderDomain === "paypal.de") {
+      const paypalDokKw = ["zahlung", "abbuchung", "bezahlung", "payment", "quittung", "transaction", "geld gesendet", "geld empfangen"];
+      if (paypalDokKw.some(k => betreff.includes(k) || vorschau.includes(k))) {
+        return NextResponse.json({ relevant: true, grund: "paypal_zahlung" });
+      }
+      return NextResponse.json({ relevant: false, grund: "paypal_irrelevant" });
+    }
+
+    // ── 2e. Plancraft — Subunternehmer senden Rechnungen über Plancraft ──
+    if (absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com") {
+      const plancraftDokKw = ["rechnung", "angebot", "aufmaß", "aufmass", "leistungsnachweis", "gutschrift", "invoice"];
+      if (plancraftDokKw.some(k => betreff.includes(k))) {
+        return NextResponse.json({ relevant: true, grund: "plancraft_dokument" });
+      }
+      // Plancraft ohne Dokument-Betreff → irrelevant (System-Benachrichtigungen etc.)
+      return NextResponse.json({ relevant: false, grund: "plancraft_irrelevant" });
     }
 
     const supabase = createServiceClient();
