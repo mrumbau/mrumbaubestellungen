@@ -13,7 +13,7 @@ export const IRRELEVANT_DOMAINS = [
   "zapier.com", "send.zapier.com", "make.com",
   "mailchimp.com", "sendinblue.com", "brevo.com",
   "hubspot.com", "salesforce.com",
-  "plancraft.com",
+  // plancraft.com entfernt — wird in email-check + webhook speziell behandelt (SU-Rechnungen)
 
   // Social/Marketing
   "linkedin.com", "facebook.com", "twitter.com", "instagram.com",

@@ -176,11 +176,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Idempotenz-Check (24h-Fenster, SHA-256 für kollisionsarmen Hash)
+    // Fail-open: Bei DB-Fehler Email trotzdem verarbeiten (lieber Duplikat als Datenverlust)
     const idempotencyKey = `${email_absender || ""}|${email_betreff || ""}|${email_datum || ""}`;
     const { createHash } = await import("crypto");
     const idempotencyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 64);
-    {
-      const { data: existing } = await supabase
+    try {
+      const { data: existing, error: idempotencyError } = await supabase
         .from("webhook_logs")
         .select("id")
         .eq("typ", "email")
@@ -188,7 +189,9 @@ export async function POST(request: NextRequest) {
         .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .limit(1);
 
-      if (existing && existing.length > 0) {
+      if (idempotencyError) {
+        logError("webhook/email", "Idempotenz-Check DB-Fehler (fail-open)", idempotencyError);
+      } else if (existing && existing.length > 0) {
         return NextResponse.json({ success: true, deduplicated: true });
       }
 
@@ -197,6 +200,8 @@ export async function POST(request: NextRequest) {
         status: "processing",
         bestellnummer: idempotencyHash,
       });
+    } catch (idempotencyErr) {
+      logError("webhook/email", "Idempotenz-Check Fehler (fail-open)", idempotencyErr);
     }
 
     // 6. Betreff-Validierung
@@ -244,6 +249,12 @@ export async function POST(request: NextRequest) {
 
         // MIME-Typ normalisieren
         mimeType = effectiveMimeType(mimeType, name);
+
+        // SVG-Dateien ausschließen (können JavaScript/XSS enthalten)
+        if (mimeType === "image/svg+xml") {
+          logInfo("webhook/email", `Anhang übersprungen (SVG/XSS-Risiko): ${name}`);
+          continue;
+        }
 
         // Unbekannte MIME-Typen SKIPPEN (nicht rejecten!)
         if (!ALLOWED_MIME_TYPES.has(mimeType) && !mimeType.startsWith("image/")) {
@@ -788,6 +799,29 @@ export async function POST(request: NextRequest) {
     }
 
     // =====================================================================
+    // ROLLBACK: Sekundäre Dokumente dürfen keine neue Bestellung erstellen
+    // Lieferschein + Versandbestätigung sind nur gültig wenn bereits eine
+    // Bestellung existiert (mit Best.bestätigung, Rechnung, Aufmaß o.ä.)
+    // =====================================================================
+    const PRIMAER_TYPEN = ["bestellbestaetigung", "rechnung", "aufmass", "leistungsnachweis"];
+    if (bestellungNeuErstellt && dokumenteGespeichert > 0) {
+      const hatPrimaerDokument = gespeicherteTypen.some(t => PRIMAER_TYPEN.includes(t));
+      if (!hatPrimaerDokument) {
+        logInfo("webhook/email", "Rollback: Nur sekundäre Dokumente (LS/VS) ohne bestehende Bestellung", {
+          bestellungId, typen: gespeicherteTypen, email_absender, email_betreff,
+        });
+        await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
+        await supabase.from("bestellungen").delete().eq("id", bestellungId);
+        return NextResponse.json({
+          success: true,
+          skipped: true,
+          reason: "sekundaer_ohne_bestellung",
+          debug: { typen: gespeicherteTypen },
+        });
+      }
+    }
+
+    // =====================================================================
     // E-MAIL BODY ALS ERGÄNZUNG ANALYSIEREN
     // =====================================================================
     if (emailText && emailText.length > 100) {
@@ -926,15 +960,15 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Versand-Emails: NUR an bestehende Bestellung anhängen, keine neue erstellen
-        if (fallbackTyp === "versandbestaetigung" && bestellungNeuErstellt) {
-          logInfo("webhook/email", "Rollback: Versand-Email ohne bestehende Bestellung", { bestellungId, email_absender, email_betreff });
+        // Sekundäre Dokumente (LS/VS): NUR an bestehende Bestellung anhängen, keine neue erstellen
+        if ((fallbackTyp === "versandbestaetigung" || fallbackTyp === "lieferschein") && bestellungNeuErstellt) {
+          logInfo("webhook/email", `Rollback: ${fallbackTyp} ohne bestehende Bestellung`, { bestellungId, email_absender, email_betreff });
           await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
           await supabase.from("bestellungen").delete().eq("id", bestellungId);
           return NextResponse.json({
             success: true,
             skipped: true,
-            reason: "versand_ohne_bestellung",
+            reason: "sekundaer_ohne_bestellung",
           });
         }
 

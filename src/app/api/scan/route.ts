@@ -184,6 +184,18 @@ export async function POST(request: NextRequest) {
       updateFields.hat_aufmass = true;
     } else if (erkannterTyp === "leistungsnachweis") {
       updateFields.hat_leistungsnachweis = true;
+    } else if (erkannterTyp === "versandbestaetigung") {
+      updateFields.hat_versandbestaetigung = true;
+      if (analyse.tracking_nummer) updateFields.tracking_nummer = analyse.tracking_nummer;
+      if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;
+      if (analyse.tracking_url) {
+        updateFields.tracking_url = analyse.tracking_url;
+      } else if (analyse.versanddienstleister && analyse.tracking_nummer) {
+        const { buildTrackingUrl } = await import("@/lib/tracking-urls");
+        const autoUrl = buildTrackingUrl(analyse.versanddienstleister, analyse.tracking_nummer);
+        if (autoUrl) updateFields.tracking_url = autoUrl;
+      }
+      if (analyse.voraussichtliche_lieferung) updateFields.voraussichtliche_lieferung = analyse.voraussichtliche_lieferung;
     }
 
     await supabase
