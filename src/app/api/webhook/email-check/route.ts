@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         try {
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
           const gptCheck = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-4o",
             temperature: 0,
             max_tokens: 100,
             messages: [
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
       const gptResult = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         temperature: 0,
         max_tokens: 150,
         messages: [
