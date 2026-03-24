@@ -122,9 +122,9 @@ var SCORE_CONFIRMATION_KEYWORDS = [
 ];
 
 // Schwellenwerte
-var SCORE_SICHER = 10;    // ≥10 Punkte → sofort Signal senden (erhöht: weniger False Positives)
-var SCORE_VIELLEICHT = 5; // 5-9 Punkte → KI fragen
-                          // <5 Punkte → ignorieren
+var SCORE_SICHER = 6;     // ≥6 Punkte → sofort Signal senden (gleicher Wert wie Server-Config)
+var SCORE_VIELLEICHT = 3; // 3-5 Punkte → KI fragen (gleicher Wert wie Server-Config)
+                          // <3 Punkte → ignorieren
 
 // =====================================================================
 // FILTER: Domains und Pfade die NIEMALS geprüft werden

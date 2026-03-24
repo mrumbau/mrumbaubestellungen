@@ -33,12 +33,12 @@
 
   var rootDomain = extractRootDomain(hostname);
 
-  // Duplikat-Schutz (sessionStorage + localStorage mit 10-Min-TTL)
+  // Duplikat-Schutz (sessionStorage + localStorage mit 30-Min-TTL)
   var signalKey = "mr_signal_" + rootDomain + "_" + pathname;
   if (sessionStorage.getItem(signalKey)) return;
   try {
     var lsEntry = localStorage.getItem(signalKey);
-    if (lsEntry && (Date.now() - parseInt(lsEntry, 10)) < 600000) return; // 10 Min
+    if (lsEntry && (Date.now() - parseInt(lsEntry, 10)) < 1800000) return; // 30 Min
   } catch (e) { /* localStorage nicht verfügbar */ }
 
   // Fetch mit Timeout
@@ -60,7 +60,14 @@
         hostname.endsWith("." + haendler.domain);
       if (!domainMatch) return false;
       return haendler.patterns.some(function (pattern) {
-        return pathname.includes(pattern);
+        // Exakter Pfad-Segment-Match: Pattern muss als vollständiger Pfad-Teil vorkommen.
+        // "/checkout/confirmation" matcht "/checkout/confirmation" und "/checkout/confirmation?id=1"
+        // aber NICHT "/checkout/confirmation_pending" oder "/mycheckout/confirmation"
+        return pathname === pattern ||
+               pathname.startsWith(pattern + "/") ||
+               pathname.startsWith(pattern + "?") ||
+               pathname.startsWith(pattern + "#") ||
+               pathname === pattern + "/";
       });
     });
   }
@@ -75,7 +82,15 @@
   // Dynamische Config laden, dann Stufe 1b + 2 + 3
   // ===================================================================
 
+  var configTimeout = setTimeout(function () {
+    configTimeout = null;
+    starteStufe2(null);
+  }, 3000);
+
   chrome.runtime.sendMessage({ type: "get_config" }, function (response) {
+    if (!configTimeout) return; // Timeout bereits ausgelöst
+    clearTimeout(configTimeout);
+
     if (chrome.runtime.lastError) {
       starteStufe2(null);
       return;
