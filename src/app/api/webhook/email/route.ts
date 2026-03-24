@@ -247,6 +247,15 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Inline-Bilder/Logos filtern: Bilder < 5 KB sind keine echten Dokumente
+        // (z.B. ATT00002.png, image001.png — E-Mail-Signaturen und Logos)
+        const istBild = mimeType.startsWith("image/") || (raw.contentType as string || "").startsWith("image/");
+        const geschaetzteGroesse = Math.ceil((base64.length * 3) / 4);
+        if (istBild && geschaetzteGroesse < 5_000) {
+          logInfo("webhook/email", `Anhang[${idx}] übersprungen: Inline-Bild zu klein (${geschaetzteGroesse} Bytes)`, { name });
+          continue;
+        }
+
         // MIME-Typ normalisieren
         mimeType = effectiveMimeType(mimeType, name);
 
@@ -900,8 +909,23 @@ export async function POST(request: NextRequest) {
       try {
         // Nur wenn noch Zeit übrig ist (< 45s verbraucht)
         if (Date.now() - startTime < 45_000) {
-          const bodyBase64 = Buffer.from(emailText.slice(0, 8000)).toString("base64");
+          // Betreff als Kontext mitgeben — GPT braucht den Betreff um den Dokumenttyp korrekt zu erkennen
+          // z.B. "Ihre Bestellung bei Strauss" = Bestellbestätigung, nicht Versandbestätigung
+          const bodyMitBetreff = email_betreff
+            ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 7500)}`
+            : emailText.slice(0, 8000);
+          const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
           const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
+
+          // Betreff-basierte Korrektur: Wenn der Betreff klar einen Typ signalisiert, GPT aber etwas anderes sagt
+          if (email_betreff) {
+            const betreffLower = email_betreff.toLowerCase();
+            const betreffIstBestellung = ["ihre bestellung", "bestellbestätigung", "auftragsbestätigung", "order confirmation", "bestellung eingegangen", "bestellung bei"].some(kw => betreffLower.includes(kw));
+            if (betreffIstBestellung && bodyAnalyse.typ === "versandbestaetigung") {
+              logInfo("webhook/email", "Betreff-Korrektur: GPT sagte versandbestaetigung, Betreff sagt bestellbestaetigung", { email_betreff, gpt_typ: bodyAnalyse.typ });
+              bodyAnalyse.typ = "bestellbestaetigung";
+            }
+          }
 
           if (bekannteTypen.includes(bodyAnalyse.typ) && !gespeicherteTypen.includes(bodyAnalyse.typ)) {
             // Neuer Typ aus Body → speichern
@@ -999,23 +1023,25 @@ export async function POST(request: NextRequest) {
         let fallbackTyp: string;
         let fallbackFlag: string;
 
-        const versandKw = ["versand", "versendet", "sendungsverfolgung", "tracking", "shipped", "paket", "zustellung", "unterwegs", "sendung"];
+        // Reihenfolge wichtig: Bestellbestätigung VOR Versand prüfen,
+        // weil "Ihre Bestellung" (= Bestätigung) stärker ist als generische Versand-Keywords
+        const bestellungKw = ["bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "order confirmation", "ihre bestellung", "bestellung eingegangen", "bestellung bei"];
         const rechnungKw = ["rechnung", "invoice", "zahlungsaufforderung", "fällig", "rechnungsnummer", "zahlungsziel"];
         const lieferscheinKw = ["lieferschein", "lieferung", "delivery note", "warenausgang"];
-        const bestellungKw = ["bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "order confirmation", "ihre bestellung", "bestellung eingegangen"];
+        const versandKw = ["versandbestätigung", "versandbestaetigung", "versendet", "sendungsverfolgung", "tracking", "shipped", "zustellung", "unterwegs", "paket wurde", "sendung verfolgen"];
 
-        if (versandKw.some((k) => suchText.includes(k))) {
-          fallbackTyp = "versandbestaetigung";
-          fallbackFlag = "hat_versandbestaetigung";
+        if (bestellungKw.some((k) => suchText.includes(k))) {
+          fallbackTyp = "bestellbestaetigung";
+          fallbackFlag = "hat_bestellbestaetigung";
         } else if (rechnungKw.some((k) => suchText.includes(k))) {
           fallbackTyp = "rechnung";
           fallbackFlag = "hat_rechnung";
         } else if (lieferscheinKw.some((k) => suchText.includes(k))) {
           fallbackTyp = "lieferschein";
           fallbackFlag = "hat_lieferschein";
-        } else if (bestellungKw.some((k) => suchText.includes(k))) {
-          fallbackTyp = "bestellbestaetigung";
-          fallbackFlag = "hat_bestellbestaetigung";
+        } else if (versandKw.some((k) => suchText.includes(k))) {
+          fallbackTyp = "versandbestaetigung";
+          fallbackFlag = "hat_versandbestaetigung";
         } else {
           // Kein Keyword erkannt → NICHT als Bestellbestätigung speichern
           // Stattdessen: Bestellung löschen wenn neu erstellt (irrelevante Email)
