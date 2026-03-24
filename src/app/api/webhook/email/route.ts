@@ -875,8 +875,31 @@ export async function POST(request: NextRequest) {
           fallbackTyp = "bestellbestaetigung";
           fallbackFlag = "hat_bestellbestaetigung";
         } else {
-          fallbackTyp = "bestellbestaetigung";
-          fallbackFlag = "hat_bestellbestaetigung";
+          // Kein Keyword erkannt → NICHT als Bestellbestätigung speichern
+          // Stattdessen: Bestellung löschen wenn neu erstellt (irrelevante Email)
+          if (bestellungNeuErstellt) {
+            logInfo("webhook/email", "Rollback: Body-only ohne erkannten Typ", { bestellungId, email_absender, email_betreff });
+            await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
+            await supabase.from("bestellungen").delete().eq("id", bestellungId);
+          }
+          return NextResponse.json({
+            success: true,
+            skipped: true,
+            reason: "kein_dokument_erkannt",
+            debug: { email_betreff, email_absender },
+          });
+        }
+
+        // Versand-Emails: NUR an bestehende Bestellung anhängen, keine neue erstellen
+        if (fallbackTyp === "versandbestaetigung" && bestellungNeuErstellt) {
+          logInfo("webhook/email", "Rollback: Versand-Email ohne bestehende Bestellung", { bestellungId, email_absender, email_betreff });
+          await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
+          await supabase.from("bestellungen").delete().eq("id", bestellungId);
+          return NextResponse.json({
+            success: true,
+            skipped: true,
+            reason: "versand_ohne_bestellung",
+          });
         }
 
         // Tracking-Daten extrahieren bei Versand-Emails

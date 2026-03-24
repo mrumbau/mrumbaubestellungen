@@ -24,7 +24,24 @@ const SYSTEM_KEYWORDS = [
   "undeliverable", "delivery failure", "mail delivery failed",
   "calendar:", "einladung:", "termineinladung",
   "newsletter", "abonnement", "unsubscribe", "abmelden",
+  // Telefon-/VoIP-Systeme
+  "verpasster anruf", "missed call", "voicemail", "3cx",
+  // Lesebestätigungen
+  "gelesen:", "read:", "lesebestätigung", "read receipt",
+  // Hosting/Service-Benachrichtigungen
+  "kontoinformation", "account information",
+  // Werbung/Marketing allgemein
+  "profinews", "produktneuheiten", "firmendaten aktualisieren",
+  "jetzt online", "vorteil sichern",
 ];
+
+// Domains die IMMER irrelevant sind (Telefon, Hosting, Auskunfteien etc.)
+const SYSTEM_DOMAINS = new Set([
+  "3cx.net", "3cx.com",
+  "creditreform.de", "muenchen.creditreform.de",
+  "all-inkl.com",
+  "plancraft.com",
+]);
 
 // Marketing/Transaktions-Mails von Händlern die KEINE Geschäftsdokumente sind
 const HAENDLER_IRRELEVANT_KEYWORDS = [
@@ -79,9 +96,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ relevant: false, grund: "kein_absender" });
     }
 
-    // ── 2. System-Mails (Geräte, Bounces, Kalender) ──
-    if (SYSTEM_KEYWORDS.some(k => betreff.includes(k) || absenderAdresse.includes(k))) {
+    // ── 2. System-Mails (Geräte, Bounces, Kalender, Telefon, Lesebestätigungen) ──
+    if (SYSTEM_KEYWORDS.some(k => betreff.includes(k) || vorschau.includes(k) || absenderAdresse.includes(k))) {
       return NextResponse.json({ relevant: false, grund: "system_mail" });
+    }
+
+    // ── 2b. System-Domains (immer irrelevant) ──
+    if (SYSTEM_DOMAINS.has(absenderDomain) ||
+        [...SYSTEM_DOMAINS].some(d => absenderDomain.endsWith("." + d))) {
+      return NextResponse.json({ relevant: false, grund: "system_domain" });
+    }
+
+    // ── 2c. Interne mrumbau.de Emails (Lesebestätigungen, Weiterleitungen etc.) ──
+    if (absenderDomain === "mrumbau.de" || absenderDomain === "reuter-mr.de") {
+      return NextResponse.json({ relevant: false, grund: "intern" });
     }
 
     const supabase = createServiceClient();
@@ -123,6 +151,51 @@ export async function POST(request: NextRequest) {
       const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => combined.includes(k));
       if (istMarketing) {
         return NextResponse.json({ relevant: false, grund: "haendler_marketing" });
+      }
+
+      // Positive Prüfung: Betreff MUSS auf ein echtes Geschäftsdokument hindeuten
+      const dokumentKeywords = [
+        "bestellung", "bestätigung", "auftragsbestätigung", "order",
+        "rechnung", "invoice", "gutschrift", "credit",
+        "lieferschein", "lieferung", "delivery",
+        "versand", "tracking", "sendung", "paket", "shipped",
+        "angebot", "angebotsnr", "quotation",
+        "aufmaß", "aufmass", "leistungsnachweis",
+        "mahnung", "zahlungserinnerung",
+      ];
+      const hatDokumentHinweis = dokumentKeywords.some(k => betreff.includes(k));
+
+      // Wenn Betreff KEIN Dokument-Keyword hat → GPT entscheiden lassen statt blind durchlassen
+      if (!hatDokumentHinweis) {
+        // Mini-GPT-Check für Händler-Emails ohne klaren Dokument-Betreff
+        try {
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const gptCheck = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            temperature: 0,
+            max_tokens: 100,
+            messages: [
+              {
+                role: "system",
+                content: `Ist diese Email ein echtes Geschäftsdokument (Bestellung, Rechnung, Lieferschein, Angebot, Versandbestätigung)? Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurz"}. Im Zweifel: false.`,
+              },
+              {
+                role: "user",
+                content: `Absender: ${email_absender}\nBetreff: ${email_betreff}\nVorschau: ${(email_vorschau || "").substring(0, 300)}`,
+              },
+            ],
+          });
+          const txt = gptCheck.choices[0]?.message?.content || "";
+          const jm = txt.match(/\{[\s\S]*\}/);
+          if (jm) {
+            const p = JSON.parse(jm[0]);
+            if (!p.relevant) {
+              return NextResponse.json({ relevant: false, grund: "haendler_ki_nein", ki_begruendung: p.grund });
+            }
+          }
+        } catch {
+          // GPT-Fehler bei Händler → sicherheitshalber durchlassen
+        }
       }
 
       return NextResponse.json({
@@ -186,25 +259,30 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `Du bist ein E-Mail-Klassifizierer für eine deutsche Baufirma (MR Umbau GmbH).
-Entscheide ob diese E-Mail geschäftsrelevant ist und verarbeitet werden soll.
+            content: `Du bist ein strenger E-Mail-Klassifizierer für eine deutsche Baufirma (MR Umbau GmbH).
+Entscheide ob diese E-Mail ein KONKRETES Geschäftsdokument enthält oder ankündigt.
 
-RELEVANT (ja):
-- Bestellbestätigungen, Auftragsbestätigungen
-- Rechnungen, Gutschriften
-- Lieferscheine, Versandbestätigungen
-- Angebote von Lieferanten/Händlern
+RELEVANT (ja) — NUR wenn die Email SELBST ein Dokument IST oder eines im Anhang hat:
+- Automatische Bestellbestätigungen direkt von einem Webshop ("Ihre Bestellung #12345")
+- Rechnungen mit Rechnungsnummer und Betrag
+- Lieferscheine
+- Versandbestätigungen mit Tracking-Nummer
+- Angebote mit konkreten Positionen/Preisen
 - Aufmaße, Leistungsnachweise
-- Mahnungen, Zahlungserinnerungen
 
-IRRELEVANT (nein):
-- Newsletter, Werbung, Marketing
-- Spam, Phishing
-- Persönliche Emails, Kundenanfragen
-- Geräte-Benachrichtigungen (Router, NAS, Drucker)
-- Social Media, Kalendereinladungen
-- Bewerbungen, Stellenangebote
-- Interne System-Mails
+IRRELEVANT (nein) — im Zweifel IMMER nein:
+- Newsletter, Werbung, Marketing, ProfiNews, Produktinfos
+- E-Mail-Konversationen/Antworten (AW:, RE:, SV:, FW:, WG:) — das sind Gespräche, keine Dokumente!
+- Allgemeine Korrespondenz ("Sehr geehrter Herr...", "anbei die Unterlagen...")
+- Geräte-Benachrichtigungen (Router, NAS, Drucker, Telefon/3CX)
+- Mahnungen, Zahlungserinnerungen, Kontoinformationen
+- Bewertungsaufforderungen
+- Spam, Phishing, Bewerbungen
+- Hosting-/Domain-Benachrichtigungen
+- Kalender, Social Media, Lesebestätigungen
+- Emails die nur "Per E-Mail senden:" im Betreff haben
+
+WICHTIG: Ein Betreff der "Auftragsbestätigung" oder "Angebot" enthält ist NUR relevant wenn es eine AUTOMATISCHE Benachrichtigung eines Webshops/Händlers ist, NICHT wenn es eine weitergeleitete oder beantwortete persönliche Email ist (erkennbar an AW:/RE:/SV:/FW:/WG: Präfixen).
 
 Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurze Begründung"}`,
           },
