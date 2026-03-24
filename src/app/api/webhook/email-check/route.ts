@@ -26,6 +26,19 @@ const SYSTEM_KEYWORDS = [
   "newsletter", "abonnement", "unsubscribe", "abmelden",
 ];
 
+// Marketing/Transaktions-Mails von Händlern die KEINE Geschäftsdokumente sind
+const HAENDLER_IRRELEVANT_KEYWORDS = [
+  "bewerte", "bewertung", "rezension", "review", "feedback geben",
+  "wie war", "zufrieden", "erfahrung teilen",
+  "gutschein", "rabatt", "coupon", "% auf", "sale", "sonderangebot", "angebot des tages",
+  "empfehlung", "könnte ihnen gefallen", "ähnliche produkte", "passend dazu",
+  "treuepunkte", "bonuspunkte", "prämie",
+  "warenkorb", "vergessen", "abgebrochen",
+  "passwort zurücksetzen", "passwort ändern", "password reset",
+  "konto bestätigen", "e-mail bestätigen", "verify your email",
+  "willkommen bei", "welcome to", "registrierung",
+];
+
 function extractEmailAddress(raw: string): string {
   if (!raw) return "";
   const match = raw.match(/[\w.+-]+@[\w.-]+\.\w+/);
@@ -103,6 +116,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (haendlerMatch) {
+      // Prüfen ob es eine Marketing/Bewertungs-Mail ist (kein Geschäftsdokument)
+      const combined = betreff + " " + vorschau;
+      const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => combined.includes(k));
+      if (istMarketing) {
+        return NextResponse.json({ relevant: false, grund: "haendler_marketing" });
+      }
+
       return NextResponse.json({
         relevant: true,
         grund: "haendler",
@@ -125,6 +145,12 @@ export async function POST(request: NextRequest) {
     );
 
     if (suMatch) {
+      const combined = betreff + " " + vorschau;
+      const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => combined.includes(k));
+      if (istMarketing) {
+        return NextResponse.json({ relevant: false, grund: "su_marketing" });
+      }
+
       return NextResponse.json({
         relevant: true,
         grund: "subunternehmer",

@@ -1227,6 +1227,39 @@ export function BestelldetailClient({
                   )}
                 </div>
 
+                {/* Artikel-Liste wenn vorhanden */}
+                {aktivesDokument.artikel && Array.isArray(aktivesDokument.artikel) && aktivesDokument.artikel.length > 0 && (
+                  <div className="bg-white rounded-lg border border-[#e8e6e3]">
+                    <div className="px-4 py-2.5 text-xs font-medium text-[#9a9a9a] border-b border-[#f0eeeb]">Artikel</div>
+                    <div className="divide-y divide-[#f0eeeb]">
+                      {aktivesDokument.artikel.map((art: { name?: string; menge?: number; einzelpreis?: number; gesamtpreis?: number }, idx: number) => (
+                        <div key={idx} className="px-4 py-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-[#1a1a1a]">{art.name || "Unbekannt"}</span>
+                            {art.gesamtpreis != null && <span className="font-medium text-[#1a1a1a]">{Number(art.gesamtpreis).toFixed(2)} EUR</span>}
+                          </div>
+                          {(art.menge != null || art.einzelpreis != null) && (
+                            <div className="text-[#9a9a9a] mt-0.5">
+                              {art.menge != null && <span>{art.menge}x</span>}
+                              {art.einzelpreis != null && <span> à {Number(art.einzelpreis).toFixed(2)} EUR</span>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* E-Mail-Text wenn vorhanden (body-only Dokumente) */}
+                {aktivesDokument.ki_roh_daten?.email_text && (
+                  <div className="bg-white rounded-lg border border-[#e8e6e3]">
+                    <div className="px-4 py-2.5 text-xs font-medium text-[#9a9a9a] border-b border-[#f0eeeb]">E-Mail Inhalt</div>
+                    <div className="px-4 py-3 text-xs text-[#6b6b6b] whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto">
+                      {aktivesDokument.ki_roh_daten.email_text}
+                    </div>
+                  </div>
+                )}
+
                 {/* Upload-Buttons */}
                 <div className="flex gap-2 justify-center pt-2">
                   <button onClick={() => cameraInputRef.current?.click()} disabled={scanLoading} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#570006] bg-[#570006]/5 rounded-lg hover:bg-[#570006]/10 transition-colors">
