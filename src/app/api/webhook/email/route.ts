@@ -655,46 +655,118 @@ export async function POST(request: NextRequest) {
             .eq("id", bestellungId);
         }
       } else {
-        // 3. Neue Bestellung anlegen
-        // Bestellungsart aus GPT-Analyse übernehmen
-        if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
-          const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
-          if (vermuteteArt === "subunternehmer") bestellungsart = "subunternehmer";
+        // 3. Erweiterte Suche: Gleicher Händler/SU + offene Bestellung die den Dokumenttyp noch nicht hat
+        // Verhindert Duplikate wenn verschiedene Dokumente derselben Bestellung zeitversetzt ankommen
+        // (z.B. Rechnung zuerst, dann Bestellbestätigung/Aufmaß nachträglich)
+        let erweiterterMatch: string | null = null;
+        const analyseTypen = analyseErgebnisse
+          .filter(e => ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"].includes(e.analyse.typ))
+          .map(e => e.analyse.typ);
+
+        if (analyseTypen.length > 0 && (haendler?.id || erkannterSubunternehmer?.id)) {
+          const vierzehnTageZurueck = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+          const typFlagMap: Record<string, string> = {
+            bestellbestaetigung: "hat_bestellbestaetigung",
+            lieferschein: "hat_lieferschein",
+            rechnung: "hat_rechnung",
+            aufmass: "hat_aufmass",
+            leistungsnachweis: "hat_leistungsnachweis",
+            versandbestaetigung: "hat_versandbestaetigung",
+          };
+
+          let erweiterteQuery = supabase
+            .from("bestellungen")
+            .select("id, betrag, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
+            .in("status", ["offen", "erwartet", "vollstaendig", "abweichung"])
+            .gte("created_at", vierzehnTageZurueck);
+
+          if (haendler?.id) {
+            erweiterteQuery = erweiterteQuery.eq("haendler_id", haendler.id);
+          } else if (erkannterSubunternehmer?.id) {
+            erweiterteQuery = erweiterteQuery.eq("subunternehmer_id", erkannterSubunternehmer.id);
+          }
+
+          // Besteller einschränken wenn bekannt (UNBEKANNT matcht zu breit)
+          if (bestellerKuerzel && bestellerKuerzel !== "UNBEKANNT") {
+            erweiterteQuery = erweiterteQuery.eq("besteller_kuerzel", bestellerKuerzel);
+          }
+
+          const { data: kandidaten } = await erweiterteQuery
+            .order("created_at", { ascending: false })
+            .limit(5);
+
+          if (kandidaten && kandidaten.length > 0) {
+            const hauptTyp = analyseTypen[0];
+            const flag = typFlagMap[hauptTyp];
+
+            if (flag) {
+              const erkannterBetrag = analyseErgebnisse.find(e => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag;
+
+              const match = kandidaten.find(k => {
+                // Muss den Dokumenttyp noch nicht haben
+                if (k[flag as keyof typeof k]) return false;
+                // Betrag-Validierung: wenn beide Beträge bekannt, max 15% Abweichung erlauben
+                if (erkannterBetrag && k.betrag) {
+                  const abweichung = Math.abs(Number(k.betrag) - erkannterBetrag) / Math.max(Number(k.betrag), erkannterBetrag);
+                  if (abweichung > 0.15) return false;
+                }
+                return true;
+              });
+
+              if (match) {
+                erweiterterMatch = match.id;
+                logInfo("webhook/email", "Erweiterte Zuordnung: Dokument an bestehende Bestellung", {
+                  bestellungId: match.id, typ: hauptTyp, email_absender, email_betreff,
+                });
+              }
+            }
+          }
         }
 
-        const { data: neue, error: insertError } = await supabase
-          .from("bestellungen")
-          .insert({
-            bestellnummer: erkannteBestellnummer,
-            haendler_id: haendler?.id || null,
-            haendler_name: erkannterSubunternehmer?.firma || haendlerName,
-            besteller_kuerzel: bestellerKuerzel,
-            besteller_name: benutzer?.name || bestellerKuerzel,
-            status: "offen",
-            zuordnung_methode: zuordnungsMethode,
-            bestellungsart,
-            subunternehmer_id: erkannterSubunternehmer?.id || null,
-          })
-          .select()
-          .single();
-
-        if (insertError && erkannteBestellnummer) {
-          const { data: fallback } = await supabase
-            .from("bestellungen")
-            .select("id")
-            .eq("bestellnummer", erkannteBestellnummer)
-            .limit(1)
-            .maybeSingle();
-          if (fallback) {
-            bestellungId = fallback.id;
-          } else {
-            throw new Error("Bestellung konnte weder angelegt noch gefunden werden");
-          }
-        } else if (!neue) {
-          throw new Error("Bestellung konnte nicht angelegt werden");
+        if (erweiterterMatch) {
+          bestellungId = erweiterterMatch;
         } else {
-          bestellungId = neue.id;
-          bestellungNeuErstellt = true;
+          // 4. Neue Bestellung anlegen
+          // Bestellungsart aus GPT-Analyse übernehmen
+          if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
+            const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
+            if (vermuteteArt === "subunternehmer") bestellungsart = "subunternehmer";
+          }
+
+          const { data: neue, error: insertError } = await supabase
+            .from("bestellungen")
+            .insert({
+              bestellnummer: erkannteBestellnummer,
+              haendler_id: haendler?.id || null,
+              haendler_name: erkannterSubunternehmer?.firma || haendlerName,
+              besteller_kuerzel: bestellerKuerzel,
+              besteller_name: benutzer?.name || bestellerKuerzel,
+              status: "offen",
+              zuordnung_methode: zuordnungsMethode,
+              bestellungsart,
+              subunternehmer_id: erkannterSubunternehmer?.id || null,
+            })
+            .select()
+            .single();
+
+          if (insertError && erkannteBestellnummer) {
+            const { data: fallback } = await supabase
+              .from("bestellungen")
+              .select("id")
+              .eq("bestellnummer", erkannteBestellnummer)
+              .limit(1)
+              .maybeSingle();
+            if (fallback) {
+              bestellungId = fallback.id;
+            } else {
+              throw new Error("Bestellung konnte weder angelegt noch gefunden werden");
+            }
+          } else if (!neue) {
+            throw new Error("Bestellung konnte nicht angelegt werden");
+          } else {
+            bestellungId = neue.id;
+            bestellungNeuErstellt = true;
+          }
         }
       }
     }
