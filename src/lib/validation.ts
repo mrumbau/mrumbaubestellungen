@@ -9,8 +9,13 @@ export function isValidUUID(value: string): boolean {
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/webp",
+  "image/gif",
+  "image/tiff",
+  "image/bmp",
+  "application/octet-stream", // M365 sendet PDFs manchmal so
 ];
 
 export function isAllowedMimeType(mimeType: string): boolean {

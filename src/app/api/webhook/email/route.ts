@@ -672,7 +672,7 @@ export async function POST(request: NextRequest) {
           .filter(e => ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"].includes(e.analyse.typ))
           .map(e => e.analyse.typ);
 
-        if (analyseTypen.length > 0 && (haendler?.id || erkannterSubunternehmer?.id)) {
+        if (analyseTypen.length > 0) {
           const vierzehnTageZurueck = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
           const typFlagMap: Record<string, string> = {
             bestellbestaetigung: "hat_bestellbestaetigung",
@@ -685,7 +685,7 @@ export async function POST(request: NextRequest) {
 
           let erweiterteQuery = supabase
             .from("bestellungen")
-            .select("id, betrag, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
+            .select("id, betrag, haendler_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
             .in("status", ["offen", "erwartet", "vollstaendig", "abweichung"])
             .gte("created_at", vierzehnTageZurueck);
 
@@ -693,6 +693,12 @@ export async function POST(request: NextRequest) {
             erweiterteQuery = erweiterteQuery.eq("haendler_id", haendler.id);
           } else if (erkannterSubunternehmer?.id) {
             erweiterteQuery = erweiterteQuery.eq("subunternehmer_id", erkannterSubunternehmer.id);
+          } else if (haendlerName) {
+            // Kein Händler in DB, aber Name erkannt → über haendler_name suchen
+            erweiterteQuery = erweiterteQuery.ilike("haendler_name", `%${haendlerName}%`);
+          } else {
+            // Weder Händler-ID noch Name → erweiterte Suche nicht sinnvoll
+            erweiterteQuery = null as unknown as typeof erweiterteQuery;
           }
 
           // Besteller einschränken wenn bekannt (UNBEKANNT matcht zu breit)
@@ -700,9 +706,9 @@ export async function POST(request: NextRequest) {
             erweiterteQuery = erweiterteQuery.eq("besteller_kuerzel", bestellerKuerzel);
           }
 
-          const { data: kandidaten } = await erweiterteQuery
-            .order("created_at", { ascending: false })
-            .limit(5);
+          const kandidaten = erweiterteQuery
+            ? (await erweiterteQuery.order("created_at", { ascending: false }).limit(5)).data
+            : null;
 
           if (kandidaten && kandidaten.length > 0) {
             const hauptTyp = analyseTypen[0];
@@ -1303,21 +1309,34 @@ async function handleVersandEmail(
   }
 
   if (!bestellungId) {
-    // Fallback: Letzte offene Bestellung die zum Versanddienstleister-Kontext passt.
-    // Wir suchen nur Bestellungen der letzten 7 Tage und bevorzugen solche
-    // die bereits Material-Bestellungen sind (Versand ist für SU-Leistungen irrelevant).
+    // Fallback: Letzte offene Material-Bestellung der letzten 7 Tage,
+    // die NOCH KEINE Versandbestätigung hat.
+    // Zusätzlich: Wenn der Versanddienstleister aus der Domain erkennbar ist (z.B. dhl.de),
+    // können wir NICHT auf den Händler filtern — Versand-Emails kommen vom Carrier, nicht vom Händler.
+    // Deshalb: Nur Bestellungen nehmen die hat_versandbestaetigung = false haben.
     const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: letzte } = await supabase
+    const { data: kandidaten } = await supabase
       .from("bestellungen")
-      .select("id")
+      .select("id, hat_versandbestaetigung, hat_bestellbestaetigung")
       .in("status", ["offen", "erwartet", "vollstaendig"])
       .eq("bestellungsart", "material")
+      .eq("hat_versandbestaetigung", false)
       .gte("created_at", siebenTageZurueck)
       .order("created_at", { ascending: false })
-      .limit(1);
+      .limit(5);
 
-    if (letzte?.[0]) {
-      bestellungId = letzte[0].id;
+    if (kandidaten && kandidaten.length === 1) {
+      // Eindeutig: Nur eine offene Bestellung ohne Versand → zuordnen
+      bestellungId = kandidaten[0].id;
+    } else if (kandidaten && kandidaten.length > 1) {
+      // Mehrere Kandidaten: Bevorzuge Bestellungen die bereits eine Bestätigung haben
+      // (= weiter im Prozess, wahrscheinlicher dass Versand kommt)
+      const mitBestaetigung = kandidaten.find(k => k.hat_bestellbestaetigung);
+      if (mitBestaetigung) {
+        bestellungId = mitBestaetigung.id;
+      }
+      // Bei mehreren Kandidaten OHNE klare Zuordnung: NICHT raten → lieber verwerfen
+      // als falsch zuordnen
     }
   }
 
@@ -1365,9 +1384,19 @@ async function handleVersandEmail(
   for (const anhang of anhaenge.slice(0, 1)) {
     const storagePfad = `${bestellungId}/versand_${Date.now()}_${anhang.name}`;
     const buffer = Buffer.from(anhang.base64, "base64");
-    await supabase.storage
+    const { error: uploadErr } = await supabase.storage
       .from("dokumente")
       .upload(storagePfad, buffer, { contentType: anhang.mime_type, upsert: true });
+    if (uploadErr) {
+      logError("webhook/email", `Versand-Anhang Upload fehlgeschlagen: ${anhang.name}`, uploadErr);
+    } else {
+      // Storage-Pfad im Dokument-Eintrag nachtragen
+      await supabase.from("dokumente")
+        .update({ storage_pfad: storagePfad })
+        .eq("bestellung_id", bestellungId)
+        .eq("typ", "versandbestaetigung")
+        .is("storage_pfad", null);
+    }
   }
 
   await updateBestellungStatus(supabase, bestellungId);

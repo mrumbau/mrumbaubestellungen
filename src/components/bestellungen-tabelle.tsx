@@ -129,7 +129,10 @@ export function BestellungenTabelle({
     setDownloadingId(bestellungId);
     try {
       const res = await fetch(`/api/pdfs/zip?bestellung_id=${bestellungId}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        window.alert("Fehler beim Herunterladen der Dokumente. Bitte versuchen Sie es erneut.");
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -141,8 +144,11 @@ export function BestellungenTabelle({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch { /* silent */ }
-    finally { setDownloadingId(null); }
+    } catch {
+      window.alert("Fehler beim Herunterladen der Dokumente. Bitte versuchen Sie es erneut.");
+    } finally {
+      setDownloadingId(null);
+    }
   }
 
   function toggleSelect(id: string) {
@@ -175,9 +181,15 @@ export function BestellungenTabelle({
         setSelectionMode(false);
         setShowDeleteDialog(false);
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        window.alert(data.error || "Fehler beim Löschen der Bestellungen");
       }
-    } catch { /* silent */ }
-    finally { setDeleteLoading(false); }
+    } catch {
+      window.alert("Netzwerkfehler beim Löschen der Bestellungen");
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   return (

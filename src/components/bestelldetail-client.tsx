@@ -385,13 +385,19 @@ export function BestelldetailClient({
     e.preventDefault();
     if (!kommentarText.trim()) return;
     setLoading(true);
-    const res = await fetch("/api/kommentare", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bestellung_id: bestellung.id, text: kommentarText }),
-    });
-    if (res.ok) { setKommentarText(""); router.refresh(); }
-    setLoading(false);
+    try {
+      const res = await fetch("/api/kommentare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestellung_id: bestellung.id, text: kommentarText }),
+      });
+      if (res.ok) { setKommentarText(""); router.refresh(); }
+      else { window.alert("Fehler beim Speichern des Kommentars"); }
+    } catch {
+      window.alert("Netzwerkfehler beim Speichern des Kommentars");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleKiZusammenfassung() {
