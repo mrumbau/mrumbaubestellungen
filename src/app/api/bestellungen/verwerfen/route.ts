@@ -69,6 +69,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Verworfene Email-Muster lernen (vor dem Löschen!)
+    for (const id of ids) {
+      const { data: docs } = await supabase
+        .from("dokumente")
+        .select("email_absender, email_betreff")
+        .eq("bestellung_id", id);
+
+      if (docs && docs.length > 0) {
+        const muster = docs
+          .filter((d) => d.email_absender && d.email_betreff)
+          .map((d) => {
+            const addr = (d.email_absender || "").toLowerCase().trim();
+            const domain = addr.split("@")[1] || "";
+            return {
+              absender_adresse: addr,
+              absender_domain: domain,
+              email_betreff: d.email_betreff || "",
+              verworfen_von: profil!.kuerzel,
+            };
+          })
+          .filter((m) => m.absender_domain);
+
+        if (muster.length > 0) {
+          await supabase.from("verworfene_emails").insert(muster);
+        }
+      }
+    }
+
     // Zugehörige Daten löschen (Reihenfolge: FK-Abhängigkeiten zuerst)
     for (const id of ids) {
       await supabase.from("webhook_logs").delete().eq("bestellung_id", id);

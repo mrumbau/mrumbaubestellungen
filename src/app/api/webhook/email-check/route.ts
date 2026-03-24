@@ -127,6 +127,35 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── 3b. Gelernte Muster aus verworfenen Bestellungen ──
+    const { data: verworfene } = await supabase
+      .from("verworfene_emails")
+      .select("absender_adresse, absender_domain, email_betreff")
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (verworfene && verworfene.length > 0) {
+      // Exakter Absender-Match: gleicher Absender + ähnlicher Betreff → blockieren
+      const exakterMatch = verworfene.find((v) => {
+        if (v.absender_adresse !== absenderAdresse) return false;
+        // Betreff-Ähnlichkeit: mindestens 3 gemeinsame Wörter (>3 Zeichen)
+        const vWoerter = v.email_betreff.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+        const bWoerter = betreff.split(/\s+/).filter((w: string) => w.length > 3);
+        const gemeinsam = vWoerter.filter((w: string) => bWoerter.includes(w));
+        return gemeinsam.length >= 3 || v.email_betreff.toLowerCase() === betreff;
+      });
+
+      if (exakterMatch) {
+        return NextResponse.json({ relevant: false, grund: "gelernt_verworfen" });
+      }
+
+      // Domain-Häufigkeit: gleiche Domain wurde ≥3x verworfen → blockieren
+      const domainCount = verworfene.filter((v) => v.absender_domain === absenderDomain).length;
+      if (domainCount >= 3) {
+        return NextResponse.json({ relevant: false, grund: "domain_oft_verworfen" });
+      }
+    }
+
     // ── 4. Bekannter Händler? ──
     const { data: haendlerListe } = await supabase
       .from("haendler")
@@ -248,9 +277,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ relevant: false, grund: "freemail" });
     }
 
-    // ── 8. Unbekannter Absender → GPT-4o-mini entscheidet ──
+    // ── 8. Unbekannter Absender → GPT-4o entscheidet ──
     try {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      // Gelernte Negativ-Beispiele aus verworfenen Bestellungen
+      let verworfeneBeispiele = "";
+      if (verworfene && verworfene.length > 0) {
+        const beispiele = verworfene
+          .slice(0, 15)
+          .map((v) => `- "${v.email_betreff}" von ${v.absender_adresse}`)
+          .join("\n");
+        verworfeneBeispiele = `\n\nFolgende Emails wurden in der Vergangenheit vom Benutzer als IRRELEVANT verworfen — ähnliche Emails sind ebenfalls irrelevant:\n${beispiele}`;
+      }
 
       const gptResult = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -282,7 +321,7 @@ IRRELEVANT (nein) — im Zweifel IMMER nein:
 - Kalender, Social Media, Lesebestätigungen
 - Emails die nur "Per E-Mail senden:" im Betreff haben
 
-WICHTIG: Ein Betreff der "Auftragsbestätigung" oder "Angebot" enthält ist NUR relevant wenn es eine AUTOMATISCHE Benachrichtigung eines Webshops/Händlers ist, NICHT wenn es eine weitergeleitete oder beantwortete persönliche Email ist (erkennbar an AW:/RE:/SV:/FW:/WG: Präfixen).
+WICHTIG: Ein Betreff der "Auftragsbestätigung" oder "Angebot" enthält ist NUR relevant wenn es eine AUTOMATISCHE Benachrichtigung eines Webshops/Händlers ist, NICHT wenn es eine weitergeleitete oder beantwortete persönliche Email ist (erkennbar an AW:/RE:/SV:/FW:/WG: Präfixen).${verworfeneBeispiele}
 
 Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurze Begründung"}`,
           },

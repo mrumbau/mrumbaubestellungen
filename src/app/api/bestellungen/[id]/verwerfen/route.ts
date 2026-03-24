@@ -94,6 +94,32 @@ export async function POST(
       }
     }
 
+    // Verworfene Email-Muster lernen (vor dem Löschen!)
+    const { data: docs } = await supabase
+      .from("dokumente")
+      .select("email_absender, email_betreff")
+      .eq("bestellung_id", id);
+
+    if (docs && docs.length > 0) {
+      const muster = docs
+        .filter((d) => d.email_absender && d.email_betreff)
+        .map((d) => {
+          const addr = (d.email_absender || "").toLowerCase().trim();
+          const domain = addr.split("@")[1] || "";
+          return {
+            absender_adresse: addr,
+            absender_domain: domain,
+            email_betreff: d.email_betreff || "",
+            verworfen_von: profil.kuerzel,
+          };
+        })
+        .filter((m) => m.absender_domain);
+
+      if (muster.length > 0) {
+        await supabase.from("verworfene_emails").insert(muster);
+      }
+    }
+
     // Abhängige Daten löschen
     await supabase.from("dokumente").delete().eq("bestellung_id", id);
     await supabase.from("abgleiche").delete().eq("bestellung_id", id);
