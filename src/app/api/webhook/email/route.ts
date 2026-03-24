@@ -210,14 +210,37 @@ export async function POST(request: NextRequest) {
     const rawAnhaenge = body.anhaenge || [];
     const anhaenge: { name: string; base64: string; mime_type: string }[] = [];
 
+    // Debug-Log: Was kommt von Make.com an?
+    logInfo("webhook/email", "Anhänge empfangen", {
+      email_betreff,
+      email_absender,
+      raw_count: Array.isArray(rawAnhaenge) ? rawAnhaenge.length : 0,
+      raw_type: typeof rawAnhaenge,
+      hasAttachments_field: body.hasAttachments,
+    });
+
     if (Array.isArray(rawAnhaenge)) {
-      for (const a of rawAnhaenge) {
+      for (let idx = 0; idx < rawAnhaenge.length; idx++) {
+        const a = rawAnhaenge[idx];
         const raw = a as Record<string, unknown>;
         const name = (raw.name as string) || (raw.fileName as string) || "anhang";
         const base64 = (raw.base64 as string) || (raw.contentBytes as string) || "";
         let mimeType = (raw.mime_type as string) || (raw.contentType as string) || "application/octet-stream";
 
-        if (!base64 || base64.length < 100) continue; // Leere/winzige Anhänge skippen
+        // Debug-Log: Details pro Anhang
+        logInfo("webhook/email", `Anhang[${idx}] Details`, {
+          name,
+          mimeType_raw: (raw.mime_type as string) || (raw.contentType as string) || "(leer)",
+          base64_length: base64 ? base64.length : 0,
+          has_base64: !!raw.base64,
+          has_contentBytes: !!raw.contentBytes,
+          raw_keys: Object.keys(raw).join(", "),
+        });
+
+        if (!base64 || base64.length < 100) {
+          logInfo("webhook/email", `Anhang[${idx}] übersprungen: base64 leer/zu kurz (${base64 ? base64.length : 0})`, { name });
+          continue;
+        }
 
         // MIME-Typ normalisieren
         mimeType = effectiveMimeType(mimeType, name);
@@ -236,6 +259,8 @@ export async function POST(request: NextRequest) {
 
         anhaenge.push({ name, base64, mime_type: mimeType });
       }
+    } else if (rawAnhaenge && typeof rawAnhaenge === "object") {
+      logInfo("webhook/email", "Anhänge kein Array!", { type: typeof rawAnhaenge, keys: Object.keys(rawAnhaenge).join(", ") });
     }
 
     // =====================================================================
@@ -1051,6 +1076,11 @@ export async function POST(request: NextRequest) {
       zuordnung: { methode: zuordnungsMethode, kuerzel: bestellerKuerzel },
       dokumente_gespeichert: dokumenteGespeichert,
       dauer_ms: dauer,
+      debug_anhaenge: {
+        raw_empfangen: Array.isArray(rawAnhaenge) ? rawAnhaenge.length : 0,
+        nach_filter: anhaenge.length,
+        analysiert: analyseErgebnisse.length,
+      },
     });
   } catch (err) {
     logError("webhook/email", "Webhook Fehler", err);
