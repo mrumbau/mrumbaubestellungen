@@ -124,8 +124,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. Vorfilter von Make.com
+    // 2. Vorfilter von Make.com (email-check Endpoint hat bereits geprüft)
     const vorfilter = body.vorfilter || "";
+    const vorfilterHaendlerId = body.haendler_id || null;
+    const vorfilterHaendlerName = body.haendler_name || null;
+    const vorfilterSuId = body.su_id || null;
+    const hatVorfilter = vorfilter === "ja";
+
     if (vorfilter === "nein") {
       logInfo("webhook/email", "Vorfilter: irrelevant", { email_betreff, email_absender });
       return NextResponse.json({ success: true, skipped: true, reason: "vorfilter_nein" });
@@ -136,38 +141,37 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // 3. Irrelevante Domains abweisen — ABER erst prüfen ob der Absender
-    //    als Händler oder Subunternehmer bekannt ist (z.B. feistbaur@t-online.de)
-    if (isIrrelevantDomain(absenderDomain)) {
-      const { data: bekannterHaendler } = await supabase
-        .from("haendler")
-        .select("id")
-        .contains("email_absender", [absenderAdresse])
-        .limit(1);
-      const { data: bekannterSU } = await supabase
-        .from("subunternehmer")
-        .select("id")
-        .contains("email_absender", [absenderAdresse])
-        .limit(1);
+    // 3. Irrelevante Domains + Blacklist — NUR wenn kein Vorfilter (sonst bereits geprüft)
+    if (!hatVorfilter) {
+      if (isIrrelevantDomain(absenderDomain)) {
+        const { data: bekannterHaendler } = await supabase
+          .from("haendler")
+          .select("id")
+          .contains("email_absender", [absenderAdresse])
+          .limit(1);
+        const { data: bekannterSU } = await supabase
+          .from("subunternehmer")
+          .select("id")
+          .contains("email_absender", [absenderAdresse])
+          .limit(1);
 
-      if ((!bekannterHaendler || bekannterHaendler.length === 0) &&
-          (!bekannterSU || bekannterSU.length === 0)) {
-        logInfo("webhook/email", `Irrelevante Domain: ${absenderDomain}`, { email_betreff });
-        return NextResponse.json({ success: true, skipped: true, reason: "irrelevant_domain" });
+        if ((!bekannterHaendler || bekannterHaendler.length === 0) &&
+            (!bekannterSU || bekannterSU.length === 0)) {
+          logInfo("webhook/email", `Irrelevante Domain: ${absenderDomain}`, { email_betreff });
+          return NextResponse.json({ success: true, skipped: true, reason: "irrelevant_domain" });
+        }
       }
-      logInfo("webhook/email", `Irrelevante Domain ${absenderDomain} übersprungen — Absender ist bekannt`, { email_betreff, absenderAdresse });
-    }
 
-    // 4. Absender-Blacklist aus DB prüfen
-    const { data: blacklist } = await supabase.from("email_blacklist").select("muster, typ");
-    if (blacklist && blacklist.length > 0) {
-      const istBlockiert = blacklist.some((bl) => {
-        const muster = bl.muster.toLowerCase();
-        if (bl.typ === "adresse") return absenderAdresse === muster;
-        return absenderDomain === muster || absenderDomain.endsWith("." + muster);
-      });
-      if (istBlockiert) {
-        return NextResponse.json({ success: true, skipped: true, reason: "blacklisted" });
+      const { data: blacklist } = await supabase.from("email_blacklist").select("muster, typ");
+      if (blacklist && blacklist.length > 0) {
+        const istBlockiert = blacklist.some((bl) => {
+          const muster = bl.muster.toLowerCase();
+          if (bl.typ === "adresse") return absenderAdresse === muster;
+          return absenderDomain === muster || absenderDomain.endsWith("." + muster);
+        });
+        if (istBlockiert) {
+          return NextResponse.json({ success: true, skipped: true, reason: "blacklisted" });
+        }
       }
     }
 
@@ -259,83 +263,109 @@ export async function POST(request: NextRequest) {
     }
 
     // =====================================================================
-    // HÄNDLER ERKENNEN
+    // HÄNDLER ERKENNEN — Vorfilter-Daten nutzen wenn vorhanden
     // =====================================================================
-    const { data: haendlerListe } = await supabase.from("haendler").select("*");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let haendler: any = null;
+    let erkannterSubunternehmer: { id: string; firma: string } | null = null;
+    let bestellungsart: "material" | "subunternehmer" = "material";
 
-    // 1. E-Mail-Match (exakt oder Wildcard *@domain.de)
-    let haendler = haendlerListe?.find((h) =>
-      h.email_absender?.some((addr: string) => {
-        const normalized = addr.toLowerCase().trim();
-        // Wildcard: *@domain.de matcht alle Adressen von dieser Domain
-        if (normalized.startsWith("*@")) {
-          const wildcardDomain = normalized.slice(2);
-          return absenderAdresse.endsWith("@" + wildcardDomain);
-        }
-        return absenderAdresse === normalized;
-      })
-    ) || null;
-
-    // 2. Domain-Match (nur vorwärts: Absender-Domain enthält Händler-Domain)
-    if (!haendler && absenderDomain) {
-      haendler = haendlerListe?.find((h) => {
-        const hDomain = h.domain?.toLowerCase();
-        if (!hDomain) return false;
-        // Exakter Match oder Subdomain-Match (z.B. mail.bauhaus.de enthält bauhaus.de)
-        return absenderDomain === hDomain || absenderDomain.endsWith("." + hDomain);
-      }) || null;
-
-      // Auto-learn: Absender-Adresse ergänzen
-      if (haendler && absenderAdresse) {
+    if (vorfilterHaendlerId) {
+      // Vorfilter hat Händler bereits identifiziert → direkt aus DB laden (1 Query statt vollem Scan)
+      const { data: vfHaendler } = await supabase
+        .from("haendler")
+        .select("*")
+        .eq("id", vorfilterHaendlerId)
+        .maybeSingle();
+      if (vfHaendler) {
+        haendler = vfHaendler;
+        // Auto-learn: Absender-Adresse ergänzen
         const bestehendeAdressen: string[] = haendler.email_absender || [];
-        if (!bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
+        if (absenderAdresse && !bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
           await supabase
             .from("haendler")
             .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
             .eq("id", haendler.id);
         }
       }
+    } else if (vorfilterSuId) {
+      // Vorfilter hat Subunternehmer identifiziert → direkt laden
+      const { data: vfSU } = await supabase
+        .from("subunternehmer")
+        .select("id, firma")
+        .eq("id", vorfilterSuId)
+        .maybeSingle();
+      if (vfSU) {
+        erkannterSubunternehmer = { id: vfSU.id, firma: vfSU.firma };
+        bestellungsart = "subunternehmer";
+      }
     }
 
-    const haendlerDomain = haendler?.domain || absenderDomain;
-    const haendlerName = haendler?.name || absenderDomain;
+    // Fallback: Kein Vorfilter-Match → volle DB-Suche (für direkte API-Aufrufe ohne Make.com)
+    if (!haendler && !erkannterSubunternehmer) {
+      const { data: haendlerListe } = await supabase.from("haendler").select("*");
 
-    // =====================================================================
-    // SUBUNTERNEHMER PRÜFEN (nur DB-Lookup, kein GPT)
-    // =====================================================================
-    let erkannterSubunternehmer: { id: string; firma: string } | null = null;
-    let bestellungsart: "material" | "subunternehmer" = "material";
+      haendler = haendlerListe?.find((h) =>
+        h.email_absender?.some((addr: string) => {
+          const normalized = addr.toLowerCase().trim();
+          if (normalized.startsWith("*@")) {
+            return absenderAdresse.endsWith("@" + normalized.slice(2));
+          }
+          return absenderAdresse === normalized;
+        })
+      ) || null;
 
-    if (!haendler) {
-      const { data: suListe } = await supabase.from("subunternehmer").select("*");
-      if (suListe && suListe.length > 0) {
-        // E-Mail-Match (exakt oder Wildcard *@domain.de)
-        const suMatch = suListe.find((su) =>
-          su.email_absender?.some((addr: string) => {
-            const normalized = addr.toLowerCase().trim();
-            if (normalized.startsWith("*@")) {
-              return absenderAdresse.endsWith("@" + normalized.slice(2));
-            }
-            return absenderAdresse === normalized;
-          })
-        );
-        if (suMatch) {
-          erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
-          bestellungsart = "subunternehmer";
-        } else {
-          // Domain-Fallback
-          const suDomainMatch = suListe.find((su) => {
-            const suDomain = su.email?.split("@")[1]?.toLowerCase();
-            if (suDomain === absenderDomain) return true;
-            return su.email_absender?.some((addr: string) => addr.split("@")[1]?.toLowerCase() === absenderDomain);
-          });
-          if (suDomainMatch) {
-            erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
+      if (!haendler && absenderDomain) {
+        haendler = haendlerListe?.find((h) => {
+          const hDomain = h.domain?.toLowerCase();
+          if (!hDomain) return false;
+          return absenderDomain === hDomain || absenderDomain.endsWith("." + hDomain);
+        }) || null;
+
+        if (haendler && absenderAdresse) {
+          const bestehendeAdressen: string[] = haendler.email_absender || [];
+          if (!bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
+            await supabase
+              .from("haendler")
+              .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
+              .eq("id", haendler.id);
+          }
+        }
+      }
+
+      // SU-Check nur wenn kein Händler gefunden
+      if (!haendler) {
+        const { data: suListe } = await supabase.from("subunternehmer").select("*");
+        if (suListe && suListe.length > 0) {
+          const suMatch = suListe.find((su) =>
+            su.email_absender?.some((addr: string) => {
+              const normalized = addr.toLowerCase().trim();
+              if (normalized.startsWith("*@")) {
+                return absenderAdresse.endsWith("@" + normalized.slice(2));
+              }
+              return absenderAdresse === normalized;
+            })
+          );
+          if (suMatch) {
+            erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
             bestellungsart = "subunternehmer";
+          } else {
+            const suDomainMatch = suListe.find((su) => {
+              const suDomain = su.email?.split("@")[1]?.toLowerCase();
+              if (suDomain === absenderDomain) return true;
+              return su.email_absender?.some((addr: string) => addr.split("@")[1]?.toLowerCase() === absenderDomain);
+            });
+            if (suDomainMatch) {
+              erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
+              bestellungsart = "subunternehmer";
+            }
           }
         }
       }
     }
+
+    const haendlerDomain = haendler?.domain || absenderDomain;
+    const haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
 
     // =====================================================================
     // ANHÄNGE PARALLEL ANALYSIEREN (GPT-4o) — max 3 gleichzeitig
