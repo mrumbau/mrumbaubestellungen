@@ -184,7 +184,32 @@ export async function POST(request: NextRequest) {
       updateFields.hat_aufmass = true;
     } else if (erkannterTyp === "leistungsnachweis") {
       updateFields.hat_leistungsnachweis = true;
-    } else if (erkannterTyp === "versandbestaetigung") {
+    }
+
+    // Betrag setzen (für alle Nicht-Versand-Typen)
+    // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung)
+    if (erkannterTyp !== "versandbestaetigung") {
+      const scanBetrag = analyse.gesamtbetrag || analyse.netto || null;
+      const scanIstNetto = !analyse.gesamtbetrag && !!analyse.netto;
+      if (scanBetrag) {
+        if (erkannterTyp === "rechnung") {
+          updateFields.betrag = scanBetrag;
+          if (scanIstNetto) updateFields.betrag_ist_netto = true;
+        } else {
+          const { data: bestCheck } = await supabase
+            .from("bestellungen")
+            .select("betrag")
+            .eq("id", bestellung_id)
+            .maybeSingle();
+          if (bestCheck && !bestCheck.betrag) {
+            updateFields.betrag = scanBetrag;
+            if (scanIstNetto) updateFields.betrag_ist_netto = true;
+          }
+        }
+      }
+    }
+
+    if (erkannterTyp === "versandbestaetigung") {
       updateFields.hat_versandbestaetigung = true;
       if (analyse.tracking_nummer) updateFields.tracking_nummer = analyse.tracking_nummer;
       if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;

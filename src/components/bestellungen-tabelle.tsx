@@ -15,6 +15,7 @@ interface Bestellung {
   besteller_kuerzel: string;
   besteller_name: string;
   betrag: number | null;
+  betrag_ist_netto?: boolean;
   waehrung: string;
   status: string;
   hat_bestellbestaetigung: boolean;
@@ -491,6 +492,9 @@ export function BestellungenTabelle({
                       <span className="font-mono-amount font-semibold text-[#1a1a1a]">
                         {formatBetrag(b.betrag, b.waehrung)}
                       </span>
+                      {b.betrag_ist_netto && b.betrag != null && (
+                        <span className="text-[10px] text-[#9a9a9a] ml-1">netto</span>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <button

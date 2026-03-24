@@ -871,11 +871,15 @@ export async function POST(request: NextRequest) {
         // Bestellnummer aus Nicht-Versand-Dokumenten übernehmen
         if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
         // Betrag nur von Rechnungen übernehmen (Rechnungsbetrag ist maßgeblich, nicht Bestellbestätigung)
-        if (analyse.gesamtbetrag && analyse.typ === "rechnung") {
-          updateFields.betrag = analyse.gesamtbetrag;
-        } else if (analyse.gesamtbetrag && !updateFields.betrag) {
-          // Bestellbestätigung/Lieferschein: nur setzen wenn noch kein Betrag vorhanden
-          updateFields.betrag = analyse.gesamtbetrag;
+        // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung, 0% MwSt)
+        const effektiverBetrag = analyse.gesamtbetrag || analyse.netto || null;
+        const istNetto = !analyse.gesamtbetrag && !!analyse.netto;
+        if (effektiverBetrag && analyse.typ === "rechnung") {
+          updateFields.betrag = effektiverBetrag;
+          if (istNetto) updateFields.betrag_ist_netto = true;
+        } else if (effektiverBetrag && !updateFields.betrag) {
+          updateFields.betrag = effektiverBetrag;
+          if (istNetto) updateFields.betrag_ist_netto = true;
         }
       }
 
@@ -967,16 +971,21 @@ export async function POST(request: NextRequest) {
             if (bodyAnalyse.typ !== "versandbestaetigung") {
               if (bodyAnalyse.bestellnummer) bodyUpdate.bestellnummer = bodyAnalyse.bestellnummer;
               // Betrag: Rechnung ist maßgeblich, andere Typen nur wenn noch kein Betrag in DB
-              if (bodyAnalyse.gesamtbetrag && bodyAnalyse.typ === "rechnung") {
-                bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
-              } else if (bodyAnalyse.gesamtbetrag) {
+              // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung)
+              const bodyEffektiverBetrag = bodyAnalyse.gesamtbetrag || bodyAnalyse.netto || null;
+              const bodyIstNetto = !bodyAnalyse.gesamtbetrag && !!bodyAnalyse.netto;
+              if (bodyEffektiverBetrag && bodyAnalyse.typ === "rechnung") {
+                bodyUpdate.betrag = bodyEffektiverBetrag;
+                if (bodyIstNetto) bodyUpdate.betrag_ist_netto = true;
+              } else if (bodyEffektiverBetrag) {
                 const { data: existing } = await supabase
                   .from("bestellungen")
                   .select("betrag")
                   .eq("id", bestellungId)
                   .maybeSingle();
                 if (existing && !existing.betrag) {
-                  bodyUpdate.betrag = bodyAnalyse.gesamtbetrag;
+                  bodyUpdate.betrag = bodyEffektiverBetrag;
+                  if (bodyIstNetto) bodyUpdate.betrag_ist_netto = true;
                 }
               }
             }
@@ -996,13 +1005,19 @@ export async function POST(request: NextRequest) {
                 .maybeSingle();
               if (check && !check.bestellnummer) ergaenzung.bestellnummer = bodyAnalyse.bestellnummer;
             }
-            if (bodyAnalyse.gesamtbetrag && bodyAnalyse.typ !== "versandbestaetigung") {
-              const { data: check } = await supabase
-                .from("bestellungen")
-                .select("betrag")
-                .eq("id", bestellungId)
-                .maybeSingle();
-              if (check && !check.betrag) ergaenzung.betrag = bodyAnalyse.gesamtbetrag;
+            if (bodyAnalyse.typ !== "versandbestaetigung") {
+              const ergBetrag = bodyAnalyse.gesamtbetrag || bodyAnalyse.netto || null;
+              if (ergBetrag) {
+                const { data: check } = await supabase
+                  .from("bestellungen")
+                  .select("betrag")
+                  .eq("id", bestellungId)
+                  .maybeSingle();
+                if (check && !check.betrag) {
+                  ergaenzung.betrag = ergBetrag;
+                  if (!bodyAnalyse.gesamtbetrag && !!bodyAnalyse.netto) ergaenzung.betrag_ist_netto = true;
+                }
+              }
             }
             if (Object.keys(ergaenzung).length > 0) {
               await supabase.from("bestellungen").update(ergaenzung).eq("id", bestellungId);

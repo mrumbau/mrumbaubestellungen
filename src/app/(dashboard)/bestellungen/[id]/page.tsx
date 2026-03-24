@@ -175,7 +175,9 @@ export default async function BestellungDetailPage({
 
           {/* Right: Betrag prominent */}
           <div className="flex flex-col items-end shrink-0">
-            <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Betrag</p>
+            <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">
+              Betrag{bestellung.betrag_ist_netto ? " (netto)" : ""}
+            </p>
             <p className="text-2xl font-bold font-mono-amount text-[#1a1a1a] mt-0.5">
               {bestellung.betrag
                 ? `${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
