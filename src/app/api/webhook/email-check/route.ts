@@ -37,6 +37,8 @@ const HAENDLER_IRRELEVANT_KEYWORDS = [
   "passwort zurücksetzen", "passwort ändern", "password reset",
   "konto bestätigen", "e-mail bestätigen", "verify your email",
   "willkommen bei", "welcome to", "registrierung",
+  "mahnung", "mahnschreiben", "zahlungserinnerung", "zahl.-erinnerung", "zahlungsaufforderung",
+  "inkasso", "letzte erinnerung", "forderung",
 ];
 
 function extractEmailAddress(raw: string): string {
