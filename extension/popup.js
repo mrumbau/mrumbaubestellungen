@@ -124,20 +124,36 @@ haendlerBtn.addEventListener("click", function () {
 
 bestellungBtn.addEventListener("click", function () {
   bestellungBtn.disabled = true;
-  bestellungBtn.textContent = "Wird gesendet...";
+  bestellungBtn.innerHTML =
+    '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="animation: spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-dasharray="30 70" /></svg> Wird gemeldet...';
   actionStatus.style.display = "none";
+  var hint = document.getElementById("bestellungHint");
 
   chrome.runtime.sendMessage({ type: "manuelles_signal" }, function (response) {
-    bestellungBtn.disabled = false;
-    bestellungBtn.innerHTML =
-      '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">' +
-      '<path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />' +
-      '</svg> Bestellung melden';
-
     if (response && response.success) {
-      showStatus(actionStatus, "success", "Bestellung gemeldet: " + response.domain);
+      bestellungBtn.classList.add("gesendet");
+      bestellungBtn.innerHTML =
+        '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />' +
+        '</svg> Gemeldet!';
+      if (hint) hint.textContent = escapeHtml(response.domain) + " wurde als Bestellung registriert";
       ladeHistory();
+      // Nach 3 Sekunden Button zurücksetzen
+      setTimeout(function () {
+        bestellungBtn.classList.remove("gesendet");
+        bestellungBtn.disabled = false;
+        bestellungBtn.innerHTML =
+          '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />' +
+          '</svg> Gerade bestellt';
+        if (hint) hint.textContent = "Klicke hier nachdem du eine Bestellung aufgegeben hast";
+      }, 3000);
     } else {
+      bestellungBtn.disabled = false;
+      bestellungBtn.innerHTML =
+        '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">' +
+        '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />' +
+        '</svg> Gerade bestellt';
       var error = (response && response.error) || "Unbekannter Fehler";
       showStatus(actionStatus, "error", error);
     }
