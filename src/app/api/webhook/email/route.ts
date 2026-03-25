@@ -589,13 +589,14 @@ export async function POST(request: NextRequest) {
     const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
 
     // 1. Suche per Bestellnummer (mit Händler-Filter um Kollisionen zu vermeiden)
-    let existierendeBestellung = null;
+    let existierendeBestellung: { id: string; hat_bestellbestaetigung?: boolean; hat_lieferschein?: boolean; hat_rechnung?: boolean; hat_aufmass?: boolean; hat_leistungsnachweis?: boolean; hat_versandbestaetigung?: boolean } | null = null;
+    const stufe1Select = "id, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung";
     if (erkannteBestellnummer) {
       // Erst mit Händler-Einschränkung suchen (verschiedene Händler können gleiche Bestellnummern haben)
       if (haendler?.id) {
         const { data } = await supabase
           .from("bestellungen")
-          .select("id")
+          .select(stufe1Select)
           .eq("bestellnummer", erkannteBestellnummer)
           .eq("haendler_id", haendler.id)
           .limit(1)
@@ -605,7 +606,7 @@ export async function POST(request: NextRequest) {
       if (!existierendeBestellung && haendlerName) {
         const { data } = await supabase
           .from("bestellungen")
-          .select("id")
+          .select(stufe1Select)
           .eq("bestellnummer", erkannteBestellnummer)
           .eq("haendler_name", haendlerName)
           .limit(1)
@@ -616,12 +617,36 @@ export async function POST(request: NextRequest) {
       if (!existierendeBestellung && erkannterSubunternehmer) {
         const { data } = await supabase
           .from("bestellungen")
-          .select("id")
+          .select(stufe1Select)
           .eq("bestellnummer", erkannteBestellnummer)
           .eq("subunternehmer_id", erkannterSubunternehmer.id)
           .limit(1)
           .maybeSingle();
         existierendeBestellung = data;
+      }
+
+      // Prüfe ob die bestehende Bestellung den Dokumenttyp schon hat
+      // Pro Bestellung kann es nur eine Rechnung, eine Bestellbestätigung etc. geben
+      // Wenn der Typ schon existiert → nicht zuordnen, neue Bestellung erstellen
+      if (existierendeBestellung) {
+        const hauptTyp = analyseErgebnisse
+          .filter(e => ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"].includes(e.analyse.typ))
+          .map(e => e.analyse.typ)[0];
+        const typFlagCheck: Record<string, string> = {
+          bestellbestaetigung: "hat_bestellbestaetigung",
+          lieferschein: "hat_lieferschein",
+          rechnung: "hat_rechnung",
+          aufmass: "hat_aufmass",
+          leistungsnachweis: "hat_leistungsnachweis",
+          versandbestaetigung: "hat_versandbestaetigung",
+        };
+        const flagKey = hauptTyp ? typFlagCheck[hauptTyp] : null;
+        if (flagKey && existierendeBestellung[flagKey as keyof typeof existierendeBestellung]) {
+          logInfo("webhook/email", `Stufe-1 Match übersprungen: Bestellung hat bereits ${hauptTyp}`, {
+            bestellungId: existierendeBestellung.id, bestellnummer: erkannteBestellnummer, typ: hauptTyp,
+          });
+          existierendeBestellung = null; // Nicht zuordnen → neue Bestellung wird erstellt
+        }
       }
     }
 
