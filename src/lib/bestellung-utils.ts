@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Bestellungsart: Material vs. Subunternehmer
 // =====================================================================
 
-export type Bestellungsart = "material" | "subunternehmer";
+export type Bestellungsart = "material" | "subunternehmer" | "abo";
 
 export interface DokumentAnforderung {
   flag: string;
@@ -26,11 +26,15 @@ export const DOKUMENT_CONFIG: Record<Bestellungsart, DokumentAnforderung[]> = {
     { flag: "hat_aufmass", typ: "aufmass", label: "Aufmaß", kurzLabel: "AM", erforderlich: false },
     { flag: "hat_leistungsnachweis", typ: "leistungsnachweis", label: "Leistungsnachweis", kurzLabel: "LN", erforderlich: false },
   ],
+  abo: [
+    { flag: "hat_rechnung", typ: "rechnung", label: "Rechnung", kurzLabel: "RE", erforderlich: true },
+  ],
 };
 
 export const BESTELLUNGSART_LABELS: Record<Bestellungsart, string> = {
   material: "Material",
   subunternehmer: "Subunternehmer",
+  abo: "Abo / Vertrag",
 };
 
 export const GEWERKE = [

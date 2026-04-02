@@ -111,6 +111,11 @@ Erkenne außerdem die "vermutete_bestellungsart":
 
 Signale für "subunternehmer": Stundensätze, Pauschalpreise für Arbeitsleistungen, Gewerk-Bezeichnungen (Elektro, Trockenbau, Sanitär, Maler etc.), Leistungsbeschreibungen statt Artikellisten, Begriffe wie "Montage", "Einbau", "Verlegung", "Installation".
 
+WICHTIG zum Feld "bestellnummer": Gib hier die Bestell- oder Rechnungsnummer zurück:
+- Bei Rechnungen: Die Rechnungsnummer (z.B. "308993-R", "RE-2026-001")
+- Bei Bestellbestätigungen: Die Bestell-/Auftragsnummer
+Dieses Feld darf NIEMALS null sein wenn eine Bestell- oder Rechnungsnummer erkennbar ist!
+
 Gib folgende Struktur zurück:
 {
   "typ": "rechnung",

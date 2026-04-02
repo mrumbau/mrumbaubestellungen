@@ -210,6 +210,34 @@ export async function POST(request: NextRequest) {
     }
 
     // =====================================================================
+    // AUTO-BEREINIGUNG: "erwartet"-Einträge ohne Dokumente nach 24h löschen
+    // Läuft gelegentlich (~10% der Requests) um DB sauber zu halten
+    // =====================================================================
+    if (Math.random() < 0.1) {
+      const vierundzwanzigStundenZurueck = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Nur Material-Bestellungen bereinigen — SU/Abo "erwartet"-Einträge
+      // haben andere Dokument-Anforderungen und werden nicht per Extension erstellt
+      const { data: abgelaufen } = await supabase
+        .from("bestellungen")
+        .select("id")
+        .eq("status", "erwartet")
+        .in("bestellungsart", ["material"])
+        .eq("hat_bestellbestaetigung", false)
+        .eq("hat_lieferschein", false)
+        .eq("hat_rechnung", false)
+        .eq("hat_versandbestaetigung", false)
+        .lt("created_at", vierundzwanzigStundenZurueck)
+        .limit(20);
+
+      if (abgelaufen && abgelaufen.length > 0) {
+        const ids = abgelaufen.map(b => b.id);
+        await supabase.from("dokumente").delete().in("bestellung_id", ids);
+        await supabase.from("bestellungen").delete().in("id", ids);
+        logInfo("webhook/email", `Auto-Bereinigung: ${ids.length} abgelaufene erwartet-Einträge gelöscht`);
+      }
+    }
+
+    // =====================================================================
     // ANHÄNGE NORMALISIEREN + FILTERN (nicht rejecten!)
     // =====================================================================
     const rawAnhaenge = body.anhaenge || [];
@@ -294,8 +322,29 @@ export async function POST(request: NextRequest) {
     // =====================================================================
     const istVersandDomain = isVersandDomain(absenderDomain);
 
-    if (istVersandDomain) {
+    // Betreff-basierte Versand-Erkennung (für Händler wie Amazon die alles von derselben Domain senden)
+    // NUR eindeutige Versand-Keywords, keine generischen wie "zustellung" oder "ihre lieferung"
+    const versandBetreffKeywords = [
+      "versandbestätigung", "versandbestaetigung",
+      "sendungsverfolgung", "tracking",
+      "shipped", "dispatched",
+      "aktualisierung der voraussichtlichen lieferung",
+      "paket wurde", "sendung verfolgen",
+      "wurde versendet", "ist unterwegs", "out for delivery",
+    ];
+    // Bestellbestätigung-Keywords als Gegenprüfung — wenn der Betreff auch auf eine Bestellung hindeutet, NICHT als Versand behandeln
+    const bestellBetreffKeywords = [
+      "bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung",
+      "order confirmation", "ihre bestellung", "bestellung eingegangen",
+      "bestellung bei", "rechnung", "invoice", "auftragsbestaetigung",
+    ];
+    const betreffLowerVersand = (email_betreff || "").toLowerCase();
+    const istVersandBetreff = versandBetreffKeywords.some(kw => betreffLowerVersand.includes(kw));
+    const istBestellBetreff = bestellBetreffKeywords.some(kw => betreffLowerVersand.includes(kw));
+
+    if (istVersandDomain || (istVersandBetreff && !istBestellBetreff)) {
       // Versand-Emails: An existierende Bestellung anhängen, KEINE neue erstellen
+      logInfo("webhook/email", `Versand-Email erkannt via ${istVersandDomain ? "Domain" : "Betreff"}`, { email_betreff, absenderDomain });
       return await handleVersandEmail(supabase, {
         email_betreff,
         email_absender,
@@ -313,7 +362,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let haendler: any = null;
     let erkannterSubunternehmer: { id: string; firma: string } | null = null;
-    let bestellungsart: "material" | "subunternehmer" = "material";
+    let bestellungsart: "material" | "subunternehmer" | "abo" = "material";
 
     if (vorfilterHaendlerId) {
       // Vorfilter hat Händler bereits identifiziert → direkt aus DB laden (1 Query statt vollem Scan)
@@ -421,7 +470,7 @@ export async function POST(request: NextRequest) {
     // PayPal-Emails werden normal verarbeitet, GPT erkennt den Händler aus dem Zahlungstext
 
     const haendlerDomain = haendler?.domain || absenderDomain;
-    const haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
+    let haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
 
     // =====================================================================
     // ANHÄNGE PARALLEL ANALYSIEREN (GPT-4o) — max 3 gleichzeitig
@@ -773,6 +822,16 @@ export async function POST(request: NextRequest) {
             if (vermuteteArt === "subunternehmer") bestellungsart = "subunternehmer";
           }
 
+          // Händlername aus GPT-Analyse übernehmen wenn nur Absender-Domain bekannt
+          // (z.B. plancraft.com ist nur ein Tool — der echte Firmenname steht im Dokument)
+          if (haendlerName === absenderDomain && analyseErgebnisse.length > 0) {
+            const gptHaendler = analyseErgebnisse.find((e) => e.analyse.haendler)?.analyse.haendler;
+            if (gptHaendler) {
+              logInfo("webhook/email", `Händlername aus GPT übernommen (statt Domain ${absenderDomain})`, { gptHaendler });
+              haendlerName = gptHaendler;
+            }
+          }
+
           const { data: neue, error: insertError } = await supabase
             .from("bestellungen")
             .insert({
@@ -902,9 +961,17 @@ export async function POST(request: NextRequest) {
         if (effektiverBetrag && analyse.typ === "rechnung") {
           updateFields.betrag = effektiverBetrag;
           if (istNetto) updateFields.betrag_ist_netto = true;
-        } else if (effektiverBetrag && !updateFields.betrag) {
-          updateFields.betrag = effektiverBetrag;
-          if (istNetto) updateFields.betrag_ist_netto = true;
+        } else if (effektiverBetrag) {
+          // Bestellbestätigung/Lieferschein: nur setzen wenn noch kein Betrag in DB
+          const { data: existing } = await supabase
+            .from("bestellungen")
+            .select("betrag")
+            .eq("id", bestellungId)
+            .maybeSingle();
+          if (existing && !existing.betrag) {
+            updateFields.betrag = effektiverBetrag;
+            if (istNetto) updateFields.betrag_ist_netto = true;
+          }
         }
       }
 
@@ -960,6 +1027,20 @@ export async function POST(request: NextRequest) {
               logInfo("webhook/email", "Betreff-Korrektur: GPT sagte versandbestaetigung, Betreff sagt bestellbestaetigung", { email_betreff, gpt_typ: bodyAnalyse.typ });
               bodyAnalyse.typ = "bestellbestaetigung";
             }
+          }
+
+          // Versandbestätigung aus Body darf keine neue Bestellung erstellen
+          if (bodyAnalyse.typ === "versandbestaetigung" && bestellungNeuErstellt && dokumenteGespeichert === 0) {
+            logInfo("webhook/email", "Rollback: Body-only Versandbestätigung ohne bestehende Bestellung", {
+              bestellungId, email_absender, email_betreff,
+            });
+            await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
+            await supabase.from("bestellungen").delete().eq("id", bestellungId);
+            return NextResponse.json({
+              success: true,
+              skipped: true,
+              reason: "versand_body_ohne_bestellung",
+            });
           }
 
           if (bekannteTypen.includes(bodyAnalyse.typ) && !gespeicherteTypen.includes(bodyAnalyse.typ)) {

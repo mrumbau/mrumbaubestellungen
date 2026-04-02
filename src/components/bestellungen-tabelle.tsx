@@ -45,7 +45,7 @@ function DokumentIcon({ vorhanden }: { vorhanden: boolean }) {
   );
 }
 
-type ArtFilter = "" | "material" | "subunternehmer";
+type ArtFilter = "" | "material" | "subunternehmer" | "abo";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Alle Status" },
@@ -108,7 +108,7 @@ export function BestellungenTabelle({
 
   // Count per art for tab badges
   const artCounts = useMemo(() => {
-    const counts = { material: 0, subunternehmer: 0 };
+    const counts = { material: 0, subunternehmer: 0, abo: 0 };
     for (const b of bestellungen) {
       const art = b.bestellungsart || "material";
       if (art in counts) counts[art as keyof typeof counts]++;
@@ -223,6 +223,7 @@ export function BestellungenTabelle({
             { key: "" as ArtFilter, label: "Alle" },
             { key: "material" as ArtFilter, label: "Material" },
             { key: "subunternehmer" as ArtFilter, label: "Subunternehmer" },
+            { key: "abo" as ArtFilter, label: "Abo" },
           ]).map((tab) => (
             <button
               key={tab.key}
@@ -387,7 +388,9 @@ export function BestellungenTabelle({
             ) : (
               gefiltert.map((b, i) => {
                 const status = getStatusConfig(b.status);
-                const isSub = (b.bestellungsart || "material") === "subunternehmer";
+                const artValue = b.bestellungsart || "material";
+                const isSub = artValue === "subunternehmer";
+                const isAbo = artValue === "abo";
                 return (
                   <tr
                     key={b.id}
@@ -417,8 +420,11 @@ export function BestellungenTabelle({
                       <div className="flex items-center gap-2">
                         <span className="truncate max-w-[150px]">{b.haendler_name || "–"}</span>
                         {isSub && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                            SUB
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">SUB</span>
+                        )}
+                        {isAbo && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200 shrink-0">
+                            ABO
                           </span>
                         )}
                       </div>
@@ -451,7 +457,7 @@ export function BestellungenTabelle({
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
-                        {isSub ? (
+                        {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_bestellbestaetigung} />
@@ -460,7 +466,7 @@ export function BestellungenTabelle({
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
-                        {isSub ? (
+                        {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_lieferschein} />
@@ -472,7 +478,7 @@ export function BestellungenTabelle({
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
-                        {isSub ? (
+                        {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} />

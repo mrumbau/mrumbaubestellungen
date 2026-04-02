@@ -18,7 +18,7 @@ interface BuchhaltungRow {
   bezahlt_am: string | null;
   bezahlt_von: string | null;
   archiviert_am: string | null;
-  bestellungsart?: "material" | "subunternehmer" | null;
+  bestellungsart?: "material" | "subunternehmer" | "abo" | null;
   hat_bestellbestaetigung?: boolean;
   hat_lieferschein?: boolean;
 }
@@ -80,7 +80,7 @@ export function BuchhaltungClient({
   const searchParams = useSearchParams();
 
   const [localRows, setLocalRows] = useState(rows);
-  const [artFilter, setArtFilter] = useState<"alle" | "material" | "subunternehmer">("alle");
+  const [artFilter, setArtFilter] = useState<"alle" | "material" | "subunternehmer" | "abo">("alle");
 
   const offeneRows = localRows.filter((r) => !r.bezahlt_am);
   const bezahlteRows = localRows.filter((r) => !!r.bezahlt_am && !r.archiviert_am);
@@ -502,6 +502,7 @@ export function BuchhaltungClient({
             <option value="alle">Alle Arten</option>
             <option value="material">Material</option>
             <option value="subunternehmer">Subunternehmer</option>
+            <option value="abo">Abo / Vertrag</option>
           </select>
           <div className="relative flex-1 min-w-0">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

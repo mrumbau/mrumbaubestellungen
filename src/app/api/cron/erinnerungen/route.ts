@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       .select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, created_at")
       .eq("hat_lieferschein", false)
       .neq("bestellungsart", "subunternehmer")
+      .neq("bestellungsart", "abo")
       .in("status", ["offen", "ls_fehlt"])
       .lt("created_at", schwelleDatum)
       .order("created_at", { ascending: true });

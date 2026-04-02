@@ -173,12 +173,13 @@
     });
 
     // Negative URL-Patterns (-3 pro Treffer) — aktiver Checkout, nicht Bestätigung
-    // ABER: Bei bekannten Händlern negative URL-Patterns überspringen,
-    // weil gespeicherte Patterns (z.B. /cart, /warenkorb) sonst den Score killen
+    // ABER: Bei bekannten Händlern nur die gelernten Patterns von negativer Bewertung ausnehmen
     var negUrlPatterns = (cfg && cfg.score_negative_url_patterns) || SCORE_NEGATIVE_URL_PATTERNS;
     negUrlPatterns.forEach(function (pattern) {
-      if (istBekannterHaendler) return; // Bekannter Händler → nicht negativ bewerten
-      if (pathname.includes(pattern)) score -= 3;
+      if (!pathname.includes(pattern)) return;
+      // Prüfe ob dieses Pattern ein gelerntes Händler-Pattern ist → nicht negativ bewerten
+      if (istBekannterHaendler && bekanntePatterns.some(function (bp) { return pattern.includes(bp) || bp.includes(pattern); })) return;
+      score -= 3;
     });
 
     // Titel-Keywords (+2 pro Treffer)
@@ -200,14 +201,12 @@
 
     // Negative DOM-Selektoren (-2 pro Treffer, max -6) — Checkout-Formulare noch aktiv
     var negDomScore = 0;
-    if (!istBekannterHaendler) {
-      var negDomSelectors = (cfg && cfg.score_negative_dom_selectors) || SCORE_NEGATIVE_DOM_SELECTORS;
-      negDomSelectors.forEach(function (selector) {
-        try {
-          if (negDomScore > -6 && document.querySelector(selector)) negDomScore -= 2;
-        } catch (e) { /* ungültiger Selektor */ }
-      });
-    }
+    var negDomSelectors = (cfg && cfg.score_negative_dom_selectors) || SCORE_NEGATIVE_DOM_SELECTORS;
+    negDomSelectors.forEach(function (selector) {
+      try {
+        if (negDomScore > -6 && document.querySelector(selector)) negDomScore -= 2;
+      } catch (e) { /* ungültiger Selektor */ }
+    });
     score += negDomScore;
 
     // Seiteninhalt extrahieren (einmal für alle Content-Checks)
@@ -229,12 +228,10 @@
 
     // Negative Seiteninhalt-Keywords (-2 pro Treffer, max -8) — "Jetzt bestellen" etc.
     var negContentScore = 0;
-    if (!istBekannterHaendler) {
-      var negContentKeywords = (cfg && cfg.score_negative_content_keywords) || SCORE_NEGATIVE_CONTENT_KEYWORDS;
-      negContentKeywords.forEach(function (keyword) {
-        if (negContentScore > -8 && bodyText.includes(keyword)) negContentScore -= 2;
-      });
-    }
+    var negContentKeywords = (cfg && cfg.score_negative_content_keywords) || SCORE_NEGATIVE_CONTENT_KEYWORDS;
+    negContentKeywords.forEach(function (keyword) {
+      if (negContentScore > -8 && bodyText.includes(keyword)) negContentScore -= 2;
+    });
     score += negContentScore;
 
     return score;

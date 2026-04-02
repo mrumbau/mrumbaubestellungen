@@ -36,15 +36,27 @@ export default async function ArchivPage() {
     .order("archiviert_am", { ascending: false })
     .limit(100);
 
+  let aboQuery = supabase
+    .from("bestellungen")
+    .select(
+      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
+    )
+    .not("archiviert_am", "is", null)
+    .eq("bestellungsart", "abo")
+    .order("archiviert_am", { ascending: false })
+    .limit(100);
+
   if (istBesteller) {
     materialQuery = materialQuery.eq("besteller_kuerzel", profil.kuerzel);
     suQuery = suQuery.eq("besteller_kuerzel", profil.kuerzel);
+    aboQuery = aboQuery.eq("besteller_kuerzel", profil.kuerzel);
   }
 
   const [
     { data: projekte },
     { data: materialOrders },
     { data: suOrders },
+    { data: aboOrders },
     { data: subunternehmer },
   ] = await Promise.all([
     supabase
@@ -54,11 +66,12 @@ export default async function ArchivPage() {
       .order("created_at", { ascending: false }),
     materialQuery,
     suQuery,
+    aboQuery,
     supabase.from("subunternehmer").select("id, firma, gewerk"),
   ]);
 
   const safeMatOrders = materialOrders || [];
-  const safeSuOrders = suOrders || [];
+  const safeSuOrders = [...(suOrders || []), ...(aboOrders || [])];
   const allOrders = [...safeMatOrders, ...safeSuOrders];
 
   // Phase 2: Dokumente laden (abhängig von Phase 1)

@@ -134,7 +134,7 @@ export async function PATCH(
 
     // bestellungsart ändern
     if (body.bestellungsart !== undefined) {
-      const erlaubteArten = ["material", "subunternehmer"];
+      const erlaubteArten = ["material", "subunternehmer", "abo"];
       if (!erlaubteArten.includes(body.bestellungsart)) {
         return NextResponse.json({ error: "Ungültige Bestellungsart" }, { status: 400 });
       }
