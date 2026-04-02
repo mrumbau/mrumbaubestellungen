@@ -466,6 +466,25 @@ export async function POST(request: NextRequest) {
       // GPT-Analyse der Anhänge wird den SU-Namen aus der Rechnung extrahieren
     }
 
+    // ── Abo-Anbieter-Erkennung: Emails von bekannten Abo-Anbietern automatisch als "abo" markieren ──
+    if (!haendler && !erkannterSubunternehmer && bestellungsart === "material") {
+      const { data: aboListe } = await supabase.from("abo_anbieter").select("*");
+      if (aboListe && aboListe.length > 0) {
+        const aboMatch = aboListe.find((ab) => {
+          // Exakter Email-Absender Match
+          if (ab.email_absender?.some((addr: string) => addr.toLowerCase().trim() === absenderAdresse)) return true;
+          // Domain-Match
+          if (ab.domain && (absenderDomain === ab.domain.toLowerCase() || absenderDomain.endsWith("." + ab.domain.toLowerCase()))) return true;
+          return false;
+        });
+        if (aboMatch) {
+          bestellungsart = "abo";
+          haendler = { id: null, name: aboMatch.name, domain: aboMatch.domain };
+          logInfo("webhook/email", `Abo-Anbieter erkannt: ${aboMatch.name}`, { absenderDomain, absenderAdresse });
+        }
+      }
+    }
+
     // ── PayPal-Spezialbehandlung: Zahlungsbestätigungen zu Bestellungen ──
     // PayPal-Emails werden normal verarbeitet, GPT erkennt den Händler aus dem Zahlungstext
 

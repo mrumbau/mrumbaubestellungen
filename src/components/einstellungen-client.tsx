@@ -64,6 +64,15 @@ interface Subunternehmer {
   created_at: string;
 }
 
+interface AboAnbieter {
+  id: string;
+  name: string;
+  domain: string;
+  email_absender: string[];
+  notizen: string | null;
+  created_at: string;
+}
+
 interface HealthStatus {
   status: string;
   timestamp: string;
@@ -81,6 +90,7 @@ export function EinstellungenClient({
   webhookLogs: initialWebhookLogs,
   projekte: initialProjekte = [],
   subunternehmer: initialSubunternehmer = [],
+  aboAnbieter: initialAboAnbieter = [],
   firmaEinstellungen: initialFirmaEinstellungen = [],
   emailBlacklist: initialEmailBlacklist = [],
   rolle = "admin",
@@ -93,6 +103,7 @@ export function EinstellungenClient({
   webhookLogs: WebhookLog[];
   projekte?: Projekt[];
   subunternehmer?: Subunternehmer[];
+  aboAnbieter?: AboAnbieter[];
   firmaEinstellungen?: { schluessel: string; wert: string }[];
   emailBlacklist?: { muster: string; typ: string; grund: string | null; erstellt_am: string }[];
   rolle?: string;
@@ -150,6 +161,17 @@ export function EinstellungenClient({
   const [suFormIban, setSuFormIban] = useState("");
   const [suFormNotizen, setSuFormNotizen] = useState("");
   const [suDeleteConfirm, setSuDeleteConfirm] = useState<{ id: string; firma: string } | null>(null);
+
+  // Abo-Anbieter
+  const [aboListe, setAboListe] = useState(initialAboAnbieter);
+  const [aboEditId, setAboEditId] = useState<string | null>(null);
+  const [showAboForm, setShowAboForm] = useState(false);
+  const [aboLoading, setAboLoading] = useState(false);
+  const [aboFormName, setAboFormName] = useState("");
+  const [aboFormDomain, setAboFormDomain] = useState("");
+  const [aboFormEmailAbsender, setAboFormEmailAbsender] = useState("");
+  const [aboFormNotizen, setAboFormNotizen] = useState("");
+  const [aboDeleteConfirm, setAboDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   // Projekt-Adresse (singular)
   const [projektFormAdresse, setProjektFormAdresse] = useState("");
@@ -506,6 +528,78 @@ export function EinstellungenClient({
   }
 
   // startProjektEdit() setzt bereits projektFormAdresse
+
+  // Abo-Anbieter Funktionen
+  function resetAboForm() {
+    setAboFormName("");
+    setAboFormDomain("");
+    setAboFormEmailAbsender("");
+    setAboFormNotizen("");
+    setAboEditId(null);
+    setShowAboForm(false);
+  }
+
+  function handleAboEdit(abo: AboAnbieter) {
+    setAboFormName(abo.name);
+    setAboFormDomain(abo.domain);
+    setAboFormEmailAbsender((abo.email_absender || []).join(", "));
+    setAboFormNotizen(abo.notizen || "");
+    setAboEditId(abo.id);
+    setShowAboForm(true);
+  }
+
+  async function handleAboSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!aboFormName.trim() || !aboFormDomain.trim()) return;
+    setAboLoading(true);
+    try {
+      const payload = {
+        name: aboFormName.trim(),
+        domain: aboFormDomain.trim().toLowerCase(),
+        email_absender: aboFormEmailAbsender.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+        notizen: aboFormNotizen.trim() || null,
+      };
+      if (aboEditId) {
+        const res = await fetch(`/api/abo-anbieter/${aboEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setAboListe((prev) => prev.map((a) => (a.id === aboEditId ? data.abo_anbieter : a)));
+      } else {
+        const res = await fetch("/api/abo-anbieter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setAboListe((prev) => [...prev, data.abo_anbieter].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      resetAboForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
+    } finally {
+      setAboLoading(false);
+    }
+  }
+
+  async function handleAboDelete(id: string) {
+    setAboDeleteConfirm(null);
+    setAboLoading(true);
+    try {
+      const res = await fetch(`/api/abo-anbieter/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAboListe((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Löschen");
+    } finally {
+      setAboLoading(false);
+    }
+  }
 
   // Blacklist-Funktionen
   async function handleBlacklistAdd(e: React.FormEvent) {
@@ -1179,6 +1273,126 @@ export function EinstellungenClient({
       </div>
 
       {/* ═══════════════════════════════════════════
+          ABO-ANBIETER
+          ═══════════════════════════════════════════ */}
+      <div className={`card p-6 mt-6 ${!istAdmin ? "hidden" : ""}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+              <svg className="w-4 h-4 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Abo-Anbieter ({aboListe.length})</h2>
+              <p className="text-[10px] text-[#c4c2bf] mt-0.5">Wiederkehrende Rechnungen (Software, Verträge, Lizenzen)</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { resetAboForm(); setShowAboForm(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Hinzufügen
+          </button>
+        </div>
+
+        {showAboForm && (
+          <form onSubmit={handleAboSubmit} className="mb-4 p-4 bg-[#fafaf9] rounded-lg border border-[#f0eeeb] space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Name *</label>
+                <input
+                  type="text" value={aboFormName} onChange={(e) => setAboFormName(e.target.value)} required
+                  placeholder="z.B. Hold & Spada"
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Domain *</label>
+                <input
+                  type="text" value={aboFormDomain} onChange={(e) => setAboFormDomain(e.target.value)} required
+                  placeholder="z.B. holdspada.de"
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">E-Mail Absender</label>
+              <input
+                type="text" value={aboFormEmailAbsender} onChange={(e) => setAboFormEmailAbsender(e.target.value)}
+                placeholder="rechnung@holdspada.de, billing@firma.com"
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none"
+              />
+              <p className="text-[10px] text-[#c4c2bf] mt-1">Kommagetrennt. Emails von diesen Absendern werden automatisch als Abo erkannt.</p>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Notizen</label>
+              <input
+                type="text" value={aboFormNotizen} onChange={(e) => setAboFormNotizen(e.target.value)}
+                placeholder="z.B. Monatlich 49,90€, Handwerkersoftware"
+                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="submit" disabled={aboLoading}
+                className="px-4 py-2 text-xs font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                {aboLoading ? "Speichern..." : aboEditId ? "Aktualisieren" : "Anlegen"}
+              </button>
+              <button type="button" onClick={() => { resetAboForm(); setShowAboForm(false); }}
+                className="px-4 py-2 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors">
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="space-y-2">
+          {aboListe.length === 0 ? (
+            <p className="text-sm text-[#c4c2bf] py-4 text-center">Noch keine Abo-Anbieter angelegt.</p>
+          ) : (
+            aboListe.map((abo) => (
+              <div key={abo.id} className="flex items-start justify-between p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] transition-colors">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-violet-600">ABO</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-[#1a1a1a]">{abo.name}</span>
+                    <span className="text-[10px] text-[#c4c2bf] ml-2">{abo.domain}</span>
+                    {abo.notizen && (
+                      <p className="text-[11px] text-[#9a9a9a] mt-0.5">{abo.notizen}</p>
+                    )}
+                    {abo.email_absender && abo.email_absender.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {abo.email_absender.map((ea, i) => (
+                          <span key={i} className="text-[10px] px-1.5 py-0.5 bg-violet-500/5 text-violet-600 rounded">{ea}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  <button onClick={() => handleAboEdit(abo)} className="p-1.5 text-[#c4c2bf] hover:text-violet-600 transition-colors rounded-lg hover:bg-[#f0eeeb]">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
+                    </svg>
+                  </button>
+                  <button onClick={() => setAboDeleteConfirm({ id: abo.id, name: abo.name })} className="p-1.5 text-[#c4c2bf] hover:text-red-600 transition-colors rounded-lg hover:bg-red-50">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════
           E-MAIL BLACKLIST
           ═══════════════════════════════════════════ */}
       <div className={`card p-6 mt-6 ${!istAdmin ? "hidden" : ""}`}>
@@ -1746,6 +1960,15 @@ export function EinstellungenClient({
         variant="danger"
         onConfirm={() => suDeleteConfirm && handleSuDelete(suDeleteConfirm.id)}
         onCancel={() => setSuDeleteConfirm(null)}
+      />
+      <ConfirmDialog
+        open={!!aboDeleteConfirm}
+        title="Abo-Anbieter löschen"
+        message={`Soll der Abo-Anbieter "${aboDeleteConfirm?.name}" gelöscht werden?`}
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={() => aboDeleteConfirm && handleAboDelete(aboDeleteConfirm.id)}
+        onCancel={() => setAboDeleteConfirm(null)}
       />
       <ConfirmDialog
         open={!!blDeleteConfirm}
