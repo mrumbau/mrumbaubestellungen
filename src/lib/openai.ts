@@ -39,6 +39,8 @@ export interface DokumentAnalyse {
   typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "versandbestaetigung" | "unbekannt";
   vermutete_bestellungsart?: "material" | "subunternehmer";
   bestellnummer: string | null;
+  auftragsnummer: string | null;
+  lieferscheinnummer: string | null;
   haendler: string | null;
   datum: string | null;
   artikel: { name: string; menge: number; einzelpreis: number; gesamtpreis: number }[];
@@ -111,16 +113,19 @@ Erkenne außerdem die "vermutete_bestellungsart":
 
 Signale für "subunternehmer": Stundensätze, Pauschalpreise für Arbeitsleistungen, Gewerk-Bezeichnungen (Elektro, Trockenbau, Sanitär, Maler etc.), Leistungsbeschreibungen statt Artikellisten, Begriffe wie "Montage", "Einbau", "Verlegung", "Installation".
 
-WICHTIG zum Feld "bestellnummer": Gib hier die Bestell- oder Rechnungsnummer zurück:
-- Bei Rechnungen: Die Rechnungsnummer (z.B. "308993-R", "RE-2026-001")
-- Bei Bestellbestätigungen: Die Bestell-/Auftragsnummer
-Dieses Feld darf NIEMALS null sein wenn eine Bestell- oder Rechnungsnummer erkennbar ist!
+WICHTIG zu den Nummern-Feldern — extrahiere ALLE vorhandenen Nummern:
+- "bestellnummer": Bestell-/Auftragsnummer oder Rechnungsnummer (die Hauptnummer des Dokuments). Bei Rechnungen: Rechnungsnummer. Bei Bestellbestätigungen: Auftragsnummer. Kommissionsnamen (wie "Dörning", "Peiß", Projektnamen) sind KEINE Bestellnummern!
+- "auftragsnummer": Auftragsnummer falls vorhanden (z.B. "2030398090"). Oft als "Auftrags-Nr.", "Auftrag", "Order No." bezeichnet. Kann auf Lieferscheinen, Rechnungen und Bestätigungen stehen.
+- "lieferscheinnummer": Lieferscheinnummer falls vorhanden (z.B. "4313393316"). Nur bei Lieferscheinen.
+Mindestens eines der drei Felder muss gefüllt sein wenn irgendeine Nummer erkennbar ist!
 
 Gib folgende Struktur zurück:
 {
   "typ": "rechnung",
   "vermutete_bestellungsart": "material",
   "bestellnummer": "#45231",
+  "auftragsnummer": "2030393220",
+  "lieferscheinnummer": null,
   "haendler": "Bauhaus GmbH",
   "datum": "2026-03-12",
   "artikel": [
@@ -207,7 +212,7 @@ export async function analysiereDokument(
     };
   } catch {
     logError("openai/analysiereDokument", "JSON-Parse fehlgeschlagen", { text: text.slice(0, 500) });
-    return { typ: "unbekannt", bestellnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: text, parse_fehler: true };
+    return { typ: "unbekannt", bestellnummer: null, auftragsnummer: null, lieferscheinnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: text, parse_fehler: true };
   }
 }
 

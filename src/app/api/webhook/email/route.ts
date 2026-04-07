@@ -671,6 +671,8 @@ export async function POST(request: NextRequest) {
     let bestellungNeuErstellt = false;
 
     const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
+    const erkannteAuftragsnummer = analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer || null;
+    const erkannteLiferscheinnummer = analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer || null;
 
     // STUFE 0 Nachlauf: Wenn Betreff-Extraktion kein Signal fand, GPT-Bestellnummer versuchen
     if (!signal && bestellerKuerzel === "UNBEKANNT" && erkannteBestellnummer && erkannteBestellnummer !== schnellBestellnummer) {
@@ -701,42 +703,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 1. Suche per Bestellnummer (mit Händler-Filter um Kollisionen zu vermeiden)
+    // 1. Suche per Bestellnummer / Auftragsnummer (mit Händler-Filter)
+    // Alle drei Nummern werden für Matching genutzt: bestellnummer, auftragsnummer, lieferscheinnummer
     let existierendeBestellung: { id: string; hat_bestellbestaetigung?: boolean; hat_lieferschein?: boolean; hat_rechnung?: boolean; hat_aufmass?: boolean; hat_leistungsnachweis?: boolean; hat_versandbestaetigung?: boolean } | null = null;
     const stufe1Select = "id, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung";
-    if (erkannteBestellnummer) {
-      // Erst mit Händler-Einschränkung suchen (verschiedene Händler können gleiche Bestellnummern haben)
+
+    // Alle erkannten Nummern für Suche sammeln
+    const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer].filter(Boolean) as string[];
+
+    for (const suchNr of suchNummern) {
+      if (existierendeBestellung) break;
+      // Per bestellnummer ODER auftragsnummer suchen
       if (haendler?.id) {
-        const { data } = await supabase
-          .from("bestellungen")
-          .select(stufe1Select)
-          .eq("bestellnummer", erkannteBestellnummer)
-          .eq("haendler_id", haendler.id)
-          .limit(1)
-          .maybeSingle();
-        existierendeBestellung = data;
+        // Suche in bestellnummer
+        const { data: d1 } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("bestellnummer", suchNr).eq("haendler_id", haendler.id).limit(1).maybeSingle();
+        if (d1) { existierendeBestellung = d1; break; }
+        // Suche in auftragsnummer
+        const { data: d2 } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("auftragsnummer", suchNr).eq("haendler_id", haendler.id).limit(1).maybeSingle();
+        if (d2) { existierendeBestellung = d2; break; }
       }
       if (!existierendeBestellung && haendlerName) {
-        const { data } = await supabase
-          .from("bestellungen")
-          .select(stufe1Select)
-          .eq("bestellnummer", erkannteBestellnummer)
-          .eq("haendler_name", haendlerName)
-          .limit(1)
-          .maybeSingle();
-        existierendeBestellung = data;
+        const { data: d3 } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("bestellnummer", suchNr).eq("haendler_name", haendlerName).limit(1).maybeSingle();
+        if (d3) { existierendeBestellung = d3; break; }
+        const { data: d4 } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("auftragsnummer", suchNr).eq("haendler_name", haendlerName).limit(1).maybeSingle();
+        if (d4) { existierendeBestellung = d4; break; }
       }
-      // Fallback ohne Händler-Filter nur wenn SU-Bestellung (SU-Bestellnummern sind typisch eindeutig)
       if (!existierendeBestellung && erkannterSubunternehmer) {
-        const { data } = await supabase
-          .from("bestellungen")
-          .select(stufe1Select)
-          .eq("bestellnummer", erkannteBestellnummer)
-          .eq("subunternehmer_id", erkannterSubunternehmer.id)
-          .limit(1)
-          .maybeSingle();
-        existierendeBestellung = data;
+        const { data: d5 } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("bestellnummer", suchNr).eq("subunternehmer_id", erkannterSubunternehmer.id).limit(1).maybeSingle();
+        if (d5) { existierendeBestellung = d5; break; }
       }
+    }
 
       // Prüfe ob die bestehende Bestellung den Dokumenttyp schon hat
       // Pro Bestellung kann es nur eine Rechnung, eine Bestellbestätigung etc. geben
@@ -761,7 +762,6 @@ export async function POST(request: NextRequest) {
           existierendeBestellung = null; // Nicht zuordnen → neue Bestellung wird erstellt
         }
       }
-    }
 
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
@@ -787,7 +787,7 @@ export async function POST(request: NextRequest) {
 
           let erweiterteQuery = supabase
             .from("bestellungen")
-            .select("id, betrag, haendler_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
+            .select("id, bestellnummer, auftragsnummer, betrag, haendler_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
             .in("status", ["offen", "erwartet", "vollstaendig", "abweichung"])
             .gte("created_at", vierzehnTageZurueck);
 
@@ -822,6 +822,15 @@ export async function POST(request: NextRequest) {
               const match = kandidaten.find(k => {
                 // Muss den Dokumenttyp noch nicht haben
                 if (k[flag as keyof typeof k]) return false;
+                // Nummern-Validierung: wenn Nummern auf beiden Seiten bekannt sind, müssen sie übereinstimmen
+                // Verhindert falsches Matching bei mehreren Bestellungen beim selben Händler
+                // Prüfe alle drei Nummern kreuzweise
+                const kandidatNummern = [k.bestellnummer, (k as Record<string, unknown>).auftragsnummer as string | null].filter(Boolean);
+                const dokumentNummern = [erkannteBestellnummer, erkannteAuftragsnummer].filter(Boolean);
+                if (kandidatNummern.length > 0 && dokumentNummern.length > 0) {
+                  const hatUebereinstimmung = dokumentNummern.some(dn => kandidatNummern.includes(dn));
+                  if (!hatUebereinstimmung) return false;
+                }
                 // Betrag-Validierung: wenn beide Beträge bekannt, max 15% Abweichung erlauben
                 if (erkannterBetrag && k.betrag) {
                   const abweichung = Math.abs(Number(k.betrag) - erkannterBetrag) / Math.max(Number(k.betrag), erkannterBetrag);
@@ -940,6 +949,8 @@ export async function POST(request: NextRequest) {
         email_datum,
         ki_roh_daten: analyse,
         bestellnummer_erkannt: analyse.bestellnummer,
+        auftragsnummer: analyse.auftragsnummer || null,
+        lieferscheinnummer: analyse.lieferscheinnummer || null,
         artikel: analyse.artikel,
         gesamtbetrag: analyse.gesamtbetrag,
         netto: analyse.netto,
@@ -983,8 +994,10 @@ export async function POST(request: NextRequest) {
         }
         if (analyse.voraussichtliche_lieferung) updateFields.voraussichtliche_lieferung = analyse.voraussichtliche_lieferung;
       } else {
-        // Bestellnummer aus Nicht-Versand-Dokumenten übernehmen
+        // Nummern aus Nicht-Versand-Dokumenten übernehmen
         if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
+        if (analyse.auftragsnummer) updateFields.auftragsnummer = analyse.auftragsnummer;
+        if (analyse.lieferscheinnummer) updateFields.lieferscheinnummer = analyse.lieferscheinnummer;
         // Betrag nur von Rechnungen übernehmen (Rechnungsbetrag ist maßgeblich, nicht Bestellbestätigung)
         // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung, 0% MwSt)
         const effektiverBetrag = analyse.gesamtbetrag != null ? analyse.gesamtbetrag : (analyse.netto ?? null);
