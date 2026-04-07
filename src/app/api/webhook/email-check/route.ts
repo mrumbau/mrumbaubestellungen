@@ -90,6 +90,13 @@ export async function POST(request: NextRequest) {
     const betreff = (email_betreff || "").toLowerCase();
     const vorschau = (email_vorschau || "").toLowerCase();
 
+    // Bestellnummer aus Betreff extrahieren (wird im Response mitgesendet für STUFE 0 Match)
+    const betreffOriginal = email_betreff || "";
+    const nrMatch = betreffOriginal.match(/(?:bestellnummer|bestellung|order|auftrag|auftrags-?nr|bestell-?nr)[:\s#]*([A-Z0-9][\w\-]{2,29})/i)
+      || betreffOriginal.match(/(\d{3}-\d{7}-\d{7})/) // Amazon-Format
+      || betreffOriginal.match(/(?:nr|number|#)[.:\s]*([A-Z0-9][\w\-]{4,29})/i);
+    const bestellnummerBetreff = nrMatch?.[1] || null;
+
     // ── 1. Kein gültiger Absender ──
     if (!absenderAdresse || !absenderAdresse.includes("@") || !absenderDomain.includes(".")) {
       return NextResponse.json({ relevant: false, grund: "kein_absender" });
@@ -115,7 +122,7 @@ export async function POST(request: NextRequest) {
     if (absenderDomain === "paypal.com" || absenderDomain === "paypal.de") {
       const paypalDokKw = ["zahlung", "abbuchung", "bezahlung", "payment", "quittung", "transaction", "geld gesendet", "geld empfangen"];
       if (paypalDokKw.some(k => betreff.includes(k) || vorschau.includes(k))) {
-        return NextResponse.json({ relevant: true, grund: "paypal_zahlung" });
+        return NextResponse.json({ relevant: true, grund: "paypal_zahlung", bestellnummer_betreff: bestellnummerBetreff });
       }
       return NextResponse.json({ relevant: false, grund: "paypal_irrelevant" });
     }
@@ -124,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com") {
       const plancraftDokKw = ["rechnung", "angebot", "aufmaß", "aufmass", "leistungsnachweis", "gutschrift", "invoice"];
       if (plancraftDokKw.some(k => betreff.includes(k))) {
-        return NextResponse.json({ relevant: true, grund: "plancraft_dokument" });
+        return NextResponse.json({ relevant: true, grund: "plancraft_dokument", bestellnummer_betreff: bestellnummerBetreff });
       }
       // Plancraft ohne Dokument-Betreff → irrelevant (System-Benachrichtigungen etc.)
       return NextResponse.json({ relevant: false, grund: "plancraft_irrelevant" });
@@ -250,6 +257,7 @@ export async function POST(request: NextRequest) {
         grund: "haendler",
         haendler_name: haendlerMatch.name,
         haendler_id: haendlerMatch.id,
+        bestellnummer_betreff: bestellnummerBetreff,
       });
     }
 

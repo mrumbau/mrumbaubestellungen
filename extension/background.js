@@ -167,6 +167,108 @@ chrome.runtime.onInstalled.addListener(function () {
 });
 
 // ===================================================================
+// FORM-SUBMIT Navigation Detection (Schwachstelle 1 Fix)
+// Erkennt klassische Form-POSTs zum Checkout über Chrome webNavigation API.
+// transitionType "form_submit" ist ein starkes Signal das Chrome nativ liefert.
+// Zeitfenster: ±2 Min statt ±4h → praktisch eindeutig.
+// ===================================================================
+
+var CONFIRMATION_URL_PATTERNS = [
+  "/checkout/confirmation", "/checkout/success", "/checkout/complete", "/checkout/done",
+  "/checkout/thank", "/checkout/thankyou", "/checkout/thank-you",
+  "/bestellbestaetigung", "/bestellung/bestaetigung", "/bestellung/danke",
+  "/order/confirmation", "/order/success", "/order/complete", "/order/thankyou",
+  "/order-success", "/order-confirmation", "/order-complete",
+  "/thankyou", "/thank-you", "/vielen-dank", "/danke",
+  "/gp/buy/thankyou", "/order-confirm",
+];
+
+function isConfirmationUrl(url) {
+  if (!url) return false;
+  try {
+    var path = new URL(url).pathname.toLowerCase();
+    return CONFIRMATION_URL_PATTERNS.some(function(p) { return path.includes(p); });
+  } catch(e) { return false; }
+}
+
+chrome.webNavigation.onCommitted.addListener(function(details) {
+  // Nur Hauptframe, nur form_submit
+  if (details.frameId !== 0) return;
+  if (details.transitionType !== "form_submit") return;
+  if (!isConfirmationUrl(details.url)) return;
+
+  console.log("[MR Umbau] Form-Submit zu Bestätigungsseite erkannt:", details.url);
+
+  chrome.storage.sync.get(["kuerzel"], function(result) {
+    if (!result.kuerzel) return;
+
+    try {
+      var urlObj = new URL(details.url);
+      var parts = urlObj.hostname.split(".");
+      var domain = parts.length <= 2 ? urlObj.hostname : parts.slice(-2).join(".");
+
+      var payload = {
+        kuerzel: result.kuerzel,
+        haendler_domain: domain,
+        zeitstempel: new Date().toISOString(),
+        secret: EXTENSION_SECRET,
+        erkennung: "form_submit",
+        seiten_url: details.url,
+        confidence: 0.9, // Hoch aber nicht 1.0 (keine Bestellnummer extrahiert)
+      };
+
+      fetchWithTimeout("https://cloud.mrumbau.de/api/webhook/bestellung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }, FETCH_TIMEOUT_MS).then(function(res) {
+        if (res.ok) {
+          console.log("[MR Umbau] Form-Submit Signal gesendet:", domain);
+          chrome.action.setBadgeText({ text: "1" });
+          chrome.action.setBadgeBackgroundColor({ color: "#059669" });
+          setTimeout(function() { chrome.action.setBadgeText({ text: "" }); }, 5000);
+          addToHistory(domain, "form_submit", null);
+        }
+      }).catch(function() {});
+    } catch(e) {}
+  });
+});
+
+// ===================================================================
+// CSP-Fallback: chrome.scripting Interceptor Injection (Schwachstelle 2 Fix)
+// Wenn inline <script> Injection durch CSP blockiert wird,
+// injiziert der Background Worker den Interceptor via chrome.scripting API.
+// chrome.scripting umgeht CSP der Webseite.
+// ===================================================================
+
+chrome.webNavigation.onCompleted.addListener(function(details) {
+  if (details.frameId !== 0) return;
+
+  // Nur auf nicht-ignorierten Domains
+  try {
+    var urlObj = new URL(details.url);
+    if (!urlObj.protocol.startsWith("http")) return;
+  } catch(e) { return; }
+
+  // Prüfen ob der Content-Script Interceptor schon aktiv ist
+  // (content.js setzt ein Flag via postMessage wenn inline-Injection erfolgreich war)
+  chrome.tabs.sendMessage(details.tabId, { type: "interceptor_check" }, function(response) {
+    if (chrome.runtime.lastError || (response && response.active)) return;
+
+    // Inline-Injection hat nicht funktioniert → chrome.scripting als Fallback
+    chrome.scripting.executeScript({
+      target: { tabId: details.tabId },
+      world: "MAIN",
+      files: ["interceptor.js"],
+    }).then(function() {
+      console.log("[MR Umbau] Interceptor via chrome.scripting injiziert (CSP-Fallback), Tab:", details.tabId);
+    }).catch(function() {
+      // Auch chrome.scripting fehlgeschlagen → DOM-Scan greift als letzter Fallback
+    });
+  });
+});
+
+// ===================================================================
 // Message Handler
 // ===================================================================
 

@@ -56,6 +56,32 @@
   // ===================================================================
 
   var interceptorOrderNumber = null;
+  var interceptorInjected = false;
+
+  // Prüfe ob inline-Injection geklappt hat (interceptor.js setzt ein globales Flag)
+  try {
+    // Kurz warten dann prüfen ob Interceptor aktiv ist
+    setTimeout(function() {
+      var testScript = document.createElement("script");
+      testScript.textContent = "window.postMessage({type:'MR_UMBAU_INTERCEPTOR_STATUS',active:typeof window.__mrUmbauInterceptor!=='undefined'},'*')";
+      document.documentElement.appendChild(testScript);
+      testScript.remove();
+    }, 100);
+  } catch(e) {}
+
+  window.addEventListener("message", function(event) {
+    if (event.source === window && event.data && event.data.type === "MR_UMBAU_INTERCEPTOR_STATUS") {
+      interceptorInjected = event.data.active;
+    }
+  });
+
+  // Background Worker fragt ob Interceptor aktiv ist (für CSP-Fallback)
+  chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    if (message.type === "interceptor_check") {
+      sendResponse({ active: interceptorInjected });
+      return false;
+    }
+  });
 
   window.addEventListener("message", function (event) {
     if (event.source !== window) return;

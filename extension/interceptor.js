@@ -185,7 +185,9 @@
     return origSend.apply(this, arguments);
   };
 
-  // Log
+  // Flag für content.js (CSP-Fallback Check)
+  window.__mrUmbauInterceptor = true;
+
   console.debug("[MR Umbau] API-Interceptor aktiv");
 
 })();

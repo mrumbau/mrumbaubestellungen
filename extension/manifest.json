@@ -5,7 +5,9 @@
   "description": "Erkennt Bestellungen bei bekannten Händlern und meldet sie automatisch an das MR Umbau Bestellmanagement.",
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "webNavigation",
+    "scripting"
   ],
   "host_permissions": [
     "https://cloud.mrumbau.de/*",

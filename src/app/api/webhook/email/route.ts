@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
     const vorfilterHaendlerId = body.haendler_id || null;
     const vorfilterHaendlerName = body.haendler_name || null;
     const vorfilterSuId = body.su_id || null;
+    const vorfilterBestellnummer = body.bestellnummer_betreff || null;
     const hatVorfilter = vorfilter === "ja";
 
     if (vorfilter === "nein") {
@@ -544,7 +545,8 @@ export async function POST(request: NextRequest) {
     // Bestellnummer aus Betreff/Body extrahieren für schnellen Match (GPT-Analyse kommt erst später)
     const betreffNrMatch = (email_betreff || "").match(/(?:bestellnummer|bestellung|order|auftrag|auftrags-?nr)[:\s#]*([A-Z0-9][\w\-]{2,29})/i)
       || (email_betreff || "").match(/(\d{3}-\d{7}-\d{7})/); // Amazon-Format
-    const schnellBestellnummer = betreffNrMatch?.[1] || null;
+    // Bestellnummer: Vorfilter (email-check) hat Priorität, dann eigene Extraktion
+    const schnellBestellnummer = vorfilterBestellnummer || betreffNrMatch?.[1] || null;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let signal: any = null;
