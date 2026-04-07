@@ -42,7 +42,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, domain, email_absender, notizen } = body;
+    const { name, domain, email_absender, notizen, intervall, erwarteter_betrag, toleranz_prozent, naechste_rechnung, vertragsbeginn, vertragsende, kuendigungsfrist_tage } = body;
 
     if (name && !validateTextLength(name, 200)) {
       return NextResponse.json({ error: "Name zu lang (max. 200 Zeichen)" }, { status: 400 });
@@ -59,6 +59,13 @@ export async function PUT(
         domain,
         email_absender: email_absender || [],
         notizen: notizen || null,
+        intervall: intervall || "monatlich",
+        erwarteter_betrag: erwarteter_betrag || null,
+        toleranz_prozent: toleranz_prozent ?? 10,
+        naechste_rechnung: naechste_rechnung || null,
+        vertragsbeginn: vertragsbeginn || null,
+        vertragsende: vertragsende || null,
+        kuendigungsfrist_tage: kuendigungsfrist_tage || null,
       })
       .eq("id", id)
       .select()

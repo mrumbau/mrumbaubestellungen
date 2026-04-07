@@ -116,6 +116,8 @@ export interface DashboardWidgetsProps {
   aktionenNoetig: BestellungItem[];
   letzte: BestellungItem[];
   bestellerStats: Record<string, number>;
+  aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
+  aboMonatlicheKosten?: number;
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -149,6 +151,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
   { id: "neue_haendler", label: "Neue Händler", defaultVisible: true, adminOnly: true },
   { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true, adminOnly: true },
+  { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true, adminOnly: true },
   { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },
@@ -487,6 +490,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     aktionenNoetig,
     letzte,
     bestellerStats,
+    aboHinweise,
+    aboMonatlicheKosten,
   } = props;
 
   const router = useRouter();
@@ -687,6 +692,60 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
           {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
             <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
           )}
+        </div>
+      )}
+
+      {/* Abo-Übersicht */}
+      {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboMonatlicheKosten && aboMonatlicheKosten > 0)) && (
+        <div className="mb-6">
+          <CollapsibleCard
+            title="Abo-Übersicht"
+            borderColor="#7c3aed"
+            icon={
+              <svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+              </svg>
+            }
+            badge={aboHinweise && aboHinweise.some(h => h.dringend) ? (
+              <span className="font-mono-amount text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                {aboHinweise.filter(h => h.dringend).length}
+              </span>
+            ) : undefined}
+          >
+            {aboMonatlicheKosten && aboMonatlicheKosten > 0 ? (
+              <div className="flex items-center gap-2 mb-3 p-2.5 bg-violet-50/50 rounded-lg border border-violet-100">
+                <span className="text-[11px] text-violet-600 font-medium">Monatliche Abo-Kosten:</span>
+                <span className="font-mono-amount text-sm font-bold text-violet-700">
+                  {aboMonatlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                </span>
+                <span className="text-[10px] text-[#c4c2bf]">
+                  ({(aboMonatlicheKosten * 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € / Jahr)
+                </span>
+              </div>
+            ) : null}
+            {aboHinweise && aboHinweise.length > 0 ? (
+              <div className="space-y-1.5">
+                {aboHinweise.map((h, i) => (
+                  <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg ${h.dringend ? "bg-red-50 border border-red-100" : "bg-amber-50/50 border border-amber-100"}`}>
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-red-500" : "bg-amber-500"}`} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-[#1a1a1a]">{h.name}</span>
+                      <span className={`text-[11px] ml-2 ${h.dringend ? "text-red-600" : "text-amber-600"}`}>{h.detail}</span>
+                    </div>
+                    <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      h.typ === "ueberfaellig" ? "bg-red-100 text-red-700" :
+                      h.typ === "kuendigung" ? "bg-amber-100 text-amber-700" :
+                      "bg-violet-100 text-violet-700"
+                    }`}>
+                      {{ ueberfaellig: "Überfällig", kuendigung: "Kündigung", vertragsende: "Vertragsende" }[h.typ]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#c4c2bf] text-center py-2">Keine Abo-Hinweise.</p>
+            )}
+          </CollapsibleCard>
         </div>
       )}
 

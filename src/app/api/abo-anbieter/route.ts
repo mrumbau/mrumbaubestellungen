@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, domain, email_absender, notizen } = body;
+    const { name, domain, email_absender, notizen, intervall, erwarteter_betrag, toleranz_prozent, naechste_rechnung, vertragsbeginn, vertragsende, kuendigungsfrist_tage } = body;
 
     if (!name || !domain) {
       return NextResponse.json({ error: "Name und Domain sind Pflichtfelder" }, { status: 400 });
@@ -87,6 +87,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ungültige Domain" }, { status: 400 });
     }
 
+    const erlaubteIntervalle = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
+    if (intervall && !erlaubteIntervalle.includes(intervall)) {
+      return NextResponse.json({ error: "Ungültiges Intervall" }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("abo_anbieter")
       .insert({
@@ -94,6 +99,13 @@ export async function POST(request: NextRequest) {
         domain,
         email_absender: email_absender || [],
         notizen: notizen || null,
+        intervall: intervall || "monatlich",
+        erwarteter_betrag: erwarteter_betrag || null,
+        toleranz_prozent: toleranz_prozent ?? 10,
+        naechste_rechnung: naechste_rechnung || null,
+        vertragsbeginn: vertragsbeginn || null,
+        vertragsende: vertragsende || null,
+        kuendigungsfrist_tage: kuendigungsfrist_tage || null,
       })
       .select()
       .single();

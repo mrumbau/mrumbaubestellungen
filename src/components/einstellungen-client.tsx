@@ -70,6 +70,15 @@ interface AboAnbieter {
   domain: string;
   email_absender: string[];
   notizen: string | null;
+  intervall: "monatlich" | "quartalsweise" | "halbjaehrlich" | "jaehrlich";
+  erwarteter_betrag: number | null;
+  toleranz_prozent: number;
+  naechste_rechnung: string | null;
+  vertragsbeginn: string | null;
+  vertragsende: string | null;
+  kuendigungsfrist_tage: number | null;
+  letzte_rechnung_am: string | null;
+  letzter_betrag: number | null;
   created_at: string;
 }
 
@@ -171,6 +180,13 @@ export function EinstellungenClient({
   const [aboFormDomain, setAboFormDomain] = useState("");
   const [aboFormEmailAbsender, setAboFormEmailAbsender] = useState("");
   const [aboFormNotizen, setAboFormNotizen] = useState("");
+  const [aboFormIntervall, setAboFormIntervall] = useState<"monatlich" | "quartalsweise" | "halbjaehrlich" | "jaehrlich">("monatlich");
+  const [aboFormBetrag, setAboFormBetrag] = useState("");
+  const [aboFormToleranz, setAboFormToleranz] = useState("10");
+  const [aboFormNaechsteRechnung, setAboFormNaechsteRechnung] = useState("");
+  const [aboFormVertragsbeginn, setAboFormVertragsbeginn] = useState("");
+  const [aboFormVertragsende, setAboFormVertragsende] = useState("");
+  const [aboFormKuendigungsfrist, setAboFormKuendigungsfrist] = useState("");
   const [aboDeleteConfirm, setAboDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   // Projekt-Adresse (singular)
@@ -535,6 +551,13 @@ export function EinstellungenClient({
     setAboFormDomain("");
     setAboFormEmailAbsender("");
     setAboFormNotizen("");
+    setAboFormIntervall("monatlich");
+    setAboFormBetrag("");
+    setAboFormToleranz("10");
+    setAboFormNaechsteRechnung("");
+    setAboFormVertragsbeginn("");
+    setAboFormVertragsende("");
+    setAboFormKuendigungsfrist("");
     setAboEditId(null);
     setShowAboForm(false);
   }
@@ -544,6 +567,13 @@ export function EinstellungenClient({
     setAboFormDomain(abo.domain);
     setAboFormEmailAbsender((abo.email_absender || []).join(", "));
     setAboFormNotizen(abo.notizen || "");
+    setAboFormIntervall(abo.intervall || "monatlich");
+    setAboFormBetrag(abo.erwarteter_betrag ? String(abo.erwarteter_betrag) : "");
+    setAboFormToleranz(String(abo.toleranz_prozent ?? 10));
+    setAboFormNaechsteRechnung(abo.naechste_rechnung || "");
+    setAboFormVertragsbeginn(abo.vertragsbeginn || "");
+    setAboFormVertragsende(abo.vertragsende || "");
+    setAboFormKuendigungsfrist(abo.kuendigungsfrist_tage ? String(abo.kuendigungsfrist_tage) : "");
     setAboEditId(abo.id);
     setShowAboForm(true);
   }
@@ -558,6 +588,13 @@ export function EinstellungenClient({
         domain: aboFormDomain.trim().toLowerCase(),
         email_absender: aboFormEmailAbsender.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
         notizen: aboFormNotizen.trim() || null,
+        intervall: aboFormIntervall,
+        erwarteter_betrag: aboFormBetrag ? parseFloat(aboFormBetrag.replace(",", ".")) : null,
+        toleranz_prozent: parseInt(aboFormToleranz) || 10,
+        naechste_rechnung: aboFormNaechsteRechnung || null,
+        vertragsbeginn: aboFormVertragsbeginn || null,
+        vertragsende: aboFormVertragsende || null,
+        kuendigungsfrist_tage: aboFormKuendigungsfrist ? parseInt(aboFormKuendigungsfrist) : null,
       };
       if (aboEditId) {
         const res = await fetch(`/api/abo-anbieter/${aboEditId}`, {
@@ -1328,13 +1365,60 @@ export function EinstellungenClient({
               />
               <p className="text-[10px] text-[#c4c2bf] mt-1">Kommagetrennt. Emails von diesen Absendern werden automatisch als Abo erkannt.</p>
             </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Notizen</label>
-              <input
-                type="text" value={aboFormNotizen} onChange={(e) => setAboFormNotizen(e.target.value)}
-                placeholder="z.B. Monatlich 49,90€, Handwerkersoftware"
-                className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none"
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Intervall</label>
+                <select value={aboFormIntervall} onChange={(e) => setAboFormIntervall(e.target.value as typeof aboFormIntervall)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none bg-white">
+                  <option value="monatlich">Monatlich</option>
+                  <option value="quartalsweise">Quartalsweise</option>
+                  <option value="halbjaehrlich">Halbjährlich</option>
+                  <option value="jaehrlich">Jährlich</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Erwarteter Betrag (€)</label>
+                <input type="text" value={aboFormBetrag} onChange={(e) => setAboFormBetrag(e.target.value)}
+                  placeholder="z.B. 49,90"
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Toleranz (%)</label>
+                <input type="number" value={aboFormToleranz} onChange={(e) => setAboFormToleranz(e.target.value)}
+                  min="0" max="100" placeholder="10"
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Nächste Rechnung</label>
+                <input type="date" value={aboFormNaechsteRechnung} onChange={(e) => setAboFormNaechsteRechnung(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Vertragsbeginn</label>
+                <input type="date" value={aboFormVertragsbeginn} onChange={(e) => setAboFormVertragsbeginn(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Vertragsende</label>
+                <input type="date" value={aboFormVertragsende} onChange={(e) => setAboFormVertragsende(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Kündigungsfrist (Tage)</label>
+                <input type="number" value={aboFormKuendigungsfrist} onChange={(e) => setAboFormKuendigungsfrist(e.target.value)}
+                  min="0" placeholder="z.B. 30"
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-[#9a9a9a] uppercase tracking-wider mb-1">Notizen</label>
+                <input type="text" value={aboFormNotizen} onChange={(e) => setAboFormNotizen(e.target.value)}
+                  placeholder="z.B. Handwerkersoftware"
+                  className="w-full px-3 py-2 text-sm border border-[#e8e6e3] rounded-lg focus:ring-1 focus:ring-violet-500 focus:border-violet-500 outline-none" />
+              </div>
             </div>
             <div className="flex gap-2 pt-1">
               <button type="submit" disabled={aboLoading}
@@ -1360,11 +1444,35 @@ export function EinstellungenClient({
                     <span className="text-[10px] font-bold text-violet-600">ABO</span>
                   </div>
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-[#1a1a1a]">{abo.name}</span>
-                    <span className="text-[10px] text-[#c4c2bf] ml-2">{abo.domain}</span>
-                    {abo.notizen && (
-                      <p className="text-[11px] text-[#9a9a9a] mt-0.5">{abo.notizen}</p>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-[#1a1a1a]">{abo.name}</span>
+                      <span className="text-[10px] text-[#c4c2bf]">{abo.domain}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-violet-500/10 text-violet-600 rounded font-medium">
+                        {{ monatlich: "Monatlich", quartalsweise: "Quartalsweise", halbjaehrlich: "Halbjährlich", jaehrlich: "Jährlich" }[abo.intervall] || "Monatlich"}
+                      </span>
+                      {abo.erwarteter_betrag && (
+                        <span className="text-[10px] font-mono text-[#1a1a1a]">{Number(abo.erwarteter_betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-1 text-[10px] text-[#9a9a9a]">
+                      {abo.naechste_rechnung && (
+                        <span className={new Date(abo.naechste_rechnung) < new Date() ? "text-red-500 font-medium" : ""}>
+                          Nächste RE: {new Date(abo.naechste_rechnung).toLocaleDateString("de-DE")}
+                        </span>
+                      )}
+                      {abo.vertragsende && (
+                        <span>Vertragsende: {new Date(abo.vertragsende).toLocaleDateString("de-DE")}</span>
+                      )}
+                      {abo.kuendigungsfrist_tage && abo.vertragsende && (() => {
+                        const frist = new Date(abo.vertragsende);
+                        frist.setDate(frist.getDate() - abo.kuendigungsfrist_tage);
+                        const tageUebrig = Math.ceil((frist.getTime() - Date.now()) / 86400000);
+                        if (tageUebrig <= 30 && tageUebrig > 0) return <span className="text-amber-600 font-medium">Kündigungsfrist in {tageUebrig} Tagen!</span>;
+                        if (tageUebrig <= 0) return <span className="text-red-500 font-medium">Kündigungsfrist abgelaufen!</span>;
+                        return null;
+                      })()}
+                      {abo.notizen && <span>{abo.notizen}</span>}
+                    </div>
                     {abo.email_absender && abo.email_absender.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {abo.email_absender.map((ea, i) => (

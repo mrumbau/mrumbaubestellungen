@@ -128,7 +128,8 @@ export default async function EinstellungenPage() {
       webhookLogs={(webhookLogs || []) as { id: string; typ: string; status: string; bestellnummer: string | null; fehler_text: string | null; created_at: string }[]}
       projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
       subunternehmer={(subunternehmer || []) as { id: string; firma: string; ansprechpartner: string | null; gewerk: string | null; telefon: string | null; email: string | null; email_absender: string[]; steuer_nr: string | null; iban: string | null; notizen: string | null; confirmed_at: string | null; created_at: string }[]}
-      aboAnbieter={(aboAnbieter || []) as { id: string; name: string; domain: string; email_absender: string[]; notizen: string | null; created_at: string }[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      aboAnbieter={(aboAnbieter || []) as any[]}
       firmaEinstellungen={(firmaEinstellungen || []) as { schluessel: string; wert: string }[]}
       emailBlacklist={(emailBlacklist || []) as { muster: string; typ: string; grund: string | null; erstellt_am: string }[]}
       rolle="admin"

@@ -44,6 +44,7 @@ export default async function DashboardPage() {
     { data: kiVorschlaegeRoh },
     { data: neueKundenRoh },
     { data: neueSubunternehmerRoh },
+    { data: aboAnbieterRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen")),
@@ -81,6 +82,9 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[] }),
+    profil.rolle === "admin"
+      ? supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag")
+      : Promise.resolve({ data: [] as { id: string; name: string; intervall: string; erwarteter_betrag: number | null; naechste_rechnung: string | null; vertragsende: string | null; kuendigungsfrist_tage: number | null; letzter_betrag: number | null }[] }),
   ]);
 
   // Dashboard-Config aus DB
@@ -129,6 +133,53 @@ export default async function DashboardPage() {
     .sort((a, b) => b.stats.gesamt - a.stats.gesamt)
     .slice(0, 3);
 
+  // Abo-Hinweise berechnen
+  const aboAnbieter = (aboAnbieterRoh || []) as { id: string; name: string; intervall: string; erwarteter_betrag: number | null; naechste_rechnung: string | null; vertragsende: string | null; kuendigungsfrist_tage: number | null; letzter_betrag: number | null }[];
+  const heute = new Date();
+  const aboHinweise: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[] = [];
+  let aboMonatlicheKosten = 0;
+
+  for (const abo of aboAnbieter) {
+    // Monatliche Kosten berechnen
+    if (abo.erwarteter_betrag) {
+      const divisor: Record<string, number> = { monatlich: 1, quartalsweise: 3, halbjaehrlich: 6, jaehrlich: 12 };
+      aboMonatlicheKosten += Number(abo.erwarteter_betrag) / (divisor[abo.intervall] || 1);
+    }
+
+    // Überfällige Rechnung (7 Tage Puffer)
+    if (abo.naechste_rechnung) {
+      const faellig = new Date(abo.naechste_rechnung);
+      faellig.setDate(faellig.getDate() + 7);
+      if (heute > faellig) {
+        const tage = Math.ceil((heute.getTime() - new Date(abo.naechste_rechnung).getTime()) / 86400000);
+        aboHinweise.push({ typ: "ueberfaellig", name: abo.name, detail: `Rechnung ${tage} Tage überfällig`, dringend: true });
+      }
+    }
+
+    // Kündigungsfrist ODER Vertragsende (nicht beides, um Doppelmeldungen zu vermeiden)
+    let hatKuendigungsHinweis = false;
+    if (abo.kuendigungsfrist_tage && abo.vertragsende) {
+      const frist = new Date(abo.vertragsende);
+      frist.setDate(frist.getDate() - abo.kuendigungsfrist_tage);
+      const tageUebrig = Math.ceil((frist.getTime() - heute.getTime()) / 86400000);
+      if (tageUebrig <= 30 && tageUebrig > 0) {
+        aboHinweise.push({ typ: "kuendigung", name: abo.name, detail: `Kündigungsfrist in ${tageUebrig} Tagen`, dringend: tageUebrig <= 7 });
+        hatKuendigungsHinweis = true;
+      } else if (tageUebrig <= 0) {
+        aboHinweise.push({ typ: "kuendigung", name: abo.name, detail: "Kündigungsfrist abgelaufen!", dringend: true });
+        hatKuendigungsHinweis = true;
+      }
+    }
+
+    // Vertragsende nur anzeigen wenn KEIN Kündigungshinweis (sonst Dopplung)
+    if (!hatKuendigungsHinweis && abo.vertragsende) {
+      const tage = Math.ceil((new Date(abo.vertragsende).getTime() - heute.getTime()) / 86400000);
+      if (tage <= 30 && tage > 0) {
+        aboHinweise.push({ typ: "vertragsende", name: abo.name, detail: `Vertrag endet in ${tage} Tagen`, dringend: tage <= 7 });
+      }
+    }
+  }
+
   // Stat-Daten als Array für den Client
   const statCards = [
     { id: "offen", label: "Offen", value: offen, color: "#2563eb", row: 1 },
@@ -174,6 +225,8 @@ export default async function DashboardPage() {
         aktionenNoetig={aktionenNoetig}
         letzte={letzte}
         bestellerStats={bestellerStatsMap}
+        aboHinweise={aboHinweise}
+        aboMonatlicheKosten={aboMonatlicheKosten}
       />
     </div>
   );

@@ -178,7 +178,7 @@
     negUrlPatterns.forEach(function (pattern) {
       if (!pathname.includes(pattern)) return;
       // Prüfe ob dieses Pattern ein gelerntes Händler-Pattern ist → nicht negativ bewerten
-      if (istBekannterHaendler && bekanntePatterns.some(function (bp) { return pattern.includes(bp) || bp.includes(pattern); })) return;
+      if (istBekannterHaendler && bekanntePatterns.some(function (bp) { return bp === pattern || bp.startsWith(pattern); })) return;
       score -= 3;
     });
 

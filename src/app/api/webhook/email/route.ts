@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
     // NUR eindeutige Versand-Keywords, keine generischen wie "zustellung" oder "ihre lieferung"
     const versandBetreffKeywords = [
       "versandbestätigung", "versandbestaetigung",
-      "sendungsverfolgung", "tracking",
+      "sendungsverfolgung", "tracking-nummer", "trackingnummer", "tracking number",
       "shipped", "dispatched",
       "aktualisierung der voraussichtlichen lieferung",
       "paket wurde", "sendung verfolgen",
@@ -491,7 +491,9 @@ export async function POST(request: NextRequest) {
     const haendlerDomain = haendler?.domain || absenderDomain;
     // Plancraft ist kein Händler/SU — es ist nur ein Tool. Nie als Name verwenden.
     const istPlancraftDomain = absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com";
-    let haendlerName = haendler?.name || vorfilterHaendlerName || (istPlancraftDomain ? "" : absenderDomain);
+    // Plancraft ist ein Tool, kein Händler — Name wird später aus GPT-Analyse übernommen
+    let haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
+    const haendlerNameIstNurDomain = haendlerName === absenderDomain;
 
     // =====================================================================
     // ANHÄNGE PARALLEL ANALYSIEREN (GPT-4o) — max 3 gleichzeitig
@@ -977,7 +979,7 @@ export async function POST(request: NextRequest) {
         if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
         // Betrag nur von Rechnungen übernehmen (Rechnungsbetrag ist maßgeblich, nicht Bestellbestätigung)
         // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung, 0% MwSt)
-        const effektiverBetrag = analyse.gesamtbetrag || analyse.netto || null;
+        const effektiverBetrag = analyse.gesamtbetrag != null ? analyse.gesamtbetrag : (analyse.netto ?? null);
         const istNetto = !analyse.gesamtbetrag && !!analyse.netto;
         if (effektiverBetrag && analyse.typ === "rechnung") {
           updateFields.betrag = effektiverBetrag;
@@ -1099,7 +1101,7 @@ export async function POST(request: NextRequest) {
               if (bodyAnalyse.bestellnummer) bodyUpdate.bestellnummer = bodyAnalyse.bestellnummer;
               // Betrag: Rechnung ist maßgeblich, andere Typen nur wenn noch kein Betrag in DB
               // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung)
-              const bodyEffektiverBetrag = bodyAnalyse.gesamtbetrag || bodyAnalyse.netto || null;
+              const bodyEffektiverBetrag = bodyAnalyse.gesamtbetrag != null ? bodyAnalyse.gesamtbetrag : (bodyAnalyse.netto ?? null);
               const bodyIstNetto = !bodyAnalyse.gesamtbetrag && !!bodyAnalyse.netto;
               if (bodyEffektiverBetrag && bodyAnalyse.typ === "rechnung") {
                 bodyUpdate.betrag = bodyEffektiverBetrag;
@@ -1140,7 +1142,7 @@ export async function POST(request: NextRequest) {
               if (check && !check.bestellnummer) ergaenzung.bestellnummer = bodyAnalyse.bestellnummer;
             }
             if (bodyAnalyse.typ !== "versandbestaetigung") {
-              const ergBetrag = bodyAnalyse.gesamtbetrag || bodyAnalyse.netto || null;
+              const ergBetrag = bodyAnalyse.gesamtbetrag != null ? bodyAnalyse.gesamtbetrag : (bodyAnalyse.netto ?? null);
               if (ergBetrag) {
                 const { data: check } = await supabase
                   .from("bestellungen")
@@ -1331,6 +1333,73 @@ export async function POST(request: NextRequest) {
     // STATUS AKTUALISIEREN
     // =====================================================================
     await updateBestellungStatus(supabase, bestellungId);
+
+    // =====================================================================
+    // ABO-LOGIK: Betragsabweichung prüfen + nächste Rechnung weiterschalten
+    // =====================================================================
+    if (bestellungsart === "abo") {
+      // Abo-Anbieter aus DB laden (für Betragsprüfung und Intervall)
+      // Abo-Anbieter laden: zuerst per Domain, dann per Name
+      let abo = (await supabase
+        .from("abo_anbieter")
+        .select("*")
+        .eq("domain", haendlerDomain)
+        .maybeSingle()).data;
+
+      if (!abo && haendlerName) {
+        abo = (await supabase
+          .from("abo_anbieter")
+          .select("*")
+          .ilike("name", `%${haendlerName}%`)
+          .maybeSingle()).data;
+      }
+
+      if (abo) {
+        // Betrag der aktuellen Rechnung holen
+        const { data: bestellung } = await supabase
+          .from("bestellungen")
+          .select("betrag")
+          .eq("id", bestellungId)
+          .maybeSingle();
+
+        const aktuellerBetrag = bestellung?.betrag ? Number(bestellung.betrag) : null;
+
+        // 1. Betragsabweichung prüfen
+        if (abo.erwarteter_betrag && aktuellerBetrag) {
+          const toleranz = (abo.toleranz_prozent || 10) / 100;
+          const abweichung = Math.abs(aktuellerBetrag - Number(abo.erwarteter_betrag)) / Number(abo.erwarteter_betrag);
+          if (abweichung > toleranz) {
+            await supabase.from("bestellungen").update({ status: "abweichung" }).eq("id", bestellungId);
+            await supabase.from("kommentare").insert({
+              bestellung_id: bestellungId,
+              autor_kuerzel: "SYSTEM",
+              autor_name: "Abo-Prüfung",
+              text: `Abo-Betragsabweichung erkannt!\nErwartet: ${Number(abo.erwarteter_betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € (±${abo.toleranz_prozent || 10}%)\nErhalten: ${aktuellerBetrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €\nAbweichung: ${(abweichung * 100).toFixed(1)}%`,
+            });
+            logInfo("webhook/email", `Abo-Abweichung: ${abo.name}`, { erwartet: abo.erwarteter_betrag, erhalten: aktuellerBetrag });
+          }
+        }
+
+        // 2. Nächste Rechnung weiterschalten (vom geplanten Datum, nicht von heute — verhindert Drift)
+        const intervallMonate: Record<string, number> = { monatlich: 1, quartalsweise: 3, halbjaehrlich: 6, jaehrlich: 12 };
+        const monate = intervallMonate[abo.intervall] || 1;
+        const heute = new Date();
+        let naechste: Date;
+        if (abo.naechste_rechnung) {
+          // Vom geplanten Datum weiterschalten (kein Drift)
+          const geplant = new Date(abo.naechste_rechnung);
+          naechste = new Date(geplant.getFullYear(), geplant.getMonth() + monate, geplant.getDate());
+        } else {
+          naechste = new Date(heute.getFullYear(), heute.getMonth() + monate, heute.getDate());
+        }
+
+        await supabase.from("abo_anbieter").update({
+          naechste_rechnung: naechste.toISOString().split("T")[0],
+          letzte_rechnung_am: heute.toISOString().split("T")[0],
+          letzter_betrag: aktuellerBetrag,
+        }).eq("id", abo.id);
+      }
+    }
 
     // Signal wurde bereits oben atomar als verarbeitet markiert (Race-Condition-Schutz)
 
