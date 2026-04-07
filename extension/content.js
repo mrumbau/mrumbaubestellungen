@@ -426,7 +426,7 @@
 
           var domain = (typeof data.haendler_domain === "string" && data.haendler_domain) || rootDomain;
           var bestellnummer = (typeof data.bestellnummer === "string") ? data.bestellnummer : null;
-          sendeSignal(domain, "ki", bestellnummer, 8);
+          sendeSignal(domain, "ki", bestellnummer, 6);
           console.log(
             "[MR Umbau] KI bestätigt:", domain,
             "Konfidenz:", data.konfidenz

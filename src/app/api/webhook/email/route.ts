@@ -674,32 +674,41 @@ export async function POST(request: NextRequest) {
     const erkannteAuftragsnummer = analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer || null;
     const erkannteLiferscheinnummer = analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer || null;
 
-    // STUFE 0 Nachlauf: Wenn Betreff-Extraktion kein Signal fand, GPT-Bestellnummer versuchen
-    if (!signal && bestellerKuerzel === "UNBEKANNT" && erkannteBestellnummer && erkannteBestellnummer !== schnellBestellnummer) {
-      const { data: signalByGpt } = await supabase
-        .from("bestellung_signale")
-        .select("*")
-        .eq("order_nummer", erkannteBestellnummer)
-        .eq("status", "pending")
-        .limit(1);
-
-      if (signalByGpt?.[0]) {
-        const { data: claimed } = await supabase
+    // STUFE 0 Nachlauf: GPT-Bestellnummer für Matching nutzen
+    if (erkannteBestellnummer) {
+      if (!signal && bestellerKuerzel === "UNBEKANNT") {
+        // Kein Signal bisher → versuche per GPT-Bestellnummer zu matchen
+        const { data: signalByGpt } = await supabase
           .from("bestellung_signale")
-          .update({ status: "matched", verarbeitet: true })
-          .eq("id", signalByGpt[0].id)
+          .select("*")
+          .eq("order_nummer", erkannteBestellnummer)
           .eq("status", "pending")
-          .select("id");
-        if (claimed && claimed.length > 0) {
-          signal = signalByGpt[0];
-          bestellerKuerzel = signal.kuerzel;
-          zuordnungsMethode = "bestellnummer_match_gpt";
-          logInfo("webhook/email", `Besteller per GPT-Bestellnummer zugeordnet: ${signal.kuerzel}`, { bestellnummer: erkannteBestellnummer });
-          // Name neu laden da bestellerKuerzel geändert wurde
-          const { data: nachlaufBenutzer } = await supabase
-            .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzel).maybeSingle();
-          if (nachlaufBenutzer) benutzer = nachlaufBenutzer;
+          .limit(1);
+
+        if (signalByGpt?.[0]) {
+          const { data: claimed } = await supabase
+            .from("bestellung_signale")
+            .update({ status: "matched", verarbeitet: true })
+            .eq("id", signalByGpt[0].id)
+            .eq("status", "pending")
+            .select("id");
+          if (claimed && claimed.length > 0) {
+            signal = signalByGpt[0];
+            bestellerKuerzel = signal.kuerzel;
+            zuordnungsMethode = "bestellnummer_match_gpt";
+            logInfo("webhook/email", `Besteller per GPT-Bestellnummer zugeordnet: ${signal.kuerzel}`, { bestellnummer: erkannteBestellnummer });
+            const { data: nachlaufBenutzer } = await supabase
+              .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzel).maybeSingle();
+            if (nachlaufBenutzer) benutzer = nachlaufBenutzer;
+          }
         }
+      }
+
+      // Signal hatte keine order_nummer → jetzt mit GPT-Bestellnummer upgraden
+      if (signal && !signal.order_nummer) {
+        await supabase.from("bestellung_signale")
+          .update({ order_nummer: erkannteBestellnummer })
+          .eq("id", signal.id);
       }
     }
 
