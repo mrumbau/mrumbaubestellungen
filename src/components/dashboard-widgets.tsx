@@ -117,7 +117,7 @@ export interface DashboardWidgetsProps {
   letzte: BestellungItem[];
   bestellerStats: Record<string, number>;
   aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
-  aboMonatlicheKosten?: number;
+  aboJaehrlicheKosten?: number;
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -469,7 +469,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     letzte,
     bestellerStats,
     aboHinweise,
-    aboMonatlicheKosten,
+    aboJaehrlicheKosten,
   } = props;
 
   const router = useRouter();
@@ -674,7 +674,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
       )}
 
       {/* Abo-Übersicht */}
-      {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboMonatlicheKosten && aboMonatlicheKosten > 0)) && (
+      {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboJaehrlicheKosten && aboJaehrlicheKosten > 0)) && (
         <div className="mb-6">
           <CollapsibleCard
             title="Abo-Übersicht"
@@ -690,15 +690,20 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               </span>
             ) : undefined}
           >
-            {aboMonatlicheKosten && aboMonatlicheKosten > 0 ? (
-              <div className="flex items-center gap-2 mb-3 p-2.5 bg-violet-50/50 rounded-lg border border-violet-100">
-                <span className="text-[11px] text-violet-600 font-medium">Monatliche Abo-Kosten:</span>
-                <span className="font-mono-amount text-sm font-bold text-violet-700">
-                  {aboMonatlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-                </span>
-                <span className="text-[10px] text-[#c4c2bf]">
-                  ({(aboMonatlicheKosten * 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € / Jahr)
-                </span>
+            {aboJaehrlicheKosten && aboJaehrlicheKosten > 0 ? (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="p-2.5 bg-violet-50/50 rounded-lg border border-violet-100 text-center">
+                  <p className="text-[10px] text-violet-500 font-medium uppercase tracking-wider">Pro Monat</p>
+                  <p className="font-mono-amount text-lg font-bold text-violet-700 mt-0.5">
+                    {(aboJaehrlicheKosten / 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                  </p>
+                </div>
+                <div className="p-2.5 bg-violet-50/50 rounded-lg border border-violet-100 text-center">
+                  <p className="text-[10px] text-violet-500 font-medium uppercase tracking-wider">Pro Jahr</p>
+                  <p className="font-mono-amount text-lg font-bold text-violet-700 mt-0.5">
+                    {aboJaehrlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                  </p>
+                </div>
               </div>
             ) : null}
             {aboHinweise && aboHinweise.length > 0 ? (

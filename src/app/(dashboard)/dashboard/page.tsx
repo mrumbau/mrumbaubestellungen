@@ -137,13 +137,13 @@ export default async function DashboardPage() {
   const aboAnbieter = (aboAnbieterRoh || []) as { id: string; name: string; intervall: string; erwarteter_betrag: number | null; naechste_rechnung: string | null; vertragsende: string | null; kuendigungsfrist_tage: number | null; letzter_betrag: number | null }[];
   const heute = new Date();
   const aboHinweise: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[] = [];
-  let aboMonatlicheKosten = 0;
+  let aboJaehrlicheKosten = 0;
 
   for (const abo of aboAnbieter) {
-    // Monatliche Kosten berechnen
+    // Jährliche Kosten berechnen (alle Intervalle auf Jahr hochrechnen)
     if (abo.erwarteter_betrag) {
-      const divisor: Record<string, number> = { monatlich: 1, quartalsweise: 3, halbjaehrlich: 6, jaehrlich: 12 };
-      aboMonatlicheKosten += Number(abo.erwarteter_betrag) / (divisor[abo.intervall] || 1);
+      const multiplikator: Record<string, number> = { monatlich: 12, quartalsweise: 4, halbjaehrlich: 2, jaehrlich: 1 };
+      aboJaehrlicheKosten += Number(abo.erwarteter_betrag) * (multiplikator[abo.intervall] || 1);
     }
 
     // Überfällige Rechnung (7 Tage Puffer)
@@ -226,7 +226,7 @@ export default async function DashboardPage() {
         letzte={letzte}
         bestellerStats={bestellerStatsMap}
         aboHinweise={aboHinweise}
-        aboMonatlicheKosten={aboMonatlicheKosten}
+        aboJaehrlicheKosten={aboJaehrlicheKosten}
       />
     </div>
   );
