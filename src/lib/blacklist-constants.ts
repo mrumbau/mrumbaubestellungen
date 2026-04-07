@@ -21,13 +21,21 @@ export const IRRELEVANT_DOMAINS = [
 ];
 
 export const VERSAND_DOMAINS = [
-  "dhl.de", "dhl.com",
-  "dpd.de", "dpd.com",
+  // DHL
+  "dhl.de", "dhl.com", "noreply.dhl.com", "mail.dhl.de",
+  // DPD
+  "dpd.de", "dpd.com", "tracking.dpd.de",
+  // Hermes
   "hermes-logistik.de", "hermesworld.com", "myhermes.de",
+  // UPS
   "ups.com",
-  "gls-group.eu", "gls-group.com",
+  // GLS
+  "gls-group.eu", "gls-group.com", "gls-pakete.de", "gls-germany.com",
+  // FedEx
   "fedex.com",
+  // Sonstige Paketdienste
   "trans-o-flex.com",
   "go-express.com",
-  "deutschepost.de",
+  "deutschepost.de", "brief.deutschepost.de",
+  // Amazon: Versand wird über Betreff erkannt, nicht Domain (amazon.de sendet auch Bestellbestätigungen)
 ];

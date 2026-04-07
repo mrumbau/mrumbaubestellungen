@@ -74,7 +74,11 @@
 
   var treffer = pruefeHaendlerListe(HAENDLER_PATTERNS);
   if (treffer) {
-    sendeSignal(treffer.domain, "bekannt", null, 10);
+    // Kurz warten bis DOM vollständig geladen, dann Bestellnummer extrahieren
+    setTimeout(function () {
+      var nr = extractBestellnummer();
+      sendeSignal(treffer.domain, "bekannt", nr, 10);
+    }, 1000);
     return;
   }
 
@@ -111,7 +115,7 @@
       var gelernterTreffer = pruefeHaendlerListe(serverConfig.haendler);
       if (gelernterTreffer) {
         console.log("[MR Umbau] Gelernt erkannt:", gelernterTreffer.domain);
-        sendeSignal(gelernterTreffer.domain, "bekannt", extractBestellnummer(serverConfig), 10);
+        sendeSignal(gelernterTreffer.domain, "bekannt", extractBestellnummer(), 10);
         return;
       }
     }
@@ -125,6 +129,30 @@
 
   function starteStufe2(serverConfig) {
     setTimeout(function () {
+      // ── STUFE 2a: Bestellnummer-Scan (höchste Priorität) ──
+      // Wenn eine Bestellnummer auf der Seite gefunden wird → das IST eine Bestätigungsseite.
+      // Kein URL-Pattern oder Score nötig. Die Bestellnummer ist der Beweis.
+      var bestellnummer = extractBestellnummer();
+      if (bestellnummer) {
+        // Zusätzlich prüfen ob die Seite auch Bestätigungssignale hat
+        // (verhindert False Positives auf Produktseiten die zufällig eine Nummer zeigen)
+        var bodyText = extractCompactText();
+        var bestaetigungsSignale = [
+          "vielen dank", "thank you", "bestellung aufgegeben", "bestellung erhalten",
+          "order confirmed", "order placed", "bestellbestätigung", "auftragsbestätigung",
+          "bestellung erfolgreich", "erfolgreich bestellt", "bestellung wurde",
+          "wir haben ihre bestellung", "your order has been",
+        ];
+        var hatBestaetigung = bestaetigungsSignale.some(function (s) { return bodyText.includes(s); });
+
+        if (hatBestaetigung) {
+          console.log("[MR Umbau] Bestellnummer erkannt:", bestellnummer, "→ Signal senden (Bestätigungsseite)");
+          sendeSignal(rootDomain, "bestellnummer", bestellnummer, 10);
+          return;
+        }
+      }
+
+      // ── STUFE 2b: Score-basierte Erkennung (Fallback) ──
       var score = berechneScore(serverConfig);
 
       var schwelle_sicher = (serverConfig && serverConfig.score_sicher) || SCORE_SICHER;
@@ -134,7 +162,7 @@
 
       if (score >= schwelle_sicher) {
         console.log("[MR Umbau] Lokaler Score:", score, "→ Signal senden");
-        sendeSignal(rootDomain, "lokal_score", extractBestellnummer(serverConfig), score);
+        sendeSignal(rootDomain, "lokal_score", bestellnummer, score);
       } else if (score >= schwelle_vielleicht) {
         console.log("[MR Umbau] Lokaler Score:", score, "→ KI-Bestätigung");
         kiBestaetigung();
@@ -284,21 +312,81 @@
   // ===================================================================
 
   function extractBestellnummer() {
-    var bodyText = extractCompactText();
-
-    var patterns = [
-      /bestellnummer[:\s#]*([A-Z0-9\-]{3,20})/i,
-      /order\s*(?:number|no|nr|#)[:\s#]*([A-Z0-9\-]{3,20})/i,
-      /auftragsnummer[:\s#]*([A-Z0-9\-]{3,20})/i,
-      /ordernummer[:\s#]*([A-Z0-9\-]{3,20})/i,
-      /bestellung\s*#\s*([A-Z0-9\-]{3,20})/i,
-      /#\s*(\d{4,10})\b/,
+    // ── STRATEGIE 1: DOM-Selektoren (strukturierte Daten, höchste Zuverlässigkeit) ──
+    var domSelectors = [
+      "[data-order-id]", "[data-order-number]", "[data-orderid]",
+      "[data-testid='order-number']", "[data-testid='order-id']",
+      "[data-qa='order-number']", "[data-qa='order-id']",
+      ".order-number", ".order-id", ".ordernumber", ".orderNumber",
+      ".confirmation-number", ".confirmation-id",
+      "#order-number", "#ordernumber", "#orderNumber",
+      "[class*='order-confirm'] [class*='number']",
+      "[class*='orderNumber']", "[class*='order-number']",
+      "[class*='bestellnummer']", "[class*='auftragsnummer']",
     ];
 
-    for (var i = 0; i < patterns.length; i++) {
-      var match = bodyText.match(patterns[i]);
-      if (match && match[1]) return match[1];
+    for (var s = 0; s < domSelectors.length; s++) {
+      try {
+        var el = document.querySelector(domSelectors[s]);
+        if (el) {
+          // data-attribute Wert hat Priorität
+          var dataVal = el.getAttribute("data-order-id") || el.getAttribute("data-order-number") || el.getAttribute("data-orderid");
+          if (dataVal && dataVal.length >= 3 && dataVal.length <= 30) return dataVal.trim();
+          // Textinhalt
+          var text = (el.textContent || "").trim();
+          var numMatch = text.match(/([A-Z0-9][\w\-]{2,29})/i);
+          if (numMatch) return numMatch[1];
+        }
+      } catch (e) { /* ungültiger Selektor */ }
     }
+
+    // ── STRATEGIE 2: Seitentext mit Keyword-Kontext (bewährte Regex-Patterns) ──
+    var bodyText = extractCompactText();
+
+    var textPatterns = [
+      // Deutsch
+      /bestellnummer[:\s#]*([A-Z0-9][\w\-]{2,29})/i,
+      /auftragsnummer[:\s#]*([A-Z0-9][\w\-]{2,29})/i,
+      /bestellung[:\s#]+([A-Z0-9][\w\-]{2,29})/i,
+      /ihre bestellung\s+#?\s*([A-Z0-9][\w\-]{2,29})/i,
+      /auftrags?[:\s#]+([A-Z0-9][\w\-]{2,29})/i,
+      // Englisch
+      /order\s*(?:number|no|nr|#|id)[:\s#]*([A-Z0-9][\w\-]{2,29})/i,
+      /order\s*:\s*#?\s*([A-Z0-9][\w\-]{2,29})/i,
+      /confirmation\s*(?:number|#|id)[:\s#]*([A-Z0-9][\w\-]{2,29})/i,
+      // Amazon-spezifisch (Format: 303-1234567-1234567)
+      /(\d{3}-\d{7}-\d{7})/,
+    ];
+
+    for (var i = 0; i < textPatterns.length; i++) {
+      var match = bodyText.match(textPatterns[i]);
+      if (match && match[1] && match[1].length >= 3) return match[1];
+    }
+
+    // ── STRATEGIE 3: URL-Parameter (manche Shops haben Order-ID in URL) ──
+    var urlParams = new URLSearchParams(window.location.search);
+    var urlKeys = ["order_id", "orderid", "orderId", "order_number", "bestellnummer", "order", "confirmation"];
+    for (var u = 0; u < urlKeys.length; u++) {
+      var val = urlParams.get(urlKeys[u]);
+      if (val && val.length >= 3 && val.length <= 30) return val;
+    }
+
+    // ── STRATEGIE 4: HTML data-Attribute im Body (JSON-LD, Microdata) ──
+    try {
+      var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (var j = 0; j < jsonLdScripts.length; j++) {
+        var jsonText = jsonLdScripts[j].textContent;
+        if (jsonText && jsonText.includes("orderNumber")) {
+          var parsed = JSON.parse(jsonText);
+          if (parsed.orderNumber) return String(parsed.orderNumber);
+          if (parsed["@graph"]) {
+            for (var g = 0; g < parsed["@graph"].length; g++) {
+              if (parsed["@graph"][g].orderNumber) return String(parsed["@graph"][g].orderNumber);
+            }
+          }
+        }
+      }
+    } catch (e) { /* JSON-Parse fehlgeschlagen */ }
 
     return null;
   }

@@ -539,33 +539,65 @@ export async function POST(request: NextRequest) {
 
     const emailZeit = new Date(email_datum || Date.now()).getTime();
 
-    // STUFE 1: Chrome Extension Signal ±4h (vereinheitlicht, sortiert nach Confidence)
-    // Signale sind reine Zuordnungs-Hinweise — sie erstellen keine Bestellungen mehr
-    const { data: signale } = await supabase
-      .from("bestellung_signale")
-      .select("*")
-      .eq("haendler_domain", haendlerDomain)
-      .eq("status", "pending")
-      .gte("zeitstempel", new Date(emailZeit - 4 * 60 * 60 * 1000).toISOString())
-      .lte("zeitstempel", new Date(emailZeit + 4 * 60 * 60 * 1000).toISOString())
-      .order("confidence", { ascending: false })
-      .order("zeitstempel", { ascending: false })
-      .limit(1);
+    // STUFE 0: Bestellnummer-Match (höchste Zuverlässigkeit, 100% Match)
+    // Extension hat die Bestellnummer von der Bestätigungsseite extrahiert.
+    // Bestellnummer aus Betreff/Body extrahieren für schnellen Match (GPT-Analyse kommt erst später)
+    const betreffNrMatch = (email_betreff || "").match(/(?:bestellnummer|bestellung|order|auftrag|auftrags-?nr)[:\s#]*([A-Z0-9][\w\-]{2,29})/i)
+      || (email_betreff || "").match(/(\d{3}-\d{7}-\d{7})/); // Amazon-Format
+    const schnellBestellnummer = betreffNrMatch?.[1] || null;
 
-    let signal = signale?.[0] || null;
-    if (signal) {
-      // Atomar claimen: status → matched (verhindert Race Conditions)
-      const { data: claimed } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let signal: any = null;
+    if (schnellBestellnummer) {
+      const { data: signalByNr } = await supabase
         .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signal.id)
+        .select("*")
+        .eq("order_nummer", schnellBestellnummer)
         .eq("status", "pending")
-        .select("id");
-      if (claimed && claimed.length > 0) {
-        bestellerKuerzel = signal.kuerzel;
-        zuordnungsMethode = "signal_4h";
-      } else {
-        signal = null;
+        .order("zeitstempel", { ascending: false })
+        .limit(1);
+
+      if (signalByNr?.[0]) {
+        const { data: claimed } = await supabase
+          .from("bestellung_signale")
+          .update({ status: "matched", verarbeitet: true })
+          .eq("id", signalByNr[0].id)
+          .eq("status", "pending")
+          .select("id");
+        if (claimed && claimed.length > 0) {
+          signal = signalByNr[0];
+          bestellerKuerzel = signal.kuerzel;
+          zuordnungsMethode = "bestellnummer_match";
+          logInfo("webhook/email", `Besteller per Bestellnummer zugeordnet: ${signal.kuerzel}`, { bestellnummer: schnellBestellnummer });
+        }
+      }
+    }
+
+    // STUFE 1: Chrome Extension Signal ±4h (Fallback wenn kein Bestellnummer-Match)
+    if (!bestellerKuerzel) {
+      const { data: signale } = await supabase
+        .from("bestellung_signale")
+        .select("*")
+        .eq("haendler_domain", haendlerDomain)
+        .eq("status", "pending")
+        .gte("zeitstempel", new Date(emailZeit - 4 * 60 * 60 * 1000).toISOString())
+        .lte("zeitstempel", new Date(emailZeit + 4 * 60 * 60 * 1000).toISOString())
+        .order("confidence", { ascending: false })
+        .order("zeitstempel", { ascending: false })
+        .limit(1);
+
+      if (signale?.[0]) {
+        const { data: claimed } = await supabase
+          .from("bestellung_signale")
+          .update({ status: "matched", verarbeitet: true })
+          .eq("id", signale[0].id)
+          .eq("status", "pending")
+          .select("id");
+        if (claimed && claimed.length > 0) {
+          signal = signale[0];
+          bestellerKuerzel = signal.kuerzel;
+          zuordnungsMethode = "signal_4h";
+        }
       }
     }
 
@@ -626,7 +658,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Besteller-Name holen
-    const { data: benutzer } = await supabase
+    let { data: benutzer } = await supabase
       .from("benutzer_rollen")
       .select("name")
       .eq("kuerzel", bestellerKuerzel)
@@ -639,6 +671,35 @@ export async function POST(request: NextRequest) {
     let bestellungNeuErstellt = false;
 
     const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
+
+    // STUFE 0 Nachlauf: Wenn Betreff-Extraktion kein Signal fand, GPT-Bestellnummer versuchen
+    if (!signal && bestellerKuerzel === "UNBEKANNT" && erkannteBestellnummer && erkannteBestellnummer !== schnellBestellnummer) {
+      const { data: signalByGpt } = await supabase
+        .from("bestellung_signale")
+        .select("*")
+        .eq("order_nummer", erkannteBestellnummer)
+        .eq("status", "pending")
+        .limit(1);
+
+      if (signalByGpt?.[0]) {
+        const { data: claimed } = await supabase
+          .from("bestellung_signale")
+          .update({ status: "matched", verarbeitet: true })
+          .eq("id", signalByGpt[0].id)
+          .eq("status", "pending")
+          .select("id");
+        if (claimed && claimed.length > 0) {
+          signal = signalByGpt[0];
+          bestellerKuerzel = signal.kuerzel;
+          zuordnungsMethode = "bestellnummer_match_gpt";
+          logInfo("webhook/email", `Besteller per GPT-Bestellnummer zugeordnet: ${signal.kuerzel}`, { bestellnummer: erkannteBestellnummer });
+          // Name neu laden da bestellerKuerzel geändert wurde
+          const { data: nachlaufBenutzer } = await supabase
+            .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzel).maybeSingle();
+          if (nachlaufBenutzer) benutzer = nachlaufBenutzer;
+        }
+      }
+    }
 
     // 1. Suche per Bestellnummer (mit Händler-Filter um Kollisionen zu vermeiden)
     let existierendeBestellung: { id: string; hat_bestellbestaetigung?: boolean; hat_lieferschein?: boolean; hat_rechnung?: boolean; hat_aufmass?: boolean; hat_leistungsnachweis?: boolean; hat_versandbestaetigung?: boolean } | null = null;

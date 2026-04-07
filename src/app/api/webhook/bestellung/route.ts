@@ -50,23 +50,38 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Duplikat-Check VOR Insert: gleicher Besteller + gleicher Händler innerhalb 5 Minuten?
+    // Duplikat-Check: gleicher Besteller + gleicher Händler innerhalb 5 Minuten?
+    // ABER: Wenn das neue Signal eine Bestellnummer hat und das alte nicht → altes upgraden
     const { data: recentSignals } = await supabase
       .from("bestellung_signale")
-      .select("id")
+      .select("id, order_nummer")
       .eq("kuerzel", kuerzel)
       .eq("haendler_domain", haendler_domain)
       .gte("zeitstempel", new Date(Date.now() - 5 * 60 * 1000).toISOString())
       .limit(1);
 
     if (recentSignals && recentSignals.length > 0) {
-      return NextResponse.json({ success: true, signal_id: recentSignals[0].id, deduplicated: true });
+      const existing = recentSignals[0];
+      const newOrderNr = bestellnummer && typeof bestellnummer === "string" && bestellnummer.length >= 3 ? bestellnummer.trim() : null;
+
+      if (newOrderNr && !existing.order_nummer) {
+        // Bestehendes Signal upgraden mit der Bestellnummer
+        await supabase.from("bestellung_signale")
+          .update({ order_nummer: newOrderNr, confidence: 1.0 })
+          .eq("id", existing.id);
+        return NextResponse.json({ success: true, signal_id: existing.id, upgraded: true });
+      }
+      return NextResponse.json({ success: true, signal_id: existing.id, deduplicated: true });
     }
 
     // Signal speichern (reaktiv — kein "erwartet"-Eintrag in bestellungen)
     // Das Signal wird erst bei Email-Eingang konsumiert um den Besteller zuzuordnen
     const urlPath = seiten_url ? (() => { try { return new URL(seiten_url).pathname; } catch { return null; } })() : null;
     const confidence = body.confidence != null ? Math.min(1.0, Math.max(0.0, Number(body.confidence))) : 0.5;
+
+    // order_nummer: Von Extension extrahierte Bestellnummer (höchste Zuordnungs-Priorität)
+    const orderNummer = bestellnummer && typeof bestellnummer === "string" && bestellnummer.length >= 3 && bestellnummer.length <= 30
+      ? bestellnummer.trim() : null;
 
     const { data, error } = await supabase
       .from("bestellung_signale")
@@ -78,6 +93,7 @@ export async function POST(request: NextRequest) {
         page_title: body.page_title || null,
         confidence,
         status: "pending",
+        order_nummer: orderNummer,
       })
       .select()
       .single();
