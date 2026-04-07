@@ -50,6 +50,26 @@
   }
 
   // ===================================================================
+  // STUFE 0: API-Interceptor Listener
+  // Die Injection in MAIN world passiert über interceptor-inject.js (document_start).
+  // Hier empfangen wir nur die Ergebnisse via postMessage.
+  // ===================================================================
+
+  var interceptorOrderNumber = null;
+
+  window.addEventListener("message", function (event) {
+    if (event.source !== window) return;
+    if (!event.data || event.data.type !== "MR_UMBAU_ORDER") return;
+
+    var orderNumber = event.data.orderNumber;
+    if (!orderNumber || interceptorOrderNumber) return;
+    interceptorOrderNumber = orderNumber;
+
+    console.log("[MR Umbau] Bestellnummer aus API-Response:", orderNumber, "(via " + event.data.source + ")");
+    sendeSignal(rootDomain, "api_intercept", orderNumber, 10);
+  });
+
+  // ===================================================================
   // STUFE 1: Hardcoded Händler (sofort, ohne async)
   // ===================================================================
 
@@ -72,10 +92,16 @@
     });
   }
 
+  // Hilfsfunktion: Nur senden wenn Interceptor nicht schon was gefunden hat
+  function sollSignalSenden() {
+    return !interceptorOrderNumber;
+  }
+
   var treffer = pruefeHaendlerListe(HAENDLER_PATTERNS);
   if (treffer) {
     // Kurz warten bis DOM vollständig geladen, dann Bestellnummer extrahieren
     setTimeout(function () {
+      if (!sollSignalSenden()) return; // Interceptor hat schon gesendet
       var nr = extractBestellnummer();
       sendeSignal(treffer.domain, "bekannt", nr, 10);
     }, 1000);
@@ -114,6 +140,7 @@
 
       var gelernterTreffer = pruefeHaendlerListe(serverConfig.haendler);
       if (gelernterTreffer) {
+        if (!sollSignalSenden()) return; // Interceptor hat schon gesendet
         console.log("[MR Umbau] Gelernt erkannt:", gelernterTreffer.domain);
         sendeSignal(gelernterTreffer.domain, "bekannt", extractBestellnummer(), 10);
         return;
@@ -129,6 +156,8 @@
 
   function starteStufe2(serverConfig) {
     setTimeout(function () {
+      if (!sollSignalSenden()) return; // Interceptor hat schon gesendet
+
       // ── STUFE 2a: Bestellnummer-Scan (höchste Priorität) ──
       // Wenn eine Bestellnummer auf der Seite gefunden wird → das IST eine Bestätigungsseite.
       // Kein URL-Pattern oder Score nötig. Die Bestellnummer ist der Beweis.

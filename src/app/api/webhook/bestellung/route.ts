@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
         confidence,
         status: "pending",
         order_nummer: orderNummer,
+        erkennung: erkennung || null,
       })
       .select()
       .single();
