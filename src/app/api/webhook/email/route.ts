@@ -489,7 +489,9 @@ export async function POST(request: NextRequest) {
     // PayPal-Emails werden normal verarbeitet, GPT erkennt den Händler aus dem Zahlungstext
 
     const haendlerDomain = haendler?.domain || absenderDomain;
-    let haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
+    // Plancraft ist kein Händler/SU — es ist nur ein Tool. Nie als Name verwenden.
+    const istPlancraftDomain = absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com";
+    let haendlerName = haendler?.name || vorfilterHaendlerName || (istPlancraftDomain ? "" : absenderDomain);
 
     // =====================================================================
     // ANHÄNGE PARALLEL ANALYSIEREN (GPT-4o) — max 3 gleichzeitig
@@ -1115,6 +1117,13 @@ export async function POST(request: NextRequest) {
               }
             }
 
+            // Händlername aus Body-Analyse übernehmen wenn noch fehlend oder nur Domain
+            if (bodyAnalyse.haendler && (!haendlerName || haendlerName === absenderDomain || haendlerName === "")) {
+              bodyUpdate.haendler_name = bodyAnalyse.haendler;
+              haendlerName = bodyAnalyse.haendler;
+              logInfo("webhook/email", `Händlername aus Body-Analyse übernommen: ${bodyAnalyse.haendler}`);
+            }
+
             await supabase.from("bestellungen").update(bodyUpdate).eq("id", bestellungId);
             dokumenteGespeichert++;
             gespeicherteTypen.push(bodyAnalyse.typ);
@@ -1143,6 +1152,10 @@ export async function POST(request: NextRequest) {
                   if (!bodyAnalyse.gesamtbetrag && !!bodyAnalyse.netto) ergaenzung.betrag_ist_netto = true;
                 }
               }
+            }
+            // Händlername ergänzen wenn noch fehlend
+            if (bodyAnalyse.haendler && (!haendlerName || haendlerName === absenderDomain || haendlerName === "")) {
+              ergaenzung.haendler_name = bodyAnalyse.haendler;
             }
             if (Object.keys(ergaenzung).length > 0) {
               await supabase.from("bestellungen").update(ergaenzung).eq("id", bestellungId);
