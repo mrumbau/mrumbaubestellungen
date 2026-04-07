@@ -30,8 +30,6 @@ export async function GET() {
     const lsFehlt = alle.filter((b) => b.status === "ls_fehlt").length;
     const freigegeben = alle.filter((b) => b.status === "freigegeben").length;
     const vollstaendig = alle.filter((b) => b.status === "vollstaendig").length;
-    const erwartet = alle.filter((b) => b.status === "erwartet").length;
-
     const freigegebenesVolumen = alle
       .filter((b) => b.status === "freigegeben" && b.betrag)
       .reduce((sum, b) => sum + Number(b.betrag), 0);
@@ -94,7 +92,6 @@ export async function GET() {
       ls_fehlt: lsFehlt,
       freigegeben,
       vollstaendig,
-      erwartet,
       freigegebenes_volumen: freigegebenesVolumen,
       ueberfaellige_rechnungen: ueberfaelligeRechnungen,
       abweichende_bestellungen: abweichendeMitDetails,

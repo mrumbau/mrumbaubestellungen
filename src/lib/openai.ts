@@ -487,7 +487,6 @@ export async function generiereWochenzusammenfassung(
     ls_fehlt: number;
     freigegeben: number;
     vollstaendig: number;
-    erwartet: number;
     freigegebenes_volumen: number;
     ueberfaellige_rechnungen: { bestellnummer: string; haendler: string; faellig: string; betrag: number }[];
     abweichende_bestellungen: { bestellnummer: string; haendler: string; problem: string }[];
@@ -519,7 +518,6 @@ Gib NUR ein JSON-Objekt zurück:
 - LS fehlt: ${stats.ls_fehlt}
 - Freigegeben: ${stats.freigegeben}
 - Vollständig (bereit zur Freigabe): ${stats.vollstaendig}
-- Erwartet: ${stats.erwartet}
 - Freigegebenes Volumen: ${stats.freigegebenes_volumen.toFixed(2)}€
 
 Überfällige Rechnungen:

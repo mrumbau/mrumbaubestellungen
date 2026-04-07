@@ -63,13 +63,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, signal_id: recentSignals[0].id, deduplicated: true });
     }
 
-    // Signal speichern
+    // Signal speichern (reaktiv — kein "erwartet"-Eintrag in bestellungen)
+    // Das Signal wird erst bei Email-Eingang konsumiert um den Besteller zuzuordnen
+    const urlPath = seiten_url ? (() => { try { return new URL(seiten_url).pathname; } catch { return null; } })() : null;
+    const confidence = body.confidence != null ? Math.min(1.0, Math.max(0.0, Number(body.confidence))) : 0.5;
+
     const { data, error } = await supabase
       .from("bestellung_signale")
       .insert({
         kuerzel,
         haendler_domain,
         zeitstempel: zeitstempel || new Date().toISOString(),
+        url_path: urlPath,
+        page_title: body.page_title || null,
+        confidence,
+        status: "pending",
       })
       .select()
       .single();
@@ -79,30 +87,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Interner Serverfehler" }, { status: 500 });
     }
 
-    // Besteller-Name aus benutzer_rollen holen
-    const { data: benutzer } = await supabase
-      .from("benutzer_rollen")
-      .select("name")
-      .eq("kuerzel", kuerzel)
-      .single();
-
-    // Händler-Name aus haendler-Tabelle holen
+    // Händler-Name aus haendler-Tabelle holen (für URL-Pattern-Learning)
     const { data: haendler } = await supabase
       .from("haendler")
       .select("id, name")
       .eq("domain", haendler_domain)
       .single();
-
-    // Bestellung mit Status "erwartet" anlegen
-    await supabase.from("bestellungen").insert({
-      bestellnummer: bestellnummer || null,
-      haendler_id: haendler?.id || null,
-      haendler_name: haendler?.name || haendler_domain,
-      besteller_kuerzel: kuerzel,
-      besteller_name: benutzer?.name || kuerzel,
-      status: "erwartet",
-      zuordnung_methode: "extension_signal",
-    });
 
     // Bei KI- oder Score-Erkennung: URL-Pattern lernen
     if (erkennung && erkennung !== "bekannt" && seiten_url) {

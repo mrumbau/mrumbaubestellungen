@@ -49,7 +49,6 @@ type ArtFilter = "" | "material" | "subunternehmer" | "abo";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Alle Status" },
-  { value: "erwartet", label: "Erwartet" },
   { value: "offen", label: "Offen" },
   { value: "vollstaendig", label: "Vollständig" },
   { value: "abweichung", label: "Abweichung" },

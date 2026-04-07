@@ -51,12 +51,12 @@ export default async function DashboardPage() {
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung")),
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "ls_fehlt")),
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben")),
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "erwartet")),
+    Promise.resolve({ count: 0 }), // erwartet-Status nicht mehr verwendet (Signale statt Einträge)
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "vollstaendig")),
     eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true })),
     eigene(supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null)),
     eigene(supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5)),
-    eigene(supabase.from("bestellungen").select("*").in("status", ["erwartet", "abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
+    eigene(supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
     createServiceClient().from("bestellungen").select("besteller_kuerzel"),
     supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
     { id: "abweichungen", label: "Abweichungen", value: abweichungen, color: "#dc2626", alert: abweichungen > 0, row: 1 },
     { id: "ls_fehlt", label: "LS fehlt", value: lsFehlt, color: "#d97706", row: 1 },
     { id: "freigegeben", label: "Freigegeben", value: freigegeben, color: "#059669", row: 1 },
-    { id: "erwartet", label: "Erwartet", value: erwartet, color: "#8b8b8b", row: 2 },
+    // "erwartet" nicht mehr angezeigt — Extension-Signale erstellen keine Einträge mehr
     { id: "vollstaendig", label: "Vollständig", value: vollstaendig, color: "#16a34a", row: 2 },
     { id: "gesamt", label: "Gesamt", value: gesamtAnzahl, color: "#570006", row: 2 },
     { id: "aktive_projekte", label: "Aktive Projekte", value: (aktiveProjekte || []).length, color: "#7c3aed", row: 2 },

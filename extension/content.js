@@ -74,7 +74,7 @@
 
   var treffer = pruefeHaendlerListe(HAENDLER_PATTERNS);
   if (treffer) {
-    sendeSignal(treffer.domain, "bekannt", null);
+    sendeSignal(treffer.domain, "bekannt", null, 10);
     return;
   }
 
@@ -111,7 +111,7 @@
       var gelernterTreffer = pruefeHaendlerListe(serverConfig.haendler);
       if (gelernterTreffer) {
         console.log("[MR Umbau] Gelernt erkannt:", gelernterTreffer.domain);
-        sendeSignal(gelernterTreffer.domain, "bekannt", extractBestellnummer(serverConfig));
+        sendeSignal(gelernterTreffer.domain, "bekannt", extractBestellnummer(serverConfig), 10);
         return;
       }
     }
@@ -134,7 +134,7 @@
 
       if (score >= schwelle_sicher) {
         console.log("[MR Umbau] Lokaler Score:", score, "→ Signal senden");
-        sendeSignal(rootDomain, "lokal_score", extractBestellnummer(serverConfig));
+        sendeSignal(rootDomain, "lokal_score", extractBestellnummer(serverConfig), score);
       } else if (score >= schwelle_vielleicht) {
         console.log("[MR Umbau] Lokaler Score:", score, "→ KI-Bestätigung");
         kiBestaetigung();
@@ -338,7 +338,7 @@
 
           var domain = (typeof data.haendler_domain === "string" && data.haendler_domain) || rootDomain;
           var bestellnummer = (typeof data.bestellnummer === "string") ? data.bestellnummer : null;
-          sendeSignal(domain, "ki", bestellnummer);
+          sendeSignal(domain, "ki", bestellnummer, 8);
           console.log(
             "[MR Umbau] KI bestätigt:", domain,
             "Konfidenz:", data.konfidenz
@@ -358,13 +358,16 @@
   // Signal senden (mit Timeout + Retry-Queue bei Fehler)
   // ===================================================================
 
-  function sendeSignal(domain, quelle, bestellnummer) {
+  function sendeSignal(domain, quelle, bestellnummer, score) {
     chrome.storage.sync.get(["kuerzel"], function (result) {
       var kuerzel = result.kuerzel;
       if (!kuerzel) {
         console.warn("[MR Umbau] Kein Kürzel konfiguriert.");
         return;
       }
+
+      // Confidence: Score normalisiert auf 0.0-1.0 (10+ = 1.0)
+      var confidence = score != null ? Math.min(1.0, Math.max(0.0, score / 10)) : 0.5;
 
       var payload = {
         kuerzel: kuerzel,
@@ -373,6 +376,8 @@
         secret: EXTENSION_SECRET,
         erkennung: quelle,
         seiten_url: fullUrl,
+        page_title: document.title.slice(0, 200),
+        confidence: confidence,
       };
 
       if (bestellnummer) {

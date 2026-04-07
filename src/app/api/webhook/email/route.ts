@@ -210,31 +210,38 @@ export async function POST(request: NextRequest) {
     }
 
     // =====================================================================
-    // AUTO-BEREINIGUNG: "erwartet"-Einträge ohne Dokumente nach 24h löschen
+    // AUTO-BEREINIGUNG: Versand-only Einträge + abgelaufene Signale
     // Läuft gelegentlich (~10% der Requests) um DB sauber zu halten
     // =====================================================================
+    // Gelegentliche Bereinigung (~10% der Requests)
     if (Math.random() < 0.1) {
-      const vierundzwanzigStundenZurueck = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      // Nur Material-Bestellungen bereinigen — SU/Abo "erwartet"-Einträge
-      // haben andere Dokument-Anforderungen und werden nicht per Extension erstellt
-      const { data: abgelaufen } = await supabase
+      // 1. Versand-only Einträge nach 48h löschen
+      const achtundvierzigStundenZurueck = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const { data: versandOnly } = await supabase
         .from("bestellungen")
         .select("id")
-        .eq("status", "erwartet")
-        .in("bestellungsart", ["material"])
+        .eq("hat_versandbestaetigung", true)
         .eq("hat_bestellbestaetigung", false)
-        .eq("hat_lieferschein", false)
         .eq("hat_rechnung", false)
-        .eq("hat_versandbestaetigung", false)
-        .lt("created_at", vierundzwanzigStundenZurueck)
+        .eq("hat_lieferschein", false)
+        .in("status", ["offen"])
+        .lt("created_at", achtundvierzigStundenZurueck)
         .limit(20);
 
-      if (abgelaufen && abgelaufen.length > 0) {
-        const ids = abgelaufen.map(b => b.id);
-        await supabase.from("dokumente").delete().in("bestellung_id", ids);
-        await supabase.from("bestellungen").delete().in("id", ids);
-        logInfo("webhook/email", `Auto-Bereinigung: ${ids.length} abgelaufene erwartet-Einträge gelöscht`);
+      if (versandOnly && versandOnly.length > 0) {
+        const vIds = versandOnly.map(b => b.id);
+        await supabase.from("webhook_logs").delete().in("bestellung_id", vIds);
+        await supabase.from("kommentare").delete().in("bestellung_id", vIds);
+        await supabase.from("dokumente").delete().in("bestellung_id", vIds);
+        await supabase.from("bestellungen").delete().in("id", vIds);
+        logInfo("webhook/email", `Auto-Bereinigung: ${vIds.length} versand-only Einträge gelöscht`);
       }
+
+      // 2. Abgelaufene Signale als expired markieren (48h ohne Match)
+      await supabase.from("bestellung_signale")
+        .update({ status: "expired" })
+        .eq("status", "pending")
+        .lt("zeitstempel", achtundvierzigStundenZurueck);
     }
 
     // =====================================================================
@@ -331,6 +338,7 @@ export async function POST(request: NextRequest) {
       "aktualisierung der voraussichtlichen lieferung",
       "paket wurde", "sendung verfolgen",
       "wurde versendet", "ist unterwegs", "out for delivery",
+      "zustellung heute", "wird zugestellt", "paket wird zugestellt",
     ];
     // Bestellbestätigung-Keywords als Gegenprüfung — wenn der Betreff auch auf eine Bestellung hindeutet, NICHT als Versand behandeln
     const bestellBetreffKeywords = [
@@ -531,61 +539,33 @@ export async function POST(request: NextRequest) {
 
     const emailZeit = new Date(email_datum || Date.now()).getTime();
 
-    // STUFE 1: Chrome Extension Signal ±60 min
-    // Atomar claimen: Signal sofort als verarbeitet markieren um Race Conditions zu vermeiden
-    const { data: signale60 } = await supabase
+    // STUFE 1: Chrome Extension Signal ±4h (vereinheitlicht, sortiert nach Confidence)
+    // Signale sind reine Zuordnungs-Hinweise — sie erstellen keine Bestellungen mehr
+    const { data: signale } = await supabase
       .from("bestellung_signale")
       .select("*")
       .eq("haendler_domain", haendlerDomain)
-      .eq("verarbeitet", false)
-      .gte("zeitstempel", new Date(emailZeit - 60 * 60 * 1000).toISOString())
-      .lte("zeitstempel", new Date(emailZeit + 60 * 60 * 1000).toISOString())
+      .eq("status", "pending")
+      .gte("zeitstempel", new Date(emailZeit - 4 * 60 * 60 * 1000).toISOString())
+      .lte("zeitstempel", new Date(emailZeit + 4 * 60 * 60 * 1000).toISOString())
+      .order("confidence", { ascending: false })
       .order("zeitstempel", { ascending: false })
       .limit(1);
 
-    let signal = signale60?.[0] || null;
+    let signal = signale?.[0] || null;
     if (signal) {
-      // Sofort als verarbeitet markieren (atomar — verhindert dass parallele Requests dasselbe Signal claimen)
+      // Atomar claimen: status → matched (verhindert Race Conditions)
       const { data: claimed } = await supabase
         .from("bestellung_signale")
-        .update({ verarbeitet: true })
+        .update({ status: "matched", verarbeitet: true })
         .eq("id", signal.id)
-        .eq("verarbeitet", false) // Nur wenn noch nicht geclaimed
+        .eq("status", "pending")
         .select("id");
       if (claimed && claimed.length > 0) {
         bestellerKuerzel = signal.kuerzel;
-        zuordnungsMethode = "signal_60min";
+        zuordnungsMethode = "signal_4h";
       } else {
-        // Signal wurde bereits von einem parallelen Request geclaimed
         signal = null;
-      }
-    }
-
-    // STUFE 2: Signal ±24h
-    if (!bestellerKuerzel) {
-      const { data: signale24h } = await supabase
-        .from("bestellung_signale")
-        .select("*")
-        .eq("haendler_domain", haendlerDomain)
-        .eq("verarbeitet", false)
-        .gte("zeitstempel", new Date(emailZeit - 24 * 60 * 60 * 1000).toISOString())
-        .lte("zeitstempel", new Date(emailZeit + 24 * 60 * 60 * 1000).toISOString())
-        .order("zeitstempel", { ascending: false })
-        .limit(1);
-
-      if (signale24h?.[0]) {
-        // Atomar claimen
-        const { data: claimed } = await supabase
-          .from("bestellung_signale")
-          .update({ verarbeitet: true })
-          .eq("id", signale24h[0].id)
-          .eq("verarbeitet", false)
-          .select("id");
-        if (claimed && claimed.length > 0) {
-          signal = signale24h[0];
-          bestellerKuerzel = signal.kuerzel;
-          zuordnungsMethode = "signal_24h";
-        }
       }
     }
 
@@ -725,43 +705,7 @@ export async function POST(request: NextRequest) {
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
     } else {
-      // 2. Suche per Signal (erwartet-Status)
-      let erwartetBestellung: { id: string } | null = null;
-      if (signal) {
-        const matchName = haendler?.name || haendlerDomain;
-        const { data: erwartet } = await supabase
-          .from("bestellungen")
-          .select("id")
-          .eq("besteller_kuerzel", bestellerKuerzel)
-          .eq("status", "erwartet")
-          .in("haendler_name", [matchName, haendlerDomain].filter(Boolean))
-          .order("created_at", { ascending: false })
-          .limit(1);
-        erwartetBestellung = erwartet?.[0] || null;
-
-        if (!erwartetBestellung && haendler?.id) {
-          const { data: erwartetById } = await supabase
-            .from("bestellungen")
-            .select("id")
-            .eq("besteller_kuerzel", bestellerKuerzel)
-            .eq("status", "erwartet")
-            .eq("haendler_id", haendler.id)
-            .order("created_at", { ascending: false })
-            .limit(1);
-          erwartetBestellung = erwartetById?.[0] || null;
-        }
-      }
-
-      if (erwartetBestellung) {
-        bestellungId = erwartetBestellung.id;
-        if (haendler?.name) {
-          await supabase
-            .from("bestellungen")
-            .update({ haendler_name: haendler.name, haendler_id: haendler.id })
-            .eq("id", bestellungId);
-        }
-      } else {
-        // 3. Erweiterte Suche: Gleicher Händler/SU + offene Bestellung die den Dokumenttyp noch nicht hat
+      // 2. Erweiterte Suche: Gleicher Händler/SU + offene Bestellung die den Dokumenttyp noch nicht hat
         // Verhindert Duplikate wenn verschiedene Dokumente derselben Bestellung zeitversetzt ankommen
         // (z.B. Rechnung zuerst, dann Bestellbestätigung/Aufmaß nachträglich)
         let erweiterterMatch: string | null = null;
@@ -891,6 +835,9 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+    if (!bestellungId) {
+      throw new Error("Keine bestellungId gesetzt — weder gefunden noch erstellt");
     }
 
     // =====================================================================
@@ -1401,7 +1348,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Signal wurde bereits oben atomar als verarbeitet markiert (Race-Condition-Schutz)
+    // Signal mit Bestellung verknüpfen
+    if (signal) {
+      await supabase.from("bestellung_signale")
+        .update({ matched_bestellung_id: bestellungId })
+        .eq("id", signal.id);
+    }
 
     // Admin-Hinweis bei UNBEKANNT
     if (bestellerKuerzel === "UNBEKANNT") {

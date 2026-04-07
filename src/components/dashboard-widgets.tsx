@@ -127,7 +127,7 @@ const STAT_DEFS = [
   { id: "abweichungen", label: "Abweichungen" },
   { id: "ls_fehlt", label: "LS fehlt" },
   { id: "freigegeben", label: "Freigegeben" },
-  { id: "erwartet", label: "Erwartet" },
+  // "erwartet" entfernt — Extension-Signale erstellen keine Einträge mehr
   { id: "vollstaendig", label: "Vollständig" },
   { id: "gesamt", label: "Gesamt" },
   { id: "aktive_projekte", label: "Aktive Projekte" },
@@ -384,16 +384,14 @@ function AktionIcon({ status }: { status: string }) {
 function QuickAction({ bestellungId, status, onSuccess }: { bestellungId: string; status: string; onSuccess: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  if (status !== "vollstaendig" && status !== "erwartet") return null;
+  if (status !== "vollstaendig") return null;
 
   async function handleAction(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     setLoading(true);
     try {
-      const endpoint = status === "erwartet"
-        ? `/api/bestellungen/${bestellungId}/verwerfen`
-        : `/api/bestellungen/${bestellungId}/freigeben`;
+      const endpoint = `/api/bestellungen/${bestellungId}/freigeben`;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -402,26 +400,6 @@ function QuickAction({ bestellungId, status, onSuccess }: { bestellungId: string
     } finally {
       setLoading(false);
     }
-  }
-
-  if (status === "erwartet") {
-    return (
-      <button
-        onClick={handleAction}
-        disabled={loading}
-        className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#9a9a9a] bg-[#f5f4f2] border border-[#e8e6e3] rounded-md hover:text-red-600 hover:bg-red-50 hover:border-red-200 disabled:opacity-50 transition-colors shrink-0"
-        title="Erwartete Bestellung verwerfen (keine Bestellung aufgegeben)"
-      >
-        {loading ? (
-          <div className="spinner w-3 h-3" />
-        ) : (
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        )}
-        Verwerfen
-      </button>
-    );
   }
 
   return (

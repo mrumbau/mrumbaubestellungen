@@ -3,10 +3,9 @@ import { createServiceClient } from "@/lib/supabase";
 import { logError } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
 
-// POST /api/cron/cleanup – Täglicher Job: Verwaiste "erwartet"-Bestellungen aufräumen
-// Bestellungen mit Status "erwartet" die nach 48h kein einziges Dokument erhalten haben,
-// werden automatisch gelöscht. Das passiert z.B. wenn die Extension ein Signal sendet,
-// aber keine Bestellung tatsächlich aufgegeben wurde.
+// POST /api/cron/cleanup – Täglicher Job:
+// 1. Abgelaufene Extension-Signale als "expired" markieren (48h ohne Match)
+// 2. Versand-only Bestellungen löschen (48h ohne weitere Dokumente)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -19,88 +18,48 @@ export async function POST(request: NextRequest) {
     const stunden = body.stunden || 48;
     const schwelleDatum = new Date(Date.now() - stunden * 60 * 60 * 1000).toISOString();
 
-    // Finde "erwartet"-Bestellungen die älter als 48h sind
-    const { data: verwaiste } = await supabase
+    // 1. Abgelaufene Signale als "expired" markieren
+    const { data: abgelaufeneSignale } = await supabase
+      .from("bestellung_signale")
+      .update({ status: "expired" })
+      .eq("status", "pending")
+      .lt("zeitstempel", schwelleDatum)
+      .select("id");
+
+    const signaleExpired = abgelaufeneSignale?.length || 0;
+
+    // 2. Versand-only Bestellungen löschen (nur Versand, keine anderen Dokumente)
+    const { data: versandOnly } = await supabase
       .from("bestellungen")
-      .select("id, bestellnummer, haendler_name, besteller_kuerzel, created_at, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis")
-      .eq("status", "erwartet")
+      .select("id, bestellnummer, haendler_name")
+      .eq("hat_versandbestaetigung", true)
+      .eq("hat_bestellbestaetigung", false)
+      .eq("hat_rechnung", false)
+      .eq("hat_lieferschein", false)
+      .in("status", ["offen"])
       .lt("created_at", schwelleDatum);
 
-    if (!verwaiste || verwaiste.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: "Keine verwaisten Bestellungen gefunden.",
-        geloescht: 0,
-      });
-    }
-
-    // Nur Bestellungen löschen die KEIN Dokument haben
-    const zuLoeschen = verwaiste.filter(
-      (b) => !b.hat_bestellbestaetigung && !b.hat_lieferschein && !b.hat_rechnung && !b.hat_aufmass && !b.hat_leistungsnachweis
-    );
-
-    if (zuLoeschen.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: "Alle erwartet-Bestellungen haben bereits Dokumente.",
-        geloescht: 0,
-      });
-    }
-
-    const ids = zuLoeschen.map((b) => b.id);
-
-    // Zugehörige Signale als verarbeitet markieren
-    // (Signale löschen wir nicht, nur die Bestellungen)
-
-    // Storage-Dateien löschen (bevor DB-Records entfernt werden)
-    const { data: dokumente } = await supabase
-      .from("dokumente")
-      .select("storage_pfad")
-      .in("bestellung_id", ids);
-
-    if (dokumente && dokumente.length > 0) {
-      const pfade = dokumente.map((d) => d.storage_pfad).filter(Boolean);
-      if (pfade.length > 0) {
-        await supabase.storage.from("dokumente").remove(pfade);
-      }
-    }
-
-    // Dokumente löschen
-    await supabase.from("dokumente").delete().in("bestellung_id", ids);
-
-    // Abgleiche löschen
-    await supabase.from("abgleiche").delete().in("bestellung_id", ids);
-
-    // Kommentare löschen
-    await supabase.from("kommentare").delete().in("bestellung_id", ids);
-
-    // Bestellungen löschen
-    const { error: deleteError } = await supabase
-      .from("bestellungen")
-      .delete()
-      .in("id", ids);
-
-    if (deleteError) {
-      logError("/api/cron/cleanup", "Löschen fehlgeschlagen", deleteError);
-      return NextResponse.json({ error: "Löschen fehlgeschlagen" }, { status: 500 });
+    let versandGeloescht = 0;
+    if (versandOnly && versandOnly.length > 0) {
+      const ids = versandOnly.map((b) => b.id);
+      await supabase.from("webhook_logs").delete().in("bestellung_id", ids);
+      await supabase.from("kommentare").delete().in("bestellung_id", ids);
+      await supabase.from("dokumente").delete().in("bestellung_id", ids);
+      await supabase.from("bestellungen").delete().in("id", ids);
+      versandGeloescht = ids.length;
     }
 
     // Log
-    const details = zuLoeschen.map(
-      (b) => `${b.bestellnummer || "Ohne Nr."} (${b.haendler_name || "?"}, ${b.besteller_kuerzel})`
-    );
-
     await supabase.from("webhook_logs").insert({
       typ: "cron",
       status: "success",
-      fehler_text: `Cleanup: ${zuLoeschen.length} verwaiste Bestellung(en) gelöscht: ${details.join(", ")}`,
+      fehler_text: `Cleanup: ${signaleExpired} Signale expired, ${versandGeloescht} Versand-only gelöscht`,
     });
 
     return NextResponse.json({
       success: true,
-      message: `${zuLoeschen.length} verwaiste Bestellung(en) gelöscht.`,
-      geloescht: zuLoeschen.length,
-      details,
+      signale_expired: signaleExpired,
+      versand_geloescht: versandGeloescht,
     });
   } catch (err) {
     logError("/api/cron/cleanup", "Unerwarteter Fehler", err);
