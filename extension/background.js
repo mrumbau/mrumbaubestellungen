@@ -187,7 +187,10 @@ function isConfirmationUrl(url) {
   if (!url) return false;
   try {
     var path = new URL(url).pathname.toLowerCase();
-    return CONFIRMATION_URL_PATTERNS.some(function(p) { return path.includes(p); });
+    return CONFIRMATION_URL_PATTERNS.some(function(p) {
+      // Segment-aware Match: Pattern muss als vollständiger Pfad-Teil vorkommen
+      return path === p || path.startsWith(p + "/") || path.startsWith(p + "?") || path.startsWith(p + "#");
+    });
   } catch(e) { return false; }
 }
 
@@ -250,12 +253,25 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
     if (!urlObj.protocol.startsWith("http")) return;
   } catch(e) { return; }
 
-  // Prüfen ob der Content-Script Interceptor schon aktiv ist
-  // (content.js setzt ein Flag via postMessage wenn inline-Injection erfolgreich war)
-  chrome.tabs.sendMessage(details.tabId, { type: "interceptor_check" }, function(response) {
-    if (chrome.runtime.lastError || (response && response.active)) return;
+  // Ignorierte Domains nicht injizieren (Bug 4 Fix)
+  try {
+    var checkHost = new URL(details.url).hostname;
+    var IGNORED = ["google.com", "google.de", "youtube.com", "facebook.com", "instagram.com",
+      "twitter.com", "x.com", "linkedin.com", "reddit.com", "wikipedia.org",
+      "github.com", "stackoverflow.com", "localhost", "127.0.0.1",
+      "mrumbau.de", "cloud.mrumbau.de", "supabase.co", "vercel.app",
+      "outlook.office.com", "mail.google.com", "web.whatsapp.com"];
+    var isIgnoredDomain = IGNORED.some(function(d) { return checkHost === d || checkHost.endsWith("." + d); });
+    if (isIgnoredDomain) return;
+  } catch(e) { return; }
 
-    // Inline-Injection hat nicht funktioniert → chrome.scripting als Fallback
+  // Prüfen ob der Content-Script Interceptor schon aktiv ist
+  chrome.tabs.sendMessage(details.tabId, { type: "interceptor_check" }, function(response) {
+    // Nur skippen wenn content.js explizit sagt "interceptor ist aktiv"
+    // lastError (kein Listener) = content.js noch nicht geladen → Fallback trotzdem versuchen
+    if (response && response.active) return;
+    if (chrome.runtime.lastError) { /* content.js nicht bereit — trotzdem injizieren */ }
+
     chrome.scripting.executeScript({
       target: { tabId: details.tabId },
       world: "MAIN",
@@ -263,7 +279,7 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
     }).then(function() {
       console.log("[MR Umbau] Interceptor via chrome.scripting injiziert (CSP-Fallback), Tab:", details.tabId);
     }).catch(function() {
-      // Auch chrome.scripting fehlgeschlagen → DOM-Scan greift als letzter Fallback
+      // chrome.scripting fehlgeschlagen → DOM-Scan greift als letzter Fallback
     });
   });
 });
@@ -273,6 +289,20 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
 // ===================================================================
 
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  // Interceptor-Status Check (CSP-sicher via chrome.scripting)
+  if (message.type === "check_interceptor_status" && sender.tab) {
+    chrome.scripting.executeScript({
+      target: { tabId: sender.tab.id },
+      world: "MAIN",
+      func: function() { return typeof window.__mrUmbauInterceptor !== "undefined"; },
+    }).then(function(results) {
+      sendResponse({ active: results && results[0] && results[0].result === true });
+    }).catch(function() {
+      sendResponse({ active: false });
+    });
+    return true; // async response
+  }
+
   // Badge bei erkannter Bestellung
   if (message.type === "bestellung_erkannt") {
     var badgeColor = BADGE_COLORS[message.quelle] || "#570006";

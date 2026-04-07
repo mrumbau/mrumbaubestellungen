@@ -58,22 +58,12 @@
   var interceptorOrderNumber = null;
   var interceptorInjected = false;
 
-  // Prüfe ob inline-Injection geklappt hat (interceptor.js setzt ein globales Flag)
+  // Prüfe ob Interceptor aktiv ist via chrome.scripting (kein inline Script → CSP-sicher)
   try {
-    // Kurz warten dann prüfen ob Interceptor aktiv ist
-    setTimeout(function() {
-      var testScript = document.createElement("script");
-      testScript.textContent = "window.postMessage({type:'MR_UMBAU_INTERCEPTOR_STATUS',active:typeof window.__mrUmbauInterceptor!=='undefined'},'*')";
-      document.documentElement.appendChild(testScript);
-      testScript.remove();
-    }, 100);
+    chrome.runtime.sendMessage({ type: "check_interceptor_status", tabUrl: fullUrl }, function(response) {
+      if (response && response.active) interceptorInjected = true;
+    });
   } catch(e) {}
-
-  window.addEventListener("message", function(event) {
-    if (event.source === window && event.data && event.data.type === "MR_UMBAU_INTERCEPTOR_STATUS") {
-      interceptorInjected = event.data.active;
-    }
-  });
 
   // Background Worker fragt ob Interceptor aktiv ist (für CSP-Fallback)
   chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
