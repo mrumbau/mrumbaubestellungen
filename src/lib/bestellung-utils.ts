@@ -79,9 +79,9 @@ export async function updateBestellungStatus(
     return "offen";
   }
 
-  // Nur "freigegeben" nie automatisch überschreiben (manueller Workflow-Schritt).
-  // "abweichung" darf überschrieben werden, wenn alle Dokumente neu eingehen.
-  if (bestellung.status === "freigegeben") {
+  // "freigegeben" und "abweichung" nie automatisch überschreiben.
+  // Abweichung muss manuell geprüft und aufgelöst werden (z.B. Abo-Betragsabweichung).
+  if (bestellung.status === "freigegeben" || bestellung.status === "abweichung") {
     return bestellung.status;
   }
 

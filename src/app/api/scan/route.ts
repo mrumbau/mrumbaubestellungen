@@ -152,6 +152,8 @@ export async function POST(request: NextRequest) {
         storage_pfad: uploadError ? null : storagePfad,
         ki_roh_daten: analyse,
         bestellnummer_erkannt: analyse.bestellnummer || null,
+        auftragsnummer: analyse.auftragsnummer || null,
+        lieferscheinnummer: analyse.lieferscheinnummer || null,
         artikel: analyse.artikel || null,
         gesamtbetrag: safeNum(analyse.gesamtbetrag),
         netto: safeNum(analyse.netto),
@@ -186,8 +188,12 @@ export async function POST(request: NextRequest) {
       updateFields.hat_leistungsnachweis = true;
     }
 
+    // Nummern setzen
+    if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
+    if (analyse.auftragsnummer) updateFields.auftragsnummer = analyse.auftragsnummer;
+    if (analyse.lieferscheinnummer) updateFields.lieferscheinnummer = analyse.lieferscheinnummer;
+
     // Betrag setzen (für alle Nicht-Versand-Typen)
-    // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung)
     if (erkannterTyp !== "versandbestaetigung") {
       const scanBetrag = analyse.gesamtbetrag || analyse.netto || null;
       const scanIstNetto = !analyse.gesamtbetrag && !!analyse.netto;
@@ -236,7 +242,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (
-      bestellung?.bestellungsart !== "subunternehmer" &&
+      bestellung?.bestellungsart === "material" &&
       bestellung?.hat_bestellbestaetigung &&
       bestellung?.hat_lieferschein &&
       bestellung?.hat_rechnung

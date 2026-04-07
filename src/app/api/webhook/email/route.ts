@@ -674,7 +674,7 @@ export async function POST(request: NextRequest) {
 
     const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
     const erkannteAuftragsnummer = analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer || null;
-    const erkannteLiferscheinnummer = analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer || null;
+    const erkannteLieferscheinnummer = analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer || null;
 
     // STUFE 0 Nachlauf: GPT-Bestellnummer für Matching nutzen
     if (erkannteBestellnummer) {
@@ -720,7 +720,7 @@ export async function POST(request: NextRequest) {
     const stufe1Select = "id, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung";
 
     // Alle erkannten Nummern für Suche sammeln
-    const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer].filter(Boolean) as string[];
+    const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer].filter(Boolean) as string[];
 
     for (const suchNr of suchNummern) {
       if (existierendeBestellung) break;
@@ -734,6 +734,10 @@ export async function POST(request: NextRequest) {
         const { data: d2 } = await supabase.from("bestellungen").select(stufe1Select)
           .eq("auftragsnummer", suchNr).eq("haendler_id", haendler.id).limit(1).maybeSingle();
         if (d2) { existierendeBestellung = d2; break; }
+        // Suche in lieferscheinnummer
+        const { data: d2b } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("lieferscheinnummer", suchNr).eq("haendler_id", haendler.id).limit(1).maybeSingle();
+        if (d2b) { existierendeBestellung = d2b; break; }
       }
       if (!existierendeBestellung && haendlerName) {
         const { data: d3 } = await supabase.from("bestellungen").select(stufe1Select)
@@ -742,6 +746,9 @@ export async function POST(request: NextRequest) {
         const { data: d4 } = await supabase.from("bestellungen").select(stufe1Select)
           .eq("auftragsnummer", suchNr).eq("haendler_name", haendlerName).limit(1).maybeSingle();
         if (d4) { existierendeBestellung = d4; break; }
+        const { data: d4b } = await supabase.from("bestellungen").select(stufe1Select)
+          .eq("lieferscheinnummer", suchNr).eq("haendler_name", haendlerName).limit(1).maybeSingle();
+        if (d4b) { existierendeBestellung = d4b; break; }
       }
       if (!existierendeBestellung && erkannterSubunternehmer) {
         const { data: d5 } = await supabase.from("bestellungen").select(stufe1Select)
@@ -1110,6 +1117,8 @@ export async function POST(request: NextRequest) {
               email_datum,
               ki_roh_daten: bodyAnalyse,
               bestellnummer_erkannt: bodyAnalyse.bestellnummer,
+              auftragsnummer: bodyAnalyse.auftragsnummer || null,
+              lieferscheinnummer: bodyAnalyse.lieferscheinnummer || null,
               artikel: bodyAnalyse.artikel,
               gesamtbetrag: bodyAnalyse.gesamtbetrag,
               netto: bodyAnalyse.netto,
@@ -1131,6 +1140,8 @@ export async function POST(request: NextRequest) {
             if (flagMap[bodyAnalyse.typ]) bodyUpdate[flagMap[bodyAnalyse.typ]] = true;
             if (bodyAnalyse.typ !== "versandbestaetigung") {
               if (bodyAnalyse.bestellnummer) bodyUpdate.bestellnummer = bodyAnalyse.bestellnummer;
+              if (bodyAnalyse.auftragsnummer) bodyUpdate.auftragsnummer = bodyAnalyse.auftragsnummer;
+              if (bodyAnalyse.lieferscheinnummer) bodyUpdate.lieferscheinnummer = bodyAnalyse.lieferscheinnummer;
               // Betrag: Rechnung ist maßgeblich, andere Typen nur wenn noch kein Betrag in DB
               // Fallback: netto verwenden wenn gesamtbetrag null (z.B. steuerfreie innergemeinschaftliche Lieferung)
               const bodyEffektiverBetrag = bodyAnalyse.gesamtbetrag != null ? bodyAnalyse.gesamtbetrag : (bodyAnalyse.netto ?? null);
