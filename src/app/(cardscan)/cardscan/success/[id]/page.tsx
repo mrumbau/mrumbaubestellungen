@@ -4,14 +4,39 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
 
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1.5 text-xs font-mono-amount text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+      title={`${label} kopieren`}
+    >
+      {text}
+      {copied ? (
+        <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function ProjectCreateCard({
-  crm1CustomerId,
-  crm2CustomerId,
-  displayName,
+  crm1CustomerId, crm2CustomerId, displayName,
 }: {
-  crm1CustomerId: string | null;
-  crm2CustomerId: string | null;
-  displayName: string;
+  crm1CustomerId: string | null; crm2CustomerId: string | null; displayName: string;
 }) {
   const [projectName, setProjectName] = useState(displayName);
   const [creating, setCreating] = useState(false);
@@ -20,94 +45,71 @@ function ProjectCreateCard({
   async function handleCreate() {
     if (!projectName.trim()) return;
     setCreating(true);
-
     try {
       const res = await fetch("/api/cardscan/create-project", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_name: projectName.trim(),
-          crm1_customer_id: crm1CustomerId,
-          crm2_customer_id: crm2CustomerId,
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_name: projectName.trim(), crm1_customer_id: crm1CustomerId, crm2_customer_id: crm2CustomerId }),
       });
-
-      if (res.ok) {
-        setResult("success");
-      } else {
-        setResult("error");
-      }
-    } catch {
-      setResult("error");
-    } finally {
-      setCreating(false);
-    }
+      setResult(res.ok ? "success" : "error");
+    } catch { setResult("error"); } finally { setCreating(false); }
   }
 
   if (result === "success") {
     return (
-      <div className="card p-4 mb-6 text-left">
-        <div className="flex items-center gap-2 text-sm text-emerald-700">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          Projekt &quot;{projectName}&quot; erstellt
-        </div>
+      <div className="card p-4 mb-5 flex items-center gap-3 text-sm text-emerald-700">
+        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+        Projekt &quot;{projectName}&quot; erstellt
       </div>
     );
   }
 
   return (
-    <div className="card p-4 mb-6 text-left">
-      <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">
-        Projekt anlegen?
-      </h2>
+    <div className="card p-4 mb-5">
+      <p className="text-xs text-[var(--text-secondary)] mb-3 font-medium">Projekt anlegen?</p>
       <div className="flex gap-2">
         <input
-          type="text"
-          value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
+          type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
           placeholder="Projektname"
-          className="flex-1 py-2 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]"
+          className="flex-1 py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)] min-h-[44px]"
         />
         <button
-          onClick={handleCreate}
-          disabled={creating || !projectName.trim()}
-          className="py-2 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium disabled:opacity-30 hover:bg-[#1f1f1f] transition-colors flex items-center gap-1.5"
+          onClick={handleCreate} disabled={creating || !projectName.trim()}
+          className="py-2.5 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium disabled:opacity-30 hover:bg-[#1f1f1f] transition-colors min-h-[44px]"
         >
-          {creating ? (
-            <span className="spinner w-3.5 h-3.5 border-white/30 border-t-white" />
-          ) : (
-            <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          )}
-          Erstellen
+          {creating ? <span className="spinner w-4 h-4 border-white/30 border-t-white" /> : "Erstellen"}
         </button>
       </div>
-      {result === "error" && (
-        <p className="text-xs text-red-600 mt-2">Projekt konnte nicht erstellt werden.</p>
-      )}
+      {result === "error" && <p className="text-xs text-red-600 mt-2">Konnte nicht erstellt werden.</p>}
     </div>
   );
 }
 
-function CrmStatusBadge({ status, label }: { status: string | null; label: string }) {
-  const config: Record<string, { bg: string; text: string; label: string }> = {
-    success: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Erstellt" },
-    failed: { bg: "bg-red-50", text: "text-red-700", label: "Fehlgeschlagen" },
-    skipped: { bg: "bg-slate-50", text: "text-slate-600", label: "Dry-Run" },
-    pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Ausstehend" },
+function CrmRow({ label, status, refNum, error: err }: { label: string; status: string | null; refNum: string | null; error: string | null }) {
+  const s = status || "pending";
+  const conf: Record<string, { dot: string; text: string }> = {
+    success: { dot: "bg-emerald-500", text: "Erstellt" },
+    failed: { dot: "bg-red-500", text: "Fehler" },
+    skipped: { dot: "bg-slate-400", text: "Dry-Run" },
+    pending: { dot: "bg-amber-400", text: "Ausstehend" },
   };
-
-  const s = config[status || "pending"] || config.pending;
+  const c = conf[s] || conf.pending;
 
   return (
-    <div className="flex items-center justify-between text-sm py-2">
-      <span className="text-[var(--text-secondary)]">{label}</span>
-      <span className={`text-xs px-2.5 py-1 rounded-[var(--radius-sm)] font-medium ${s.bg} ${s.text}`}>
-        {s.label}
-      </span>
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-center gap-2.5">
+        <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+        <span className="text-sm text-[var(--text-primary)]">{label}</span>
+      </div>
+      <div className="text-right">
+        {refNum ? (
+          <CopyButton text={refNum} label="Kundennummer" />
+        ) : (
+          <span className="text-xs text-[var(--text-tertiary)]">{c.text}</span>
+        )}
+        {err && <p className="text-[10px] text-red-500 mt-0.5 max-w-[200px] truncate">{err}</p>}
+      </div>
     </div>
   );
 }
@@ -119,131 +121,72 @@ export default function CardScanSuccessPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/cardscan/captures/${id}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data) setCapture(json.data);
-      })
-      .finally(() => setLoading(false));
+    fetch(`/api/cardscan/captures/${id}`).then((r) => r.json()).then((j) => { if (j.data) setCapture(j.data); }).finally(() => setLoading(false));
   }, [id]);
+
+  // Haptik
+  useEffect(() => {
+    if (!capture || loading) return;
+    if (navigator.vibrate) {
+      capture.status === "failed" ? navigator.vibrate([100, 50, 100]) : navigator.vibrate([50, 30, 50]);
+    }
+  }, [capture, loading]);
 
   if (loading) {
     return (
-      <div className="max-w-xl mx-auto py-12 text-center">
-        <div className="skeleton w-20 h-20 rounded-full mx-auto mb-6" />
-        <div className="skeleton-text w-1/3 h-7 mx-auto mb-2" />
+      <div className="max-w-xl mx-auto py-12">
+        <div className="skeleton w-14 h-14 rounded-2xl mx-auto mb-5" />
+        <div className="skeleton-text w-1/3 h-6 mx-auto mb-2" />
         <div className="skeleton-text w-2/3 h-4 mx-auto mb-8" />
-        <div className="card p-4 mb-6 text-left space-y-3">
-          <div className="skeleton-text w-1/4 h-3" />
+        <div className="card p-4 space-y-3">
           <div className="skeleton w-full h-8" />
           <div className="skeleton w-full h-8" />
-        </div>
-        <div className="flex gap-3">
-          <div className="skeleton flex-1 h-12" />
-          <div className="skeleton flex-1 h-12" />
         </div>
       </div>
     );
   }
 
-  const data: ExtractedContactData | null =
-    capture?.final_data || capture?.extracted_data || null;
-
+  const data: ExtractedContactData | null = capture?.final_data || capture?.extracted_data || null;
+  const isCompany = data?.customer_type === "company";
   const displayName = data
-    ? data.customer_type === "company"
-      ? data.companyName || `${data.firstName || ""} ${data.lastName || ""}`.trim()
-      : `${data.firstName || ""} ${data.lastName || ""}`.trim()
+    ? isCompany
+      ? data.companyName || [data.firstName, data.lastName].filter(Boolean).join(" ")
+      : [data.firstName, data.lastName].filter(Boolean).join(" ")
     : "Kontakt";
-
-  const isSuccess = capture?.status === "success";
-  const isPartial = capture?.status === "partial_success";
   const isFailed = capture?.status === "failed";
-
-  // Haptisches Feedback beim Laden
-  useEffect(() => {
-    if (!capture || loading) return;
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      if (isFailed) {
-        navigator.vibrate([100, 50, 100]);
-      } else {
-        navigator.vibrate([50, 30, 50]);
-      }
-    }
-  }, [capture, loading, isFailed]);
+  const isPartial = capture?.status === "partial_success";
 
   return (
-    <div className="max-w-xl mx-auto py-12 text-center">
-      {/* Icon mit Animation */}
-      <div
-        className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${
-          isFailed
-            ? "bg-red-50 animate-shake"
-            : isPartial
-              ? "bg-amber-50 animate-scale-in"
-              : "bg-emerald-50 animate-scale-in"
-        }`}
-      >
-        {isFailed ? (
-          <svg className="w-10 h-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : isPartial ? (
-          <svg className="w-10 h-10 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-        ) : (
-          <svg className="w-10 h-10 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-        )}
+    <div className="max-w-xl mx-auto py-8">
+      {/* ─── Hero: Kontaktname groß + Icon ─────────────────────────── */}
+      <div className="text-center mb-8">
+        <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
+          isFailed ? "bg-red-50 animate-shake" : "bg-emerald-50 animate-scale-in"
+        }`}>
+          {isFailed ? (
+            <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          ) : (
+            <svg className="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+          )}
+        </div>
+
+        <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
+          {displayName}
+        </h1>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          {isFailed ? "Konnte nicht angelegt werden" : isPartial ? "Teilweise angelegt" : "Erfolgreich angelegt"}
+        </p>
       </div>
 
-      <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight mb-2">
-        {isFailed
-          ? "Anlage fehlgeschlagen"
-          : isPartial
-            ? "Teilweise angelegt"
-            : "Erfolgreich angelegt"}
-      </h1>
-      <p className="text-sm text-[var(--text-secondary)] mb-8">
-        <strong>{displayName}</strong>
-        {isFailed
-          ? " konnte in keinem CRM angelegt werden."
-          : isPartial
-            ? " wurde nur in einem CRM angelegt."
-            : " wurde in beiden CRMs angelegt."}
-      </p>
-
-      {/* CRM-Status */}
-      <div className="card p-4 mb-6 text-left">
-        <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">
-          CRM-Status
-        </h2>
-        <CrmStatusBadge status={capture?.crm1_status || null} label="CRM 1" />
-        {capture?.crm1_reference_number && (
-          <p className="text-xs text-[var(--text-tertiary)] pl-0 mb-2">
-            Kundennr.: {capture.crm1_reference_number}
-          </p>
-        )}
-        {capture?.crm1_error && (
-          <p className="text-xs text-red-600 mb-2">{capture.crm1_error}</p>
-        )}
-
-        <div className="border-t border-[var(--border-subtle)] my-2" />
-
-        <CrmStatusBadge status={capture?.crm2_status || null} label="CRM 2" />
-        {capture?.crm2_reference_number && (
-          <p className="text-xs text-[var(--text-tertiary)] mb-2">
-            Kundennr.: {capture.crm2_reference_number}
-          </p>
-        )}
-        {capture?.crm2_error && (
-          <p className="text-xs text-red-600 mb-2">{capture.crm2_error}</p>
-        )}
+      {/* ─── CRM-Status ───────────────────────────────────────────── */}
+      <div className="card p-4 mb-5">
+        <CrmRow label="CRM 1" status={capture?.crm1_status || null} refNum={capture?.crm1_reference_number || null} error={capture?.crm1_error || null} />
+        <div className="border-t border-[var(--border-subtle)] my-1" />
+        <CrmRow label="CRM 2" status={capture?.crm2_status || null} refNum={capture?.crm2_reference_number || null} error={capture?.crm2_error || null} />
       </div>
 
-      {/* Projekt anlegen */}
-      {(isSuccess || isPartial) && (capture?.crm1_customer_id || capture?.crm2_customer_id) && (
+      {/* ─── Projekt anlegen ──────────────────────────────────────── */}
+      {!isFailed && (capture?.crm1_customer_id || capture?.crm2_customer_id) && (
         <ProjectCreateCard
           crm1CustomerId={capture.crm1_customer_id}
           crm2CustomerId={capture.crm2_customer_id}
@@ -251,17 +194,17 @@ export default function CardScanSuccessPage() {
         />
       )}
 
-      {/* Aktionen */}
+      {/* ─── Aktionen ─────────────────────────────────────────────── */}
       <div className="flex gap-3">
         <button
           onClick={() => router.push("/cardscan")}
-          className="flex-1 py-3 px-4 rounded-[var(--radius-md)] btn-primary text-sm"
+          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium hover:bg-[#1f1f1f] transition-colors min-h-[44px]"
         >
           Neuer Scan
         </button>
         <button
           onClick={() => router.push("/cardscan/history")}
-          className="flex-1 py-3 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors"
+          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
         >
           Historie
         </button>
