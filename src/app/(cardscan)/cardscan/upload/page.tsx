@@ -7,7 +7,7 @@ const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 0.85;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-const ACCEPTED_TYPES = [
+const IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
@@ -15,10 +15,34 @@ const ACCEPTED_TYPES = [
   "image/heif",
 ];
 
-/**
- * Client-seitige Bildkompression via Canvas.
- * Reduziert auf max 1920px lange Seite, JPEG Q85.
- */
+const DOCUMENT_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/vcard",
+  "text/x-vcard",
+];
+
+// Für <input accept>
+const ACCEPT_STRING =
+  "image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.docx,.vcf";
+
+function isImageType(type: string): boolean {
+  return IMAGE_TYPES.includes(type);
+}
+
+function isDocumentType(type: string, name: string): boolean {
+  if (DOCUMENT_TYPES.includes(type)) return true;
+  const lower = name.toLowerCase();
+  return lower.endsWith(".pdf") || lower.endsWith(".docx") || lower.endsWith(".vcf");
+}
+
+function getFileIcon(type: string, name: string): string {
+  if (type === "application/pdf" || name.endsWith(".pdf")) return "PDF";
+  if (type.includes("wordprocessingml") || name.endsWith(".docx")) return "DOCX";
+  if (type.includes("vcard") || name.endsWith(".vcf")) return "VCF";
+  return "Datei";
+}
+
 async function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -70,9 +94,6 @@ async function compressImage(file: File): Promise<File> {
   });
 }
 
-/**
- * Konvertiert HEIC/HEIF zu JPEG via heic2any (lazy loaded).
- */
 async function convertHeicToJpeg(file: File): Promise<File> {
   const heic2any = (await import("heic2any")).default;
   const blob = await heic2any({
@@ -80,7 +101,6 @@ async function convertHeicToJpeg(file: File): Promise<File> {
     toType: "image/jpeg",
     quality: JPEG_QUALITY,
   });
-
   const result = Array.isArray(blob) ? blob[0] : blob;
   return new File([result], "capture.jpg", { type: "image/jpeg" });
 }
@@ -88,9 +108,11 @@ async function convertHeicToJpeg(file: File): Promise<File> {
 export default function CardScanUploadPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [fileLabel, setFileLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,35 +123,50 @@ export default function CardScanUploadPage() {
 
     setError(null);
     setProcessing(null);
+    setPreview(null);
+    setFileLabel(null);
 
-    // Typ-Check
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError(`Dateityp ${file.type || "unbekannt"} nicht unterstützt. Erlaubt: JPEG, PNG, WebP, HEIC.`);
+    // Größen-Check
+    if (file.size > MAX_FILE_SIZE * 2) {
+      setError("Datei zu groß (maximal 20 MB vor Kompression).");
       return;
     }
 
-    // Größen-Check (vor Konvertierung)
-    if (file.size > MAX_FILE_SIZE * 2) {
-      setError("Datei zu groß (maximal 20 MB vor Kompression).");
+    // ─── Dokument-Typen (PDF, DOCX, vCard) → direkt übernehmen ─────
+    if (isDocumentType(file.type, file.name)) {
+      if (file.size > MAX_FILE_SIZE) {
+        setError("Datei zu groß (maximal 10 MB).");
+        return;
+      }
+
+      setSelectedFile(file);
+      setFileLabel(getFileIcon(file.type, file.name));
+      return;
+    }
+
+    // ─── Bild-Typen → HEIC-Konvertierung + Kompression ─────────────
+    if (!isImageType(file.type)) {
+      setError(
+        `Dateityp "${file.type || "unbekannt"}" nicht unterstützt. Erlaubt: JPEG, PNG, WebP, HEIC, PDF, DOCX, vCard (.vcf).`
+      );
       return;
     }
 
     let processedFile = file;
 
     try {
-      // HEIC → JPEG Konvertierung
       if (file.type === "image/heic" || file.type === "image/heif") {
         setProcessing("Konvertiere HEIC → JPEG…");
         processedFile = await convertHeicToJpeg(file);
       }
 
-      // Kompression
       setProcessing("Komprimiere Bild…");
       processedFile = await compressImage(processedFile);
 
-      // Größen-Check nach Kompression
       if (processedFile.size > MAX_FILE_SIZE) {
-        setError("Bild nach Kompression noch zu groß. Bitte ein kleineres Bild verwenden.");
+        setError(
+          "Bild nach Kompression noch zu groß. Bitte ein kleineres Bild verwenden."
+        );
         return;
       }
 
@@ -142,9 +179,7 @@ export default function CardScanUploadPage() {
       reader.readAsDataURL(processedFile);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Fehler bei der Bildverarbeitung"
+        err instanceof Error ? err.message : "Fehler bei der Bildverarbeitung"
       );
       setProcessing(null);
     }
@@ -159,7 +194,7 @@ export default function CardScanUploadPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      formData.append("source_type", "image");
+      formData.append("source_type", fileLabel ? "file" : "image");
 
       const res = await fetch("/api/cardscan/extract", {
         method: "POST",
@@ -184,26 +219,25 @@ export default function CardScanUploadPage() {
   function handleRemove() {
     setSelectedFile(null);
     setPreview(null);
+    setFileLabel(null);
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   return (
     <div className="max-w-xl mx-auto">
       <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight mb-2">
-        Foto hochladen
+        Datei hochladen
       </h1>
       <p className="text-sm text-[var(--text-secondary)] mb-6">
-        Visitenkarte, Briefkopf oder Dokument als Foto hochladen.
-        HEIC-Bilder (iPhone) werden automatisch konvertiert.
+        Visitenkarten-Foto, PDF, DOCX oder vCard (.vcf) hochladen.
       </p>
 
       {/* Datei-Auswahl */}
-      {!selectedFile && (
+      {!selectedFile && !processing && (
         <div className="space-y-3">
-          {/* Kamera-Button (öffnet native Kamera-App) */}
+          {/* Kamera */}
           <label className="card card-hover p-6 flex flex-col items-center gap-3 cursor-pointer block text-center">
             <div className="w-14 h-14 rounded-2xl bg-[var(--mr-red)]/5 flex items-center justify-center">
               <svg className="w-7 h-7 text-[var(--mr-red)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -216,7 +250,7 @@ export default function CardScanUploadPage() {
               <p className="text-xs text-[var(--text-tertiary)]">Öffnet die Kamera</p>
             </div>
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
@@ -225,7 +259,7 @@ export default function CardScanUploadPage() {
             />
           </label>
 
-          {/* Galerie/Datei-Button */}
+          {/* Datei aus Galerie/Dateien */}
           <label className="card card-hover p-6 flex flex-col items-center gap-3 cursor-pointer block text-center">
             <div className="w-14 h-14 rounded-2xl bg-[var(--bg-input)] flex items-center justify-center">
               <svg className="w-7 h-7 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -233,12 +267,17 @@ export default function CardScanUploadPage() {
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">Aus Galerie / Dateien</p>
-              <p className="text-xs text-[var(--text-tertiary)]">JPEG, PNG, WebP, HEIC</p>
+              <p className="text-sm font-medium text-[var(--text-primary)]">
+                Aus Galerie / Dateien
+              </p>
+              <p className="text-xs text-[var(--text-tertiary)]">
+                JPEG, PNG, WebP, HEIC, PDF, DOCX, vCard
+              </p>
             </div>
             <input
+              ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              accept={ACCEPT_STRING}
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -246,7 +285,7 @@ export default function CardScanUploadPage() {
         </div>
       )}
 
-      {/* Verarbeitungs-Status */}
+      {/* Verarbeitung */}
       {processing && (
         <div className="card p-4 flex items-center gap-3 text-sm text-[var(--text-secondary)]">
           <span className="spinner w-5 h-5" />
@@ -254,7 +293,7 @@ export default function CardScanUploadPage() {
         </div>
       )}
 
-      {/* Vorschau */}
+      {/* Bild-Vorschau */}
       {preview && selectedFile && (
         <div className="space-y-4">
           <div className="card p-2 overflow-hidden">
@@ -264,7 +303,6 @@ export default function CardScanUploadPage() {
               className="w-full rounded-[var(--radius-md)] object-contain max-h-80"
             />
           </div>
-
           <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
             <span>
               {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)
@@ -272,6 +310,31 @@ export default function CardScanUploadPage() {
             <button
               onClick={handleRemove}
               className="text-red-600 hover:text-red-700 font-medium"
+            >
+              Entfernen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Dokument-Vorschau (kein Bild) */}
+      {fileLabel && selectedFile && !preview && (
+        <div className="space-y-4">
+          <div className="card p-6 flex items-center gap-4">
+            <div className="w-14 h-14 rounded-[var(--radius-md)] bg-[var(--bg-input)] flex items-center justify-center text-[var(--text-secondary)] font-mono-amount text-sm font-bold">
+              {fileLabel}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                {selectedFile.name}
+              </p>
+              <p className="text-xs text-[var(--text-tertiary)]">
+                {(selectedFile.size / 1024).toFixed(0)} KB
+              </p>
+            </div>
+            <button
+              onClick={handleRemove}
+              className="text-red-600 hover:text-red-700 text-xs font-medium"
             >
               Entfernen
             </button>
