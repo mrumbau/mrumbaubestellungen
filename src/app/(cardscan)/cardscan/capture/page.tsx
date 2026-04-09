@@ -13,6 +13,7 @@ export default function CardScanCapturePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const logRef = useRef<string>("");
 
   const [cameraState, setCameraState] = useState<CameraState>("requesting");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -45,6 +46,13 @@ export default function CardScanCapturePage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+
+        // Tatsächliche Auflösung prüfen (Browser wählt still die nächstbeste)
+        const actualW = videoRef.current.videoWidth;
+        const actualH = videoRef.current.videoHeight;
+        if (actualW && actualH) {
+          logRef.current = `Kamera: ${actualW}×${actualH}`;
+        }
       }
 
       setCameraState("active");
