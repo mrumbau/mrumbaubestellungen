@@ -146,7 +146,7 @@ export default function CardScanUrlPage() {
           <button
             type="button"
             onClick={() => router.push("/cardscan")}
-            className="flex-1 py-3 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-[13px] font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
+            className="flex-1 py-3 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
             disabled={loading}
           >
             Abbrechen
@@ -154,7 +154,7 @@ export default function CardScanUrlPage() {
           <button
             type="submit"
             disabled={loading || url.trim().length < 5}
-            className="flex-1 py-3 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-[13px] font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#1f1f1f] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
+            className="flex-1 py-3 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
           >
             {loading ? (
               <>

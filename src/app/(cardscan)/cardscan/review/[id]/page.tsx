@@ -174,7 +174,7 @@ export default function CardScanReviewPage() {
       <div className="card p-5 mb-4 corner-marks">
         <div className="flex items-start gap-4">
           {/* Avatar/Initial */}
-          <div className="w-12 h-12 rounded-xl bg-[#141414] flex items-center justify-center text-white text-sm font-bold shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-[var(--bg-sidebar)] flex items-center justify-center text-white text-sm font-bold shrink-0">
             {(displayName || "?")[0]?.toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -331,7 +331,7 @@ export default function CardScanReviewPage() {
         <button
           onClick={handleConfirm}
           disabled={saving || !canSubmit}
-          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#1f1f1f] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
+          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
           aria-label="Kontakt bestätigen und im CRM anlegen"
         >
           {saving ? (

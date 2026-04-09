@@ -142,7 +142,7 @@ export default function CardScanErrorsPage() {
                   <button
                     onClick={() => handleAcknowledge(err.id)}
                     disabled={acknowledging}
-                    className="text-xs px-2.5 py-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-input)] transition-colors shrink-0"
+                    className="text-xs px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-input)] transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     OK
                   </button>

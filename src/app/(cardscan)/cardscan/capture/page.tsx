@@ -175,7 +175,7 @@ export default function CardScanCapturePage() {
         </div>
         <h2 className="font-headline text-xl text-[var(--text-primary)] mb-2">Kamera nicht verfügbar</h2>
         <p className="text-sm text-[var(--text-secondary)] mb-6">Dein Browser unterstützt keinen Kamera-Zugriff oder die Seite wird nicht über HTTPS aufgerufen.</p>
-        <label className="inline-block py-3.5 px-6 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium cursor-pointer min-h-[44px]">
+        <label className="inline-block py-3.5 px-6 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium cursor-pointer min-h-[44px]">
           Foto aus Galerie wählen
           <input type="file" accept="image/*" capture="environment" onChange={handleFallbackCapture} className="hidden" />
         </label>
@@ -196,7 +196,7 @@ export default function CardScanCapturePage() {
         </div>
         <h2 className="font-headline text-xl text-[var(--text-primary)] mb-2">Kamera-Zugriff verweigert</h2>
         <p className="text-sm text-[var(--text-secondary)] mb-6">Bitte erlaube den Kamera-Zugriff in deinen Browser-Einstellungen und lade die Seite neu.</p>
-        <button onClick={() => startCamera()} className="py-3.5 px-6 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium min-h-[44px]">
+        <button onClick={() => startCamera()} className="py-3.5 px-6 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium min-h-[44px]">
           Erneut versuchen
         </button>
         <button onClick={() => router.push("/cardscan/upload")} className="block mx-auto mt-4 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] min-h-[44px]">

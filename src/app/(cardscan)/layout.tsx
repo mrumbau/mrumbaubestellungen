@@ -45,7 +45,7 @@ export default async function CardScanLayout({
         <script src="/cardscan-register-sw.js" defer />
 
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-[#141414] border-b border-white/[0.06] safe-area-top">
+        <header className="sticky top-0 z-30 bg-[var(--bg-sidebar)] border-b border-white/[0.06] safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
             <a
               href="/"

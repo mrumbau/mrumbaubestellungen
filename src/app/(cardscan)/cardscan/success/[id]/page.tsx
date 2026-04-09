@@ -77,7 +77,7 @@ function ProjectCreateCard({
         />
         <button
           onClick={handleCreate} disabled={creating || !projectName.trim()}
-          className="py-2.5 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium disabled:opacity-30 hover:bg-[#1f1f1f] transition-colors min-h-[44px]"
+          className="py-2.5 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 hover:bg-[var(--bg-sidebar-hover)] transition-colors min-h-[44px]"
         >
           {creating ? <span className="spinner w-4 h-4 border-white/30 border-t-white" /> : "Erstellen"}
         </button>
@@ -199,7 +199,7 @@ export default function CardScanSuccessPage() {
       <div className="flex gap-3">
         <button
           onClick={() => router.push("/cardscan")}
-          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium hover:bg-[#1f1f1f] transition-colors min-h-[44px]"
+          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] transition-colors min-h-[44px]"
         >
           Neuer Scan
         </button>

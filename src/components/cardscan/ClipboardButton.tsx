@@ -110,7 +110,7 @@ export function ClipboardButton() {
           <span className="font-mono-amount text-[11px] text-[var(--text-tertiary)] w-6 shrink-0">05</span>
           <div className="w-px h-8 bg-[var(--border-subtle)]" />
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-[var(--text-primary)] group-hover:text-emerald-700 transition-colors">
+            <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-emerald-700 transition-colors">
               {state === "reading" ? "Lese Zwischenablage…" : state === "processing" ? "Analysiere…" : "Aus Zwischenablage"}
             </p>
             <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">

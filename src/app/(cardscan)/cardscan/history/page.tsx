@@ -118,7 +118,7 @@ export default function CardScanHistoryPage() {
           <p className="text-sm text-[var(--text-tertiary)]">Noch keine Scans vorhanden.</p>
           <button
             onClick={() => router.push("/cardscan")}
-            className="mt-4 py-2.5 px-5 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium min-h-[44px]"
+            className="mt-4 py-2.5 px-5 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium min-h-[44px]"
           >
             Ersten Scan starten
           </button>
@@ -160,7 +160,7 @@ export default function CardScanHistoryPage() {
 
                   {/* Name + Subtitle */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{name}</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{name}</p>
                     {subtitle && (
                       <p className="text-[11px] text-[var(--text-tertiary)] truncate mt-0.5">{subtitle}</p>
                     )}
