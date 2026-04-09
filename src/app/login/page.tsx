@@ -229,7 +229,7 @@ function LoginForm() {
       </div>
 
       {/* Right: Login Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-[#f5f4f2]">
+      <div className="flex-1 flex items-center justify-center px-6 py-8 md:p-8 bg-[#f5f4f2]">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-12">
@@ -255,7 +255,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors"
+                className="w-full px-4 py-3.5 bg-white border border-[#e8e6e3] rounded-xl text-base text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors min-h-[48px]"
                 placeholder="name@mrumbau.de"
               />
             </div>
@@ -269,7 +269,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors"
+                className="w-full px-4 py-3.5 bg-white border border-[#e8e6e3] rounded-xl text-base text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors min-h-[48px]"
                 placeholder="Passwort eingeben"
               />
             </div>
@@ -287,9 +287,9 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50 active:scale-[0.98] transition-all ${
+              className={`w-full py-4 rounded-xl text-[15px] font-semibold text-white disabled:opacity-50 active:scale-[0.98] transition-all min-h-[52px] ${
                 isCardScan
-                  ? "bg-[#141414] hover:bg-[#1f1f1f]"
+                  ? "bg-[var(--bg-sidebar)] hover:bg-[var(--bg-sidebar-hover)]"
                   : "btn-primary"
               }`}
             >

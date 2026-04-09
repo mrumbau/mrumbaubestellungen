@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTransitionRouter } from "next-view-transitions";
+import { BackLink } from "@/components/cardscan/BackLink";
 
 export default function CardScanPastePage() {
   const router = useTransitionRouter();
@@ -43,24 +44,14 @@ export default function CardScanPastePage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto">
-      {/* Page header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-5 h-5 rounded border border-[var(--border-default)] flex items-center justify-center">
-            <span className="font-mono-amount text-[9px] text-[var(--text-tertiary)]">01</span>
-          </div>
-          <span className="text-[10px] text-[var(--text-tertiary)] tracking-[0.15em] uppercase font-mono-amount">
-            Text einfügen
-          </span>
-        </div>
-        <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
-          Kontaktdaten <span className="text-[var(--text-tertiary)]">einfügen</span>
-        </h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-2">
-          E-Mail-Signatur, Visitenkarten-Text, Impressum oder beliebigen Text.
-        </p>
-      </div>
+    <div className="max-w-lg mx-auto">
+      <BackLink />
+      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
+        Text einfügen
+      </h1>
+      <p className="text-sm text-[var(--text-tertiary)] mb-5">
+        E-Mail-Signatur, Visitenkarten-Text oder Impressum einfügen.
+      </p>
 
       <form onSubmit={handleSubmit}>
         <div className="card p-1 corner-marks">
@@ -94,38 +85,20 @@ export default function CardScanPastePage() {
           </div>
         )}
 
-        {/* Separator */}
-        <div className="industrial-line my-5" />
-
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/cardscan")}
-            className="flex-1 py-3 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
-            disabled={loading}
-          >
-            Abbrechen
-          </button>
-          <button
-            type="submit"
-            disabled={loading || text.trim().length < 5 || text.length > 10_000}
-            className="flex-1 py-3 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
-          >
-            {loading ? (
-              <>
-                <span className="spinner w-4 h-4 border-white/30 border-t-white" />
-                <span>Analysiere…</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-                <span>Analysieren</span>
-              </>
-            )}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={loading || text.trim().length < 5 || text.length > 10_000}
+          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
+        >
+          {loading ? (
+            <>
+              <span className="spinner w-4 h-4 border-white/30 border-t-white" />
+              Analysiere…
+            </>
+          ) : (
+            "Analysieren"
+          )}
+        </button>
       </form>
     </div>
   );
