@@ -560,7 +560,7 @@ DAS_PROGRAMM_ENDPOINT=https://app.das-programm.io/api/graphql
 **DB-Tabellen:** `cardscan_captures`, `cardscan_sync_errors` (mit RLS)  
 **Storage:** Bucket `cardscan-images` (privat, RLS)  
 **Service Worker:** `/cardscan-sw.js` auf `/cardscan` scoped – keine Interaktion mit Bestellwesen  
-**Dependencies:** `heic2any`, `cheerio`, `pdf-parse`, `mammoth`, `react-camera-pro`, `jscanify`
+**Dependencies:** `heic2any`, `cheerio`, `pdf-parse`, `mammoth`
 
 **Architektur-Prinzip:** Vollständig getrennt vom Bestellwesen. Keine Änderungen an bestehenden Tabellen, Routen oder Komponenten. Nur zentrale Utility-Libraries werden wiederverwendet (auth, csrf, rate-limit, errors, logger, supabase).
 
