@@ -1,6 +1,6 @@
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import { ErrorBadgeLink } from "@/components/cardscan/ErrorBadgeLink";
 
 export const dynamic = "force-dynamic";

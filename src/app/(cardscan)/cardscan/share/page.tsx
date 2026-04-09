@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useTransitionRouter } from "next-view-transitions";
 
 interface ShareData {
   title?: string;
@@ -24,7 +25,7 @@ export default function CardScanSharePage() {
 }
 
 function ShareHandler() {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "processing" | "error" | "empty">("loading");
   const [error, setError] = useState<string | null>(null);

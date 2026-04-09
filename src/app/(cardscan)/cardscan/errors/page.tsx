@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTransitionRouter } from "next-view-transitions";
 
 interface SyncError {
   id: string;
@@ -23,7 +23,7 @@ function formatDate(iso: string): string {
 }
 
 export default function CardScanErrorsPage() {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const [errors, setErrors] = useState<SyncError[]>([]);
   const [loading, setLoading] = useState(true);
   const [acknowledging, setAcknowledging] = useState(false);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useTransitionRouter } from "next-view-transitions";
 
 const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 0.85;
@@ -106,7 +106,7 @@ async function convertHeicToJpeg(file: File): Promise<File> {
 }
 
 export default function CardScanUploadPage() {
-  const router = useRouter();
+  const router = useTransitionRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 

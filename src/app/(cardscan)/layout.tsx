@@ -1,6 +1,7 @@
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
+import { ViewTransitions } from "next-view-transitions";
 import { Logo } from "@/components/logo";
 import type { Metadata, Viewport } from "next";
 
@@ -39,6 +40,7 @@ export default async function CardScanLayout({
   }
 
   return (
+    <ViewTransitions>
     <div className="min-h-screen bg-[var(--bg-main)] flex flex-col">
       {/* Service Worker Registration */}
       <script src="/cardscan-register-sw.js" defer />
@@ -92,5 +94,6 @@ export default async function CardScanLayout({
         </div>
       </div>
     </div>
+    </ViewTransitions>
   );
 }
