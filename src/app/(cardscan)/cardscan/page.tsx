@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ErrorBadgeLink } from "@/components/cardscan/ErrorBadgeLink";
 
-export const dynamic = "force-dynamic";
-
 export default async function CardScanPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login?redirect=/cardscan");
