@@ -28,7 +28,8 @@ export default function CardScanReviewPage() {
 
   const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([]);
   const [dupChecking, setDupChecking] = useState(false);
-  const [dupOverride, setDupOverride] = useState(false);
+  const [dupAction, setDupAction] = useState<"none" | "override" | "update">("none");
+  const [updateTarget, setUpdateTarget] = useState<DuplicateMatch | null>(null);
 
   // ─── Data Loading ─────────────────────────────────────────────────
 
@@ -109,9 +110,39 @@ export default function CardScanReviewPage() {
   async function handleConfirm() {
     if (!formData) return;
 
-    if (duplicates.length > 0 && !dupOverride) {
-      setError("Bitte bestätige den Duplikat-Override bevor du fortfährst.");
+    // Duplikat vorhanden aber keine Aktion gewählt
+    if (duplicates.length > 0 && dupAction === "none") {
+      setError("Bitte wähle 'Daten ergänzen' oder 'Trotzdem neu anlegen'.");
       return;
+    }
+
+    // Update-Flow: bestehenden Kunden aktualisieren
+    if (dupAction === "update" && updateTarget) {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/cardscan/update-customer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            crm: updateTarget.crm,
+            customer_id: updateTarget.customerId,
+            final_data: formData,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          setError(json.error || "Update fehlgeschlagen.");
+          setSaving(false);
+          return;
+        }
+        router.push(`/cardscan/success/${id}`);
+        return;
+      } catch {
+        setError("Verbindungsfehler beim Kunden-Update.");
+        setSaving(false);
+        return;
+      }
     }
 
     setSaving(true);
@@ -124,7 +155,7 @@ export default function CardScanReviewPage() {
         body: JSON.stringify({
           capture_id: id,
           final_data: formData,
-          duplicate_override: dupOverride,
+          duplicate_override: dupAction === "override",
         }),
       });
 
@@ -207,7 +238,7 @@ export default function CardScanReviewPage() {
 
   const isCompany = formData.customer_type === "company";
   const hasDuplicates = duplicates.length > 0;
-  const canSubmit = !hasDuplicates || dupOverride;
+  const canSubmit = !hasDuplicates || dupAction !== "none";
 
   // ─── Render ───────────────────────────────────────────────────────
 
@@ -235,8 +266,12 @@ export default function CardScanReviewPage() {
       )}
       <DuplicateWarning
         matches={duplicates}
-        onOverride={() => setDupOverride(true)}
-        overridden={dupOverride}
+        onOverride={() => setDupAction("override")}
+        onUpdate={(match) => {
+          setDupAction("update");
+          setUpdateTarget(match);
+        }}
+        action={dupAction}
       />
 
       {/* Confidence */}

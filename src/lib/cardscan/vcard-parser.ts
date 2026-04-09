@@ -108,6 +108,7 @@ export function parseVcard(vcfContent: string): VcardParseResult {
     fax: fields.fax || null,
     website: fields.website || null,
     vatId: null,
+    letterSalutation: null, // Nicht aus vCard ableitbar
     address:
       fields.street || fields.city
         ? {

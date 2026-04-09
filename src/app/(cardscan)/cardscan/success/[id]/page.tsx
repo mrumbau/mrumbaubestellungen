@@ -4,6 +4,94 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
 
+function ProjectCreateCard({
+  crm1CustomerId,
+  crm2CustomerId,
+  displayName,
+}: {
+  crm1CustomerId: string | null;
+  crm2CustomerId: string | null;
+  displayName: string;
+}) {
+  const [projectName, setProjectName] = useState(displayName);
+  const [creating, setCreating] = useState(false);
+  const [result, setResult] = useState<"idle" | "success" | "error">("idle");
+
+  async function handleCreate() {
+    if (!projectName.trim()) return;
+    setCreating(true);
+
+    try {
+      const res = await fetch("/api/cardscan/create-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_name: projectName.trim(),
+          crm1_customer_id: crm1CustomerId,
+          crm2_customer_id: crm2CustomerId,
+        }),
+      });
+
+      if (res.ok) {
+        setResult("success");
+      } else {
+        setResult("error");
+      }
+    } catch {
+      setResult("error");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  if (result === "success") {
+    return (
+      <div className="card p-4 mb-6 text-left">
+        <div className="flex items-center gap-2 text-sm text-emerald-700">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          Projekt &quot;{projectName}&quot; erstellt
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-4 mb-6 text-left">
+      <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3">
+        Projekt anlegen?
+      </h2>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          placeholder="Projektname"
+          className="flex-1 py-2 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]"
+        />
+        <button
+          onClick={handleCreate}
+          disabled={creating || !projectName.trim()}
+          className="py-2 px-4 rounded-[var(--radius-md)] bg-[#141414] text-white text-sm font-medium disabled:opacity-30 hover:bg-[#1f1f1f] transition-colors flex items-center gap-1.5"
+        >
+          {creating ? (
+            <span className="spinner w-3.5 h-3.5 border-white/30 border-t-white" />
+          ) : (
+            <svg className="w-3.5 h-3.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          )}
+          Erstellen
+        </button>
+      </div>
+      {result === "error" && (
+        <p className="text-xs text-red-600 mt-2">Projekt konnte nicht erstellt werden.</p>
+      )}
+    </div>
+  );
+}
+
 function CrmStatusBadge({ status, label }: { status: string | null; label: string }) {
   const config: Record<string, { bg: string; text: string; label: string }> = {
     success: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Erstellt" },
@@ -153,6 +241,15 @@ export default function CardScanSuccessPage() {
           <p className="text-xs text-red-600 mb-2">{capture.crm2_error}</p>
         )}
       </div>
+
+      {/* Projekt anlegen */}
+      {(isSuccess || isPartial) && (capture?.crm1_customer_id || capture?.crm2_customer_id) && (
+        <ProjectCreateCard
+          crm1CustomerId={capture.crm1_customer_id}
+          crm2CustomerId={capture.crm2_customer_id}
+          displayName={displayName}
+        />
+      )}
 
       {/* Aktionen */}
       <div className="flex gap-3">
