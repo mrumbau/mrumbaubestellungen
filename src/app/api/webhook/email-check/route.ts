@@ -303,25 +303,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ relevant: false, grund: "freemail" });
     }
 
-    // ── 7b. Betreff enthält eindeutiges Dokument-Keyword → durchlassen ohne GPT ──
-    // Wenn der Betreff klar auf ein Geschäftsdokument hindeutet, GPT nicht fragen
-    const dokumentKeywords = [
-      "rechnung", "invoice", "rechnungsnummer",
-      "lieferschein", "delivery note",
-      "bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "auftragsbestaetigung",
-      "order confirmation", "bestellung",
-      "angebot", "angebotsnummer", "quotation",
-      "gutschrift", "credit note",
-      "mahnung", "zahlungserinnerung",
-    ];
-    const betreffHatDokument = dokumentKeywords.some(k => betreff.includes(k));
-    if (betreffHatDokument) {
-      return NextResponse.json({
-        relevant: true,
-        grund: "betreff_dokument",
-        bestellnummer_betreff: bestellnummerBetreff,
-      });
-    }
 
     // ── 8. Unbekannter Absender → GPT-4o entscheidet ──
     try {

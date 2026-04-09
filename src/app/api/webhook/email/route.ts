@@ -830,7 +830,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Besteller einschränken wenn bekannt (UNBEKANNT matcht zu breit)
-          if (bestellerKuerzel && bestellerKuerzel !== "UNBEKANNT") {
+          if (erweiterteQuery && bestellerKuerzel && bestellerKuerzel !== "UNBEKANNT") {
             erweiterteQuery = erweiterteQuery.eq("besteller_kuerzel", bestellerKuerzel);
           }
 
@@ -1428,6 +1428,9 @@ export async function POST(request: NextRequest) {
               text: `Abo-Betragsabweichung erkannt!\nErwartet: ${Number(abo.erwarteter_betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} € (±${abo.toleranz_prozent || 10}%)\nErhalten: ${aktuellerBetrag.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €\nAbweichung: ${(abweichung * 100).toFixed(1)}%`,
             });
             logInfo("webhook/email", `Abo-Abweichung: ${abo.name}`, { erwartet: abo.erwarteter_betrag, erhalten: aktuellerBetrag });
+          } else {
+            // Betrag stimmt → Status auf vollstaendig setzen (löst auch alte "abweichung" auf)
+            await supabase.from("bestellungen").update({ status: "vollstaendig" }).eq("id", bestellungId);
           }
         }
 

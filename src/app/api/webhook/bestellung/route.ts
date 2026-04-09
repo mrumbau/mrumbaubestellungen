@@ -52,11 +52,13 @@ export async function POST(request: NextRequest) {
 
     // Duplikat-Check: gleicher Besteller + gleicher Händler innerhalb 5 Minuten?
     // ABER: Wenn das neue Signal eine Bestellnummer hat und das alte nicht → altes upgraden
+    // Nur pending Signale für Dedup prüfen (matched Signale sind schon verbraucht)
     const { data: recentSignals } = await supabase
       .from("bestellung_signale")
-      .select("id, order_nummer")
+      .select("id, order_nummer, status")
       .eq("kuerzel", kuerzel)
       .eq("haendler_domain", haendler_domain)
+      .eq("status", "pending")
       .gte("zeitstempel", new Date(Date.now() - 5 * 60 * 1000).toISOString())
       .limit(1);
 

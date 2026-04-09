@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
     // Prüfe ob alle Dokumente vorhanden → KI-Abgleich starten (nur Material)
     const { data: bestellung } = await supabase
       .from("bestellungen")
-      .select("bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung")
+      .select("bestellungsart, status, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung")
       .eq("id", bestellung_id)
       .single();
 
@@ -277,10 +277,13 @@ export async function POST(request: NextRequest) {
 
         const neuerStatus =
           abgleich.status === "ok" ? "vollstaendig" : "abweichung";
-        await supabase
-          .from("bestellungen")
-          .update({ status: neuerStatus })
-          .eq("id", bestellung_id);
+        // Nur Status setzen wenn nicht bereits freigegeben
+        if (bestellung?.status !== "freigegeben") {
+          await supabase
+            .from("bestellungen")
+            .update({ status: neuerStatus })
+            .eq("id", bestellung_id);
+        }
       } catch (err) {
         logError("/api/scan", "KI-Abgleich Fehler", err);
       }
