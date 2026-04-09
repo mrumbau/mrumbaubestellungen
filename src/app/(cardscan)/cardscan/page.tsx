@@ -26,7 +26,7 @@ const INPUT_MODES = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
       </svg>
     ),
-    active: false,
+    active: true,
   },
   {
     href: "/cardscan/upload",
