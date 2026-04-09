@@ -62,8 +62,10 @@ function LoginForm() {
         }
       }
 
-      router.refresh();
-      router.push(ziel);
+      // Voller Page-Load: Garantiert dass Auth-Cookies gesetzt sind
+      // bevor die Middleware die nächste Route prüft.
+      // Client-seitiges router.push() hat eine Race-Condition mit den Cookies.
+      window.location.replace(ziel);
     }
   }
 

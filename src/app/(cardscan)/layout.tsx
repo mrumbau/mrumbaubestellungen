@@ -41,16 +41,7 @@ export default async function CardScanLayout({
   return (
     <div className="min-h-screen bg-[var(--bg-main)] flex flex-col">
       {/* Service Worker Registration */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.register('/cardscan-sw.js', { scope: '/cardscan' })
-                .catch(function() {});
-            }
-          `,
-        }}
-      />
+      <script src="/cardscan-register-sw.js" defer />
 
       {/* Header – dunkle Sidebar-Ästhetik, industriell */}
       <header className="sticky top-0 z-30 bg-[#141414] border-b border-white/[0.06] safe-area-top">
