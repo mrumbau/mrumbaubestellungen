@@ -774,10 +774,18 @@ export async function POST(request: NextRequest) {
         };
         const flagKey = hauptTyp ? typFlagCheck[hauptTyp] : null;
         if (flagKey && existierendeBestellung[flagKey as keyof typeof existierendeBestellung]) {
-          logInfo("webhook/email", `Stufe-1 Match übersprungen: Bestellung hat bereits ${hauptTyp}`, {
+          // Gleicher Dokumenttyp existiert schon bei gleicher Bestellnummer → Duplikat verwerfen
+          // (z.B. gleiche Rechnung von zwei Make.com Szenarien die verschiedene Outlook-Ordner überwachen)
+          logInfo("webhook/email", `Duplikat verworfen: Bestellung hat bereits ${hauptTyp}`, {
             bestellungId: existierendeBestellung.id, bestellnummer: erkannteBestellnummer, typ: hauptTyp,
           });
-          existierendeBestellung = null; // Nicht zuordnen → neue Bestellung wird erstellt
+          return NextResponse.json({
+            success: true,
+            skipped: true,
+            reason: "duplikat_typ_existiert",
+            bestellungId: existierendeBestellung.id,
+            typ: hauptTyp,
+          });
         }
       }
 

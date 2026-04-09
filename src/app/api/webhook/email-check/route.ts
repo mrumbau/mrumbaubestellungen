@@ -303,6 +303,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ relevant: false, grund: "freemail" });
     }
 
+    // ── 7b. Betreff enthält eindeutiges Dokument-Keyword → durchlassen ohne GPT ──
+    // Wenn der Betreff klar auf ein Geschäftsdokument hindeutet, GPT nicht fragen
+    const dokumentKeywords = [
+      "rechnung", "invoice", "rechnungsnummer",
+      "lieferschein", "delivery note",
+      "bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "auftragsbestaetigung",
+      "order confirmation", "bestellung",
+      "angebot", "angebotsnummer", "quotation",
+      "gutschrift", "credit note",
+      "mahnung", "zahlungserinnerung",
+    ];
+    const betreffHatDokument = dokumentKeywords.some(k => betreff.includes(k));
+    if (betreffHatDokument) {
+      return NextResponse.json({
+        relevant: true,
+        grund: "betreff_dokument",
+        bestellnummer_betreff: bestellnummerBetreff,
+      });
+    }
+
     // ── 8. Unbekannter Absender → GPT-4o entscheidet ──
     try {
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -335,19 +355,21 @@ RELEVANT (ja) — NUR wenn die Email SELBST ein Dokument IST oder eines im Anhan
 - Angebote mit konkreten Positionen/Preisen
 - Aufmaße, Leistungsnachweise
 
-IRRELEVANT (nein) — im Zweifel IMMER nein:
+IRRELEVANT (nein):
 - Newsletter, Werbung, Marketing, ProfiNews, Produktinfos
-- E-Mail-Konversationen/Antworten (AW:, RE:, SV:, FW:, WG:) — das sind Gespräche, keine Dokumente!
-- Allgemeine Korrespondenz ("Sehr geehrter Herr...", "anbei die Unterlagen...")
 - Geräte-Benachrichtigungen (Router, NAS, Drucker, Telefon/3CX)
-- Mahnungen, Zahlungserinnerungen, Kontoinformationen
 - Bewertungsaufforderungen
+- Mahnungen, Zahlungserinnerungen, Kontoinformationen
 - Spam, Phishing, Bewerbungen
 - Hosting-/Domain-Benachrichtigungen
 - Kalender, Social Media, Lesebestätigungen
 - Emails die nur "Per E-Mail senden:" im Betreff haben
 
-WICHTIG: Ein Betreff der "Auftragsbestätigung" oder "Angebot" enthält ist NUR relevant wenn es eine AUTOMATISCHE Benachrichtigung eines Webshops/Händlers ist, NICHT wenn es eine weitergeleitete oder beantwortete persönliche Email ist (erkennbar an AW:/RE:/SV:/FW:/WG: Präfixen).${verworfeneBeispiele}
+WICHTIG — NICHT als irrelevant einstufen:
+- Emails mit "Sehr geehrte Damen und Herren" oder "anbei" sind NICHT automatisch irrelevant! Viele Lieferanten und Handwerker schreiben persönliche Emails mit Rechnungen/Angeboten im Anhang.
+- Wenn der Betreff ODER die Vorschau auf ein Dokument hindeutet (Rechnung, Angebot, Auftragsbestätigung, Lieferschein, im Anhang, attached) → RELEVANT.
+- E-Mail-Antworten (AW:/RE:/SV:) sind NUR irrelevant wenn sie KEINE Dokumente enthalten oder ankündigen.
+- Im Zweifel: RELEVANT (besser eine irrelevante Email verarbeiten als eine Rechnung verpassen).${verworfeneBeispiele}
 
 Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurze Begründung"}`,
           },
