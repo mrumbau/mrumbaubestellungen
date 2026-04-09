@@ -312,6 +312,15 @@ body {
    Micro-Animationen (CardScan)
    ============================================ */
 
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in-up 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 @keyframes scale-in {
   0% { transform: scale(0.5); opacity: 0; }
   60% { transform: scale(1.1); }

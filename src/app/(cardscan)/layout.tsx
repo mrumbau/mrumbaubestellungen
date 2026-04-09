@@ -80,7 +80,7 @@ export default async function CardScanLayout({
       </header>
 
       {/* Content */}
-      <main className="flex-1 p-4 md:p-8">{children}</main>
+      <main className="flex-1 p-4 md:p-8 animate-fade-in">{children}</main>
 
       {/* Subtle footer line */}
       <div className="px-4 pb-4">
