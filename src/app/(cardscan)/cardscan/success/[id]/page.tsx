@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { useTransitionRouter } from "next-view-transitions";
+import { useParams, useRouter } from "next/navigation";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -117,7 +116,7 @@ function CrmRow({ label, status, refNum, error: err }: { label: string; status: 
 
 export default function CardScanSuccessPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [capture, setCapture] = useState<CardScanCapture | null>(null);
   const [loading, setLoading] = useState(true);
 

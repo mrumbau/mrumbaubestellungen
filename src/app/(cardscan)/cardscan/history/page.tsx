@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTransitionRouter } from "next-view-transitions";
+import { useRouter } from "next/navigation";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
 
 const STATUS_DOT: Record<string, string> = {
@@ -62,7 +62,7 @@ function formatDate(iso: string): string {
 }
 
 export default function CardScanHistoryPage() {
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [captures, setCaptures] = useState<CardScanCapture[]>([]);
   const [loading, setLoading] = useState(true);
 

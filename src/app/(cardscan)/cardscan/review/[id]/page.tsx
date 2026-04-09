@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { useTransitionRouter } from "next-view-transitions";
+import { useParams, useRouter } from "next/navigation";
 import type {
   CardScanCapture,
   ExtractedContactData,
@@ -17,7 +16,7 @@ import { ContactPersonCard } from "@/components/cardscan/ContactPersonCard";
 
 export default function CardScanReviewPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useTransitionRouter();
+  const router = useRouter();
 
   const [capture, setCapture] = useState<CardScanCapture | null>(null);
   const [formData, setFormData] = useState<ExtractedContactData | null>(null);

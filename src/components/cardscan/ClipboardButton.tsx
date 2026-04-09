@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useTransitionRouter } from "next-view-transitions";
+import { useRouter } from "next/navigation";
 
 type ClipboardState = "idle" | "reading" | "processing" | "error";
 
 export function ClipboardButton() {
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [state, setState] = useState<ClipboardState>("idle");
   const [error, setError] = useState<string | null>(null);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTransitionRouter } from "next-view-transitions";
+import { useRouter } from "next/navigation";
 import { BackLink } from "@/components/cardscan/BackLink";
 
 interface SyncError {
@@ -24,7 +24,7 @@ function formatDate(iso: string): string {
 }
 
 export default function CardScanErrorsPage() {
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [errors, setErrors] = useState<SyncError[]>([]);
   const [loading, setLoading] = useState(true);
   const [acknowledging, setAcknowledging] = useState(false);

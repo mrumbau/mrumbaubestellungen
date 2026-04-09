@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useTransitionRouter } from "next-view-transitions";
+import { useRouter } from "next/navigation";
 import { BackLink } from "@/components/cardscan/BackLink";
 
 export default function CardScanPastePage() {
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

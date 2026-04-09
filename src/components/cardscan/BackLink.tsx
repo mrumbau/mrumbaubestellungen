@@ -1,6 +1,6 @@
 "use client";
 
-import { Link } from "next-view-transitions";
+import Link from "next/link";
 
 export function BackLink({ href = "/cardscan", label = "Zurück" }: { href?: string; label?: string }) {
   return (

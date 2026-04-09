@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { useTransitionRouter } from "next-view-transitions";
+import { useParams, useRouter } from "next/navigation";
 import { BackLink } from "@/components/cardscan/BackLink";
 import type {
   CardScanCapture,
@@ -57,7 +56,7 @@ function formatDate(iso: string): string {
 
 export default function HistoryDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [capture, setCapture] = useState<CardScanCapture | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useTransitionRouter } from "next-view-transitions";
+import { useRouter } from "next/navigation";
 import { BackLink } from "@/components/cardscan/BackLink";
 
 const SOCIAL_DOMAINS = ["linkedin.com", "xing.com", "facebook.com", "instagram.com"];
@@ -16,7 +16,7 @@ function isSocialUrl(url: string): boolean {
 }
 
 export default function CardScanUrlPage() {
-  const router = useTransitionRouter();
+  const router = useRouter();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

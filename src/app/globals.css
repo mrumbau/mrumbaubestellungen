@@ -56,6 +56,10 @@
    Base
    ============================================ */
 
+html {
+  background: var(--bg-main);
+}
+
 body {
   background: var(--bg-main);
   color: var(--text-primary);
@@ -309,42 +313,17 @@ body {
 }
 
 /* ============================================
-   View Transitions (native App-Feel)
+   Page-Transition (CardScan)
+   Nur transform, keine opacity → kein Flash/Flicker
    ============================================ */
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 250ms;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-::view-transition-old(root) {
-  animation-name: vt-fade-out;
-}
-
-::view-transition-new(root) {
-  animation-name: vt-fade-in;
-}
-
-@keyframes vt-fade-out {
-  to { opacity: 0; transform: scale(0.98); }
-}
-
-@keyframes vt-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-}
-
-/* ============================================
-   Micro-Animationen (CardScan)
-   ============================================ */
-
-@keyframes fade-in-up {
-  0% { opacity: 0.5; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
+@keyframes page-enter {
+  from { transform: translateY(4px); }
+  to { transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fade-in-up 0.2s ease-out;
+  animation: page-enter 0.15s ease-out;
 }
 
 @keyframes scale-in {

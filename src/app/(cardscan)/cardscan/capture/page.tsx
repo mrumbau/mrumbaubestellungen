@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useTransitionRouter } from "next-view-transitions";
+import { useRouter } from "next/navigation";
 
 const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 0.85;
@@ -9,7 +9,7 @@ const JPEG_QUALITY = 0.85;
 type CameraState = "requesting" | "active" | "denied" | "unsupported" | "captured";
 
 export default function CardScanCapturePage() {
-  const router = useTransitionRouter();
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);

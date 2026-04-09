@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link } from "next-view-transitions";
+import Link from "next/link";
 
 export function ErrorBadgeLink() {
   const [errorCount, setErrorCount] = useState(0);
