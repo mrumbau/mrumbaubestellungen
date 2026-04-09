@@ -3,11 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/cron", "/api/extension", "/api/health"];
 
+// Exakte Pfade die ohne Auth erreichbar sind (Tool-Auswahl)
+const PUBLIC_EXACT = ["/"];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Öffentliche Pfade durchlassen
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || PUBLIC_EXACT.includes(pathname)) {
     return NextResponse.next();
   }
 

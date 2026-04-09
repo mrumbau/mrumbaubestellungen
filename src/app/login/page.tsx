@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -40,11 +50,14 @@ export default function LoginPage() {
         .eq("user_id", user.id)
         .single();
 
-      let ziel = "/bestellungen";
-      if (profil?.rolle === "buchhaltung") {
-        ziel = "/buchhaltung";
-      } else if (profil?.rolle === "admin") {
-        ziel = "/dashboard";
+      // Redirect-Parameter hat Vorrang (von Tool-Auswahl)
+      let ziel = redirectTo || "/bestellungen";
+      if (!redirectTo) {
+        if (profil?.rolle === "buchhaltung") {
+          ziel = "/buchhaltung";
+        } else if (profil?.rolle === "admin") {
+          ziel = "/dashboard";
+        }
       }
 
       router.refresh();
