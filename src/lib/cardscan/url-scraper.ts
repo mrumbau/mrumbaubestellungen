@@ -37,6 +37,12 @@ const PRIVATE_IP_RANGES = [
   /^fc00:/i,
   /^fd/i,
   /^fe80:/i,
+  // IPv6-mapped IPv4 (::ffff:127.0.0.1 etc.)
+  /^::ffff:10\./i,
+  /^::ffff:172\.(1[6-9]|2\d|3[01])\./i,
+  /^::ffff:192\.168\./i,
+  /^::ffff:127\./i,
+  /^::ffff:0\./i,
 ];
 
 function isBlockedUrl(url: string): boolean {
@@ -50,7 +56,7 @@ function isBlockedUrl(url: string): boolean {
     const host = parsed.hostname.toLowerCase();
     if (BLOCKED_HOSTS.includes(host)) return true;
 
-    // Private IP-Ranges
+    // Private IP-Ranges (inkl. IPv6-mapped)
     if (PRIVATE_IP_RANGES.some((r) => r.test(host))) return true;
 
     // Port-Check (nur Standard-Ports erlaubt)
@@ -120,49 +126,61 @@ function extractTextFromHtml(html: string, url: string): string {
 
 // ─── Fetch mit Timeout ──────────────────────────────────────────────
 
-async function fetchPage(url: string): Promise<string | null> {
+async function fetchPage(url: string, maxRedirects = 3): Promise<string | null> {
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-      },
-      redirect: "follow",
-      signal: AbortSignal.timeout(10_000),
-    });
+    let currentUrl = url;
 
-    if (!res.ok) return null;
+    // Manuelle Redirect-Verfolgung mit SSRF-Check pro Hop
+    for (let i = 0; i <= maxRedirects; i++) {
+      if (isBlockedUrl(currentUrl)) return null;
 
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("text/html") && !contentType.includes("xhtml")) {
-      return null;
+      const res = await fetch(currentUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        },
+        redirect: "manual",
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      // Redirect → nächsten Hop validieren
+      if ([301, 302, 303, 307, 308].includes(res.status)) {
+        const location = res.headers.get("location");
+        if (!location) return null;
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+
+      if (!res.ok) return null;
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("text/html") && !contentType.includes("xhtml")) {
+        return null;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) return await res.text();
+
+      const chunks: Uint8Array[] = [];
+      let totalBytes = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        totalBytes += value.length;
+        if (totalBytes > MAX_RESPONSE_BYTES) break;
+      }
+
+      reader.cancel();
+      const decoder = new TextDecoder("utf-8", { fatal: false });
+      return decoder.decode(Buffer.concat(chunks));
     }
 
-    // Response-Größe begrenzen (max 500 KB)
-    const contentLength = res.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_BYTES) {
-      // Trotzdem lesen, aber abschneiden
-    }
-
-    const reader = res.body?.getReader();
-    if (!reader) return await res.text();
-
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      totalBytes += value.length;
-      if (totalBytes > MAX_RESPONSE_BYTES) break;
-    }
-
-    reader.cancel();
-    const decoder = new TextDecoder("utf-8", { fatal: false });
-    return decoder.decode(Buffer.concat(chunks));
+    // Zu viele Redirects
+    return null;
   } catch {
     return null;
   }

@@ -53,16 +53,19 @@ self.addEventListener("fetch", (event) => {
           };
         }
 
-        // In Cache speichern
+        // Session-ID generieren um Cache-Kollisionen zwischen Tabs zu vermeiden
+        const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+        // In Cache speichern mit Session-Key
         await cache.put(
-          "/cardscan/share-data",
+          `/cardscan/share-data/${sessionId}`,
           new Response(JSON.stringify(shareData), {
             headers: { "Content-Type": "application/json" },
           })
         );
 
-        // Zur Share-Page weiterleiten
-        return Response.redirect("/cardscan/share", 303);
+        // Zur Share-Page weiterleiten mit Session-ID
+        return Response.redirect(`/cardscan/share?sid=${sessionId}`, 303);
       })()
     );
     return;

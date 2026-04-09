@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface ShareData {
   title?: string;
@@ -16,7 +16,16 @@ interface ShareData {
 }
 
 export default function CardScanSharePage() {
+  return (
+    <Suspense>
+      <ShareHandler />
+    </Suspense>
+  );
+}
+
+function ShareHandler() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "processing" | "error" | "empty">("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -26,9 +35,14 @@ export default function CardScanSharePage() {
 
   async function handleSharedData() {
     try {
+      const sessionId = searchParams.get("sid");
+      const cacheKey = sessionId
+        ? `/cardscan/share-data/${sessionId}`
+        : "/cardscan/share-data";
+
       // Shared-Data aus Service Worker Cache lesen
       const cache = await caches.open("cardscan-share");
-      const response = await cache.match("/cardscan/share-data");
+      const response = await cache.match(cacheKey);
 
       if (!response) {
         setStatus("empty");
@@ -38,7 +52,7 @@ export default function CardScanSharePage() {
       const shareData: ShareData = await response.json();
 
       // Cache aufräumen
-      await cache.delete("/cardscan/share-data");
+      await cache.delete(cacheKey);
 
       // Entscheiden was wir haben
       if (shareData.file) {

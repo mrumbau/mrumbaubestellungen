@@ -79,20 +79,35 @@ export async function extractContactFromText(
     throw new Error(`GPT-4o hat die Anfrage abgelehnt: ${refusal}`);
   }
 
-  const parsed = JSON.parse(content);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error("GPT-4o returned invalid JSON");
+  }
 
-  // Confidence-Scores separieren
+  // Pflichtfelder validieren
+  if (!parsed.customer_type || !parsed.confidence) {
+    throw new Error("GPT-4o Response fehlt customer_type oder confidence");
+  }
+
   const { confidence, ...contactFields } = parsed;
+  const conf = confidence as ConfidenceScores;
+
+  // Sicherstellen dass overall existiert
+  if (typeof conf.overall !== "number") {
+    conf.overall = 0.5;
+  }
 
   logInfo(ROUTE_TAG, "Extraktion erfolgreich", {
     customerType: contactFields.customer_type,
-    overallConfidence: confidence.overall,
+    overallConfidence: conf.overall,
     durationMs,
   });
 
   return {
-    data: contactFields as ExtractedContactData,
-    confidence: confidence as ConfidenceScores,
+    data: contactFields as unknown as ExtractedContactData,
+    confidence: conf,
     durationMs,
   };
 }
@@ -155,18 +170,33 @@ export async function extractContactFromImage(
     throw new Error(`GPT-4o hat die Anfrage abgelehnt: ${refusal}`);
   }
 
-  const parsed = JSON.parse(content);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error("GPT-4o returned invalid JSON");
+  }
+
+  if (!parsed.customer_type || !parsed.confidence) {
+    throw new Error("GPT-4o Response fehlt customer_type oder confidence");
+  }
+
   const { confidence, ...contactFields } = parsed;
+  const conf = confidence as ConfidenceScores;
+
+  if (typeof conf.overall !== "number") {
+    conf.overall = 0.5;
+  }
 
   logInfo(ROUTE_TAG, "Bild-Extraktion erfolgreich", {
     customerType: contactFields.customer_type,
-    overallConfidence: confidence.overall,
+    overallConfidence: conf.overall,
     durationMs,
   });
 
   return {
-    data: contactFields as ExtractedContactData,
-    confidence: confidence as ConfidenceScores,
+    data: contactFields as unknown as ExtractedContactData,
+    confidence: conf,
     durationMs,
   };
 }

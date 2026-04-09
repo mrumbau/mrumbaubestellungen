@@ -130,10 +130,19 @@ export async function POST(request: NextRequest) {
       captureUpdate.status = "failed";
     }
 
-    await serviceClient
+    const { error: captureUpdateError } = await serviceClient
       .from("cardscan_captures")
       .update(captureUpdate)
-      .eq("id", capture_id);
+      .eq("id", capture_id)
+      .eq("user_id", user.id);
+
+    if (captureUpdateError) {
+      logError(ROUTE, "CRM-Status-Update fehlgeschlagen", captureUpdateError);
+      return NextResponse.json(
+        { error: ERRORS.INTERNER_FEHLER },
+        { status: 500 }
+      );
+    }
 
     // Fehler in cardscan_sync_errors loggen
     const errorInserts: Record<string, unknown>[] = [];
