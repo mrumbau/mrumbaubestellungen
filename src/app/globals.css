@@ -287,6 +287,66 @@ body {
 }
 
 /* ============================================
+   Skeleton Loading
+   ============================================ */
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.15; }
+}
+
+.skeleton {
+  background: var(--border-default);
+  border-radius: var(--radius-md);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  height: 1em;
+}
+
+/* ============================================
+   Micro-Animationen (CardScan)
+   ============================================ */
+
+@keyframes scale-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%, 45%, 75% { transform: translateX(-6px); }
+  30%, 60%, 90% { transform: translateX(6px); }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reduce Motion: alle Animationen deaktivieren */
+@media (prefers-reduced-motion: reduce) {
+  .animate-scale-in,
+  .animate-shake,
+  .skeleton,
+  .skeleton-text,
+  .spinner,
+  .pulse-urgent,
+  .card-hover {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ============================================
    Pulse Glow – für dringende Fälligkeiten
    ============================================ */
 

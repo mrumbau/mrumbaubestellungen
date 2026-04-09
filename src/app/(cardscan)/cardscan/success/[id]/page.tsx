@@ -41,8 +41,19 @@ export default function CardScanSuccessPage() {
 
   if (loading) {
     return (
-      <div className="max-w-xl mx-auto py-20 text-center">
-        <div className="spinner w-8 h-8 mx-auto" />
+      <div className="max-w-xl mx-auto py-12 text-center">
+        <div className="skeleton w-20 h-20 rounded-full mx-auto mb-6" />
+        <div className="skeleton-text w-1/3 h-7 mx-auto mb-2" />
+        <div className="skeleton-text w-2/3 h-4 mx-auto mb-8" />
+        <div className="card p-4 mb-6 text-left space-y-3">
+          <div className="skeleton-text w-1/4 h-3" />
+          <div className="skeleton w-full h-8" />
+          <div className="skeleton w-full h-8" />
+        </div>
+        <div className="flex gap-3">
+          <div className="skeleton flex-1 h-12" />
+          <div className="skeleton flex-1 h-12" />
+        </div>
       </div>
     );
   }
@@ -60,16 +71,28 @@ export default function CardScanSuccessPage() {
   const isPartial = capture?.status === "partial_success";
   const isFailed = capture?.status === "failed";
 
+  // Haptisches Feedback beim Laden
+  useEffect(() => {
+    if (!capture || loading) return;
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      if (isFailed) {
+        navigator.vibrate([100, 50, 100]);
+      } else {
+        navigator.vibrate([50, 30, 50]);
+      }
+    }
+  }, [capture, loading, isFailed]);
+
   return (
     <div className="max-w-xl mx-auto py-12 text-center">
-      {/* Icon */}
+      {/* Icon mit Animation */}
       <div
         className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${
           isFailed
-            ? "bg-red-50"
+            ? "bg-red-50 animate-shake"
             : isPartial
-              ? "bg-amber-50"
-              : "bg-emerald-50"
+              ? "bg-amber-50 animate-scale-in"
+              : "bg-emerald-50 animate-scale-in"
         }`}
       >
         {isFailed ? (

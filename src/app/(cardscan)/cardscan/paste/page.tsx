@@ -54,7 +54,9 @@ export default function CardScanPastePage() {
       </p>
 
       <form onSubmit={handleSubmit}>
+        <label htmlFor="cardscan-text-input" className="sr-only">Kontaktdaten als Text</label>
         <textarea
+          id="cardscan-text-input"
           value={text}
           onChange={(e) => {
             setText(e.target.value);

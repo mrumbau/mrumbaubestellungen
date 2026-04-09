@@ -1,6 +1,8 @@
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ClipboardButton } from "@/components/cardscan/ClipboardButton";
+import { ErrorBadgeLink } from "@/components/cardscan/ErrorBadgeLink";
 
 export const dynamic = "force-dynamic";
 
@@ -124,17 +126,12 @@ export default async function CardScanPage() {
             </Link>
           );
         })}
+        {/* Clipboard-Button (Client Component) */}
+        <ClipboardButton />
       </div>
 
-      {/* Link zu Historie */}
-      <div className="mt-8 text-center">
-        <Link
-          href="/cardscan/history"
-          className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-        >
-          Letzte Scans ansehen →
-        </Link>
-      </div>
+      {/* Historie-Link + Error-Badge */}
+      <ErrorBadgeLink />
     </div>
   );
 }

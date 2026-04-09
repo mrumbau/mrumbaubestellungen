@@ -1,10 +1,193 @@
-// CardScan – Error-Dashboard (Phase 8)
-// TODO: Alert-Badge, fehlgeschlagene CRM-Writes, Acknowledge
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+interface SyncError {
+  id: string;
+  created_at: string;
+  capture_id: string;
+  crm: "crm1" | "crm2";
+  error_type: string;
+  error_message: string;
+  acknowledged: boolean;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function CardScanErrorsPage() {
+  const router = useRouter();
+  const [errors, setErrors] = useState<SyncError[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acknowledging, setAcknowledging] = useState(false);
+
+  async function loadErrors() {
+    try {
+      const res = await fetch("/api/cardscan/errors");
+      const json = await res.json();
+      setErrors(json.data || []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadErrors();
+  }, []);
+
+  async function handleAcknowledge(errorId: string) {
+    setAcknowledging(true);
+    await fetch("/api/cardscan/errors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error_id: errorId }),
+    });
+    setErrors((prev) =>
+      prev.map((e) => (e.id === errorId ? { ...e, acknowledged: true } : e))
+    );
+    setAcknowledging(false);
+  }
+
+  async function handleAcknowledgeAll() {
+    setAcknowledging(true);
+    await fetch("/api/cardscan/errors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acknowledge_all: true }),
+    });
+    setErrors((prev) => prev.map((e) => ({ ...e, acknowledged: true })));
+    setAcknowledging(false);
+  }
+
+  const openErrors = errors.filter((e) => !e.acknowledged);
+  const closedErrors = errors.filter((e) => e.acknowledged);
+
+  if (loading) {
+    return (
+      <div className="max-w-xl mx-auto py-20 text-center">
+        <div className="spinner w-8 h-8 mx-auto" />
+      </div>
+    );
+  }
+
   return (
-    <div className="text-center text-[var(--text-tertiary)] py-20">
-      Error-Dashboard – Phase 8
+    <div className="max-w-xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
+          Sync-Fehler
+        </h1>
+        {openErrors.length > 0 && (
+          <span className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-700 font-medium">
+            {openErrors.length} offen
+          </span>
+        )}
+      </div>
+
+      {errors.length === 0 && (
+        <div className="card p-8 text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-emerald-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </div>
+          <p className="text-sm text-[var(--text-tertiary)]">
+            Keine Sync-Fehler vorhanden.
+          </p>
+        </div>
+      )}
+
+      {/* Offene Fehler */}
+      {openErrors.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+              Offene Fehler
+            </h2>
+            <button
+              onClick={handleAcknowledgeAll}
+              disabled={acknowledging}
+              className="text-xs text-[var(--mr-red)] hover:underline font-medium"
+            >
+              Alle bestätigen
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {openErrors.map((err) => (
+              <div key={err.id} className="card p-4 border-red-200">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-600">
+                        {err.crm === "crm1" ? "CRM 1" : "CRM 2"}
+                      </span>
+                      <span className="text-xs text-[var(--text-tertiary)]">
+                        {formatDate(err.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[var(--text-primary)]">
+                      {err.error_message}
+                    </p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                      Typ: {err.error_type}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleAcknowledge(err.id)}
+                    disabled={acknowledging}
+                    className="text-xs px-2.5 py-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-input)] transition-colors shrink-0"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bestätigte Fehler */}
+      {closedErrors.length > 0 && (
+        <div>
+          <h2 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-3">
+            Bestätigt ({closedErrors.length})
+          </h2>
+          <div className="space-y-2 opacity-60">
+            {closedErrors.slice(0, 10).map((err) => (
+              <div key={err.id} className="card p-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
+                    {err.crm === "crm1" ? "CRM 1" : "CRM 2"}
+                  </span>
+                  <span className="flex-1 truncate text-[var(--text-secondary)]">
+                    {err.error_message}
+                  </span>
+                  <span className="text-[var(--text-tertiary)]">
+                    {formatDate(err.created_at)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Zurück */}
+      <div className="mt-8 text-center">
+        <button
+          onClick={() => router.push("/cardscan")}
+          className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+        >
+          ← Zurück zu CardScan
+        </button>
+      </div>
     </div>
   );
 }

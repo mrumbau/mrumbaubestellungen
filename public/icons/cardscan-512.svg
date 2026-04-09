@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#570006"/>
+  <g transform="translate(256,256)">
+    <!-- Camera body -->
+    <rect x="-128" y="-75" width="256" height="170" rx="20" fill="none" stroke="#fff" stroke-width="10"/>
+    <!-- Camera lens -->
+    <circle cx="0" cy="10" r="54" fill="none" stroke="#fff" stroke-width="10"/>
+    <circle cx="0" cy="10" r="22" fill="#fff" opacity="0.3"/>
+    <!-- Flash -->
+    <rect x="-86" y="-96" width="64" height="30" rx="10" fill="none" stroke="#fff" stroke-width="7"/>
+    <!-- Scan lines -->
+    <line x1="-96" y1="118" x2="96" y2="118" stroke="#fff" stroke-width="5" opacity="0.5"/>
+    <line x1="-72" y1="134" x2="72" y2="134" stroke="#fff" stroke-width="5" opacity="0.3"/>
+  </g>
+</svg>

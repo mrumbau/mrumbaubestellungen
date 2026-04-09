@@ -1,0 +1,45 @@
+{
+  "name": "CardScan - MR Umbau",
+  "short_name": "CardScan",
+  "description": "Kontaktdaten erfassen & ins CRM übernehmen",
+  "start_url": "/cardscan",
+  "scope": "/cardscan",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#570006",
+  "background_color": "#f5f4f2",
+  "icons": [
+    {
+      "src": "/icons/cardscan-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/cardscan-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icons/cardscan-maskable.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "share_target": {
+    "action": "/cardscan/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "file",
+          "accept": ["image/*", "application/pdf", "text/vcard", ".vcf"]
+        }
+      ]
+    }
+  }
+}

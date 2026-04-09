@@ -1,6 +1,26 @@
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Metadata, Viewport } from "next";
+
+export const metadata: Metadata = {
+  title: "CardScan – MR Umbau",
+  description: "Kontaktdaten erfassen & ins CRM übernehmen",
+  manifest: "/cardscan-manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CardScan",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#570006",
+};
 
 export default async function CardScanLayout({
   children,
@@ -15,11 +35,23 @@ export default async function CardScanLayout({
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] flex flex-col">
+      {/* Service Worker Registration */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('/cardscan-sw.js', { scope: '/cardscan' })
+                .catch(function() {});
+            }
+          `,
+        }}
+      />
       {/* Minimaler Top-Bar ohne Sidebar */}
       <header className="sticky top-0 z-30 bg-[var(--bg-sidebar)] text-[var(--text-inverse)] px-4 py-3 flex items-center justify-between safe-area-top">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-white/70 hover:text-white transition-colors focus-ring rounded"
+          aria-label="Zurück zum Dashboard"
         >
           <svg
             className="w-5 h-5"
@@ -27,6 +59,7 @@ export default async function CardScanLayout({
             viewBox="0 0 24 24"
             stroke="currentColor"
             strokeWidth={1.5}
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
