@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "crm, customer_id und final_data erforderlich" }, { status: 400 });
     }
 
+    if (crm !== "crm1" && crm !== "crm2") {
+      return NextResponse.json({ error: "crm muss 'crm1' oder 'crm2' sein" }, { status: 400 });
+    }
+
     const token = crm === "crm1"
       ? process.env.DAS_PROGRAMM_TOKEN_CRM1 || ""
       : process.env.DAS_PROGRAMM_TOKEN_CRM2 || "";

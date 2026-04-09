@@ -15,6 +15,17 @@ import type {
 
 const ROUTE_TAG = "/lib/cardscan/duplicate-matcher";
 
+// Duplikat-Schwellenwerte
+const SCORE_EMAIL_EXACT = 0.99;
+const SCORE_COMPANY_CITY = 0.85;
+const SCORE_NAME_DOMAIN = 0.85;
+const SCORE_PHONE_SUFFIX = 0.80;
+const SCORE_COMPANY_FUZZY = 0.65;
+const THRESHOLD_NAME_SIMILARITY = 0.9;
+const THRESHOLD_COMPANY_SIMILARITY = 0.85;
+const THRESHOLD_COMPANY_FUZZY = 0.7;
+const SEARCH_TIMEOUT_MS = 5_000;
+
 interface DuplicateSearchResult {
   matches: DuplicateMatch[];
   durationMs: number;
@@ -79,7 +90,7 @@ function evaluateMatch(
       crm,
       customerId: hit.id,
       referenceNumber: hit.referenceNumber,
-      score: 0.99,
+      score: SCORE_EMAIL_EXACT,
       reason: `Gleiche E-Mail: ${hit.email}`,
       firstName: hit.firstName,
       lastName: hit.lastName,
@@ -97,12 +108,12 @@ function evaluateMatch(
   ) {
     const nameSim = similarity(data.companyName, hit.companyName);
     const citySim = similarity(data.address.city, hit.city);
-    if (nameSim > 0.85 && citySim > 0.85) {
+    if (nameSim > THRESHOLD_COMPANY_SIMILARITY && citySim > THRESHOLD_COMPANY_SIMILARITY) {
       return {
         crm,
         customerId: hit.id,
         referenceNumber: hit.referenceNumber,
-        score: 0.85,
+        score: SCORE_COMPANY_CITY,
         reason: `Firma "${hit.companyName}" in ${hit.city}`,
         firstName: hit.firstName,
         lastName: hit.lastName,
@@ -126,12 +137,12 @@ function evaluateMatch(
     const dataDomain = data.email.split("@")[1]?.toLowerCase();
     const hitDomain = hit.email.split("@")[1]?.toLowerCase();
 
-    if (firstSim > 0.9 && lastSim > 0.9 && dataDomain && dataDomain === hitDomain) {
+    if (firstSim > THRESHOLD_NAME_SIMILARITY && lastSim > THRESHOLD_NAME_SIMILARITY && dataDomain && dataDomain === hitDomain) {
       return {
         crm,
         customerId: hit.id,
         referenceNumber: hit.referenceNumber,
-        score: 0.85,
+        score: SCORE_NAME_DOMAIN,
         reason: `${hit.firstName} ${hit.lastName} (gleiche Domain: @${hitDomain})`,
         firstName: hit.firstName,
         lastName: hit.lastName,
@@ -146,12 +157,12 @@ function evaluateMatch(
     const nameSim = similarity(data.companyName, hit.companyName);
     const cityExact =
       data.address.city.toLowerCase() === hit.city.toLowerCase();
-    if (nameSim > 0.7 && cityExact) {
+    if (nameSim > THRESHOLD_COMPANY_FUZZY && cityExact) {
       return {
         crm,
         customerId: hit.id,
         referenceNumber: hit.referenceNumber,
-        score: 0.65,
+        score: SCORE_COMPANY_FUZZY,
         reason: `Ähnliche Firma "${hit.companyName}" in ${hit.city}`,
         firstName: hit.firstName,
         lastName: hit.lastName,
@@ -169,7 +180,7 @@ function evaluateMatch(
       crm,
       customerId: hit.id,
       referenceNumber: hit.referenceNumber,
-      score: 0.8,
+      score: SCORE_PHONE_SUFFIX,
       reason: `Gleiche Telefonnummer (Suffix: ...${dataPhone.slice(-4)})`,
       firstName: hit.firstName,
       lastName: hit.lastName,
@@ -235,7 +246,7 @@ async function searchInCrm(
   const results = await Promise.allSettled(
     searchPromises.map((p) =>
       Promise.race([p, new Promise<CustomerSearchResult[]>((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 5000)
+        setTimeout(() => reject(new Error("Timeout")), SEARCH_TIMEOUT_MS)
       )])
     )
   );

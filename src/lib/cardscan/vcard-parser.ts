@@ -30,7 +30,7 @@ export function parseVcard(vcfContent: string): VcardParseResult {
 
     // Property-Name extrahieren (ohne Parameter wie ;TYPE=WORK etc.)
     const propName = keyPart.split(";")[0];
-    const params = keyPart.toUpperCase();
+    const typeParams = keyPart.toUpperCase(); // z.B. "TEL;TYPE=CELL"
 
     switch (propName) {
       case "FN":
@@ -56,8 +56,8 @@ export function parseVcard(vcfContent: string): VcardParseResult {
         break;
       case "TEL": {
         const isCell =
-          params.includes("CELL") || params.includes("MOBILE");
-        const isFax = params.includes("FAX");
+          typeParams.includes("CELL") || typeParams.includes("MOBILE");
+        const isFax = typeParams.includes("FAX");
         if (isFax) {
           fields.fax = value;
         } else if (isCell) {

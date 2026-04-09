@@ -48,6 +48,8 @@ export function ClipboardButton() {
             setState("idle");
             return;
           }
+          // Andere Fehler (z.B. API-Fehler) nach oben weiterreichen
+          throw readErr;
         }
       }
 
