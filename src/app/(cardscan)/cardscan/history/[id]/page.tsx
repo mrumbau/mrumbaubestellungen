@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTransitionRouter } from "next-view-transitions";
+import { BackLink } from "@/components/cardscan/BackLink";
 import type {
   CardScanCapture,
   ExtractedContactData,
@@ -71,7 +72,7 @@ export default function HistoryDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-xl mx-auto py-20 text-center">
+      <div className="max-w-lg mx-auto py-20 text-center">
         <div className="spinner w-8 h-8 mx-auto" />
       </div>
     );
@@ -79,7 +80,7 @@ export default function HistoryDetailPage() {
 
   if (!capture) {
     return (
-      <div className="max-w-xl mx-auto py-20 text-center">
+      <div className="max-w-lg mx-auto py-20 text-center">
         <p className="text-sm text-red-600">Eintrag nicht gefunden.</p>
         <button
           onClick={() => router.push("/cardscan/history")}
@@ -102,10 +103,11 @@ export default function HistoryDetailPage() {
     : "Unbekannt";
 
   return (
-    <div className="max-w-xl mx-auto pb-8 animate-fade-in">
+    <div className="max-w-lg mx-auto pb-8 animate-fade-in">
+      <BackLink href="/cardscan/history" label="Historie" />
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
+        <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight">
           {displayName || "Kontaktdetails"}
         </h1>
         <div className="flex items-center gap-3 mt-2">
@@ -206,13 +208,6 @@ export default function HistoryDetailPage() {
         </>
       )}
 
-      {/* Zurück */}
-      <button
-        onClick={() => router.push("/cardscan/history")}
-        className="w-full py-3 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors mt-2"
-      >
-        ← Zurück zur Historie
-      </button>
     </div>
   );
 }

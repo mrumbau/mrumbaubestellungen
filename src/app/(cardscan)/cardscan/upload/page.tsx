@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useTransitionRouter } from "next-view-transitions";
+import { BackLink } from "@/components/cardscan/BackLink";
 
 const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 0.85;
@@ -226,12 +227,13 @@ export default function CardScanUploadPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto animate-fade-in">
-      <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight mb-2">
+    <div className="max-w-lg mx-auto animate-fade-in">
+      <BackLink />
+      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
         Datei hochladen
       </h1>
-      <p className="text-sm text-[var(--text-secondary)] mb-6">
-        Visitenkarten-Foto, PDF, DOCX oder vCard (.vcf) hochladen.
+      <p className="text-sm text-[var(--text-tertiary)] mb-5">
+        Foto, PDF, DOCX oder vCard (.vcf) hochladen.
       </p>
 
       {/* Datei-Auswahl */}
@@ -349,31 +351,20 @@ export default function CardScanUploadPage() {
         </div>
       )}
 
-      {/* Aktionen */}
-      <div className="mt-6 flex gap-3">
-        <button
-          type="button"
-          onClick={() => router.push("/cardscan")}
-          className="flex-1 py-3 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
-          disabled={loading}
-        >
-          Abbrechen
-        </button>
-        <button
-          onClick={handleUpload}
-          disabled={loading || !selectedFile}
-          className="flex-1 py-3 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
-        >
-          {loading ? (
-            <>
-              <span className="spinner w-4 h-4" />
-              Analysiere…
-            </>
+      <button
+        onClick={handleUpload}
+        disabled={loading || !selectedFile}
+        className="w-full mt-5 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
+      >
+        {loading ? (
+          <>
+            <span className="spinner w-4 h-4 border-white/30 border-t-white" />
+            Analysiere…
+          </>
           ) : (
             "Analysieren"
           )}
-        </button>
-      </div>
+      </button>
     </div>
   );
 }

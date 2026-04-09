@@ -120,7 +120,7 @@ export default function CardScanReviewPage() {
   // ─── Loading ────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-lg mx-auto">
         {/* Visitenkarten-Skeleton */}
         <div className="card p-5 mb-4">
           <div className="flex items-start gap-4">
@@ -150,7 +150,7 @@ export default function CardScanReviewPage() {
 
   if (error && !capture) {
     return (
-      <div className="max-w-xl mx-auto py-20 text-center">
+      <div className="max-w-lg mx-auto py-20 text-center">
         <p className="text-red-600 text-sm">{error}</p>
         <button onClick={() => router.push("/cardscan")} className="mt-4 text-sm text-[var(--text-secondary)] underline">Zurück</button>
       </div>
@@ -169,7 +169,7 @@ export default function CardScanReviewPage() {
   const hasSecondaryFields = !!(formData.fax || formData.website || formData.vatId || formData.letterSalutation);
 
   return (
-    <div className="max-w-xl mx-auto pb-8 animate-fade-in">
+    <div className="max-w-lg mx-auto pb-8 animate-fade-in">
       {/* ─── Visitenkarten-Preview ─────────────────────────────────── */}
       <div className="card p-5 mb-4 corner-marks">
         <div className="flex items-start gap-4">
@@ -322,7 +322,7 @@ export default function CardScanReviewPage() {
       <div className="flex gap-3">
         <button
           onClick={handleDiscard}
-          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
+          className="flex-1 py-3.5 px-4 rounded-xl border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[48px] active:scale-[0.98]"
           disabled={saving}
           aria-label="Kontakt verwerfen"
         >
@@ -331,7 +331,7 @@ export default function CardScanReviewPage() {
         <button
           onClick={handleConfirm}
           disabled={saving || !canSubmit}
-          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[44px]"
+          className="flex-1 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
           aria-label="Kontakt bestätigen und im CRM anlegen"
         >
           {saving ? (

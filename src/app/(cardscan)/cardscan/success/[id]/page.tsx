@@ -135,7 +135,7 @@ export default function CardScanSuccessPage() {
 
   if (loading) {
     return (
-      <div className="max-w-xl mx-auto py-12">
+      <div className="max-w-lg mx-auto py-12">
         <div className="skeleton w-14 h-14 rounded-2xl mx-auto mb-5" />
         <div className="skeleton-text w-1/3 h-6 mx-auto mb-2" />
         <div className="skeleton-text w-2/3 h-4 mx-auto mb-8" />
@@ -158,7 +158,7 @@ export default function CardScanSuccessPage() {
   const isPartial = capture?.status === "partial_success";
 
   return (
-    <div className="max-w-xl mx-auto py-8 animate-fade-in">
+    <div className="max-w-lg mx-auto py-8 animate-fade-in">
       {/* ─── Hero: Kontaktname groß + Icon ─────────────────────────── */}
       <div className="text-center mb-8">
         <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
@@ -171,7 +171,7 @@ export default function CardScanSuccessPage() {
           )}
         </div>
 
-        <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
+        <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight">
           {displayName}
         </h1>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
@@ -199,13 +199,13 @@ export default function CardScanSuccessPage() {
       <div className="flex gap-3">
         <button
           onClick={() => router.push("/cardscan")}
-          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] transition-colors min-h-[44px]"
+          className="flex-1 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] transition-colors min-h-[48px] active:scale-[0.98]"
         >
           Neuer Scan
         </button>
         <button
           onClick={() => router.push("/cardscan/history")}
-          className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[44px]"
+          className="flex-1 py-3.5 px-4 rounded-xl border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[48px] active:scale-[0.98]"
         >
           Historie
         </button>
