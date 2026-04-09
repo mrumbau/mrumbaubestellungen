@@ -17,8 +17,10 @@ export default async function Home() {
       {/* ─── Bestellmanagement Panel ─────────────────────────────────── */}
       <Link
         href={bestellwesenHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50vh] lg:min-h-screen transition-all duration-500 lg:hover:flex-[1.15]"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50vh] lg:min-h-screen"
       >
+        {/* Hover overlay – GPU-beschleunigt via opacity */}
+        <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         {/* Layered patterns */}
         <div className="absolute inset-0 bg-grid-pattern" />
         <div className="absolute inset-0 bg-diagonal-lines" />
@@ -109,7 +111,7 @@ export default async function Home() {
       {/* ─── CardScan Panel ──────────────────────────────────────────── */}
       <Link
         href={cardscanHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-[#141414] overflow-hidden min-h-[50vh] lg:min-h-screen transition-all duration-500 lg:hover:flex-[1.15]"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-[#141414] overflow-hidden min-h-[50vh] lg:min-h-screen"
       >
         {/* Dot grid pattern */}
         <div className="absolute inset-0 bg-dot-grid opacity-60" />
