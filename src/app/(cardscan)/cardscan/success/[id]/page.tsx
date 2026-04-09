@@ -158,7 +158,7 @@ export default function CardScanSuccessPage() {
   const isPartial = capture?.status === "partial_success";
 
   return (
-    <div className="max-w-xl mx-auto py-8">
+    <div className="max-w-xl mx-auto py-8 animate-fade-in">
       {/* ─── Hero: Kontaktname groß + Icon ─────────────────────────── */}
       <div className="text-center mb-8">
         <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center ${

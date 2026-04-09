@@ -69,7 +69,6 @@ export default async function CardScanLayout({
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 p-4 md:p-8">{children}</main>
 
         {/* Footer */}

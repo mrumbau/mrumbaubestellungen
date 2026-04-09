@@ -169,7 +169,7 @@ export default function CardScanReviewPage() {
   const hasSecondaryFields = !!(formData.fax || formData.website || formData.vatId || formData.letterSalutation);
 
   return (
-    <div className="max-w-xl mx-auto pb-8">
+    <div className="max-w-xl mx-auto pb-8 animate-fade-in">
       {/* ─── Visitenkarten-Preview ─────────────────────────────────── */}
       <div className="card p-5 mb-4 corner-marks">
         <div className="flex items-start gap-4">

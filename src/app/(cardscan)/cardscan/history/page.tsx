@@ -108,7 +108,7 @@ export default function CardScanHistoryPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-xl mx-auto animate-fade-in">
       <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight mb-6">
         Letzte Scans
       </h1>

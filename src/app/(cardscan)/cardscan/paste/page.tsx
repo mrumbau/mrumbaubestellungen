@@ -44,7 +44,7 @@ export default function CardScanPastePage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto animate-fade-in">
       <BackLink />
       <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
         Text einfügen

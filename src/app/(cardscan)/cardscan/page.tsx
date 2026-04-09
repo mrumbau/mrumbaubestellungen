@@ -12,7 +12,7 @@ export default async function CardScanPage() {
   const firstName = profil.name.split(" ")[0];
 
   return (
-    <div className="max-w-lg mx-auto flex flex-col min-h-[calc(100dvh-120px)]">
+    <div className="max-w-lg mx-auto flex flex-col animate-fade-in min-h-[calc(100dvh-120px)]">
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <div className="pt-4 pb-6">
         <h1 className="font-headline text-[22px] text-[var(--text-primary)] tracking-tight">

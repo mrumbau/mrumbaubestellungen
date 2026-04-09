@@ -78,7 +78,7 @@ export default function CardScanErrorsPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-xl mx-auto animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
           Sync-Fehler

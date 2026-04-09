@@ -226,7 +226,7 @@ export default function CardScanUploadPage() {
   }
 
   return (
-    <div className="max-w-xl mx-auto">
+    <div className="max-w-xl mx-auto animate-fade-in">
       <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight mb-2">
         Datei hochladen
       </h1>

@@ -102,7 +102,7 @@ export default function HistoryDetailPage() {
     : "Unbekannt";
 
   return (
-    <div className="max-w-xl mx-auto pb-8">
+    <div className="max-w-xl mx-auto pb-8 animate-fade-in">
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight">
