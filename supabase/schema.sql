@@ -381,3 +381,100 @@ CREATE POLICY admin_read_webhook_logs ON webhook_logs
   FOR SELECT USING (
     (SELECT rolle FROM benutzer_rollen WHERE user_id = auth.uid()) = 'admin'
   );
+
+-- ============================================================
+-- CardScan-Modul (Migration: cardscan_setup, April 2026)
+-- ============================================================
+
+CREATE TABLE cardscan_captures (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  source_type TEXT NOT NULL CHECK (source_type IN
+    ('image', 'text', 'url', 'file', 'clipboard', 'share')),
+  source_meta JSONB,
+  raw_image_path TEXT,
+  raw_text TEXT,
+  extracted_data JSONB,
+  confidence_scores JSONB,
+  final_data JSONB,
+  crm1_customer_id TEXT,
+  crm1_reference_number TEXT,
+  crm1_status TEXT CHECK (crm1_status IN ('pending', 'success', 'failed', 'skipped')),
+  crm1_error TEXT,
+  crm2_customer_id TEXT,
+  crm2_reference_number TEXT,
+  crm2_status TEXT CHECK (crm2_status IN ('pending', 'success', 'failed', 'skipped')),
+  crm2_error TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN
+    ('pending', 'extracting', 'review', 'writing', 'success',
+     'partial_success', 'failed', 'discarded')),
+  duplicate_matches JSONB,
+  duplicate_override BOOLEAN DEFAULT FALSE,
+  ocr_duration_ms INT,
+  llm_duration_ms INT,
+  crm1_duration_ms INT,
+  crm2_duration_ms INT
+);
+
+CREATE TABLE cardscan_sync_errors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  capture_id UUID NOT NULL REFERENCES cardscan_captures(id) ON DELETE CASCADE,
+  crm TEXT NOT NULL CHECK (crm IN ('crm1', 'crm2')),
+  error_type TEXT NOT NULL,
+  error_message TEXT NOT NULL,
+  error_details JSONB,
+  acknowledged BOOLEAN DEFAULT FALSE,
+  acknowledged_at TIMESTAMPTZ,
+  acknowledged_by UUID REFERENCES auth.users(id)
+);
+
+CREATE INDEX cardscan_captures_user_created_idx
+  ON cardscan_captures(user_id, created_at DESC);
+CREATE INDEX cardscan_captures_status_idx
+  ON cardscan_captures(status)
+  WHERE status IN ('failed', 'partial_success');
+CREATE INDEX cardscan_sync_errors_unack_idx
+  ON cardscan_sync_errors(acknowledged, created_at DESC)
+  WHERE acknowledged = FALSE;
+
+ALTER TABLE cardscan_captures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cardscan_sync_errors ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "cardscan_captures_select_own" ON cardscan_captures
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "cardscan_captures_insert_own" ON cardscan_captures
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "cardscan_captures_update_own" ON cardscan_captures
+  FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "cardscan_captures_admin" ON cardscan_captures
+  FOR ALL USING (get_user_rolle() = 'admin');
+
+CREATE POLICY "cardscan_sync_errors_select_own" ON cardscan_sync_errors
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "cardscan_sync_errors_update_own" ON cardscan_sync_errors
+  FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "cardscan_sync_errors_admin" ON cardscan_sync_errors
+  FOR ALL USING (get_user_rolle() = 'admin');
+
+-- Storage: Bucket cardscan-images (privat, RLS)
+-- Erstellt via Supabase Dashboard/API, nicht DDL.
+-- RLS Policies auf storage.objects:
+CREATE POLICY "cardscan_images_insert" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'cardscan-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+CREATE POLICY "cardscan_images_select" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'cardscan-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+CREATE POLICY "cardscan_images_delete" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'cardscan-images'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
