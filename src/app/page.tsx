@@ -113,6 +113,8 @@ export default async function Home() {
         href={cardscanHref}
         className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-[#141414] overflow-hidden min-h-[50vh] lg:min-h-screen"
       >
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         {/* Dot grid pattern */}
         <div className="absolute inset-0 bg-dot-grid opacity-60" />
 
