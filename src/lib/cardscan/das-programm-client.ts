@@ -50,6 +50,27 @@ mutation CreateCustomerContactPerson($payload: CustomerContactPersonInputObjectT
   }
 }`;
 
+const UPDATE_CUSTOMER_MUTATION = `
+mutation UpdateCustomer($payload: CustomerInputObjectType!) {
+  updateCustomer(payload: $payload) {
+    id
+    referenceNumber
+    firstName
+    lastName
+    companyName
+    email
+  }
+}`;
+
+const CREATE_PROJECT_MUTATION = `
+mutation CreateProject($payload: ProjectInputObjectType!) {
+  createProject(payload: $payload) {
+    id
+    referenceNumber
+    name
+  }
+}`;
+
 export const CUSTOMER_SEARCH_QUERY = `
 query SearchCustomers($search: QueryRequest!) {
   customerSearch(search: $search) {
@@ -198,8 +219,10 @@ async function createCustomerInCrm(
 
   try {
     const customerPayload: Record<string, unknown> = {
-      gender: data.gender ?? "m", // Fallback bei Unsicherheit
+      gender: data.gender ?? "m",
       type: data.customer_type,
+      acquisitionChannel: "CardScan",
+      locale: "de_DE",
     };
 
     if (data.firstName) customerPayload.firstName = data.firstName;
@@ -210,12 +233,15 @@ async function createCustomerInCrm(
     if (data.mobile) customerPayload.mobile = data.mobile;
     if (data.fax) customerPayload.fax = data.fax;
     if (data.vatId) customerPayload.vatId = data.vatId;
-    if (data.website) customerPayload.comment = `Website: ${data.website}`;
     if (data.title) customerPayload.title = data.title;
-    if (data.notes) {
-      customerPayload.comment = customerPayload.comment
-        ? `${customerPayload.comment}\n${data.notes}`
-        : data.notes;
+    if (data.letterSalutation) customerPayload.letterSalutation = data.letterSalutation;
+
+    // Website + Notes → comment-Feld zusammenführen
+    const commentParts: string[] = [];
+    if (data.website) commentParts.push(`Website: ${data.website}`);
+    if (data.notes) commentParts.push(data.notes);
+    if (commentParts.length > 0) {
+      customerPayload.comment = commentParts.join("\n");
     }
 
     const result = await graphqlRequest<{
@@ -373,4 +399,112 @@ export async function createInBothCRMs(
   });
 
   return { overallStatus, crm1, crm2 };
+}
+
+// ─── Kunden-Update (für Duplikat-Merge) ─────────────────────────────
+
+export interface CrmUpdateResult {
+  status: "success" | "failed" | "dry_run";
+  error: string | null;
+}
+
+/**
+ * Aktualisiert einen bestehenden Kunden in einem CRM.
+ * Wird verwendet wenn der Duplikat-Check einen Treffer findet
+ * und der User "Daten ergänzen" wählt statt "Neu anlegen".
+ */
+export async function updateCustomerInCrm(
+  token: string,
+  customerId: string,
+  data: ExtractedContactData,
+  crmLabel: string
+): Promise<CrmUpdateResult> {
+  if (isDryRun(token)) {
+    logInfo(ROUTE_TAG, `DRY_RUN: ${crmLabel} updateCustomer übersprungen`, { customerId });
+    return { status: "dry_run", error: null };
+  }
+
+  try {
+    const payload: Record<string, unknown> = {
+      id: customerId,
+      gender: data.gender ?? "m",
+      type: data.customer_type,
+    };
+
+    // Nur nicht-leere Felder senden (damit bestehende Daten nicht überschrieben werden)
+    if (data.firstName) payload.firstName = data.firstName;
+    if (data.lastName) payload.lastName = data.lastName;
+    if (data.companyName) payload.companyName = data.companyName;
+    if (data.email) payload.email = data.email;
+    if (data.phone) payload.phone = data.phone;
+    if (data.mobile) payload.mobile = data.mobile;
+    if (data.fax) payload.fax = data.fax;
+    if (data.vatId) payload.vatId = data.vatId;
+    if (data.title) payload.title = data.title;
+    if (data.letterSalutation) payload.letterSalutation = data.letterSalutation;
+
+    await graphqlRequest(token, UPDATE_CUSTOMER_MUTATION, { payload });
+
+    logInfo(ROUTE_TAG, `${crmLabel}: Kunde aktualisiert`, { customerId });
+    return { status: "success", error: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logError(ROUTE_TAG, `${crmLabel}: Update fehlgeschlagen`, err);
+    return { status: "failed", error: msg };
+  }
+}
+
+// ─── Projekt-Erstellung ─────────────────────────────────────────────
+
+export interface CrmProjectResult {
+  status: "success" | "failed" | "dry_run";
+  projectId: string | null;
+  referenceNumber: string | null;
+  error: string | null;
+}
+
+/**
+ * Erstellt ein Projekt im CRM, verknüpft mit einem Kunden.
+ */
+export async function createProjectInCrm(
+  token: string,
+  customerId: string,
+  projectName: string,
+  crmLabel: string,
+  customerAddressId?: string
+): Promise<CrmProjectResult> {
+  if (isDryRun(token)) {
+    logInfo(ROUTE_TAG, `DRY_RUN: ${crmLabel} createProject übersprungen`, { customerId, projectName });
+    return { status: "dry_run", projectId: null, referenceNumber: null, error: null };
+  }
+
+  try {
+    const payload: Record<string, unknown> = {
+      name: projectName,
+      customerId,
+      status: "active",
+    };
+
+    if (customerAddressId) payload.objectAddressId = customerAddressId;
+
+    const result = await graphqlRequest<{
+      createProject: { id: string; referenceNumber: string; name: string };
+    }>(token, CREATE_PROJECT_MUTATION, { payload });
+
+    logInfo(ROUTE_TAG, `${crmLabel}: Projekt erstellt`, {
+      projectId: result.createProject.id,
+      name: result.createProject.name,
+    });
+
+    return {
+      status: "success",
+      projectId: result.createProject.id,
+      referenceNumber: result.createProject.referenceNumber,
+      error: null,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logError(ROUTE_TAG, `${crmLabel}: Projekt-Erstellung fehlgeschlagen`, err);
+    return { status: "failed", projectId: null, referenceNumber: null, error: msg };
+  }
 }

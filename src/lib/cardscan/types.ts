@@ -64,6 +64,7 @@ export interface ExtractedContactData {
   fax: string | null;
   website: string | null;
   vatId: string | null;
+  letterSalutation: string | null;
   address: ExtractedAddress | null;
   contactPerson: ExtractedContactPerson | null;
   notes: string | null;

@@ -40,7 +40,14 @@ WICHTIGE REGELN:
 
 7. Sprache der Quelle beibehalten (KEINE Übersetzung von Feldinhalten)
 
-8. country_code nach ISO 3166-1 alpha-2 (DE, AT, CH, ...)` as const;
+8. country_code nach ISO 3166-1 alpha-2 (DE, AT, CH, ...)
+
+9. letterSalutation generieren:
+   - Für Privatpersonen: "Sehr geehrter Herr Müller" / "Sehr geehrte Frau Schmidt" / "Sehr geehrte Familie Weber"
+   - Für Firmen mit Ansprechpartner: Briefanrede für den Ansprechpartner
+   - Für Firmen ohne Person: "Sehr geehrte Damen und Herren"
+   - Bei Titel: "Sehr geehrter Herr Dr. Müller"
+   - Immer auf Deutsch, formell` as const;
 
 /**
  * JSON Schema für OpenAI Structured Outputs (response_format strict: true).
@@ -102,6 +109,10 @@ export const EXTRACTION_JSON_SCHEMA = {
       vatId: {
         type: ["string", "null"] as const,
         description: "Umsatzsteuer-ID (USt-IdNr.)",
+      },
+      letterSalutation: {
+        type: ["string", "null"] as const,
+        description: "Formelle Briefanrede auf Deutsch (z.B. 'Sehr geehrter Herr Dr. Müller')",
       },
       address: {
         type: ["object", "null"] as const,
@@ -171,7 +182,7 @@ export const EXTRACTION_JSON_SCHEMA = {
     required: [
       "customer_type", "gender", "title", "firstName", "lastName",
       "companyName", "email", "phone", "mobile", "fax", "website",
-      "vatId", "address", "contactPerson", "notes", "confidence",
+      "vatId", "letterSalutation", "address", "contactPerson", "notes", "confidence",
     ],
     additionalProperties: false,
   },
