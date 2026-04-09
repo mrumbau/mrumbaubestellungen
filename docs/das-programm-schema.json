@@ -1,0 +1,71 @@
+// das-programm.io GraphQL Introspection Schema
+// Gespeichert am 2026-04-09
+// Siehe schema.json für das vollständige Original (29.000 Zeilen)
+// Diese Datei ist eine kompakte Referenz der verfügbaren Operationen.
+
+// QUERIES:
+// customer(id!) → Customer
+// customerSearch(search: QueryRequest!) → [CustomerSearchResponse]
+// project(id!) → Project
+// projectSearch(search!) → [ProjectSearchResponse]
+// quotation(id!) → Quotation
+// quotationSearch(search!) → [QuotationSearchResponse]
+// salesOrder(id!) → SalesOrder
+// salesOrderSearch(search!) → [SalesOrderSearchResponse]
+// invoice(id!) → Invoice
+// invoiceSearch(search!) → [InvoiceSearchResponse]
+// incomingInvoice(id!) → IncomingInvoice
+// incomingInvoiceSearch(search!) → [IncomingInvoiceSearchResponse]
+// payment(id!) → Payment
+// paymentSearch(search!) → [PaymentSearchResponse]
+// supplier(id!) → Supplier
+// supplierSearch(search!) → [SupplierSearchResponse]
+// product(id!) → Product
+// materialSearch(search!) → [MaterialSearchResponse]
+// serviceSearch(search!) → [ServiceSearchResponse]
+// employee(id!) → Employee
+// employeeSearch(search!) → [EmployeeSearchResponse]
+// timeTracking(id!) → TimeTracking
+// timeTrackingSearch(search!) → [TimeTrackingSearchResponse]
+// appointment(id!) → Appointment
+// appointmentSearch(search!) → [AppointmentSearchResponse]
+// workReport(id!) → WorkReport
+// workReportSearch(search!) → [WorkReportSearchResponse]
+// constructionDiary(id!) → ConstructionDiary
+// constructionDiarySearch(search!) → [ConstructionDiarySearchResponse]
+// measurement(id!) → Measurement
+// acceptanceProtocol(id!) → AcceptanceProtocol
+// acceptanceProtocolSearch(search!) → [AcceptanceProtocolSearchResponse]
+// dunningLetter(id!) → DunningLetter
+// dunningLetterSearch(search!) → [dunningLetterSearchResponse]
+// deliverySlip(id!) → DeliverySlip
+// resource(id!) → Resource
+// resourceSearch(search!) → [ResourceSearchResponse]
+// projectTask(id!) → ProjectTask
+// projectTaskSearch(search!) → [ProjectTaskSearchResponse]
+// warehouseSearch(search!) → [WarehouseSearchResponse]
+// warehouseStockSearch(search!) → [WarehouseStockSearchResponse]
+// warehouseTransferSearch(search!) → [WarehouseTransferSearchResponse]
+// contractSearch(search!) → [ContractSearchResponse]
+// invoiceSecurityDepositSearch(search!) → [InvoiceSecurityDepositSearchResponse]
+// timeTrackingHolidayRequest(search!) → [TimeTrackingHolidayRequestResponse]
+
+// MUTATIONS:
+// createCustomer(payload: CustomerInputObjectType) → Customer
+// updateCustomer(payload: CustomerInputObjectType) → Customer
+// createCustomerAddress(payload: CustomerAddressInputObjectType) → CustomerAddress
+// updateCustomerAddress(payload: CustomerAddressInputObjectType) → CustomerAddress
+// createCustomerContactPerson(payload: CustomerContactPersonInputObjectType) → CustomerContactPerson
+// updateCustomerContactPerson(payload: CustomerContactPersonInputObjectType) → CustomerContactPerson
+// createQuotation(payload: QuotationInputObjectType) → Quotation
+// updateQuotation(payload: QuotationInputObjectType) → Quotation
+// createQuotationGroup(payload: QuotationGroupInputObjectType) → QuotationGroup
+// updateQuotationGroup(payload: QuotationGroupInputObjectType) → QuotationGroup
+// createQuotationItem(payload: QuotationItemInputObjectType) → QuotationItem
+// updateQuotationItem(payload: QuotationItemInputObjectType) → QuotationItem
+// createProduct(payload: ProductInputObjectType) → Product
+// updateProduct(payload: ProductInputObjectType) → Product
+// createProject(payload: ProjectInputObjectType) → Project
+// updateProject(payload: ProjectInputObjectType) → Project
+// createTimeTracking(payload: TimeTrackingInputObjectType) → TimeTracking
+// updateTimeTracking(payload: TimeTrackingInputObjectType) → TimeTracking
