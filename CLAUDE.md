@@ -538,6 +538,34 @@ Das System ist fertig wenn:
 
 ---
 
+---
+
+## 📇 CardScan-Modul
+
+**URL:** `/cardscan` (Route-Group `(cardscan)`, eigenes Layout ohne Sidebar)  
+**Zweck:** Kontaktdaten aus beliebigen Quellen erfassen und parallel in zwei das-programm.io CRM-Konten anlegen.
+
+**Input-Modi:** Text, Kamera, Foto-Upload (JPEG/PNG/WebP/HEIC), PDF, DOCX, vCard (.vcf), URL-Scraping, Clipboard, Share Target  
+**KI-Pipeline:** Google Cloud Vision OCR → GPT-4o Structured Outputs (strict JSON Schema)  
+**CRM:** Dual-Write via GraphQL API, Dry-Run-Modus wenn Token leer/DRY_RUN
+
+**Neue Env-Vars (in .env.local):**
+```
+GOOGLE_CLOUD_VISION_API_KEY=AIza...
+DAS_PROGRAMM_TOKEN_CRM1=...
+DAS_PROGRAMM_TOKEN_CRM2=... (oder DRY_RUN)
+DAS_PROGRAMM_ENDPOINT=https://app.das-programm.io/api/graphql
+```
+
+**DB-Tabellen:** `cardscan_captures`, `cardscan_sync_errors` (mit RLS)  
+**Storage:** Bucket `cardscan-images` (privat, RLS)  
+**Service Worker:** `/cardscan-sw.js` auf `/cardscan` scoped – keine Interaktion mit Bestellwesen  
+**Dependencies:** `heic2any`, `cheerio`, `pdf-parse`, `mammoth`, `react-camera-pro`, `jscanify`
+
+**Architektur-Prinzip:** Vollständig getrennt vom Bestellwesen. Keine Änderungen an bestehenden Tabellen, Routen oder Komponenten. Nur zentrale Utility-Libraries werden wiederverwendet (auth, csrf, rate-limit, errors, logger, supabase).
+
+---
+
 *Erstellt aus einem ausführlichen Planungsgespräch. Alle Entscheidungen wurden bewusst getroffen.*  
 *Version 2.0 | März 2026 | MR Umbau GmbH*  
 *MCPs: Supabase ✅ + Pencil ✅ konfiguriert und ready*

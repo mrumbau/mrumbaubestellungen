@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: "CardScan – MR Umbau",
   description: "Kontaktdaten erfassen & ins CRM übernehmen",
   manifest: "/cardscan-manifest.json",
+  icons: {
+    icon: "/icons/cardscan-192.svg",
+    apple: "/icons/cardscan-192.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
