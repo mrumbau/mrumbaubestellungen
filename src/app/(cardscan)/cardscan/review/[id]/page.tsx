@@ -44,19 +44,23 @@ export default function CardScanReviewPage() {
       const contactData = data.final_data || data.extracted_data;
       setFormData(contactData);
       setConfidence(data.confidence_scores);
+      // Formular sofort sichtbar – Duplikat-Check läuft im Hintergrund
+      setLoading(false);
 
+      // Duplikat-Check unabhängig, blockiert nicht die UI
       if (contactData) {
         setDupChecking(true);
-        try {
-          const dupRes = await fetch("/api/cardscan/search-duplicates", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ extracted_data: contactData }),
-          });
-          if (dupRes.ok) { const dj = await dupRes.json(); setDuplicates(dj.matches || []); }
-        } catch { /* nicht kritisch */ } finally { setDupChecking(false); }
+        fetch("/api/cardscan/search-duplicates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ extracted_data: contactData }),
+        })
+          .then((r) => r.ok ? r.json() : null)
+          .then((dj) => { if (dj) setDuplicates(dj.matches || []); })
+          .catch(() => {})
+          .finally(() => setDupChecking(false));
       }
-    } catch { setError("Verbindungsfehler."); } finally { setLoading(false); }
+    } catch { setError("Verbindungsfehler."); setLoading(false); }
   }, [id]);
 
   useEffect(() => { loadCapture(); }, [loadCapture]);
