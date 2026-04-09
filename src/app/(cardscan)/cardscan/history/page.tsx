@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BackLink } from "@/components/cardscan/BackLink";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
 
 const STATUS_DOT: Record<string, string> = {
@@ -109,7 +110,8 @@ export default function CardScanHistoryPage() {
 
   return (
     <div className="max-w-lg mx-auto animate-fade-in">
-      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-6">
+      <BackLink />
+      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-5">
         Letzte Scans
       </h1>
 

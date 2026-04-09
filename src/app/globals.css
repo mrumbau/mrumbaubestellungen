@@ -318,12 +318,12 @@ body {
    ============================================ */
 
 @keyframes page-enter {
-  from { transform: translateY(4px); }
-  to { transform: translateY(0); }
+  from { transform: translateY(6px); opacity: 0.85; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .animate-fade-in {
-  animation: page-enter 0.15s ease-out;
+  animation: page-enter 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 @keyframes scale-in {
