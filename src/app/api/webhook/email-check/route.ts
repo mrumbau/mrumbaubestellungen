@@ -118,12 +118,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ relevant: false, grund: "intern" });
     }
 
-    // ── 2d. PayPal — Zahlungsbestätigungen sind relevant (Besteller zahlt per PayPal) ──
-    if (absenderDomain === "paypal.com" || absenderDomain === "paypal.de") {
-      const paypalDokKw = ["zahlung", "abbuchung", "bezahlung", "payment", "quittung", "transaction", "geld gesendet", "geld empfangen"];
-      if (paypalDokKw.some(k => betreff.includes(k) || vorschau.includes(k))) {
-        return NextResponse.json({ relevant: true, grund: "paypal_zahlung", bestellnummer_betreff: bestellnummerBetreff });
-      }
+    // ── 2d. PayPal — IMMER irrelevant. PayPal sendet nur Zahlungsbelege, ──
+    // die echte Rechnung kommt direkt vom Händler. PayPal-Belege sind keine Geschäftsdokumente.
+    if (absenderDomain === "paypal.com" || absenderDomain === "paypal.de" || absenderDomain === "e.paypal.de") {
       return NextResponse.json({ relevant: false, grund: "paypal_irrelevant" });
     }
 
