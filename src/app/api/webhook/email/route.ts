@@ -343,6 +343,7 @@ export async function POST(request: NextRequest) {
       "paket wurde", "sendung verfolgen",
       "wurde versendet", "ist unterwegs", "out for delivery",
       "zustellung heute", "wird zugestellt", "paket wird zugestellt",
+      "wird kommissioniert", "in kommissionierung", "kommissionierung übergeben",
     ];
     // Bestellbestätigung-Keywords als Gegenprüfung — wenn der Betreff auch auf eine Bestellung hindeutet, NICHT als Versand behandeln
     const bestellBetreffKeywords = [
