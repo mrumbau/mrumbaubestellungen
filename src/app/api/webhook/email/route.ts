@@ -808,6 +808,60 @@ export async function POST(request: NextRequest) {
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
     } else {
+      // 1b. Betrag+Händler Match (gleiche Bestellung mit anderer Nummer)
+      // Shops wie Bernstein senden Bestellbestätigung mit Nr. #83347, dann Auftragsbestätigung mit Nr. 2610752.
+      // Gleicher Händler + gleicher Betrag + <24h alt + gleicher Dokumenttyp schon vorhanden → Nummern ergänzen statt Duplikat erstellen.
+      const erkannterBetrag24h = analyseErgebnisse.find(e => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag || null;
+      const hauptTyp24h = analyseErgebnisse
+        .filter(e => ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis"].includes(e.analyse.typ))
+        .map(e => e.analyse.typ)[0];
+
+      if (erkannterBetrag24h && hauptTyp24h && haendlerName) {
+        const vierundzwanzigStunden = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const typFlag24h: Record<string, string> = {
+          bestellbestaetigung: "hat_bestellbestaetigung",
+          lieferschein: "hat_lieferschein",
+          rechnung: "hat_rechnung",
+          aufmass: "hat_aufmass",
+          leistungsnachweis: "hat_leistungsnachweis",
+        };
+        const flag24h = typFlag24h[hauptTyp24h];
+
+        if (flag24h) {
+          const { data: betragMatch } = await supabase
+            .from("bestellungen")
+            .select("id, bestellnummer, auftragsnummer, betrag")
+            .ilike("haendler_name", `%${haendlerName}%`)
+            .eq("betrag", erkannterBetrag24h)
+            .gte("created_at", vierundzwanzigStunden)
+            .in("status", ["offen", "vollstaendig"])
+            .limit(1)
+            .maybeSingle();
+
+          if (betragMatch) {
+            // Gleiche Bestellung mit anderer Nummer → Nummern ergänzen, Duplikat verhindern
+            const nummernUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
+            if (erkannteBestellnummer && !betragMatch.bestellnummer) nummernUpdate.bestellnummer = erkannteBestellnummer;
+            if (erkannteAuftragsnummer && !betragMatch.auftragsnummer) nummernUpdate.auftragsnummer = erkannteAuftragsnummer;
+            if (Object.keys(nummernUpdate).length > 1) {
+              await supabase.from("bestellungen").update(nummernUpdate).eq("id", betragMatch.id);
+            }
+
+            logInfo("webhook/email", `Betrag-Match: gleicher Händler + Betrag innerhalb 24h → Duplikat verworfen`, {
+              bestellungId: betragMatch.id, betrag: erkannterBetrag24h, haendler: haendlerName,
+              alteNr: betragMatch.bestellnummer, neueNr: erkannteBestellnummer,
+            });
+
+            return NextResponse.json({
+              success: true,
+              skipped: true,
+              reason: "betrag_match_24h",
+              bestellungId: betragMatch.id,
+            });
+          }
+        }
+      }
+
       // 2. Erweiterte Suche: Gleicher Händler/SU + offene Bestellung die den Dokumenttyp noch nicht hat
         // Verhindert Duplikate wenn verschiedene Dokumente derselben Bestellung zeitversetzt ankommen
         // (z.B. Rechnung zuerst, dann Bestellbestätigung/Aufmaß nachträglich)
