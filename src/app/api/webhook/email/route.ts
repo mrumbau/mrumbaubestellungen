@@ -1100,8 +1100,8 @@ export async function POST(request: NextRequest) {
           // Betreff als Kontext mitgeben — GPT braucht den Betreff um den Dokumenttyp korrekt zu erkennen
           // z.B. "Ihre Bestellung bei Strauss" = Bestellbestätigung, nicht Versandbestätigung
           const bodyMitBetreff = email_betreff
-            ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 7500)}`
-            : emailText.slice(0, 8000);
+            ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
+            : emailText.slice(0, 15000);
           const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
           const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
 
