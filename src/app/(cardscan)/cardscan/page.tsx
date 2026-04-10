@@ -94,7 +94,7 @@ export default async function CardScanPage() {
       {/* ─── Spacer + Footer ──────────────────────────────────────── */}
       <div className="flex-1" />
       <div className="pt-6 pb-2">
-        <ErrorBadgeLink />
+        <ErrorBadgeLink isAdmin={profil.rolle === "admin"} />
       </div>
     </div>
   );
