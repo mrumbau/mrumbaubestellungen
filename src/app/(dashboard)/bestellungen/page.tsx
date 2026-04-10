@@ -22,10 +22,10 @@ export default async function BestellungenPage({
   let countQuery = supabase.from("bestellungen").select("*", { count: "exact", head: true });
   let dataQuery = supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).range(from, to);
 
-  // Besteller: nur eigene Bestellungen anzeigen (RLS erlaubt auch freigegebene anderer)
+  // Besteller: eigene Material-Bestellungen + alle Abo/SU Bestellungen (Freigabe durch jeden Besteller möglich)
   if (profil?.rolle === "besteller") {
-    countQuery = countQuery.eq("besteller_kuerzel", profil.kuerzel);
-    dataQuery = dataQuery.eq("besteller_kuerzel", profil.kuerzel);
+    countQuery = countQuery.or(`besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`);
+    dataQuery = dataQuery.or(`besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`);
   }
 
   if (projektIdParam) {

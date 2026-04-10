@@ -19,7 +19,8 @@ export default async function DashboardPage() {
   const kuerzel = profil!.kuerzel;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function eigene(query: any) {
-    return istBesteller ? query.eq("besteller_kuerzel", kuerzel) : query;
+    // Besteller sehen eigene Material-Bestellungen + alle Abo/SU (Freigabe durch jeden möglich)
+    return istBesteller ? query.or(`besteller_kuerzel.eq.${kuerzel},bestellungsart.in.(abo,subunternehmer)`) : query;
   }
 
   // Dashboard-Config + alle Daten parallel laden
