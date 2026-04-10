@@ -336,13 +336,25 @@ export async function POST(request: NextRequest) {
     // Betreff-basierte Versand-Erkennung (für Händler wie Amazon die alles von derselben Domain senden)
     // NUR eindeutige Versand-Keywords, keine generischen wie "zustellung" oder "ihre lieferung"
     const versandBetreffKeywords = [
-      "versandbestätigung", "versandbestaetigung",
+      // Versandbestätigung
+      "versandbestätigung", "versandbestaetigung", "versandmitteilung",
+      // Tracking
       "sendungsverfolgung", "tracking-nummer", "trackingnummer", "tracking number",
-      "shipped", "dispatched",
+      // Versand-Status
+      "wurde versendet", "wurde versandt", "ist versendet", "haben versendet",
+      "shipped", "dispatched", "has been shipped",
+      // Zustellung
+      "zustellung heute", "wird zugestellt", "wurde zugestellt", "erfolgreich zugestellt",
+      "paket wird zugestellt", "paket zugestellt", "paket wurde zugestellt",
+      "zugestellt an", "delivered", "has been delivered",
+      // Unterwegs
+      "ist unterwegs", "auf dem weg", "out for delivery", "in zustellung",
+      // Paket
+      "paket wurde", "sendung verfolgen", "ihr paket",
+      // Lieferung
       "aktualisierung der voraussichtlichen lieferung",
-      "paket wurde", "sendung verfolgen",
-      "wurde versendet", "ist unterwegs", "out for delivery",
-      "zustellung heute", "wird zugestellt", "paket wird zugestellt",
+      "lieferung erwartet", "voraussichtliche lieferung",
+      // Kommissionierung
       "wird kommissioniert", "in kommissionierung", "kommissionierung übergeben",
     ];
     // Bestellbestätigung-Keywords als Gegenprüfung — wenn der Betreff auch auf eine Bestellung hindeutet, NICHT als Versand behandeln
