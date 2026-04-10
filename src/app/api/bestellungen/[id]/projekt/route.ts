@@ -41,11 +41,12 @@ export async function POST(
     if (profil.rolle !== "admin") {
       const { data: bestellung } = await serviceClient
         .from("bestellungen")
-        .select("besteller_kuerzel")
+        .select("besteller_kuerzel, bestellungsart")
         .eq("id", id)
         .single();
 
-      if (!bestellung || bestellung.besteller_kuerzel !== profil.kuerzel) {
+      const istSuOderAbo = bestellung?.bestellungsart === "subunternehmer" || bestellung?.bestellungsart === "abo";
+      if (!bestellung || (bestellung.besteller_kuerzel !== profil.kuerzel && !istSuOderAbo)) {
         return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
       }
     }

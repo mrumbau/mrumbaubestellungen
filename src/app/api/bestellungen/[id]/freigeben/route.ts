@@ -55,9 +55,12 @@ export async function POST(
     }
 
     // Nur Besteller der Bestellung oder Admin darf freigeben
+    // SU/Abo: jeder Besteller darf freigeben (nicht an einen Besteller gebunden)
+    const istSuOderAbo = bestellung.bestellungsart === "subunternehmer" || bestellung.bestellungsart === "abo";
     if (
       profil.rolle !== "admin" &&
-      bestellung.besteller_kuerzel !== profil.kuerzel
+      bestellung.besteller_kuerzel !== profil.kuerzel &&
+      !istSuOderAbo
     ) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }

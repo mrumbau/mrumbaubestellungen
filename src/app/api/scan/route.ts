@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const { data: bestellungCheck } = await supabase
       .from("bestellungen")
-      .select("besteller_kuerzel")
+      .select("besteller_kuerzel, bestellungsart")
       .eq("id", bestellung_id)
       .single();
 
@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Bestellung nicht gefunden" }, { status: 404 });
     }
 
-    if (profil.rolle !== "admin" && bestellungCheck.besteller_kuerzel !== profil.kuerzel) {
+    const istSuOderAbo = bestellungCheck.bestellungsart === "subunternehmer" || bestellungCheck.bestellungsart === "abo";
+    if (profil.rolle !== "admin" && bestellungCheck.besteller_kuerzel !== profil.kuerzel && !istSuOderAbo) {
       return NextResponse.json({ error: "Keine Berechtigung für diese Bestellung" }, { status: 403 });
     }
 

@@ -48,8 +48,7 @@ export default async function ArchivPage() {
 
   if (istBesteller) {
     materialQuery = materialQuery.eq("besteller_kuerzel", profil.kuerzel);
-    suQuery = suQuery.eq("besteller_kuerzel", profil.kuerzel);
-    aboQuery = aboQuery.eq("besteller_kuerzel", profil.kuerzel);
+    // SU/Abo: alle sichtbar (nicht nach besteller_kuerzel filtern)
   }
 
   const [
