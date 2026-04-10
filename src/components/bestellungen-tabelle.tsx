@@ -35,7 +35,21 @@ interface ProjektOption {
   farbe: string;
 }
 
-function DokumentIcon({ vorhanden }: { vorhanden: boolean }) {
+function DokumentIcon({ vorhanden, onClick }: { vorhanden: boolean; onClick?: (e: React.MouseEvent) => void }) {
+  if (vorhanden && onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="p-1 -m-1 rounded-md transition-all hover:bg-green-50 hover:scale-125 cursor-pointer group/dok"
+        title="Klicken für Vorschau"
+      >
+        <svg className="w-4 h-4 text-green-600 group-hover/dok:text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </button>
+    );
+  }
   return vorhanden ? (
     <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -84,6 +98,11 @@ export function BestellungenTabelle({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [freigabeLoadingId, setFreigabeLoadingId] = useState<string | null>(null);
+  const [freigabeConfirmId, setFreigabeConfirmId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -123,6 +142,43 @@ export function BestellungenTabelle({
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", page.toString());
     router.push(`/bestellungen?${params.toString()}`);
+  }
+
+  // Quick-Freigabe direkt aus der Tabelle
+  async function handleQuickFreigabe(bestellungId: string) {
+    setFreigabeConfirmId(null);
+    setFreigabeLoadingId(bestellungId);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellungId}/freigeben`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        router.refresh();
+      }
+    } catch { /* ignore */ }
+    finally { setFreigabeLoadingId(null); }
+  }
+
+  // Quick-PDF-Vorschau
+  async function handlePreview(bestellungId: string) {
+    setPreviewId(bestellungId);
+    setPreviewLoading(true);
+    setPreviewUrl(null);
+    try {
+      const res = await fetch(`/api/pdfs/${bestellungId}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        setPreviewUrl(URL.createObjectURL(blob));
+      }
+    } catch { /* ignore */ }
+    finally { setPreviewLoading(false); }
+  }
+
+  function closePreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewId(null);
+    setPreviewUrl(null);
   }
 
   async function downloadZip(bestellungId: string) {
@@ -501,25 +557,60 @@ export function BestellungenTabelle({
                         <span className="text-[10px] text-[#9a9a9a] ml-1">netto</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <button
-                        type="button"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          downloadZip(b.id);
-                        }}
-                        disabled={downloadingId === b.id}
-                        className={`p-1.5 rounded-md transition-colors inline-flex ${
-                          downloadingId === b.id
-                            ? "text-[#570006] animate-pulse"
-                            : "text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-[#570006] hover:!bg-[#570006]/[0.06]"
-                        }`}
-                        title="Alle Dokumente herunterladen"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                      </button>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Quick-Freigabe */}
+                        {b.status !== "freigegeben" && b.hat_rechnung && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setFreigabeConfirmId(b.id); }}
+                            disabled={freigabeLoadingId === b.id}
+                            className={`p-1.5 rounded-md transition-colors inline-flex ${
+                              freigabeLoadingId === b.id
+                                ? "text-emerald-600 animate-pulse"
+                                : "text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-emerald-600 hover:!bg-emerald-50"
+                            }`}
+                            title="Rechnung freigeben"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                          </button>
+                        )}
+                        {/* Quick-PDF-Vorschau */}
+                        {b.hat_rechnung && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handlePreview(b.id); }}
+                            className="p-1.5 rounded-md transition-colors inline-flex text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-[#570006] hover:!bg-[#570006]/[0.06]"
+                            title="PDF-Vorschau"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                          </button>
+                        )}
+                        {/* Download */}
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            downloadZip(b.id);
+                          }}
+                          disabled={downloadingId === b.id}
+                          className={`p-1.5 rounded-md transition-colors inline-flex ${
+                            downloadingId === b.id
+                              ? "text-[#570006] animate-pulse"
+                              : "text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-[#570006] hover:!bg-[#570006]/[0.06]"
+                          }`}
+                          title="Alle Dokumente herunterladen"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -608,6 +699,64 @@ export function BestellungenTabelle({
         confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
         variant="danger"
       />
+
+      {/* Quick-Freigabe Bestätigung */}
+      <ConfirmDialog
+        open={!!freigabeConfirmId}
+        onCancel={() => setFreigabeConfirmId(null)}
+        onConfirm={() => freigabeConfirmId && handleQuickFreigabe(freigabeConfirmId)}
+        title="Rechnung freigeben"
+        message="Soll die Rechnung an die Buchhaltung freigegeben werden?"
+        confirmLabel="Freigeben"
+        variant="default"
+      />
+
+      {/* PDF-Vorschau Modal */}
+      {previewId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={closePreview}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-4xl h-[85vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[#f0eeeb]">
+              <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight">PDF-Vorschau</h3>
+              <button
+                onClick={closePreview}
+                className="p-1.5 rounded-lg text-[#9a9a9a] hover:text-[#1a1a1a] hover:bg-[#f5f4f2] transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-hidden">
+              {previewLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="spinner w-8 h-8 text-[#570006]" />
+                </div>
+              ) : previewUrl ? (
+                <iframe
+                  src={previewUrl}
+                  className="w-full h-full border-0"
+                  title="PDF-Vorschau"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-[#c4c2bf]">
+                  <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                  <p className="text-sm">Keine PDF verfügbar</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
