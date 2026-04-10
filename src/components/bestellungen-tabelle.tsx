@@ -76,7 +76,7 @@ export function BestellungenTabelle({
   isAdmin?: boolean;
 }) {
   const [suche, setSuche] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("offen");
   const [artFilter, setArtFilter] = useState<ArtFilter>("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
