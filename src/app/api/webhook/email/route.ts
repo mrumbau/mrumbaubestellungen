@@ -1436,6 +1436,9 @@ export async function POST(request: NextRequest) {
             // Betrag stimmt → Status auf vollstaendig setzen (löst auch alte "abweichung" auf)
             await supabase.from("bestellungen").update({ status: "vollstaendig" }).eq("id", bestellungId);
           }
+        } else {
+          // Kein erwarteter Betrag hinterlegt → Abo-Rechnung ist sofort vollständig
+          await supabase.from("bestellungen").update({ status: "vollstaendig" }).eq("id", bestellungId);
         }
 
         // 2. Nächste Rechnung weiterschalten (vom geplanten Datum, nicht von heute — verhindert Drift)
