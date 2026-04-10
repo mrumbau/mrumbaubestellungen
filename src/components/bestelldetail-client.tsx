@@ -357,10 +357,11 @@ export function BestelldetailClient({
 
   const aktivesDokument = dokumente.find((d) => d.typ === activeTab);
   const hatRechnung = bestellung.hat_rechnung;
+  const istSuOderAbo = bestellung.bestellungsart === "subunternehmer" || bestellung.bestellungsart === "abo";
   const kannFreigeben =
     !freigabe &&
     bestellung.status !== "freigegeben" &&
-    (profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel);
+    (profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel || istSuOderAbo);
 
   async function handleFreigabe() {
     setShowFreigabeDialog(false);
