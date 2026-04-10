@@ -26,26 +26,60 @@ export async function GET(
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
-    // Dokument-Metadaten laden (RLS filtert)
-    const { data: dokument } = await supabaseAuth
-      .from("dokumente")
-      .select("storage_pfad, bestellung_id")
-      .eq("id", id)
-      .single();
+    // Dokument-Metadaten laden – unterstützt Dokument-ID direkt ODER Bestellungs-ID + typ
+    const typ = _request.nextUrl.searchParams.get("typ");
+    let dokument: { storage_pfad: string; bestellung_id: string } | null = null;
+
+    if (typ) {
+      // Lookup per Bestellungs-ID + Dokumenttyp (für Tabellen-Vorschau)
+      // Erst prüfen ob Bestellung per RLS zugänglich ist
+      const { data: bestellung } = await supabaseAuth
+        .from("bestellungen")
+        .select("id")
+        .eq("id", id)
+        .single();
+
+      if (!bestellung) {
+        return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
+      }
+
+      const { data: dok } = await supabaseAuth
+        .from("dokumente")
+        .select("storage_pfad, bestellung_id")
+        .eq("bestellung_id", id)
+        .eq("typ", typ)
+        .not("storage_pfad", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      dokument = dok;
+    } else {
+      // Direkter Lookup per Dokument-ID (bestehender Flow)
+      const { data: dok } = await supabaseAuth
+        .from("dokumente")
+        .select("storage_pfad, bestellung_id")
+        .eq("id", id)
+        .single();
+
+      dokument = dok;
+    }
 
     if (!dokument?.storage_pfad) {
       return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
     }
 
-    // Verify bestellung access via RLS
-    const { data: bestellung } = await supabaseAuth
-      .from("bestellungen")
-      .select("id")
-      .eq("id", dokument.bestellung_id)
-      .single();
+    if (!typ) {
+      // Verify bestellung access via RLS (nur bei Dokument-ID Lookup nötig)
+      const { data: bestellung } = await supabaseAuth
+        .from("bestellungen")
+        .select("id")
+        .eq("id", dokument.bestellung_id)
+        .single();
 
-    if (!bestellung) {
-      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
+      if (!bestellung) {
+        return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
+      }
     }
 
     // Datei aus Storage laden (Service Client für Zugriff)

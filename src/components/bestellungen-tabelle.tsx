@@ -160,13 +160,13 @@ export function BestellungenTabelle({
     finally { setFreigabeLoadingId(null); }
   }
 
-  // Quick-PDF-Vorschau
-  async function handlePreview(bestellungId: string) {
+  // Quick-PDF-Vorschau (bestellungId + Dokumenttyp → API sucht passendes Dokument)
+  async function handlePreview(bestellungId: string, typ: string) {
     setPreviewId(bestellungId);
     setPreviewLoading(true);
     setPreviewUrl(null);
     try {
-      const res = await fetch(`/api/pdfs/${bestellungId}`);
+      const res = await fetch(`/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}`);
       if (res.ok) {
         const blob = await res.blob();
         setPreviewUrl(URL.createObjectURL(blob));
@@ -515,7 +515,7 @@ export function BestellungenTabelle({
                         {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
-                          <DokumentIcon vorhanden={b.hat_bestellbestaetigung} onClick={b.hat_bestellbestaetigung ? (e) => { e.stopPropagation(); handlePreview(b.id); } : undefined} />
+                          <DokumentIcon vorhanden={b.hat_bestellbestaetigung} onClick={b.hat_bestellbestaetigung ? (e) => { e.stopPropagation(); handlePreview(b.id, "bestellbestaetigung"); } : undefined} />
                         )}
                       </div>
                     </td>
@@ -524,19 +524,19 @@ export function BestellungenTabelle({
                         {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
-                          <DokumentIcon vorhanden={b.hat_lieferschein} onClick={b.hat_lieferschein ? (e) => { e.stopPropagation(); handlePreview(b.id); } : undefined} />
+                          <DokumentIcon vorhanden={b.hat_lieferschein} onClick={b.hat_lieferschein ? (e) => { e.stopPropagation(); handlePreview(b.id, "lieferschein"); } : undefined} />
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} onClick={b.hat_rechnung ? (e) => { e.stopPropagation(); handlePreview(b.id); } : undefined} /></div>
+                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} onClick={b.hat_rechnung ? (e) => { e.stopPropagation(); handlePreview(b.id, "rechnung"); } : undefined} /></div>
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
                         {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
-                          <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} onClick={(b.hat_versandbestaetigung) ? (e) => { e.stopPropagation(); handlePreview(b.id); } : undefined} />
+                          <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} onClick={(b.hat_versandbestaetigung) ? (e) => { e.stopPropagation(); handlePreview(b.id, "versandbestaetigung"); } : undefined} />
                         )}
                       </div>
                     </td>
