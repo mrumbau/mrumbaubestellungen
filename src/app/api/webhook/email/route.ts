@@ -17,6 +17,8 @@ export const maxDuration = 60;
 // =====================================================================
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
+  "application/pdfa",           // PDF/A Archivformat (M365/b4value.net)
+  "application/x-pdf",
   "image/jpeg",
   "image/jpg",
   "image/png",
@@ -24,14 +26,15 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/gif",
   "image/tiff",
   "image/bmp",
-  "application/octet-stream", // M365 sendet PDFs manchmal so
+  "application/octet-stream",   // M365 sendet PDFs manchmal so
 ]);
 
 // MIME-Typen die als PDF behandelt werden sollen
 const PDF_MIME_ALIASES = new Set([
   "application/pdf",
+  "application/pdfa",           // PDF/A Archivformat
   "application/x-pdf",
-  "application/octet-stream", // wenn Dateiname .pdf hat
+  "application/octet-stream",   // wenn Dateiname .pdf hat
 ]);
 
 function effectiveMimeType(mimeType: string, fileName: string): string {
