@@ -151,7 +151,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
   { id: "neue_haendler", label: "Neue Händler", defaultVisible: true, adminOnly: true },
   { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true, adminOnly: true },
-  { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true, adminOnly: true },
+  { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true },
   { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },

@@ -83,9 +83,7 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[] }),
-    profil.rolle === "admin"
-      ? supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag")
-      : Promise.resolve({ data: [] as { id: string; name: string; intervall: string; erwarteter_betrag: number | null; naechste_rechnung: string | null; vertragsende: string | null; kuendigungsfrist_tage: number | null; letzter_betrag: number | null }[] }),
+    supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),
   ]);
 
   // Dashboard-Config aus DB
