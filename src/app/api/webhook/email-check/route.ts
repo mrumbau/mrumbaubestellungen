@@ -44,6 +44,8 @@ const SYSTEM_DOMAINS = new Set([
   "3cx.net", "3cx.com",
   "creditreform.de", "muenchen.creditreform.de",
   "all-inkl.com",
+  // DATEV System-Mails (Belegupload-Bestätigungen, Unternehmen Online Benachrichtigungen)
+  "datev.de", "uploadmail.datev.de",
 ]);
 
 // Marketing/Transaktions-Mails von Händlern die KEINE Geschäftsdokumente sind
