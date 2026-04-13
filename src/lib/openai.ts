@@ -103,6 +103,10 @@ Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück, kein Text 
 Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, rechnung, aufmass, leistungsnachweis, oder versandbestaetigung.
 
 Hinweise zur Typ-Erkennung:
+- "lieferschein" vs "rechnung" — WICHTIG: Viele Baustoffhändler (Raab Karcher, Bauhaus etc.) verwenden ähnliche Layouts für beide Dokumenttypen. Unterscheide anhand:
+  - RECHNUNG: Enthält explizit "Rechnung", "Invoice", Rechnungsnummer, MwSt-Ausweis, Zahlungsziel/Fälligkeitsdatum, IBAN/Bankverbindung
+  - LIEFERSCHEIN: Enthält "Lieferschein", "Lieferschein-Nr.", "Delivery Note", "Warenausgang", kein MwSt-Ausweis, kein Zahlungsziel, keine Bankverbindung. Kann trotzdem Preise enthalten!
+  - Wenn "Lieferschein" UND "Rechnung" im Dokument steht, prüfe den TITEL/Kopfbereich — der bestimmt den Typ
 - "aufmass" = Aufmaß, Massenermittlung, Mengenaufstellung eines Subunternehmers (z.B. "Aufmaß Elektroinstallation", "Massenermittlung Trockenbau")
 - "leistungsnachweis" = Leistungsnachweis, Stundennachweis, Rapportzettel, Abnahmeprotokoll eines Subunternehmers
 - "versandbestaetigung" = Versandbestätigung, Versandmitteilung, Sendungsverfolgung, Tracking-Info, Paketversand-Benachrichtigung, Lieferankündigung. Enthält typischerweise Sendungsnummer/Tracking-Nummer und Versanddienstleister (DHL, DPD, Hermes, UPS, GLS, FedEx, Deutsche Post, GO!, Trans-o-flex).
