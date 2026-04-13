@@ -67,10 +67,10 @@ export default async function BestellungDetailPage({
     { data: projekte },
     { data: subunternehmerData },
   ] = await Promise.all([
-    supabase.from("dokumente").select("*").eq("bestellung_id", id).order("created_at", { ascending: true }),
-    supabase.from("abgleiche").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("kommentare").select("*").eq("bestellung_id", id).order("erstellt_am", { ascending: true }),
-    supabase.from("freigaben").select("*").eq("bestellung_id", id).maybeSingle(),
+    supabase.from("dokumente").select("id, typ, quelle, storage_pfad, email_betreff, email_absender, ki_roh_daten, bestellnummer_erkannt, artikel, gesamtbetrag, netto, mwst, faelligkeitsdatum, lieferdatum, iban, created_at").eq("bestellung_id", id).order("created_at", { ascending: true }),
+    supabase.from("abgleiche").select("id, status, abweichungen, ki_zusammenfassung, erstellt_am").eq("bestellung_id", id).order("erstellt_am", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("kommentare").select("id, autor_kuerzel, autor_name, text, erstellt_am").eq("bestellung_id", id).order("erstellt_am", { ascending: true }),
+    supabase.from("freigaben").select("id, freigegeben_von_kuerzel, freigegeben_von_name, freigegeben_am, kommentar").eq("bestellung_id", id).maybeSingle(),
     supabase.from("projekte").select("id, name, farbe, budget").in("status", ["aktiv", "pausiert"]).order("name"),
     bestellung.subunternehmer_id
       ? supabase.from("subunternehmer").select("id, firma, gewerk, ansprechpartner, telefon, email").eq("id", bestellung.subunternehmer_id).maybeSingle()

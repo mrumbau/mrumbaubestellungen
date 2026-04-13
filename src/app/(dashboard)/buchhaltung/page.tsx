@@ -24,7 +24,7 @@ export default async function BuchhaltungPage({
   // Phase 1: Count + Daten + Projekte parallel
   const [{ count }, { data: bestellungen }, { data: projekte }] = await Promise.all([
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
-    supabase.from("bestellungen").select("*").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
+    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, updated_at").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
     supabase.from("projekte").select("id, name").in("status", ["aktiv", "pausiert", "abgeschlossen"]).order("name"),
   ]);
 
@@ -36,8 +36,8 @@ export default async function BuchhaltungPage({
   const bestellIds = (bestellungen || []).map((b) => b.id);
   const [{ data: freigaben }, { data: rechnungen }] = bestellIds.length
     ? await Promise.all([
-        supabase.from("freigaben").select("*").in("bestellung_id", bestellIds),
-        supabase.from("dokumente").select("*").in("bestellung_id", bestellIds).eq("typ", "rechnung"),
+        supabase.from("freigaben").select("bestellung_id, freigegeben_von_name, freigegeben_am").in("bestellung_id", bestellIds),
+        supabase.from("dokumente").select("id, bestellung_id, faelligkeitsdatum").in("bestellung_id", bestellIds).eq("typ", "rechnung"),
       ])
     : [{ data: [] as never[] }, { data: [] as never[] }];
 

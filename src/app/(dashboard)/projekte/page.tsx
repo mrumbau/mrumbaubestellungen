@@ -14,7 +14,7 @@ export default async function ProjektePage() {
 
   // Projekte + Bestellungs-Stats + Kunden parallel
   const [{ data: projekte }, { data: bestellStats }, { data: kunden }] = await Promise.all([
-    supabase.from("projekte").select("*").order("created_at", { ascending: false }),
+    supabase.from("projekte").select("id, name, farbe, budget, status, beschreibung, kunde, kunden_id, adresse, created_at").order("created_at", { ascending: false }),
     supabase
       .from("bestellungen")
       .select("projekt_id, status, betrag")

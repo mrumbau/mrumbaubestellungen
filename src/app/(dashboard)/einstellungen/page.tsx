@@ -31,7 +31,7 @@ export default async function EinstellungenPage() {
         .order("name"),
       supabase
         .from("subunternehmer")
-        .select("*")
+        .select("id, firma, ansprechpartner, gewerk, telefon, email, email_absender, steuer_nr, iban, notizen, confirmed_at, created_at")
         .order("firma"),
     ]);
 
@@ -64,7 +64,7 @@ export default async function EinstellungenPage() {
     { data: aboAnbieter },
     { data: emailBlacklist },
   ] = await Promise.all([
-    supabase.from("haendler").select("*").order("name", { ascending: true }),
+    supabase.from("haendler").select("id, name, domain, email_absender, url_muster, confirmed_at, created_at").order("name", { ascending: true }),
     supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
     supabase.from("bestellungen").select("id").like("bestellnummer", "TEST-%").limit(1),
     supabase.from("bestellungen").select("haendler_name, status, created_at"),
@@ -86,11 +86,11 @@ export default async function EinstellungenPage() {
       .select("schluessel, wert"),
     supabase
       .from("subunternehmer")
-      .select("*")
+      .select("id, firma, ansprechpartner, gewerk, telefon, email, email_absender, steuer_nr, iban, notizen, confirmed_at, created_at")
       .order("firma"),
     supabase
       .from("abo_anbieter")
-      .select("*")
+      .select("id, name, domain, email_absender, intervall, erwarteter_betrag, toleranz, naechste_rechnung, vertragsbeginn, vertragsende, kuendigungsfrist_tage, notizen, letzter_betrag, created_at")
       .order("name"),
     supabase
       .from("email_blacklist")

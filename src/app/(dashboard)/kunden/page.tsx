@@ -13,7 +13,7 @@ export default async function KundenPage() {
   const supabase = await createServerSupabaseClient();
 
   const [{ data: kunden }, { data: projekte }, { data: bestellungen }] = await Promise.all([
-    supabase.from("kunden").select("*").order("name"),
+    supabase.from("kunden").select("id, name, kuerzel, adresse, email, telefon, notizen, keywords, farbe, confirmed_at, created_at").order("name"),
     supabase
       .from("projekte")
       .select("id, name, kunden_id")
