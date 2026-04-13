@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { isValidUUID } from "@/lib/validation";
@@ -92,6 +93,16 @@ export async function PATCH(
       return NextResponse.json(
         { error: ERRORS.NICHT_AUTHENTIFIZIERT },
         { status: 401 }
+      );
+    }
+
+    // Rate-Limit: 30 Updates pro Minute
+    const rateLimitKey = `cardscan-patch:${user.id}`;
+    const rateCheck = checkRateLimit(rateLimitKey, 30, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: ERRORS.ZU_VIELE_ANFRAGEN },
+        { status: 429 }
       );
     }
 

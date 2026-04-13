@@ -74,9 +74,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Capture auf 'writing' setzen
+    // Capture auf 'writing' setzen – nur wenn Status noch 'review' ist (verhindert doppelte Verarbeitung)
     const serviceClient = createServiceClient();
-    const { error: updateError } = await serviceClient
+    const { data: updatedCapture, error: updateError } = await serviceClient
       .from("cardscan_captures")
       .update({
         status: "writing",
@@ -85,7 +85,17 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", capture_id)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .in("status", ["review", "failed"])
+      .select("id")
+      .maybeSingle();
+
+    if (!updatedCapture) {
+      return NextResponse.json(
+        { error: "Dieser Kontakt wird bereits verarbeitet oder wurde schon angelegt." },
+        { status: 409 }
+      );
+    }
 
     if (updateError) {
       logError(ROUTE, "Capture-Update fehlgeschlagen", updateError);

@@ -20,11 +20,18 @@ export default function CardScanCapturePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const startingRef = useRef(false);
+
   const startCamera = useCallback(async () => {
+    // Guard: verhindert parallele getUserMedia-Calls
+    if (startingRef.current) return;
+    startingRef.current = true;
+
     setCameraState("requesting");
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraState("unsupported");
+      startingRef.current = false;
       return;
     }
 
@@ -61,6 +68,8 @@ export default function CardScanCapturePage() {
       } else {
         setCameraState("unsupported");
       }
+    } finally {
+      startingRef.current = false;
     }
   }, []);
 
