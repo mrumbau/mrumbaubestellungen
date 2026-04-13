@@ -61,6 +61,13 @@ export async function middleware(request: NextRequest) {
 
   const rolle = profil?.rolle || "";
 
+  // Kein Profil in benutzer_rollen → kein Zugang (User existiert in Auth aber hat keine Rolle)
+  if (!rolle && !pathname.startsWith("/api/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
   if (rolle) {
     // Buchhaltung darf nur /buchhaltung, /einstellungen und API-Routes sehen
     // Alle anderen Routen (/dashboard, /bestellungen, /projekte, /kunden, /archiv) → nur admin + besteller

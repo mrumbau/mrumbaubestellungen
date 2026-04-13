@@ -264,10 +264,12 @@ export function BestelldetailClient({
 
   useEffect(() => {
     if (!bestellung.projekt_id) { setProjektStats(null); return; }
-    fetch(`/api/projekte/${bestellung.projekt_id}/stats`)
+    const controller = new AbortController();
+    fetch(`/api/projekte/${bestellung.projekt_id}/stats`, { signal: controller.signal })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => data && setProjektStats({ gesamt_ausgaben: data.gesamt_ausgaben, budget: data.budget, budget_auslastung_prozent: data.budget_auslastung_prozent }))
-      .catch(() => setProjektStats(null));
+      .catch((err) => { if (err.name !== "AbortError") setProjektStats(null); });
+    return () => controller.abort();
   }, [bestellung.projekt_id]);
 
   // Filtered projects for Combobox
@@ -477,7 +479,12 @@ export function BestelldetailClient({
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        const base64 = (reader.result as string).split(",")[1];
+        if (!reader.result || typeof reader.result !== "string") {
+          setScanError("Datei konnte nicht gelesen werden.");
+          setScanLoading(false);
+          return;
+        }
+        const base64 = reader.result.split(",")[1];
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

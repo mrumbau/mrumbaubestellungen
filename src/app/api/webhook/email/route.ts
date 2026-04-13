@@ -554,7 +554,8 @@ export async function POST(request: NextRequest) {
     let bestellerKuerzel = "";
     let zuordnungsMethode = "";
 
-    const emailZeit = new Date(email_datum || Date.now()).getTime();
+    const parsedDate = email_datum ? new Date(email_datum) : new Date();
+    const emailZeit = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
 
     // STUFE 0: Bestellnummer-Match (höchste Zuverlässigkeit, 100% Match)
     // Extension hat die Bestellnummer von der Bestätigungsseite extrahiert.

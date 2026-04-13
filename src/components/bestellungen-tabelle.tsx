@@ -156,8 +156,9 @@ export function BestellungenTabelle({
       if (res.ok) {
         router.refresh();
       }
-    } catch { /* ignore */ }
-    finally { setFreigabeLoadingId(null); }
+    } catch {
+      window.alert("Freigabe fehlgeschlagen. Bitte erneut versuchen.");
+    } finally { setFreigabeLoadingId(null); }
   }
 
   // Quick-PDF-Vorschau (bestellungId + Dokumenttyp → API sucht passendes Dokument)
@@ -171,8 +172,9 @@ export function BestellungenTabelle({
         const blob = await res.blob();
         setPreviewUrl(URL.createObjectURL(blob));
       }
-    } catch { /* ignore */ }
-    finally { setPreviewLoading(false); }
+    } catch {
+      // PDF-Vorschau fehlgeschlagen — kein Alert nötig, Modal zeigt "Keine PDF verfügbar"
+    } finally { setPreviewLoading(false); }
   }
 
   function closePreview() {

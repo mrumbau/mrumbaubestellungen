@@ -70,35 +70,32 @@ export async function POST(
       return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
     }
 
-    // Freigabe erstellen
-    const { data: freigabe, error: freigabeError } = await supabase
-      .from("freigaben")
-      .insert({
-        bestellung_id: id,
-        freigegeben_von_kuerzel: profil.kuerzel,
-        freigegeben_von_name: profil.name,
-        kommentar: body.kommentar || null,
-      })
-      .select("id")
-      .single();
-
-    if (freigabeError || !freigabe) {
-      logError("/api/bestellungen/[id]/freigeben", "Freigabe Fehler", freigabeError);
-      return NextResponse.json({ error: "Freigabe konnte nicht gespeichert werden" }, { status: 500 });
-    }
-
-    // Status atomar auf freigegeben setzen (nur wenn noch nicht freigegeben → Doppelklick-Schutz)
+    // Status ZUERST atomar setzen (Doppelklick-Schutz), DANN Freigabe-Eintrag erstellen
+    // So gibt es keine orphaned Freigaben bei fehlgeschlagenem Status-Update
     const { error: updateError, count } = await supabase
       .from("bestellungen")
       .update({ status: "freigegeben", updated_at: new Date().toISOString() })
       .eq("id", id)
       .neq("status", "freigegeben");
 
-    if (updateError) {
-      // Rollback: Freigabe-Eintrag wieder löschen für konsistenten Zustand
-      logError("/api/bestellungen/[id]/freigeben", "Status-Update fehlgeschlagen, Rollback", updateError);
-      await supabase.from("freigaben").delete().eq("id", freigabe.id);
+    if (updateError || (count ?? 0) === 0) {
+      logError("/api/bestellungen/[id]/freigeben", "Status-Update fehlgeschlagen oder bereits freigegeben", updateError);
       return NextResponse.json({ error: "Status konnte nicht aktualisiert werden" }, { status: 500 });
+    }
+
+    // Freigabe-Eintrag erstellen (Status ist bereits gesetzt)
+    const { error: freigabeError } = await supabase
+      .from("freigaben")
+      .insert({
+        bestellung_id: id,
+        freigegeben_von_kuerzel: profil.kuerzel,
+        freigegeben_von_name: profil.name,
+        kommentar: body.kommentar || null,
+      });
+
+    if (freigabeError) {
+      logError("/api/bestellungen/[id]/freigeben", "Freigabe-Eintrag fehlgeschlagen (Status bereits gesetzt)", freigabeError);
+      // Status ist bereits korrekt gesetzt — Freigabe-Log fehlt aber ist nicht kritisch
     }
 
     return NextResponse.json({ success: true });

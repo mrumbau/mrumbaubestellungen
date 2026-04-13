@@ -52,9 +52,10 @@ function LoginForm() {
         .eq("user_id", user.id)
         .single();
 
-      // Redirect-Parameter hat Vorrang (von Tool-Auswahl)
-      let ziel = redirectTo || "/bestellungen";
-      if (!redirectTo) {
+      // Redirect-Parameter hat Vorrang — nur interne Pfade erlaubt (Open-Redirect-Schutz)
+      const safeRedirect = redirectTo && redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : null;
+      let ziel = safeRedirect || "/bestellungen";
+      if (!safeRedirect) {
         if (profil?.rolle === "buchhaltung") {
           ziel = "/buchhaltung";
         } else if (profil?.rolle === "admin") {

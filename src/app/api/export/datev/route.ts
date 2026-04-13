@@ -36,6 +36,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "von und bis Parameter erforderlich" }, { status: 400 });
     }
 
+    // Datum-Format validieren (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(von) || !dateRegex.test(bis) || isNaN(Date.parse(von)) || isNaN(Date.parse(bis))) {
+      return NextResponse.json({ error: "Ungültiges Datumsformat (YYYY-MM-DD erwartet)" }, { status: 400 });
+    }
+
+    // Numerische Params validieren
+    if (!/^\d{1,7}$/.test(beraterNr) || !/^\d{1,7}$/.test(mandantenNr) || !/^\d{4,5}$/.test(gegenKonto)) {
+      return NextResponse.json({ error: "Ungültige Berater-Nr., Mandanten-Nr. oder Gegenkonto" }, { status: 400 });
+    }
+
+    if (projektId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projektId)) {
+      return NextResponse.json({ error: "Ungültige Projekt-ID" }, { status: 400 });
+    }
+
     // Freigegebene Bestellungen im Zeitraum laden
     let query = supabase
       .from("bestellungen")

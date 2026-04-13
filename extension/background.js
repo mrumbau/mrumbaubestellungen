@@ -45,7 +45,9 @@ function ladeConfigVomServer() {
         return res.json();
       })
       .then(function (data) {
-        if (!data || !data.haendler) return;
+        if (!data || !data.haendler || !Array.isArray(data.haendler)) return;
+        // Schema-Validierung: Jeder Händler muss domain + patterns haben
+        if (!data.haendler.every(function(h) { return typeof h.domain === "string" && Array.isArray(h.patterns); })) return;
 
         var cache = {};
         cache[CONFIG_CACHE_KEY] = {

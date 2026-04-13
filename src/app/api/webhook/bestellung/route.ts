@@ -67,13 +67,18 @@ export async function POST(request: NextRequest) {
       const newOrderNr = bestellnummer && typeof bestellnummer === "string" && bestellnummer.length >= 3 ? bestellnummer.trim() : null;
 
       if (newOrderNr && !existing.order_nummer) {
-        // Bestehendes Signal upgraden mit der Bestellnummer
-        await supabase.from("bestellung_signale")
+        // Bestehendes Signal atomar upgraden (nur wenn noch pending → Race-Condition-Schutz)
+        const { count } = await supabase.from("bestellung_signale")
           .update({ order_nummer: newOrderNr, confidence: 1.0 })
-          .eq("id", existing.id);
-        return NextResponse.json({ success: true, signal_id: existing.id, upgraded: true });
+          .eq("id", existing.id)
+          .eq("status", "pending");
+        if ((count ?? 0) > 0) {
+          return NextResponse.json({ success: true, signal_id: existing.id, upgraded: true });
+        }
+        // count === 0 → Signal wurde zwischenzeitlich gematcht, weiter unten neues anlegen
+      } else {
+        return NextResponse.json({ success: true, signal_id: existing.id, deduplicated: true });
       }
-      return NextResponse.json({ success: true, signal_id: existing.id, deduplicated: true });
     }
 
     // Signal speichern (reaktiv — kein "erwartet"-Eintrag in bestellungen)

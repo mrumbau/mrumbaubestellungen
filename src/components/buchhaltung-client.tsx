@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import type { Rolle } from "@/lib/auth";
@@ -80,6 +80,9 @@ export function BuchhaltungClient({
   const searchParams = useSearchParams();
 
   const [localRows, setLocalRows] = useState(rows);
+
+  // Props-Sync: wenn Server neue Daten liefert (z.B. nach Seitenwechsel), localRows aktualisieren
+  useEffect(() => { setLocalRows(rows); }, [rows]);
   const [artFilter, setArtFilter] = useState<"alle" | "material" | "subunternehmer" | "abo">("alle");
 
   const offeneRows = localRows.filter((r) => !r.bezahlt_am);
