@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getStatusConfig } from "@/lib/status-config";
@@ -35,12 +35,13 @@ interface ProjektOption {
   farbe: string;
 }
 
-function DokumentIcon({ vorhanden, onClick }: { vorhanden: boolean; onClick?: (e: React.MouseEvent) => void }) {
+function DokumentIcon({ vorhanden, onClick, onMouseEnter }: { vorhanden: boolean; onClick?: (e: React.MouseEvent) => void; onMouseEnter?: () => void }) {
   if (vorhanden && onClick) {
     return (
       <button
         type="button"
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
         className="p-1 -m-1 rounded-md transition-all hover:bg-green-50 hover:scale-125 cursor-pointer group/dok"
         title="Klicken für Vorschau"
       >
@@ -103,6 +104,7 @@ export function BestellungenTabelle({
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const previewCache = useRef<Map<string, string>>(new Map());
   useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -162,24 +164,42 @@ export function BestellungenTabelle({
     } finally { setFreigabeLoadingId(null); }
   }
 
-  // Quick-PDF-Vorschau (bestellungId + Dokumenttyp → API sucht passendes Dokument)
+  // Signed URL holen (mit Cache)
+  const fetchSignedUrl = useCallback(async (bestellungId: string, typ: string): Promise<string | null> => {
+    const cacheKey = `${bestellungId}:${typ}`;
+    const cached = previewCache.current.get(cacheKey);
+    if (cached) return cached;
+    try {
+      const res = await fetch(`/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}&mode=url`);
+      if (res.ok) {
+        const { url } = await res.json();
+        if (url) {
+          previewCache.current.set(cacheKey, url);
+          // Cache nach 4 Min invalidieren (Signed URL gilt 5 Min)
+          setTimeout(() => previewCache.current.delete(cacheKey), 240_000);
+          return url;
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  }, []);
+
+  // Hover-Preload: Signed URL im Hintergrund laden
+  function preloadPreview(bestellungId: string, typ: string) {
+    fetchSignedUrl(bestellungId, typ);
+  }
+
+  // Klick: PDF-Vorschau öffnen (Signed URL → direkt im iframe, kein Blob)
   async function handlePreview(bestellungId: string, typ: string) {
     setPreviewId(bestellungId);
-    setPreviewLoading(true);
     setPreviewUrl(null);
-    try {
-      const res = await fetch(`/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        setPreviewUrl(URL.createObjectURL(blob));
-      }
-    } catch {
-      // PDF-Vorschau fehlgeschlagen — kein Alert nötig, Modal zeigt "Keine PDF verfügbar"
-    } finally { setPreviewLoading(false); }
+    setPreviewLoading(true);
+    const url = await fetchSignedUrl(bestellungId, typ);
+    setPreviewUrl(url);
+    setPreviewLoading(false);
   }
 
   function closePreview() {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewId(null);
     setPreviewUrl(null);
   }
@@ -518,7 +538,7 @@ export function BestellungenTabelle({
                         {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
-                          <DokumentIcon vorhanden={b.hat_bestellbestaetigung} onClick={b.hat_bestellbestaetigung ? (e) => { e.stopPropagation(); handlePreview(b.id, "bestellbestaetigung"); } : undefined} />
+                          <DokumentIcon vorhanden={b.hat_bestellbestaetigung} onClick={b.hat_bestellbestaetigung ? (e) => { e.stopPropagation(); handlePreview(b.id, "bestellbestaetigung"); } : undefined} onMouseEnter={b.hat_bestellbestaetigung ? () => preloadPreview(b.id, "bestellbestaetigung") : undefined} />
                         )}
                       </div>
                     </td>
@@ -527,19 +547,19 @@ export function BestellungenTabelle({
                         {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
-                          <DokumentIcon vorhanden={b.hat_lieferschein} onClick={b.hat_lieferschein ? (e) => { e.stopPropagation(); handlePreview(b.id, "lieferschein"); } : undefined} />
+                          <DokumentIcon vorhanden={b.hat_lieferschein} onClick={b.hat_lieferschein ? (e) => { e.stopPropagation(); handlePreview(b.id, "lieferschein"); } : undefined} onMouseEnter={b.hat_lieferschein ? () => preloadPreview(b.id, "lieferschein") : undefined} />
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} onClick={b.hat_rechnung ? (e) => { e.stopPropagation(); handlePreview(b.id, "rechnung"); } : undefined} /></div>
+                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} onClick={b.hat_rechnung ? (e) => { e.stopPropagation(); handlePreview(b.id, "rechnung"); } : undefined} onMouseEnter={b.hat_rechnung ? () => preloadPreview(b.id, "rechnung") : undefined} /></div>
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
                         {(isSub || isAbo) ? (
                           <span className="text-[#d4d1cc]">&ndash;</span>
                         ) : (
-                          <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} onClick={(b.hat_versandbestaetigung) ? (e) => { e.stopPropagation(); handlePreview(b.id, "versandbestaetigung"); } : undefined} />
+                          <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} onClick={(b.hat_versandbestaetigung) ? (e) => { e.stopPropagation(); handlePreview(b.id, "versandbestaetigung"); } : undefined} onMouseEnter={b.hat_versandbestaetigung ? () => preloadPreview(b.id, "versandbestaetigung") : undefined} />
                         )}
                       </div>
                     </td>

@@ -82,8 +82,25 @@ export async function GET(
       }
     }
 
-    // Datei aus Storage laden (Service Client für Zugriff)
     const supabase = createServiceClient();
+    const mode = _request.nextUrl.searchParams.get("mode");
+
+    // mode=url → Signed URL zurückgeben (schnell, kein Proxy)
+    if (mode === "url") {
+      const { data: signedData, error: signError } = await supabase.storage
+        .from("dokumente")
+        .createSignedUrl(dokument.storage_pfad, 300); // 5 Minuten gültig
+
+      if (signError || !signedData?.signedUrl) {
+        return NextResponse.json({ error: "Signed URL konnte nicht erstellt werden" }, { status: 500 });
+      }
+
+      return NextResponse.json({ url: signedData.signedUrl }, {
+        headers: { "Cache-Control": "private, max-age=240" }, // 4 Min cachen (URL gilt 5 Min)
+      });
+    }
+
+    // Fallback: Datei direkt streamen (für iframe-Einbettung in Detailansicht)
     const { data, error } = await supabase.storage
       .from("dokumente")
       .download(dokument.storage_pfad);
@@ -92,7 +109,6 @@ export async function GET(
       return NextResponse.json({ error: "Datei nicht gefunden" }, { status: 404 });
     }
 
-    // Content-Type aus Dateiendung ableiten (nur erlaubte Typen)
     const ext = dokument.storage_pfad.split(".").pop()?.toLowerCase() || "";
     const MIME_MAP: Record<string, string> = {
       pdf: "application/pdf",
@@ -113,6 +129,7 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${safeFilename}"`,
+        "Cache-Control": "private, max-age=300",
         "X-Frame-Options": "SAMEORIGIN",
         "Content-Security-Policy": "frame-ancestors 'self'",
       },
