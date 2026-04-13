@@ -1,7 +1,7 @@
 export default function HistoryLoading() {
   return (
     <div className="max-w-xl mx-auto animate-fade-in">
-      <h1 className="font-headline text-2xl text-[var(--text-primary)] tracking-tight mb-6">
+      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-5">
         Letzte Scans
       </h1>
       <div className="space-y-2">

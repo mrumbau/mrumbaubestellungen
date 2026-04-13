@@ -119,7 +119,7 @@ export default function CardScanReviewPage() {
   // ─── Loading ────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-lg md:max-w-xl mx-auto">
         {/* Visitenkarten-Skeleton */}
         <div className="card p-5 mb-4">
           <div className="flex items-start gap-4">
@@ -149,7 +149,7 @@ export default function CardScanReviewPage() {
 
   if (error && !capture) {
     return (
-      <div className="max-w-lg mx-auto py-20 text-center">
+      <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
         <p className="text-red-600 text-sm">{error}</p>
         <button onClick={() => router.push("/cardscan")} className="mt-4 text-sm text-[var(--text-secondary)] underline">Zurück</button>
       </div>
@@ -168,7 +168,7 @@ export default function CardScanReviewPage() {
   const hasSecondaryFields = !!(formData.fax || formData.website || formData.vatId || formData.letterSalutation);
 
   return (
-    <div className="max-w-lg mx-auto pb-8 animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto pb-8 animate-fade-in">
       {/* ─── Visitenkarten-Preview ─────────────────────────────────── */}
       <div className="card p-5 mb-4 corner-marks">
         <div className="flex items-start gap-4">

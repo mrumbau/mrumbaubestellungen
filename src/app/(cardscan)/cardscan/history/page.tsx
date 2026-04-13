@@ -76,7 +76,7 @@ export default function CardScanHistoryPage() {
 
   if (loading) {
     return (
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-lg md:max-w-xl mx-auto">
         <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-6">
           Letzte Scans
         </h1>
@@ -109,7 +109,7 @@ export default function CardScanHistoryPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
       <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-5">
         Letzte Scans

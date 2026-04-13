@@ -63,7 +63,7 @@ export default function CardScanUrlPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
       <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
         URL analysieren
@@ -83,7 +83,7 @@ export default function CardScanUrlPage() {
               value={url}
               onChange={(e) => handleUrlChange(e.target.value)}
               placeholder="www.musterfirma.de"
-              className="w-full py-3.5 pl-[4.5rem] pr-4 bg-[var(--bg-card)] text-[var(--text-primary)] text-sm placeholder:text-[var(--text-tertiary)]/50 focus:outline-none rounded-[var(--radius-md)] border-0"
+              className="w-full py-3.5 pl-[4.5rem] pr-4 bg-[var(--bg-card)] text-[var(--text-primary)] text-base placeholder:text-[var(--text-tertiary)]/50 focus:outline-none rounded-[var(--radius-md)] border-0"
               autoFocus
               disabled={loading}
             />
@@ -108,7 +108,7 @@ export default function CardScanUrlPage() {
         )}
 
         {error && (
-          <div className="mt-4 p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-xs">
+          <div className="mt-4 p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-sm">
             {error}
           </div>
         )}

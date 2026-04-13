@@ -44,7 +44,7 @@ export default function CardScanPastePage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
       <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
         Text einfügen
@@ -64,7 +64,7 @@ export default function CardScanPastePage() {
               if (error) setError(null);
             }}
             placeholder={`Max Mustermann\nMusterfirma GmbH\nMusterstraße 1, 80331 München\nTel: 089 123456\nmax@musterfirma.de`}
-            className="w-full h-52 p-4 rounded-[var(--radius-md)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm placeholder:text-[var(--text-tertiary)]/50 focus:outline-none resize-none border-0"
+            className="w-full h-52 p-4 rounded-[var(--radius-md)] bg-[var(--bg-card)] text-[var(--text-primary)] text-base placeholder:text-[var(--text-tertiary)]/50 focus:outline-none resize-none border-0"
             autoFocus
             disabled={loading}
           />
@@ -80,7 +80,7 @@ export default function CardScanPastePage() {
         </div>
 
         {error && (
-          <div className="mt-4 p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-xs">
+          <div className="mt-4 p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-sm">
             {error}
           </div>
         )}

@@ -71,7 +71,7 @@ export default function HistoryDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-lg mx-auto py-20 text-center">
+      <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
         <div className="spinner w-8 h-8 mx-auto" />
       </div>
     );
@@ -79,7 +79,7 @@ export default function HistoryDetailPage() {
 
   if (!capture) {
     return (
-      <div className="max-w-lg mx-auto py-20 text-center">
+      <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
         <p className="text-sm text-red-600">Eintrag nicht gefunden.</p>
         <button
           onClick={() => router.push("/cardscan/history")}
@@ -102,7 +102,7 @@ export default function HistoryDetailPage() {
     : "Unbekannt";
 
   return (
-    <div className="max-w-lg mx-auto pb-8 animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto pb-8 animate-fade-in">
       <BackLink href="/cardscan/history" label="Historie" />
       {/* Header */}
       <div className="mb-6">

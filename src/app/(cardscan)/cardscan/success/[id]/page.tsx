@@ -134,7 +134,7 @@ export default function CardScanSuccessPage() {
 
   if (loading) {
     return (
-      <div className="max-w-lg mx-auto py-12">
+      <div className="max-w-lg md:max-w-xl mx-auto py-12">
         <div className="skeleton w-14 h-14 rounded-2xl mx-auto mb-5" />
         <div className="skeleton-text w-1/3 h-6 mx-auto mb-2" />
         <div className="skeleton-text w-2/3 h-4 mx-auto mb-8" />
@@ -157,7 +157,7 @@ export default function CardScanSuccessPage() {
   const isPartial = capture?.status === "partial_success";
 
   return (
-    <div className="max-w-lg mx-auto py-8 animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto py-8 animate-fade-in">
       {/* ─── Hero: Kontaktname groß + Icon ─────────────────────────── */}
       <div className="text-center mb-8">
         <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center ${

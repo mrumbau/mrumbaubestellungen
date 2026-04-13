@@ -310,14 +310,14 @@ export default function CardScanCapturePage() {
             <button
               onClick={handleRetake}
               disabled={loading}
-              className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-white/10 text-white text-sm font-medium min-h-[44px]"
+              className="flex-1 py-3.5 px-4 rounded-xl bg-white/10 text-white text-sm font-medium min-h-[48px] active:scale-[0.98] transition-transform"
             >
               Nochmal
             </button>
             <button
               onClick={handleAnalyze}
               disabled={loading}
-              className="flex-1 py-3.5 px-4 rounded-[var(--radius-md)] bg-white text-black text-sm font-semibold flex items-center justify-center gap-2 min-h-[44px]"
+              className="flex-1 py-3.5 px-4 rounded-xl bg-white text-black text-sm font-semibold flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98] transition-transform"
             >
               {loading ? (
                 <>

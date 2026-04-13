@@ -103,7 +103,7 @@ export function ClipboardButton() {
       <button
         onClick={handleClipboard}
         disabled={state === "reading" || state === "processing"}
-        className="group relative block w-full card p-0 overflow-hidden text-left"
+        className="group relative block w-full card p-0 overflow-hidden text-left disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         <div className="flex items-center gap-4 px-5 py-4">

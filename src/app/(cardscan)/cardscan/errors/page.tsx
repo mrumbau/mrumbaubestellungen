@@ -72,14 +72,14 @@ export default function CardScanErrorsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-lg mx-auto py-20 text-center">
+      <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
         <div className="spinner w-8 h-8 mx-auto" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-lg mx-auto animate-fade-in">
+    <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight">
