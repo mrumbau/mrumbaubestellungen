@@ -88,8 +88,11 @@ export async function POST(
 
     // ── DATEV: Rechnungs-PDF an Uploadmail senden wenn auf "bezahlt" gesetzt ──
     let datevGesendet = false;
+    let datevFehler: string | null = null;
     if (bezahlt) {
       try {
+        console.log(`[DATEV] Start Versand für Bestellung ${id}`);
+
         // Rechnungs-Dokument mit storage_pfad finden
         const { data: rechnungDok } = await serviceClient
           .from("dokumente")
@@ -102,12 +105,15 @@ export async function POST(
           .single();
 
         if (rechnungDok?.storage_pfad) {
+          console.log(`[DATEV] PDF gefunden: ${rechnungDok.storage_pfad}`);
+
           // PDF aus Storage laden
           const { data: pdfData, error: dlError } = await serviceClient.storage
             .from("dokumente")
             .download(rechnungDok.storage_pfad);
 
           if (pdfData && !dlError) {
+            console.log(`[DATEV] PDF geladen: ${pdfData.size} bytes`);
             const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
             const filename = rechnungDok.storage_pfad.split("/").pop() || "rechnung.pdf";
 
@@ -119,19 +125,30 @@ export async function POST(
               pdfFilename: filename,
             });
             datevGesendet = result.success;
+            if (!result.success) datevFehler = result.error || "Unbekannt";
+            console.log(`[DATEV] Ergebnis: ${result.success ? "GESENDET" : "FEHLER: " + result.error}`);
           } else {
-            console.error(`[DATEV-Mail] PDF-Download fehlgeschlagen: ${dlError?.message}`);
+            datevFehler = `PDF-Download fehlgeschlagen: ${dlError?.message}`;
+            console.error(`[DATEV] ${datevFehler}`);
           }
         } else {
-          console.log(`[DATEV-Mail] Keine Rechnungs-PDF für Bestellung ${id} — übersprungen`);
+          datevFehler = "Keine Rechnungs-PDF vorhanden";
+          console.log(`[DATEV] ${datevFehler} für Bestellung ${id}`);
         }
       } catch (datevErr) {
-        // DATEV-Fehler ist nicht kritisch — Bezahlt-Status wurde bereits gesetzt
-        logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen (nicht-kritisch)", datevErr);
+        datevFehler = datevErr instanceof Error ? datevErr.message : "Unbekannter Fehler";
+        console.error(`[DATEV] Exception: ${datevFehler}`);
+        logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen", datevErr);
       }
     }
 
-    return NextResponse.json({ success: true, bezahlt, bezahlt_von: bezahlt ? profil.name : null, datev_gesendet: datevGesendet });
+    return NextResponse.json({
+      success: true,
+      bezahlt,
+      bezahlt_von: bezahlt ? profil.name : null,
+      datev_gesendet: datevGesendet,
+      datev_fehler: datevFehler,
+    });
   } catch (err) {
     logError("/api/bestellungen/[id]/bezahlt", "Unerwarteter Fehler", err);
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
