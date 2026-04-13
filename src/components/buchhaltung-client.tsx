@@ -71,8 +71,8 @@ export function BuchhaltungClient({
   });
   const [datevBis, setDatevBis] = useState(() => new Date().toISOString().slice(0, 10));
   const [datevProjekt, setDatevProjekt] = useState("");
-  const [datevBeraterNr, setDatevBeraterNr] = useState("00000");
-  const [datevMandantenNr, setDatevMandantenNr] = useState("00000");
+  const [datevBeraterNr, setDatevBeraterNr] = useState("231925");
+  const [datevMandantenNr, setDatevMandantenNr] = useState("30086");
   const [datevGegenKonto, setDatevGegenKonto] = useState("4980");
   const [datevAufwandsKonto, setDatevAufwandsKonto] = useState("");
   const [showErweitert, setShowErweitert] = useState(false);
@@ -348,14 +348,14 @@ export function BuchhaltungClient({
                     <div className="grid grid-cols-2 gap-3 pt-3">
                       <div>
                         <label className="block text-[11px] text-[#6b6b6b] mb-1">Berater-Nr.</label>
-                        <input type="text" value={datevBeraterNr} onChange={(e) => setDatevBeraterNr(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                          maxLength={5} placeholder="00000"
+                        <input type="text" value={datevBeraterNr} onChange={(e) => setDatevBeraterNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
+                          maxLength={7} placeholder="231925"
                           className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
                       </div>
                       <div>
                         <label className="block text-[11px] text-[#6b6b6b] mb-1">Mandanten-Nr.</label>
-                        <input type="text" value={datevMandantenNr} onChange={(e) => setDatevMandantenNr(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                          maxLength={5} placeholder="00000"
+                        <input type="text" value={datevMandantenNr} onChange={(e) => setDatevMandantenNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
+                          maxLength={7} placeholder="30086"
                           className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
                       </div>
                     </div>

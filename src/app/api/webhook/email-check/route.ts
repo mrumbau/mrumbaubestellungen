@@ -33,6 +33,10 @@ const SYSTEM_KEYWORDS = [
   // Werbung/Marketing allgemein
   "profinews", "produktneuheiten", "firmendaten aktualisieren",
   "jetzt online", "vorteil sichern",
+  // Lohn/Gehalt/Steuer (Steuerkanzlei, Lohnbüro)
+  "lohnabrechnung", "lohnauswertung", "entgeltabrechnung", "gehaltsabrechnung",
+  "lohn auswertung", "lohnsteuer", "lohnnachweis", "brutto/netto",
+  "sozialversicherungsmeldung", "sv-meldung", "beitragsnachweis",
 ];
 
 // Domains die IMMER irrelevant sind (Telefon, Hosting, Auskunfteien etc.)
@@ -342,6 +346,7 @@ IRRELEVANT (nein):
 - Hosting-/Domain-Benachrichtigungen
 - Kalender, Social Media, Lesebestätigungen
 - Emails die nur "Per E-Mail senden:" im Betreff haben
+- Lohnabrechnungen, Entgeltabrechnungen, Gehaltsabrechnungen, Lohnauswertungen (vom Steuerbüro/Lohnbüro)
 
 WICHTIG — NICHT als irrelevant einstufen:
 - Emails mit "Sehr geehrte Damen und Herren" oder "anbei" sind NICHT automatisch irrelevant! Viele Lieferanten und Handwerker schreiben persönliche Emails mit Rechnungen/Angeboten im Anhang.

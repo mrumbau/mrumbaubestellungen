@@ -6,6 +6,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
+import { sendeRechnungAnDatev } from "@/lib/email";
 
 // POST /api/bestellungen/[id]/bezahlt – Rechnung als bezahlt markieren/entmarkieren
 export async function POST(
@@ -58,7 +59,7 @@ export async function POST(
     // Bestellung prüfen
     const { data: bestellung } = await serviceClient
       .from("bestellungen")
-      .select("id, status")
+      .select("id, status, bestellnummer, haendler_name, betrag")
       .eq("id", id)
       .single();
 
@@ -83,6 +84,52 @@ export async function POST(
     if (updateError) {
       logError("/api/bestellungen/[id]/bezahlt", "Update fehlgeschlagen", updateError);
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
+    }
+
+    // ── DATEV: Rechnungs-PDF an Uploadmail senden wenn auf "bezahlt" gesetzt ──
+    if (bezahlt) {
+      (async () => {
+        try {
+          // Rechnungs-Dokument mit storage_pfad finden
+          const { data: rechnungDok } = await serviceClient
+            .from("dokumente")
+            .select("id, storage_pfad")
+            .eq("bestellung_id", id)
+            .eq("typ", "rechnung")
+            .not("storage_pfad", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (!rechnungDok?.storage_pfad) {
+            console.log(`[DATEV-Mail] Keine Rechnungs-PDF für Bestellung ${id} — übersprungen`);
+            return;
+          }
+
+          // PDF aus Storage laden
+          const { data: pdfData, error: dlError } = await serviceClient.storage
+            .from("dokumente")
+            .download(rechnungDok.storage_pfad);
+
+          if (dlError || !pdfData) {
+            console.error(`[DATEV-Mail] PDF-Download fehlgeschlagen: ${dlError?.message}`);
+            return;
+          }
+
+          const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
+          const filename = rechnungDok.storage_pfad.split("/").pop() || "rechnung.pdf";
+
+          await sendeRechnungAnDatev({
+            bestellnummer: bestellung.bestellnummer,
+            haendlerName: bestellung.haendler_name || "Unbekannt",
+            betrag: bestellung.betrag,
+            pdfBuffer,
+            pdfFilename: filename,
+          });
+        } catch (datevErr) {
+          logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen (nicht-kritisch)", datevErr);
+        }
+      })();
     }
 
     return NextResponse.json({ success: true, bezahlt, bezahlt_von: bezahlt ? profil.name : null });
