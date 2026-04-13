@@ -24,15 +24,10 @@ export default async function DashboardPage() {
   }
 
   // Dashboard-Config + alle Daten parallel laden
+  // 1 Query für alle Status-Counts statt 6 einzelne Count-Queries
   const [
     { data: profilRow },
-    { count: offenRaw },
-    { count: abweichungenRaw },
-    { count: lsFehltRaw },
-    { count: freigegebenRaw },
-    { count: erwartetRaw },
-    { count: vollstaendigRaw },
-    { count: gesamtRaw },
+    { data: alleStatusRaw },
     { data: freigegebenBetraege },
     { data: letzteRaw },
     { data: aktionenNoetigRaw },
@@ -48,18 +43,13 @@ export default async function DashboardPage() {
     { data: aboAnbieterRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "offen")),
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "abweichung")),
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "ls_fehlt")),
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben")),
-    Promise.resolve({ count: 0 }), // erwartet-Status nicht mehr verwendet (Signale statt Einträge)
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "vollstaendig")),
-    eigene(supabase.from("bestellungen").select("*", { count: "exact", head: true })),
+    // 1 Query statt 6: alle Status-Werte holen und clientseitig zählen
+    eigene(supabase.from("bestellungen").select("status")),
     eigene(supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null)),
-    eigene(supabase.from("bestellungen").select("*").order("created_at", { ascending: false }).limit(5)),
-    eigene(supabase.from("bestellungen").select("*").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
+    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").order("created_at", { ascending: false }).limit(5)),
+    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
     createServiceClient().from("bestellungen").select("besteller_kuerzel"),
-    supabase.from("bestellungen").select("*").eq("besteller_kuerzel", "UNBEKANNT").not("bestellungsart", "in", "(abo,subunternehmer)").order("created_at", { ascending: false }),
+    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("besteller_kuerzel", "UNBEKANNT").not("bestellungsart", "in", "(abo,subunternehmer)").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
     profil.rolle === "admin"
@@ -89,13 +79,18 @@ export default async function DashboardPage() {
   // Dashboard-Config aus DB
   const dashboardConfig = (profilRow?.dashboard_config as { stats?: Record<string, boolean>; widgets?: Record<string, boolean> }) || {};
 
-  const offen = offenRaw ?? 0;
-  const abweichungen = abweichungenRaw ?? 0;
-  const lsFehlt = lsFehltRaw ?? 0;
-  const freigegeben = freigegebenRaw ?? 0;
-  const erwartet = erwartetRaw ?? 0;
-  const vollstaendig = vollstaendigRaw ?? 0;
-  const gesamtAnzahl = gesamtRaw ?? 0;
+  // Status-Counts aus einer Query berechnen (statt 6 einzelne)
+  const statusCounts: Record<string, number> = {};
+  for (const row of alleStatusRaw || []) {
+    statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
+  }
+  const offen = statusCounts["offen"] ?? 0;
+  const abweichungen = statusCounts["abweichung"] ?? 0;
+  const lsFehlt = statusCounts["ls_fehlt"] ?? 0;
+  const freigegeben = statusCounts["freigegeben"] ?? 0;
+  const erwartet = 0; // nicht mehr verwendet
+  const vollstaendig = statusCounts["vollstaendig"] ?? 0;
+  const gesamtAnzahl = (alleStatusRaw || []).length;
   const letzte = letzteRaw || [];
   const aktionenNoetig = aktionenNoetigRaw || [];
   const unzugeordnet = unzugeordnetRaw || [];

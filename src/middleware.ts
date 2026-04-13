@@ -6,6 +6,10 @@ const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/cron", "/api/extension", "
 // Exakte Pfade die ohne Auth erreichbar sind (Tool-Auswahl)
 const PUBLIC_EXACT = ["/"];
 
+// Rolle wird für 5 Minuten im Cookie gecacht → spart 1 DB-Query pro Navigation
+const ROLLE_CACHE_TTL_MS = 5 * 60 * 1000;
+const ROLLE_COOKIE_NAME = "mr_rolle_cache";
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -49,19 +53,53 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    // Rolle-Cache löschen bei Logout
+    response = NextResponse.redirect(url);
+    response.cookies.delete(ROLLE_COOKIE_NAME);
+    return response;
   }
 
-  // Rollenprüfung: immer aus DB laden (Cookie-Cache war spoofbar)
-  const { data: profil } = await supabase
-    .from("benutzer_rollen")
-    .select("rolle")
-    .eq("user_id", user.id)
-    .single();
+  // Rolle: erst aus Cookie-Cache lesen, nur bei Cache-Miss aus DB
+  let rolle = "";
+  const rolleCookie = request.cookies.get(ROLLE_COOKIE_NAME)?.value;
 
-  const rolle = profil?.rolle || "";
+  if (rolleCookie) {
+    try {
+      const cached = JSON.parse(rolleCookie);
+      // Cache gültig wenn: gleicher User + nicht abgelaufen
+      if (cached.uid === user.id && cached.exp > Date.now()) {
+        rolle = cached.rolle || "";
+      }
+    } catch { /* ungültiger Cookie → neu laden */ }
+  }
 
-  // Kein Profil in benutzer_rollen → kein Zugang (User existiert in Auth aber hat keine Rolle)
+  if (!rolle) {
+    // Cache-Miss: aus DB laden
+    const { data: profil } = await supabase
+      .from("benutzer_rollen")
+      .select("rolle")
+      .eq("user_id", user.id)
+      .single();
+
+    rolle = profil?.rolle || "";
+
+    // In Cookie cachen (httpOnly, nicht von JS auslesbar, nicht spoofbar für Auth)
+    // Die Rolle im Cookie wird NUR für Middleware-Routing verwendet,
+    // API-Routes laden die Rolle immer frisch aus der DB
+    response.cookies.set(ROLLE_COOKIE_NAME, JSON.stringify({
+      rolle,
+      uid: user.id,
+      exp: Date.now() + ROLLE_CACHE_TTL_MS,
+    }), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: Math.ceil(ROLLE_CACHE_TTL_MS / 1000),
+    });
+  }
+
+  // Kein Profil in benutzer_rollen → kein Zugang
   if (!rolle && !pathname.startsWith("/api/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -70,7 +108,6 @@ export async function middleware(request: NextRequest) {
 
   if (rolle) {
     // Buchhaltung darf nur /buchhaltung, /einstellungen und API-Routes sehen
-    // Alle anderen Routen (/dashboard, /bestellungen, /projekte, /kunden, /archiv) → nur admin + besteller
     if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung") && !pathname.startsWith("/einstellungen") && !pathname.startsWith("/cardscan") && !pathname.startsWith("/api/")) {
       const url = request.nextUrl.clone();
       url.pathname = "/buchhaltung";
