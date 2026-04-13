@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID } from "@/lib/validation";
@@ -86,69 +86,61 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
     }
 
-    // ── DATEV: Rechnungs-PDF an Uploadmail senden wenn auf "bezahlt" gesetzt ──
-    let datevGesendet = false;
-    let datevFehler: string | null = null;
+    // ── DATEV: Rechnungs-PDF nach Response im Hintergrund an DATEV senden ──
+    // after() läuft NACH dem Response, aber Vercel hält den Prozess am Leben
     if (bezahlt) {
-      try {
-        console.log(`[DATEV] Start Versand für Bestellung ${id}`);
+      after(async () => {
+        try {
+          console.log(`[DATEV] Start Versand für Bestellung ${id}`);
+          const svc = createServiceClient();
 
-        // Rechnungs-Dokument mit storage_pfad finden
-        const { data: rechnungDok } = await serviceClient
-          .from("dokumente")
-          .select("id, storage_pfad")
-          .eq("bestellung_id", id)
-          .eq("typ", "rechnung")
-          .not("storage_pfad", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
+          const { data: rechnungDok } = await svc
+            .from("dokumente")
+            .select("id, storage_pfad")
+            .eq("bestellung_id", id)
+            .eq("typ", "rechnung")
+            .not("storage_pfad", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
 
-        if (rechnungDok?.storage_pfad) {
+          if (!rechnungDok?.storage_pfad) {
+            console.log(`[DATEV] Keine Rechnungs-PDF für Bestellung ${id} — übersprungen`);
+            return;
+          }
+
           console.log(`[DATEV] PDF gefunden: ${rechnungDok.storage_pfad}`);
 
-          // PDF aus Storage laden
-          const { data: pdfData, error: dlError } = await serviceClient.storage
+          const { data: pdfData, error: dlError } = await svc.storage
             .from("dokumente")
             .download(rechnungDok.storage_pfad);
 
-          if (pdfData && !dlError) {
-            console.log(`[DATEV] PDF geladen: ${pdfData.size} bytes`);
-            const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
-            const filename = rechnungDok.storage_pfad.split("/").pop() || "rechnung.pdf";
-
-            const result = await sendeRechnungAnDatev({
-              bestellnummer: bestellung.bestellnummer,
-              haendlerName: bestellung.haendler_name || "Unbekannt",
-              betrag: bestellung.betrag,
-              pdfBuffer,
-              pdfFilename: filename,
-            });
-            datevGesendet = result.success;
-            if (!result.success) datevFehler = result.error || "Unbekannt";
-            console.log(`[DATEV] Ergebnis: ${result.success ? "GESENDET" : "FEHLER: " + result.error}`);
-          } else {
-            datevFehler = `PDF-Download fehlgeschlagen: ${dlError?.message}`;
-            console.error(`[DATEV] ${datevFehler}`);
+          if (!pdfData || dlError) {
+            console.error(`[DATEV] PDF-Download fehlgeschlagen: ${dlError?.message}`);
+            return;
           }
-        } else {
-          datevFehler = "Keine Rechnungs-PDF vorhanden";
-          console.log(`[DATEV] ${datevFehler} für Bestellung ${id}`);
+
+          console.log(`[DATEV] PDF geladen: ${pdfData.size} bytes`);
+          const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
+          const filename = rechnungDok.storage_pfad.split("/").pop() || "rechnung.pdf";
+
+          const result = await sendeRechnungAnDatev({
+            bestellnummer: bestellung.bestellnummer,
+            haendlerName: bestellung.haendler_name || "Unbekannt",
+            betrag: bestellung.betrag,
+            pdfBuffer,
+            pdfFilename: filename,
+          });
+
+          console.log(`[DATEV] Ergebnis: ${result.success ? "GESENDET" : "FEHLER: " + result.error}`);
+        } catch (datevErr) {
+          console.error(`[DATEV] Exception:`, datevErr instanceof Error ? datevErr.message : datevErr);
+          logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen", datevErr);
         }
-      } catch (datevErr) {
-        datevFehler = datevErr instanceof Error ? datevErr.message : "Unbekannter Fehler";
-        console.error(`[DATEV] Exception: ${datevFehler}`);
-        logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen", datevErr);
-      }
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      bezahlt,
-      bezahlt_von: bezahlt ? profil.name : null,
-      datev_gesendet: datevGesendet,
-      datev_fehler: datevFehler,
-    });
+    return NextResponse.json({ success: true, bezahlt, bezahlt_von: bezahlt ? profil.name : null });
   } catch (err) {
     logError("/api/bestellungen/[id]/bezahlt", "Unerwarteter Fehler", err);
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
