@@ -117,7 +117,8 @@ export function BestellungenTabelle({
       b.haendler_name?.toLowerCase().includes(suche.toLowerCase()) ||
       b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
 
-    const statusMatch = !statusFilter || b.status === statusFilter;
+    const statusMatch = !statusFilter
+      || (statusFilter === "offen" ? b.status !== "freigegeben" : b.status === statusFilter);
     const artMatch = !artFilter || (b.bestellungsart || "material") === artFilter;
     const projektMatch = !projektFilter || b.projekt_id === projektFilter;
 
