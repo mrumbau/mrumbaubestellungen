@@ -31,9 +31,19 @@ export default function CardScanUrlPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const trimmed = url.trim();
-    if (trimmed.length < 5) {
-      setError("Bitte eine gültige URL eingeben.");
+    let trimmed = url.trim();
+
+    // Leerzeichen und Whitespace entfernen
+    trimmed = trimmed.replace(/\s+/g, "");
+
+    // Protokoll hinzufügen wenn fehlt
+    if (trimmed && !trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+      trimmed = `https://${trimmed}`;
+    }
+
+    // Mindestens eine Domain mit Punkt
+    if (!trimmed || !trimmed.includes(".") || trimmed.length < 8) {
+      setError("Bitte eine Domain eingeben, z.B. musterfirma.de");
       return;
     }
 
@@ -74,20 +84,19 @@ export default function CardScanUrlPage() {
 
       <form onSubmit={handleSubmit}>
         <div className="card p-1 corner-marks">
-          <div className="relative">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2">
-              <span className="font-mono-amount text-[11px] text-[var(--text-tertiary)]">https://</span>
-            </div>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => handleUrlChange(e.target.value)}
-              placeholder="www.musterfirma.de"
-              className="w-full py-3.5 pl-[4.5rem] pr-4 bg-[var(--bg-card)] text-[var(--text-primary)] text-base placeholder:text-[var(--text-tertiary)]/50 focus:outline-none rounded-[var(--radius-md)] border-0"
-              autoFocus
-              disabled={loading}
-            />
-          </div>
+          <input
+            type="text"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={url}
+            onChange={(e) => handleUrlChange(e.target.value)}
+            placeholder="musterfirma.de"
+            className="w-full py-3.5 px-4 bg-[var(--bg-card)] text-[var(--text-primary)] text-base placeholder:text-[var(--text-tertiary)]/50 focus:outline-none rounded-[var(--radius-md)] border-0"
+            autoFocus
+            disabled={loading}
+          />
         </div>
 
         {/* Social-Media-Hinweis */}
@@ -133,7 +142,7 @@ export default function CardScanUrlPage() {
 
         <button
           type="submit"
-          disabled={loading || url.trim().length < 5}
+          disabled={loading || !url.trim().includes(".")}
           className="w-full mt-5 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
         >
           {loading ? (
