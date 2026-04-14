@@ -27,9 +27,11 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
 
 /** Sicherer JSON-Parser für GPT-Responses — gibt Fallback statt Crash */
 function safeParseGptJson<T>(text: string, fallback: T): T {
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  // Markdown-Backticks entfernen (GPT verpackt manchmal in ```json...```)
+  const clean = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  const jsonMatch = clean.match(/\{[\s\S]*\}/);
   try {
-    return JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    return JSON.parse(jsonMatch ? jsonMatch[0] : clean);
   } catch {
     return fallback;
   }
@@ -205,7 +207,9 @@ export async function analysiereDokument(
     })
   );
 
-  const text = response.choices[0]?.message?.content || "{}";
+  const rawText = response.choices[0]?.message?.content || "{}";
+  // Markdown-Backticks entfernen (GPT verpackt manchmal in ```json...```)
+  const text = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   try {
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
@@ -216,7 +220,7 @@ export async function analysiereDokument(
     };
   } catch {
     logError("openai/analysiereDokument", "JSON-Parse fehlgeschlagen", { text: text.slice(0, 500) });
-    return { typ: "unbekannt", bestellnummer: null, auftragsnummer: null, lieferscheinnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: text, parse_fehler: true };
+    return { typ: "unbekannt", bestellnummer: null, auftragsnummer: null, lieferscheinnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: rawText, parse_fehler: true };
   }
 }
 
