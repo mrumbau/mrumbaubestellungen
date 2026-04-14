@@ -143,7 +143,23 @@ export async function POST(request: NextRequest) {
       // Weiter ohne Storage – Dokument trotzdem in DB speichern
     }
 
-    // Dokument in DB speichern
+    // Bestehendes Dokument gleichen Typs ersetzen (alte PDF aus Storage löschen)
+    const { data: existingDok } = await supabase
+      .from("dokumente")
+      .select("id, storage_pfad")
+      .eq("bestellung_id", bestellung_id)
+      .eq("typ", erkannterTyp);
+
+    if (existingDok && existingDok.length > 0) {
+      for (const alt of existingDok) {
+        if (alt.storage_pfad) {
+          await supabase.storage.from("dokumente").remove([alt.storage_pfad]);
+        }
+      }
+      await supabase.from("dokumente").delete().in("id", existingDok.map((d) => d.id));
+    }
+
+    // Neues Dokument in DB speichern
     const { data: dokument, error: dokError } = await supabase
       .from("dokumente")
       .insert({
