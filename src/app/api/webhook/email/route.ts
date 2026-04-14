@@ -518,6 +518,9 @@ export async function POST(request: NextRequest) {
     const istPlancraftDomain = absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com";
     // Plancraft ist ein Tool, kein Händler — Name wird später aus GPT-Analyse übernommen
     let haendlerName = haendler?.name || vorfilterHaendlerName || absenderDomain;
+    // Amazon: immer "Amazon Business" als Händlername (statt chinesische Marketplace-Seller-Namen)
+    const istAmazon = absenderDomain === "amazon.de" || absenderDomain === "amazon.com" || absenderDomain.endsWith(".amazon.de") || absenderDomain.endsWith(".amazon.com");
+    if (istAmazon) haendlerName = "Amazon Business";
     const haendlerNameIstNurDomain = haendlerName === absenderDomain;
 
     // =====================================================================
