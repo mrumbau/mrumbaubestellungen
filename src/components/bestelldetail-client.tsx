@@ -488,7 +488,7 @@ export function BestelldetailClient({
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bestellung_id: bestellung.id, base64, mime_type: file.type, datei_name: file.name }),
+          body: JSON.stringify({ bestellung_id: bestellung.id, base64, mime_type: file.type, datei_name: file.name, erwarteter_typ: activeTab }),
         });
         let data;
         try {

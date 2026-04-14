@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { bestellung_id, base64, mime_type, datei_name } = body;
+    const { bestellung_id, base64, mime_type, datei_name, erwarteter_typ } = body;
 
     if (!bestellung_id || !base64 || !mime_type) {
       return NextResponse.json(
@@ -121,13 +121,17 @@ export async function POST(request: NextRequest) {
       return typeof v === "string" && allowed.includes(v) ? v : null;
     };
 
-    // Dokumenttyp validieren — bei unbekanntem Typ abbrechen statt falsch zuzuordnen
-    const erkannterTyp = safeTyp(analyse.typ);
+    // Dokumenttyp validieren — bei unbekanntem Typ: Fallback auf den aktiven Tab (erwarteter_typ)
+    let erkannterTyp = safeTyp(analyse.typ);
     if (!erkannterTyp) {
-      return NextResponse.json(
-        { error: "Dokumenttyp konnte nicht erkannt werden. Bitte prüfen Sie das Dokument.", analyse },
-        { status: 422 }
-      );
+      erkannterTyp = safeTyp(erwarteter_typ);
+      if (!erkannterTyp) {
+        return NextResponse.json(
+          { error: "Dokumenttyp konnte nicht erkannt werden. Bitte prüfen Sie das Dokument.", analyse },
+          { status: 422 }
+        );
+      }
+      console.log(`[Scan] GPT-Typ unbekannt ("${analyse.typ}"), Fallback auf erwarteten Typ: ${erkannterTyp}`);
     }
 
     // Datei in Storage hochladen (Dateinamen sanitizen)
