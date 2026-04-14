@@ -300,6 +300,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ relevant: true, grund: "versand" });
     }
 
+    // ── 6b. Bekannte persönliche Absender (Freemail aber relevante Dokumente) ──
+    const BEKANNTE_PERSOENLICHE_ABSENDER = new Set([
+      "nada.jerinic@yahoo.de",
+    ]);
+    if (BEKANNTE_PERSOENLICHE_ABSENDER.has(absenderAdresse)) {
+      return NextResponse.json({ relevant: true, grund: "bekannter_absender", bestellnummer_betreff: bestellnummerBetreff });
+    }
+
     // ── 7. Freemail → NEIN (nach Händler/SU-Check, falls z.B. feistbaur@t-online.de bekannt) ──
     if (FREEMAIL_DOMAINS.has(absenderDomain) ||
         [...FREEMAIL_DOMAINS].some(d => absenderDomain.endsWith("." + d))) {
