@@ -72,14 +72,14 @@ export async function POST(
 
     // Status ZUERST atomar setzen (Doppelklick-Schutz), DANN Freigabe-Eintrag erstellen
     // So gibt es keine orphaned Freigaben bei fehlgeschlagenem Status-Update
-    const { error: updateError, count } = await supabase
+    const { error: updateError } = await supabase
       .from("bestellungen")
       .update({ status: "freigegeben", updated_at: new Date().toISOString() })
       .eq("id", id)
       .neq("status", "freigegeben");
 
-    if (updateError || (count ?? 0) === 0) {
-      logError("/api/bestellungen/[id]/freigeben", "Status-Update fehlgeschlagen oder bereits freigegeben", updateError);
+    if (updateError) {
+      logError("/api/bestellungen/[id]/freigeben", "Status-Update fehlgeschlagen", updateError);
       return NextResponse.json({ error: "Status konnte nicht aktualisiert werden" }, { status: 500 });
     }
 
