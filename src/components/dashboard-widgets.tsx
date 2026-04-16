@@ -118,7 +118,7 @@ export interface DashboardWidgetsProps {
   bestellerStats: Record<string, number>;
   aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
   aboJaehrlicheKosten?: number;
-  mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string }[];
+  mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[];
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -582,6 +582,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
+                  {m.mahnung_count && m.mahnung_count > 1 && <span className="text-[10px] font-bold text-red-600">{m.mahnung_count}.</span>}
                   <span className="text-[10px] text-red-500">{new Date(m.mahnung_am).toLocaleDateString("de-DE")}</span>
                 </span>
               </a>

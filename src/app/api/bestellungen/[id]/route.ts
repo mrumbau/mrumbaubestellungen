@@ -142,6 +142,12 @@ export async function PATCH(
       updateData.bestellungsart = body.bestellungsart;
     }
 
+    // Mahnung quittieren (zurücksetzen)
+    if (body.mahnung_am === null) {
+      updateData.mahnung_am = null;
+      updateData.mahnung_count = 0;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "Keine gültigen Felder zum Aktualisieren" }, { status: 400 });
     }

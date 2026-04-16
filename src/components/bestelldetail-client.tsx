@@ -88,6 +88,8 @@ interface Bestellung {
   versanddienstleister?: string | null;
   tracking_url?: string | null;
   voraussichtliche_lieferung?: string | null;
+  mahnung_am?: string | null;
+  mahnung_count?: number;
 }
 
 // ─── Icons ──────────────────────────────────────────────
@@ -1105,6 +1107,29 @@ export function BestelldetailClient({
             <button type="submit" disabled={loading || !kommentarText.trim()} aria-label="Kommentar senden" className="px-3 py-2 text-xs font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors">Senden</button>
           </form>
         </CollapsibleWidget>
+
+        {/* Mahnung quittieren */}
+        {bestellung.mahnung_am && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch(`/api/bestellungen/${bestellung.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ mahnung_am: null, mahnung_count: 0 }),
+                });
+                if (res.ok) router.refresh();
+              } catch { /* ignore */ }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-medium text-amber-700 hover:text-white hover:bg-amber-600 border border-amber-200 hover:border-amber-600 rounded-xl transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Mahnung quittieren
+          </button>
+        )}
 
         {/* Bestellung verwerfen — nur für Admin */}
         {profil.rolle === "admin" && (

@@ -113,6 +113,12 @@ export default async function BestellungDetailPage({
                 <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: statusConfig.color }} />
                 {statusConfig.label}
               </span>
+              {bestellung.mahnung_am && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-semibold" title={`Mahnung eingegangen am ${new Date(bestellung.mahnung_am).toLocaleDateString("de-DE")}`}>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" /></svg>
+                  {bestellung.mahnung_count > 1 ? `${bestellung.mahnung_count}. Mahnung` : "Mahnung"} — {new Date(bestellung.mahnung_am).toLocaleDateString("de-DE")}
+                </span>
+              )}
             </div>
 
             {/* Compact meta line */}

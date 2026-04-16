@@ -20,7 +20,7 @@ export default async function BestellungenPage({
 
   // Count + Daten + Projekte parallel laden
   let countQuery = supabase.from("bestellungen").select("*", { count: "exact", head: true });
-  let dataQuery = supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, created_at").order("created_at", { ascending: false }).range(from, to);
+  let dataQuery = supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at").order("created_at", { ascending: false }).range(from, to);
 
   // Besteller: eigene Material-Bestellungen + alle Abo/SU Bestellungen (Freigabe durch jeden Besteller möglich)
   if (profil?.rolle === "besteller") {

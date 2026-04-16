@@ -225,13 +225,17 @@ export async function POST(request: NextRequest) {
             query = query.order("created_at", { ascending: false }).limit(1);
           }
 
-          const { data: offeneBestellung } = await query.maybeSingle();
+          const { data: offeneBestellung } = await query.select("id, bestellnummer, mahnung_count").maybeSingle();
           if (offeneBestellung) {
             await supabase
               .from("bestellungen")
-              .update({ mahnung_am: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .update({
+                mahnung_am: new Date().toISOString(),
+                mahnung_count: (offeneBestellung.mahnung_count || 0) + 1,
+                updated_at: new Date().toISOString(),
+              })
               .eq("id", offeneBestellung.id);
-            console.log(`[Mahnung] Bestellung ${offeneBestellung.bestellnummer} als gemahnt markiert (Händler: ${haendlerMatch.name})`);
+            console.log(`[Mahnung] Bestellung ${offeneBestellung.bestellnummer} als gemahnt markiert (${(offeneBestellung.mahnung_count || 0) + 1}. Mahnung, Händler: ${haendlerMatch.name})`);
           }
         } catch { /* Fehler beim Mahnung-Update ignorieren */ }
         return NextResponse.json({ relevant: false, grund: "mahnung_markiert" });
@@ -312,6 +316,33 @@ export async function POST(request: NextRequest) {
 
     if (suMatch) {
       const combined = betreff + " " + vorschau;
+
+      // SU-Mahnungen: bestehende Bestellung markieren statt neuen Eintrag
+      const SU_MAHNUNG_KEYWORDS = ["mahnung", "mahnschreiben", "zahlungserinnerung", "zahl.-erinnerung", "zahlungsaufforderung"];
+      const istSuMahnung = SU_MAHNUNG_KEYWORDS.some(k => combined.includes(k));
+      if (istSuMahnung) {
+        try {
+          const { data: offeneSu } = await supabase
+            .from("bestellungen")
+            .select("id, bestellnummer")
+            .eq("subunternehmer_id", suMatch.id)
+            .is("bezahlt_am", null)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (offeneSu) {
+            const { data: current } = await supabase.from("bestellungen").select("mahnung_count").eq("id", offeneSu.id).single();
+            await supabase
+              .from("bestellungen")
+              .update({ mahnung_am: new Date().toISOString(), mahnung_count: (current?.mahnung_count || 0) + 1, updated_at: new Date().toISOString() })
+              .eq("id", offeneSu.id);
+            console.log(`[Mahnung] SU-Bestellung ${offeneSu.bestellnummer} als gemahnt markiert (SU: ${suMatch.firma})`);
+          }
+        } catch { /* ignore */ }
+        return NextResponse.json({ relevant: false, grund: "su_mahnung_markiert" });
+      }
+
       const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => combined.includes(k));
       if (istMarketing) {
         return NextResponse.json({ relevant: false, grund: "su_marketing" });
