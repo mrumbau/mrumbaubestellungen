@@ -26,6 +26,7 @@ interface Bestellung {
   hat_versandbestaetigung?: boolean;
   projekt_id: string | null;
   projekt_name: string | null;
+  mahnung_am: string | null;
   created_at: string;
 }
 
@@ -492,6 +493,12 @@ export function BestellungenTabelle({
                         className="font-mono-amount font-semibold text-[#570006] hover:text-[#7a1a1f] transition-colors"
                       >
                         {b.bestellnummer || "–"}
+                        {b.mahnung_am && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold" title={`Mahnung eingegangen am ${new Date(b.mahnung_am).toLocaleDateString("de-DE")}`}>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" /></svg>
+                            Mahnung
+                          </span>
+                        )}
                       </Link>
                     </td>
                     <td className="px-4 py-3.5 text-[#1a1a1a]">

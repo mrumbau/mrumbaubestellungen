@@ -41,6 +41,7 @@ export default async function DashboardPage() {
     { data: neueKundenRoh },
     { data: neueSubunternehmerRoh },
     { data: aboAnbieterRoh },
+    { data: mahnungenRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     // 1 Query statt 6: alle Status-Werte holen und clientseitig zählen
@@ -74,6 +75,8 @@ export default async function DashboardPage() {
       ? supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[] }),
     supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),
+    // Mahnungen: Bestellungen mit mahnung_am die noch nicht bezahlt sind
+    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, mahnung_am").not("mahnung_am", "is", null).is("bezahlt_am", null).order("mahnung_am", { ascending: false })),
   ]);
 
   // Dashboard-Config aus DB
@@ -221,6 +224,7 @@ export default async function DashboardPage() {
         bestellerStats={bestellerStatsMap}
         aboHinweise={aboHinweise}
         aboJaehrlicheKosten={aboJaehrlicheKosten}
+        mahnungen={(mahnungenRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string }[]}
       />
     </div>
   );

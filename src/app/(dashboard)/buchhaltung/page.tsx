@@ -24,7 +24,7 @@ export default async function BuchhaltungPage({
   // Phase 1: Count + Daten + Projekte parallel
   const [{ count }, { data: bestellungen }, { data: projekte }] = await Promise.all([
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
-    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, updated_at").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
+    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, mahnung_am, updated_at").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
     supabase.from("projekte").select("id, name").in("status", ["aktiv", "pausiert", "abgeschlossen"]).order("name"),
   ]);
 
@@ -68,6 +68,7 @@ export default async function BuchhaltungPage({
       bestellungsart: b.bestellungsart || "material",
       hat_bestellbestaetigung: b.hat_bestellbestaetigung || false,
       hat_lieferschein: b.hat_lieferschein || false,
+      mahnung_am: b.mahnung_am || null,
     };
   });
 

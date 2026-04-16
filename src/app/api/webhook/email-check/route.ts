@@ -59,7 +59,7 @@ const HAENDLER_IRRELEVANT_KEYWORDS = [
   "passwort zurücksetzen", "passwort ändern", "password reset",
   "konto bestätigen", "e-mail bestätigen", "verify your email",
   "willkommen bei", "welcome to", "registrierung",
-  "mahnung", "mahnschreiben", "zahlungserinnerung", "zahl.-erinnerung", "zahlungsaufforderung",
+  // mahnung/zahlungserinnerung werden jetzt separat behandelt (Mahnung-Feature, nicht als Marketing blockiert)
   "inkasso", "letzte erinnerung", "forderung",
 ];
 
@@ -203,8 +203,41 @@ export async function POST(request: NextRequest) {
     });
 
     if (haendlerMatch) {
-      // Prüfen ob es eine Marketing/Bewertungs-Mail ist (kein Geschäftsdokument)
+      // ── Mahnungs-Erkennung: bestehende Bestellung markieren statt neuen Eintrag ──
       const combined = betreff + " " + vorschau;
+      const MAHNUNG_KEYWORDS = ["mahnung", "mahnschreiben", "zahlungserinnerung", "zahl.-erinnerung", "zahlungsaufforderung"];
+      const istMahnung = MAHNUNG_KEYWORDS.some(k => combined.includes(k));
+      if (istMahnung) {
+        // Bestellnummer aus Betreff/Vorschau extrahieren für präzises Matching
+        const mahnungNrMatch = combined.match(/(?:bestellnummer|bestellung|rechnung|rechnungs-?nr|bestell-?nr|auftrags-?nr|nr)[.:\s#]*([A-Z0-9][\w\-]{2,29})/i);
+        try {
+          let query = supabase
+            .from("bestellungen")
+            .select("id, bestellnummer")
+            .eq("haendler_name", haendlerMatch.name)
+            .is("bezahlt_am", null);
+
+          if (mahnungNrMatch?.[1]) {
+            // Präzises Match: Bestellnummer aus Mahnung
+            query = query.eq("bestellnummer", mahnungNrMatch[1]);
+          } else {
+            // Fallback: neueste unbezahlte Bestellung dieses Händlers
+            query = query.order("created_at", { ascending: false }).limit(1);
+          }
+
+          const { data: offeneBestellung } = await query.maybeSingle();
+          if (offeneBestellung) {
+            await supabase
+              .from("bestellungen")
+              .update({ mahnung_am: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq("id", offeneBestellung.id);
+            console.log(`[Mahnung] Bestellung ${offeneBestellung.bestellnummer} als gemahnt markiert (Händler: ${haendlerMatch.name})`);
+          }
+        } catch { /* Fehler beim Mahnung-Update ignorieren */ }
+        return NextResponse.json({ relevant: false, grund: "mahnung_markiert" });
+      }
+
+      // Prüfen ob es eine Marketing/Bewertungs-Mail ist (kein Geschäftsdokument)
       const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => combined.includes(k));
       if (istMarketing) {
         return NextResponse.json({ relevant: false, grund: "haendler_marketing" });

@@ -118,6 +118,7 @@ export interface DashboardWidgetsProps {
   bestellerStats: Record<string, number>;
   aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
   aboJaehrlicheKosten?: number;
+  mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string }[];
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -470,6 +471,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     bestellerStats,
     aboHinweise,
     aboJaehrlicheKosten,
+    mahnungen,
   } = props;
 
   const router = useRouter();
@@ -560,6 +562,33 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
           isAdmin={isAdmin}
         />
       </div>
+
+      {/* Mahnungen — prominente Warnung */}
+      {mahnungen && mahnungen.length > 0 && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <h3 className="font-semibold text-red-700 text-sm">{mahnungen.length} {mahnungen.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
+          </div>
+          <div className="space-y-1.5">
+            {mahnungen.map((m) => (
+              <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-red-100 hover:border-red-300 transition-colors text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="font-mono-amount font-semibold text-[#570006]">{m.bestellnummer || "–"}</span>
+                  <span className="text-[#6b6b6b]">{m.haendler_name}</span>
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
+                  <span className="text-[10px] text-red-500">{new Date(m.mahnung_am).toLocaleDateString("de-DE")}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stat Cards Row 1 — responsive grid */}
       {row1Stats.length > 0 && (

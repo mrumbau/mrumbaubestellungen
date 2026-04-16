@@ -63,12 +63,19 @@ export async function middleware(request: NextRequest) {
   let rolle = "";
   const rolleCookie = request.cookies.get(ROLLE_COOKIE_NAME)?.value;
 
+  const ERLAUBTE_ROLLEN = ["admin", "besteller", "buchhaltung"];
   if (rolleCookie) {
     try {
       const cached = JSON.parse(rolleCookie);
-      // Cache gültig wenn: gleicher User + nicht abgelaufen
-      if (cached.uid === user.id && cached.exp > Date.now()) {
-        rolle = cached.rolle || "";
+      // Cache gültig wenn: gleicher User + nicht abgelaufen + gültige Rolle
+      if (
+        cached && typeof cached === "object" &&
+        cached.uid === user.id &&
+        cached.exp > Date.now() &&
+        typeof cached.rolle === "string" &&
+        ERLAUBTE_ROLLEN.includes(cached.rolle)
+      ) {
+        rolle = cached.rolle;
       }
     } catch { /* ungültiger Cookie → neu laden */ }
   }

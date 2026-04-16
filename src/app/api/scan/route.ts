@@ -147,23 +147,14 @@ export async function POST(request: NextRequest) {
       // Weiter ohne Storage – Dokument trotzdem in DB speichern
     }
 
-    // Bestehendes Dokument gleichen Typs ersetzen (alte PDF aus Storage löschen)
+    // Bestehende Dokumente gleichen Typs ermitteln (werden NACH erfolgreichem Insert gelöscht)
     const { data: existingDok } = await supabase
       .from("dokumente")
       .select("id, storage_pfad")
       .eq("bestellung_id", bestellung_id)
       .eq("typ", erkannterTyp);
 
-    if (existingDok && existingDok.length > 0) {
-      for (const alt of existingDok) {
-        if (alt.storage_pfad) {
-          await supabase.storage.from("dokumente").remove([alt.storage_pfad]);
-        }
-      }
-      await supabase.from("dokumente").delete().in("id", existingDok.map((d) => d.id));
-    }
-
-    // Neues Dokument in DB speichern
+    // ZUERST neues Dokument einfügen — alte erst danach löschen (kein Datenverlust bei Insert-Fehler)
     const { data: dokument, error: dokError } = await supabase
       .from("dokumente")
       .insert({
@@ -189,6 +180,19 @@ export async function POST(request: NextRequest) {
     if (dokError) {
       logError("/api/scan", "Dokument DB-Fehler", dokError);
       return NextResponse.json({ error: "Dokument konnte nicht gespeichert werden" }, { status: 500 });
+    }
+
+    // JETZT alte Dokumente sicher löschen (neues ist bereits in DB)
+    if (existingDok && existingDok.length > 0) {
+      const alteIds = existingDok.map((d) => d.id).filter((id) => id !== dokument.id);
+      if (alteIds.length > 0) {
+        for (const alt of existingDok) {
+          if (alt.id !== dokument.id && alt.storage_pfad) {
+            await supabase.storage.from("dokumente").remove([alt.storage_pfad]);
+          }
+        }
+        await supabase.from("dokumente").delete().in("id", alteIds);
+      }
     }
 
     // Bestellung aktualisieren
