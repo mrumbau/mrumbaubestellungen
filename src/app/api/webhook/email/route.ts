@@ -267,9 +267,9 @@ export async function POST(request: NextRequest) {
       for (let idx = 0; idx < rawAnhaenge.length; idx++) {
         const a = rawAnhaenge[idx];
         const raw = a as Record<string, unknown>;
-        const name = (raw.name as string) || (raw.fileName as string) || "anhang";
-        const base64 = (raw.base64 as string) || (raw.contentBytes as string) || "";
-        let mimeType = (raw.mime_type as string) || (raw.contentType as string) || "application/octet-stream";
+        const name = (raw.name as string) || (raw.Name as string) || (raw.fileName as string) || "anhang";
+        const base64 = (raw.base64 as string) || (raw.contentBytes as string) || (raw["Content Bytes"] as string) || (raw["content_bytes"] as string) || "";
+        let mimeType = (raw.mime_type as string) || (raw.contentType as string) || (raw["Content Type"] as string) || (raw["content_type"] as string) || "application/octet-stream";
 
         // Debug-Log: Details pro Anhang
         logInfo("webhook/email", `Anhang[${idx}] Details`, {
