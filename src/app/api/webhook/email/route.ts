@@ -676,19 +676,35 @@ export async function POST(request: NextRequest) {
         .in("rolle", ["besteller", "admin"]);
 
       if (benutzerListe) {
-        const suchTexte = [
-          emailText,
-          email_betreff || "",
-          ...analyseErgebnisse.map((e) => e.analyse.volltext || ""),
-          ...analyseErgebnisse.map((e) => JSON.stringify(e.analyse.lieferadressen || [])),
-        ].join(" ").toLowerCase();
+        // Zuerst: GPT-extrahierter Besteller-Name (präziser als Volltext-Suche)
+        const gptBesteller = analyseErgebnisse.find((e) => e.analyse.besteller_im_dokument)?.analyse.besteller_im_dokument?.toLowerCase() || "";
+        if (gptBesteller) {
+          for (const benutzer of benutzerListe) {
+            const namen = benutzer.name.toLowerCase().split(" ");
+            if (namen.length >= 2 && namen.every((n: string) => gptBesteller.includes(n))) {
+              bestellerKuerzel = benutzer.kuerzel;
+              zuordnungsMethode = "besteller_im_dokument";
+              break;
+            }
+          }
+        }
 
-        for (const benutzer of benutzerListe) {
-          const namen = benutzer.name.toLowerCase().split(" ");
-          if (namen.length >= 2 && namen.every((n: string) => suchTexte.includes(n))) {
-            bestellerKuerzel = benutzer.kuerzel;
-            zuordnungsMethode = "name_im_text";
-            break;
+        // Fallback: Volltext-Suche
+        if (!bestellerKuerzel) {
+          const suchTexte = [
+            emailText,
+            email_betreff || "",
+            ...analyseErgebnisse.map((e) => e.analyse.volltext || ""),
+            ...analyseErgebnisse.map((e) => JSON.stringify(e.analyse.lieferadressen || [])),
+          ].join(" ").toLowerCase();
+
+          for (const benutzer of benutzerListe) {
+            const namen = benutzer.name.toLowerCase().split(" ");
+            if (namen.length >= 2 && namen.every((n: string) => suchTexte.includes(n))) {
+              bestellerKuerzel = benutzer.kuerzel;
+              zuordnungsMethode = "name_im_text";
+              break;
+            }
           }
         }
       }
@@ -830,6 +846,24 @@ export async function POST(request: NextRequest) {
         }
       }
 
+    // 1a. Erweiterte Cross-Suche: Jede erkannte Nummer in ALLEN drei Spalten suchen (ohne Händler-Filter)
+    // Fängt Fälle wo der Händlername leicht abweicht oder die haendler_id nicht gesetzt ist
+    if (!existierendeBestellung && suchNummern.length > 0) {
+      for (const suchNr of suchNummern) {
+        if (existierendeBestellung) break;
+        const { data: crossMatch } = await supabase
+          .from("bestellungen")
+          .select(stufe1Select)
+          .or(`bestellnummer.eq.${suchNr},auftragsnummer.eq.${suchNr},lieferscheinnummer.eq.${suchNr}`)
+          .limit(1)
+          .maybeSingle();
+        if (crossMatch) {
+          existierendeBestellung = crossMatch;
+          logInfo("webhook/email", `Cross-Match gefunden (ohne Händler-Filter)`, { suchNr, bestellungId: crossMatch.id });
+        }
+      }
+    }
+
     if (existierendeBestellung) {
       bestellungId = existierendeBestellung.id;
     } else {
@@ -842,7 +876,7 @@ export async function POST(request: NextRequest) {
         .map(e => e.analyse.typ)[0];
 
       if (erkannterBetrag24h && hauptTyp24h && haendlerName) {
-        const vierundzwanzigStunden = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const betragMatchZeitraum = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(); // 14 Tage Fenster (Lieferscheine/Rechnungen können bis zu 10+ Tage später kommen)
         const typFlag24h: Record<string, string> = {
           bestellbestaetigung: "hat_bestellbestaetigung",
           lieferschein: "hat_lieferschein",
@@ -858,7 +892,7 @@ export async function POST(request: NextRequest) {
             .select("id, bestellnummer, auftragsnummer, betrag")
             .ilike("haendler_name", `%${haendlerName}%`)
             .eq("betrag", erkannterBetrag24h)
-            .gte("created_at", vierundzwanzigStunden)
+            .gte("created_at", betragMatchZeitraum)
             .in("status", ["offen", "vollstaendig"])
             .limit(1)
             .maybeSingle();
@@ -1079,6 +1113,10 @@ export async function POST(request: NextRequest) {
         faelligkeitsdatum: analyse.faelligkeitsdatum,
         lieferdatum: analyse.lieferdatum,
         iban: analyse.iban,
+        kundennummer: analyse.kundennummer || null,
+        besteller_im_dokument: analyse.besteller_im_dokument || null,
+        projekt_referenz: analyse.projekt_referenz || null,
+        bestelldatum: analyse.bestelldatum || null,
       });
 
       if (insertError) {
@@ -1229,6 +1267,10 @@ export async function POST(request: NextRequest) {
               faelligkeitsdatum: bodyAnalyse.faelligkeitsdatum,
               lieferdatum: bodyAnalyse.lieferdatum,
               iban: bodyAnalyse.iban,
+              kundennummer: bodyAnalyse.kundennummer || null,
+              besteller_im_dokument: bodyAnalyse.besteller_im_dokument || null,
+              projekt_referenz: bodyAnalyse.projekt_referenz || null,
+              bestelldatum: bodyAnalyse.bestelldatum || null,
             });
 
             const bodyUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };

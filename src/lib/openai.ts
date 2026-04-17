@@ -60,6 +60,10 @@ export interface DokumentAnalyse {
   versanddienstleister?: string | null;
   tracking_url?: string | null;
   voraussichtliche_lieferung?: string | null;
+  kundennummer?: string | null;
+  besteller_im_dokument?: string | null;
+  projekt_referenz?: string | null;
+  bestelldatum?: string | null;
 }
 
 export interface AbgleichErgebnis {
@@ -123,7 +127,9 @@ Erkenne außerdem die "vermutete_bestellungsart":
 Signale für "subunternehmer": Stundensätze, Pauschalpreise für Arbeitsleistungen, Gewerk-Bezeichnungen (Elektro, Trockenbau, Sanitär, Maler etc.), Leistungsbeschreibungen statt Artikellisten, Begriffe wie "Montage", "Einbau", "Verlegung", "Installation".
 
 WICHTIG zu den Nummern-Feldern — extrahiere ALLE vorhandenen Nummern:
-- "bestellnummer": Die HAUPTNUMMER des Dokuments. Bei Rechnungen: Rechnungsnummer (z.B. "8778719837", "R183788583", "R-00211"). Bei Bestellbestätigungen: Auftragsnummer. NICHT: Kommissionsnamen (Dörning, Peiß, Glöggler = Projektnamen!), NICHT: Versandart (Express, Standard), NICHT: Bes-Nr./BV-Nummern.
+- "bestellnummer": Die HAUPTNUMMER des Dokuments — steht typischerweise groß im Titel/Header. Bei Rechnungen: Rechnungsnummer. Bei Auftragsbestätigungen: Auftragsnummer. Bei Lieferscheinen: Lieferscheinnummer als bestellnummer verwenden falls keine andere Hauptnummer vorhanden.
+  ACHTUNG bei Raab Karcher / STARK Deutschland: Die "Bes-Nr." oder "Bestell-Nr." (z.B. "BV: Glögler, Prinzenstr. 42") ist ein PROJEKTNAME, KEINE Bestellnummer! Die echte Nummer steht direkt neben dem Dokumenttitel: "RECHNUNG 8778719837", "AUFTRAGSBESTÄTIGUNG 2030496297", "DIGITALER LIEFERSCHEIN 4313394708".
+  Kommissionsnamen (Dörning, Peiß, Glöggler) sind ebenfalls KEINE Bestellnummern.
 - "auftragsnummer": Auftragsnummer falls vorhanden (z.B. "2030398090"). Oft als "Auftrags-Nr.", "Auftrag", "Order No." bezeichnet. Kann auf Lieferscheinen, Rechnungen und Bestätigungen stehen.
 - "lieferscheinnummer": Lieferscheinnummer falls vorhanden (z.B. "4313393316"). Nur bei Lieferscheinen.
 Mindestens eines der drei Felder muss gefüllt sein wenn irgendeine Nummer erkennbar ist!
@@ -153,7 +159,11 @@ Gib folgende Struktur zurück:
   "tracking_nummer": null,
   "versanddienstleister": null,
   "tracking_url": null,
-  "voraussichtliche_lieferung": null
+  "voraussichtliche_lieferung": null,
+  "kundennummer": "35454475",
+  "besteller_im_dokument": "Tschon,Marlon",
+  "projekt_referenz": "BV: Glögler, Prinzenstr. 42",
+  "bestelldatum": "2026-04-16"
 }
 
 Extrahiere auch:
@@ -163,6 +173,10 @@ Extrahiere auch:
 - "versanddienstleister": Name des Versanddienstleisters (z.B. "DHL", "DPD", "Hermes", "UPS", "GLS"). Normalisiert als Kurzname.
 - "tracking_url": Direkte URL zur Sendungsverfolgung falls im Dokument vorhanden.
 - "voraussichtliche_lieferung": Voraussichtliches Lieferdatum im Format "YYYY-MM-DD" falls angegeben.
+- "kundennummer": Kundennummer beim Lieferanten/Händler (z.B. "Kunden-Nr. 35454475", "Kundennummer: 13254"). Wichtig für Matching.
+- "besteller_im_dokument": Name des Bestellers wie er im Dokument steht (z.B. "Besteller: Tschon,Marlon", "Besteller: Valon", "Auftraggeber: MR Umbau GmbH"). Nur den Personennamen, nicht die Firma.
+- "projekt_referenz": Projekt- oder Bauvorhabenreferenz (z.B. "BV: Glögler, Prinzenstr. 42", "Bes-Nr.: BV Klöggler", "Kommission: Dörning"). Der vollständige Text.
+- "bestelldatum": Datum der ursprünglichen Bestellung (z.B. "Bestelldatum: 16.04.2026"). Format "YYYY-MM-DD". Nicht verwechseln mit Rechnungsdatum oder Lieferdatum.
 
 Falls ein Feld nicht erkennbar ist, setze null.`;
 
