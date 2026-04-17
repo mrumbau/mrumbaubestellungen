@@ -48,6 +48,8 @@ const SYSTEM_DOMAINS = new Set([
   "3cx.net", "3cx.com",
   "creditreform.de", "muenchen.creditreform.de",
   "all-inkl.com",
+  // Leasing/Fuhrpark (keine Bestellungen)
+  "aldautomotive.com", "oms.aldautomotive.com",
   // DATEV System-Mails (Belegupload-Bestätigungen, Unternehmen Online Benachrichtigungen)
   "datev.de", "uploadmail.datev.de",
 ]);
