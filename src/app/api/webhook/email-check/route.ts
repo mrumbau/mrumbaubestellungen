@@ -37,6 +37,10 @@ const SYSTEM_KEYWORDS = [
   "lohnabrechnung", "lohnauswertung", "entgeltabrechnung", "gehaltsabrechnung",
   "lohn auswertung", "lohnsteuer", "lohnnachweis", "brutto/netto",
   "sozialversicherungsmeldung", "sv-meldung", "beitragsnachweis",
+  // Retouren/Rückläufer (interne Mitteilungen, keine Bestellungen)
+  "rückläufer", "ruecklaeufer", "retoure",
+  // Leasing/Finanzierung (keine Bestellungen)
+  "leasingantrag", "bonitätsprüfung", "bonitaetspruefung",
 ];
 
 // Domains die IMMER irrelevant sind (Telefon, Hosting, Auskunfteien etc.)
