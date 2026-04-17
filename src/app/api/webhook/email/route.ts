@@ -267,17 +267,31 @@ export async function POST(request: NextRequest) {
       for (let idx = 0; idx < rawAnhaenge.length; idx++) {
         const a = rawAnhaenge[idx];
         const raw = a as Record<string, unknown>;
-        const name = (raw.name as string) || (raw.Name as string) || (raw.fileName as string) || "anhang";
-        const base64 = (raw.base64 as string) || (raw.contentBytes as string) || (raw["Content Bytes"] as string) || (raw["content_bytes"] as string) || "";
-        let mimeType = (raw.mime_type as string) || (raw.contentType as string) || (raw["Content Type"] as string) || (raw["content_type"] as string) || "application/octet-stream";
+
+        // Case-insensitive Feld-Suche: Make.com kann Feldnamen in beliebiger Schreibweise senden
+        // (name/Name, contentBytes/Content Bytes, contentType/Content Type, etc.)
+        const findField = (...keys: string[]): string => {
+          for (const key of keys) {
+            if (raw[key] && typeof raw[key] === "string") return raw[key] as string;
+          }
+          // Fallback: case-insensitive Suche über alle Schlüssel
+          const rawKeys = Object.keys(raw);
+          for (const key of keys) {
+            const found = rawKeys.find(k => k.toLowerCase().replace(/[\s_-]/g, "") === key.toLowerCase().replace(/[\s_-]/g, ""));
+            if (found && raw[found] && typeof raw[found] === "string") return raw[found] as string;
+          }
+          return "";
+        };
+
+        const name = findField("name", "Name", "fileName", "filename") || "anhang";
+        const base64 = findField("base64", "contentBytes", "Content Bytes", "content_bytes", "data");
+        let mimeType = (findField("mime_type", "mimeType", "contentType", "Content Type", "content_type", "type") || "application/octet-stream").toLowerCase();
 
         // Debug-Log: Details pro Anhang
         logInfo("webhook/email", `Anhang[${idx}] Details`, {
           name,
-          mimeType_raw: (raw.mime_type as string) || (raw.contentType as string) || "(leer)",
+          mimeType,
           base64_length: base64 ? base64.length : 0,
-          has_base64: !!raw.base64,
-          has_contentBytes: !!raw.contentBytes,
           raw_keys: Object.keys(raw).join(", "),
         });
 
@@ -287,15 +301,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Inline-Bilder/Logos filtern: Bilder < 5 KB sind keine echten Dokumente
-        // (z.B. ATT00002.png, image001.png — E-Mail-Signaturen und Logos)
-        const istBild = mimeType.startsWith("image/") || (raw.contentType as string || "").startsWith("image/");
+        const istBild = mimeType.startsWith("image/");
         const geschaetzteGroesse = Math.ceil((base64.length * 3) / 4);
         if (istBild && geschaetzteGroesse < 5_000) {
           logInfo("webhook/email", `Anhang[${idx}] übersprungen: Inline-Bild zu klein (${geschaetzteGroesse} Bytes)`, { name });
           continue;
         }
 
-        // MIME-Typ normalisieren
+        // MIME-Typ normalisieren (PDF-Aliase, jpg→jpeg)
         mimeType = effectiveMimeType(mimeType, name);
 
         // SVG-Dateien ausschließen (können JavaScript/XSS enthalten)
@@ -304,10 +317,18 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Unbekannte MIME-Typen SKIPPEN (nicht rejecten!)
+        // MIME-Check: bekannte Typen oder Bilder durchlassen
         if (!ALLOWED_MIME_TYPES.has(mimeType) && !mimeType.startsWith("image/")) {
-          logInfo("webhook/email", `Anhang übersprungen (MIME: ${mimeType}): ${name}`);
-          continue;
+          // Letzter Fallback: Dateiendung prüfen
+          const ext = name.split(".").pop()?.toLowerCase() || "";
+          const EXT_MIME: Record<string, string> = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", tiff: "image/tiff", bmp: "image/bmp" };
+          if (EXT_MIME[ext]) {
+            mimeType = EXT_MIME[ext];
+            logInfo("webhook/email", `Anhang[${idx}] MIME aus Dateiendung abgeleitet: ${ext} → ${mimeType}`, { name });
+          } else {
+            logInfo("webhook/email", `Anhang übersprungen (MIME: ${mimeType}): ${name}`);
+            continue;
+          }
         }
 
         // Größe prüfen – zu große skippen
