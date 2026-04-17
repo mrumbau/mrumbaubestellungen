@@ -99,8 +99,8 @@ export interface WochenzusammenfassungErgebnis {
   highlights: string[];
 }
 
-const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma analysiert.
-Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück, kein Text davor oder danach.
+const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma (MR Umbau GmbH) analysiert.
+Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück. KEIN Markdown, KEINE Backticks, KEIN Text davor oder danach — nur rohes JSON.
 
 Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, rechnung, aufmass, leistungsnachweis, oder versandbestaetigung.
 
@@ -112,6 +112,9 @@ Hinweise zur Typ-Erkennung:
 - "aufmass" = Aufmaß, Massenermittlung, Mengenaufstellung eines Subunternehmers (z.B. "Aufmaß Elektroinstallation", "Massenermittlung Trockenbau")
 - "leistungsnachweis" = Leistungsnachweis, Stundennachweis, Rapportzettel, Abnahmeprotokoll eines Subunternehmers
 - "versandbestaetigung" = Versandbestätigung, Versandmitteilung, Sendungsverfolgung, Tracking-Info, Paketversand-Benachrichtigung, Lieferankündigung. Enthält typischerweise Sendungsnummer/Tracking-Nummer und Versanddienstleister (DHL, DPD, Hermes, UPS, GLS, FedEx, Deutsche Post, GO!, Trans-o-flex).
+- "DIGITALER LIEFERSCHEIN" (z.B. von STARK EDI) = lieferschein, NICHT rechnung! Auch wenn Preise enthalten sind.
+- "AUFTRAGSBESTÄTIGUNG" = bestellbestaetigung (z.B. "Auftragsbestätigung 2030485657" von Raab Karcher/STARK).
+- "Schlussrechnung" = rechnung (eine finale Rechnung nach Abschlagsrechnungen).
 
 Erkenne außerdem die "vermutete_bestellungsart":
 - "material" = Warenlieferung von einem Händler/Lieferant (Produkte, Baumaterial, Werkzeug)
@@ -120,10 +123,11 @@ Erkenne außerdem die "vermutete_bestellungsart":
 Signale für "subunternehmer": Stundensätze, Pauschalpreise für Arbeitsleistungen, Gewerk-Bezeichnungen (Elektro, Trockenbau, Sanitär, Maler etc.), Leistungsbeschreibungen statt Artikellisten, Begriffe wie "Montage", "Einbau", "Verlegung", "Installation".
 
 WICHTIG zu den Nummern-Feldern — extrahiere ALLE vorhandenen Nummern:
-- "bestellnummer": Bestell-/Auftragsnummer oder Rechnungsnummer (die Hauptnummer des Dokuments). Bei Rechnungen: Rechnungsnummer. Bei Bestellbestätigungen: Auftragsnummer. Kommissionsnamen (wie "Dörning", "Peiß", Projektnamen) sind KEINE Bestellnummern!
+- "bestellnummer": Die HAUPTNUMMER des Dokuments. Bei Rechnungen: Rechnungsnummer (z.B. "8778719837", "R183788583", "R-00211"). Bei Bestellbestätigungen: Auftragsnummer. NICHT: Kommissionsnamen (Dörning, Peiß, Glöggler = Projektnamen!), NICHT: Versandart (Express, Standard), NICHT: Bes-Nr./BV-Nummern.
 - "auftragsnummer": Auftragsnummer falls vorhanden (z.B. "2030398090"). Oft als "Auftrags-Nr.", "Auftrag", "Order No." bezeichnet. Kann auf Lieferscheinen, Rechnungen und Bestätigungen stehen.
 - "lieferscheinnummer": Lieferscheinnummer falls vorhanden (z.B. "4313393316"). Nur bei Lieferscheinen.
 Mindestens eines der drei Felder muss gefüllt sein wenn irgendeine Nummer erkennbar ist!
+Bei Amazon-Rechnungen: Die Bestellnummer hat das Format 305-1234567-1234567.
 
 Gib folgende Struktur zurück:
 {

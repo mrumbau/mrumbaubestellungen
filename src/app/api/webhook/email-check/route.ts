@@ -277,11 +277,11 @@ export async function POST(request: NextRequest) {
             messages: [
               {
                 role: "system",
-                content: `Ist diese Email ein echtes Geschäftsdokument (Bestellung, Rechnung, Lieferschein, Angebot, Versandbestätigung)? Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurz"}. Im Zweifel: false.`,
+                content: `Ist diese Email von einem bekannten Händler einer Baufirma ein echtes Geschäftsdokument (Bestellung, Rechnung, Lieferschein, Angebot, Versandbestätigung)? Wenn die Email Anhänge hat und "Rechnung", "Angebot" oder "Lieferschein" erwähnt → JA. Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurz"}. Im Zweifel bei Anhängen: true. Im Zweifel ohne Anhänge: false.`,
               },
               {
                 role: "user",
-                content: `Absender: ${email_absender}\nBetreff: ${email_betreff}\nVorschau: ${(email_vorschau || "").substring(0, 300)}`,
+                content: `Absender: ${email_absender}\nBetreff: ${email_betreff}\nHat Anhänge: ${body.hat_anhaenge ? "ja" : "unbekannt"}\nVorschau: ${(email_vorschau || "").substring(0, 300)}`,
               },
             ],
           });
@@ -413,24 +413,28 @@ IRRELEVANT (nein):
 - Newsletter, Werbung, Marketing, ProfiNews, Produktinfos
 - Geräte-Benachrichtigungen (Router, NAS, Drucker, Telefon/3CX)
 - Bewertungsaufforderungen
-- Mahnungen, Zahlungserinnerungen, Kontoinformationen
 - Spam, Phishing, Bewerbungen
 - Hosting-/Domain-Benachrichtigungen
 - Kalender, Social Media, Lesebestätigungen
 - Emails die nur "Per E-Mail senden:" im Betreff haben
 - Lohnabrechnungen, Entgeltabrechnungen, Gehaltsabrechnungen, Lohnauswertungen (vom Steuerbüro/Lohnbüro)
+- Leasinganträge, Bonitätsprüfungen, Finanzierungsanfragen
+- Lieferschein-Rückläufer, Retouren-Bestätigungen
+- Zahlungsbestätigungen von PayPal
 
 WICHTIG — NICHT als irrelevant einstufen:
 - Emails mit "Sehr geehrte Damen und Herren" oder "anbei" sind NICHT automatisch irrelevant! Viele Lieferanten und Handwerker schreiben persönliche Emails mit Rechnungen/Angeboten im Anhang.
 - Wenn der Betreff ODER die Vorschau auf ein Dokument hindeutet (Rechnung, Angebot, Auftragsbestätigung, Lieferschein, im Anhang, attached) → RELEVANT.
+- "Rechnung im Anhang" oder "anbei die Rechnung" → IMMER RELEVANT, auch von unbekannten Absendern.
 - E-Mail-Antworten (AW:/RE:/SV:) sind NUR irrelevant wenn sie KEINE Dokumente enthalten oder ankündigen.
+- Mahnungen/Zahlungserinnerungen → RELEVANT (werden intern als Mahnung verarbeitet).
 - Im Zweifel: RELEVANT (besser eine irrelevante Email verarbeiten als eine Rechnung verpassen).${verworfeneBeispiele}
 
 Antworte NUR mit JSON: {"relevant": true/false, "grund": "kurze Begründung"}`,
           },
           {
             role: "user",
-            content: `Absender: ${email_absender}\nBetreff: ${email_betreff}\nVorschau: ${(email_vorschau || "").substring(0, 500)}`,
+            content: `Absender: ${email_absender}\nBetreff: ${email_betreff}\nHat Anhänge: ${body.hat_anhaenge ? "ja" : "unbekannt"}\nVorschau: ${(email_vorschau || "").substring(0, 500)}`,
           },
         ],
       });
