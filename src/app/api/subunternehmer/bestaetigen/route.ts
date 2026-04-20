@@ -27,8 +27,9 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    // Nur Admin kuratiert Stammdaten (Besteller bringt SU via Bestellung ein, Admin validiert)
-    if (!requireRoles(profil, "admin")) {
+    // Admin + Besteller: Besteller sind Firmeninhaber und kennen Subunternehmer
+    // direkt aus dem Baustellen-Alltag — dürfen selbst bestätigen
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

@@ -156,7 +156,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },
-  { id: "besteller_stats", label: "Bestellungen pro Besteller", defaultVisible: true, adminOnly: true },
+  { id: "besteller_stats", label: "Bestellungen pro Besteller", defaultVisible: true },
 ];
 
 // ─── Auto-Refresh Interval ──────────────────────────────
@@ -882,8 +882,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Bestellungen pro Besteller — admin-only (Team-Stats sind Controller-Sicht, nicht Besteller-Arbeit) */}
-      {isAdmin && isWidgetVisible("besteller_stats") && bestellerEntries.length > 0 && (
+      {/* Bestellungen pro Besteller — Team-Transparenz (Firmeninhaber wollen sehen, wer wieviel bestellt) */}
+      {isWidgetVisible("besteller_stats") && bestellerEntries.length > 0 && (
         <div className="mb-6">
           <CollapsibleCard
             title="Bestellungen pro Besteller"
