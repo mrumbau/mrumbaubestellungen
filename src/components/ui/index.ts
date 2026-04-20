@@ -46,6 +46,9 @@ export type {
 
 export { BulkToolbar } from "./bulk-toolbar";
 
+export { ActionMenu } from "./action-menu";
+export type { ActionMenuItem } from "./action-menu";
+
 export { SavedViewsMenu, useSavedViews } from "./saved-views";
 export type { SavedView, UseSavedViewsResult } from "./saved-views";
 

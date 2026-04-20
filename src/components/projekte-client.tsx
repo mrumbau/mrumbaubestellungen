@@ -11,11 +11,15 @@ import {
   useTableDensity,
   SavedViewsMenu,
   useSavedViews,
+  Button,
+  ActionMenu,
+  EmptyState,
   type DataTableColumn,
   type SortState,
   type Density,
 } from "@/components/ui";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
+import { IconEdit, IconPlus, IconFolderOpen } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 type ViewMode = "grid" | "table";
@@ -413,6 +417,26 @@ export function ProjekteClient({
       className: "text-foreground-subtle whitespace-nowrap",
       render: (p) => formatDatum(p.created_at),
     },
+    {
+      key: "actions",
+      label: "",
+      stopPropagation: true,
+      align: "right",
+      width: 56,
+      render: (p) =>
+        istAdmin ? (
+          <ActionMenu
+            label={`Aktionen für ${p.name}`}
+            items={[
+              {
+                label: "Bearbeiten",
+                icon: <IconEdit />,
+                onSelect: () => openEdit(p),
+              },
+            ]}
+          />
+        ) : null,
+    },
   ];
 
   const resetForm = useCallback(() => {
@@ -772,22 +796,26 @@ export function ProjekteClient({
 
       {/* Projekt-Grid */}
       {aktive.length === 0 ? (
-        <div className="card p-16 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-input border border-line flex items-center justify-center">
-            <svg className="w-5 h-5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3H21m-3.75 3H21" />
-            </svg>
-          </div>
-          <p className="text-foreground-muted font-medium mb-1">Noch keine Projekte</p>
-          {istAdmin && (
-            <button
-              onClick={() => { resetForm(); setShowForm(true); }}
-              className="mt-3 text-brand hover:text-brand-light text-sm font-medium transition-colors"
-            >
-              Erstes Projekt erstellen
-            </button>
-          )}
-        </div>
+        <EmptyState
+          tone="info"
+          icon={<IconFolderOpen className="w-5 h-5" />}
+          title="Noch keine Projekte"
+          description="Projekte gruppieren Bestellungen und Budgets. Lege das erste Projekt an, um Bestellungen zuordnen zu können."
+          primaryAction={
+            istAdmin ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(true);
+                }}
+                iconLeft={<IconPlus />}
+              >
+                Erstes Projekt erstellen
+              </Button>
+            ) : undefined
+          }
+        />
       ) : viewMode === "table" ? (
         <DataTable<Projekt>
           columns={projektColumns}
@@ -799,7 +827,13 @@ export function ProjekteClient({
           onSortChange={setSort}
           onRowClick={(p) => router.push(`/bestellungen?projekt=${p.id}`)}
           emptyState={
-            <p className="text-foreground-subtle text-[13px]">Keine Projekte.</p>
+            <EmptyState
+              tone="info"
+              compact
+              icon={<IconFolderOpen className="w-5 h-5" />}
+              title="Keine aktiven Projekte"
+              description="Aktive Projekte erscheinen hier. Abgeschlossene und pausierte Projekte findest du im Archiv."
+            />
           }
         />
       ) : (

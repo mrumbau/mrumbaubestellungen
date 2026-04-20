@@ -199,3 +199,21 @@ export function IconPuzzle(props: IconProps) {
     </svg>
   );
 }
+
+export function IconDotsHorizontal(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props} strokeWidth={0} fill="currentColor">
+      <circle cx="3.5" cy="8" r="1.25" />
+      <circle cx="8" cy="8" r="1.25" />
+      <circle cx="12.5" cy="8" r="1.25" />
+    </svg>
+  );
+}
+
+export function IconDownload(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 12.5h11" />
+    </svg>
+  );
+}

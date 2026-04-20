@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { BulkToolbar, Button } from "@/components/ui";
-import { IconTrash } from "@/components/ui/icons";
+import { BulkToolbar, Button, EmptyState as UIEmptyState } from "@/components/ui";
+import { IconTrash, IconFolderOpen } from "@/components/ui/icons";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 
 // ---------------------------------------------------------------------------
@@ -588,24 +588,30 @@ export function ArchivClient({
 // Empty State
 // ---------------------------------------------------------------------------
 
-const EMPTY_MESSAGES = {
-  projekte: { title: "Keine abgeschlossenen Projekte", subtitle: "Projekte mit Status \"Abgeschlossen\" erscheinen hier." },
-  material: { title: "Keine archivierten Material-Bestellungen", subtitle: "Archivierte Material-Rechnungen erscheinen hier." },
-  subunternehmer: { title: "Keine archivierten SU-Rechnungen", subtitle: "Archivierte Subunternehmer-Rechnungen erscheinen hier." },
-} as const;
+const EMPTY_MESSAGES: Record<TabKey, { title: string; description: string }> = {
+  projekte: {
+    title: "Keine abgeschlossenen Projekte",
+    description: 'Projekte mit Status "Abgeschlossen" landen hier und bleiben durchsuchbar, ohne die aktive Liste zu belasten.',
+  },
+  material: {
+    title: "Keine archivierten Material-Bestellungen",
+    description: "Bezahlte Material-Rechnungen werden nach der Buchung automatisch hierher verschoben.",
+  },
+  subunternehmer: {
+    title: "Keine archivierten SU-Rechnungen",
+    description: "Bezahlte Subunternehmer-Rechnungen werden nach der Buchung automatisch hierher verschoben.",
+  },
+};
 
 function EmptyState({ type }: { type: TabKey }) {
   const msg = EMPTY_MESSAGES[type];
   return (
-    <div className="card p-16 text-center">
-      <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-input border border-line flex items-center justify-center">
-        <svg className="w-5 h-5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-        </svg>
-      </div>
-      <p className="text-foreground-muted font-medium mb-1">{msg.title}</p>
-      <p className="text-foreground-subtle text-sm">{msg.subtitle}</p>
-    </div>
+    <UIEmptyState
+      tone="info"
+      icon={<IconFolderOpen className="w-5 h-5" />}
+      title={msg.title}
+      description={msg.description}
+    />
   );
 }
 

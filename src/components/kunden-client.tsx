@@ -11,12 +11,15 @@ import {
   SavedViewsMenu,
   useSavedViews,
   Badge,
+  Button,
+  ActionMenu,
+  EmptyState,
   type DataTableColumn,
   type SortState,
   type Density,
 } from "@/components/ui";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
-import { IconCheck, IconEdit, IconTrash } from "@/components/ui/icons";
+import { IconCheck, IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 type ViewMode = "grid" | "table";
@@ -395,33 +398,25 @@ export function KundenClient({
       label: "",
       stopPropagation: true,
       align: "right",
-      width: 72,
+      width: 56,
       render: (k) =>
         istAdmin ? (
-          <div className="flex items-center justify-end gap-0.5">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openEdit(k);
-              }}
-              className="p-1 rounded hover:bg-canvas transition-colors text-foreground-faint hover:text-brand"
-              title="Bearbeiten"
-              aria-label={`${k.name} bearbeiten`}
-            >
-              <IconEdit className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeleteConfirm({ id: k.id, name: k.name });
-              }}
-              className="p-1 rounded hover:bg-error-bg transition-colors text-foreground-faint hover:text-error"
-              title="Löschen"
-              aria-label={`${k.name} löschen`}
-            >
-              <IconTrash className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <ActionMenu
+            label={`Aktionen für ${k.name}`}
+            items={[
+              {
+                label: "Bearbeiten",
+                icon: <IconEdit />,
+                onSelect: () => openEdit(k),
+              },
+              {
+                label: "Löschen",
+                icon: <IconTrash />,
+                onSelect: () => setDeleteConfirm({ id: k.id, name: k.name }),
+                destructive: true,
+              },
+            ]}
+          />
         ) : null,
     },
   ];
@@ -750,23 +745,26 @@ export function KundenClient({
 
       {/* Kunden-Grid */}
       {bestaetigt.length === 0 && unbestaetigt.length === 0 ? (
-        <div className="card p-16 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-input border border-line flex items-center justify-center">
-            <svg className="w-5 h-5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-            </svg>
-          </div>
-          <p className="text-foreground-muted font-medium mb-1">Noch keine Kunden</p>
-          <p className="text-xs text-foreground-subtle mb-3">Kunden werden automatisch aus Dokumenten erkannt oder manuell angelegt.</p>
-          {istAdmin && (
-            <button
-              onClick={() => { resetForm(); setShowForm(true); }}
-              className="text-brand hover:text-brand-light text-sm font-medium transition-colors"
-            >
-              Ersten Kunden anlegen
-            </button>
-          )}
-        </div>
+        <EmptyState
+          tone="info"
+          icon={<IconUsers className="w-5 h-5" />}
+          title="Noch keine Kunden"
+          description="Kunden werden automatisch aus Dokumenten erkannt oder können manuell angelegt werden."
+          primaryAction={
+            istAdmin ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(true);
+                }}
+                iconLeft={<IconPlus />}
+              >
+                Ersten Kunden anlegen
+              </Button>
+            ) : undefined
+          }
+        />
       ) : viewMode === "table" ? (
         <DataTable<Kunde>
           columns={kundenColumns}
@@ -778,7 +776,13 @@ export function KundenClient({
           onSortChange={setSort}
           getSelectionAriaLabel={(k) => `Kunde ${k.name} auswählen`}
           emptyState={
-            <p className="text-foreground-subtle text-[13px]">Keine Kunden.</p>
+            <EmptyState
+              tone="info"
+              compact
+              icon={<IconUsers className="w-5 h-5" />}
+              title="Keine Kunden in der Tabelle"
+              description="Die bestätigten Kunden erscheinen hier."
+            />
           }
         />
       ) : (
