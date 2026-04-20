@@ -87,7 +87,7 @@ export function SidebarMetadata({
               <option value="abo">Abo / Vertrag</option>
             </Select>
           ) : (
-            <Badge tone={aktuelleArt === "subunternehmer" ? "info" : "neutral"} size="md">
+            <Badge tone="neutral" size="md">
               {BESTELLUNGSART_LABELS[aktuelleArt]}
             </Badge>
           )}
@@ -212,23 +212,23 @@ export function SidebarMetadata({
           )}
       </Card>
 
-      {/* Subunternehmer info */}
+      {/* Subunternehmer info — category info, not workflow state → neutral grey, icon differentiates */}
       {aktuelleArt === "subunternehmer" && subunternehmer && (
-        <Card padding="md" className="border-l-[3px] border-l-info">
+        <Card padding="md" className="border-l-[3px] border-l-foreground-muted">
           <div className="flex items-center gap-2 mb-2">
             <span
               aria-hidden="true"
-              className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-info-bg text-info [&_svg]:h-3.5 [&_svg]:w-3.5"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-canvas text-foreground-muted [&_svg]:h-3.5 [&_svg]:w-3.5"
             >
               <IconTool />
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-info">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-foreground-muted">
               Subunternehmer
             </span>
           </div>
           <p className="text-[13px] font-medium text-foreground">{subunternehmer.firma}</p>
           {subunternehmer.gewerk && (
-            <Badge tone="info" size="sm" className="mt-1">
+            <Badge tone="neutral" size="sm" className="mt-1">
               {subunternehmer.gewerk}
             </Badge>
           )}

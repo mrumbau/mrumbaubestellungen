@@ -216,7 +216,7 @@ function DokumentCountPill({ current, total }: { current: number; total: number 
     <span
       className={
         "inline-flex items-center gap-1 font-medium " +
-        (complete ? "text-status-freigegeben" : "text-warning")
+        (complete ? "text-status-freigegeben" : "text-foreground-muted")
       }
     >
       <svg

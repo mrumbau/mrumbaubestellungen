@@ -91,9 +91,9 @@
   --feedback-info-bg: #eff6ff;
   --feedback-info-border: #bfdbfe;
 
-  /* Timeline (aktivitätsverlauf dot colors — semantic event categories) */
-  --timeline-dok: #2563eb;
-  --timeline-kommentar: #9a9a9a;
+  /* Timeline: status-colors are used for workflow-state transitions (abgleich/freigabe).
+     Info-events (dok, kommentar) reference the neutral text-* tokens directly —
+     no dedicated timeline tokens, since they would be mere aliases. */
 }
 
 /* ============================================
@@ -168,10 +168,6 @@
   --color-info: var(--feedback-info);
   --color-info-bg: var(--feedback-info-bg);
   --color-info-border: var(--feedback-info-border);
-
-  /* Timeline (event categories) */
-  --color-timeline-dok: var(--timeline-dok);
-  --color-timeline-kommentar: var(--timeline-kommentar);
 
   /* Shadows */
   --shadow-card: var(--shadow-card);

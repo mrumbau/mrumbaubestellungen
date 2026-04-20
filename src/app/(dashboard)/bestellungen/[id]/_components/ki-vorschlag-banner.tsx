@@ -56,26 +56,26 @@ export function KiVorschlagBanner({
   const konfidenz = Math.round((bestellung.projekt_vorschlag_konfidenz || 0) * 100);
 
   return (
-    <Card padding="md" className="border-l-[3px] border-l-warning">
+    <Card padding="md">
       <div className="flex items-center gap-2 mb-3">
         <span
           aria-hidden="true"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-warning-bg text-warning"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand/5 text-brand"
         >
           <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-            <path d="M10 2a1 1 0 011 1v1.07a6.002 6.002 0 014.93 4.93H17a1 1 0 110 2h-1.07a6.002 6.002 0 01-4.93 4.93V17a1 1 0 11-2 0v-1.07a6.002 6.002 0 01-4.93-4.93H3a1 1 0 110-2h1.07A6.002 6.002 0 019 4.07V3a1 1 0 011-1zm0 4a4 4 0 100 8 4 4 0 000-8z" />
+            <path d="M10 2a1 1 0 01.894.553l1.382 2.764 2.764 1.382a1 1 0 010 1.788l-2.764 1.382-1.382 2.764a1 1 0 01-1.788 0L7.724 9.87 4.96 8.488a1 1 0 010-1.788l2.764-1.382 1.382-2.764A1 1 0 0110 2z" />
           </svg>
         </span>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-warning">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-brand">
           KI-Vorschlag
         </span>
       </div>
 
       {bestellung.lieferadresse_erkannt && !compact && (
-        <div className="flex items-start gap-2 mb-2.5 px-2.5 py-2 bg-warning-bg/50 rounded-md">
+        <div className="flex items-start gap-2 mb-2.5 px-2.5 py-2 bg-canvas rounded-md">
           <svg
             aria-hidden="true"
-            className="w-3.5 h-3.5 text-warning mt-0.5 shrink-0"
+            className="w-3.5 h-3.5 text-foreground-subtle mt-0.5 shrink-0"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -108,7 +108,7 @@ export function KiVorschlagBanner({
           {vorschlagProjekt?.name || "Unbekanntes Projekt"}
         </span>
         {compact && (
-          <span className="font-mono-amount text-[11px] font-bold text-warning ml-auto">
+          <span className="font-mono-amount text-[11px] font-bold text-brand ml-auto">
             {konfidenz}%
           </span>
         )}
@@ -116,7 +116,7 @@ export function KiVorschlagBanner({
 
       {!compact && (
         <div className="flex items-center gap-2 mb-2">
-          <span className="font-mono-amount text-[11px] font-bold text-warning">
+          <span className="font-mono-amount text-[11px] font-bold text-brand">
             {konfidenz}%
           </span>
           <span className="text-[10px] text-foreground-subtle">

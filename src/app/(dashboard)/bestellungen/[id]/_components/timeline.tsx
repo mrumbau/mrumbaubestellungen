@@ -123,7 +123,7 @@ function buildTimeline(
       zeit: d.created_at,
       label: `${typLabels[d.typ] || d.typ} eingegangen`,
       typ: "dok",
-      farbe: "var(--timeline-dok)",
+      farbe: "var(--text-secondary)",
     });
   }
   if (abgleich) {
@@ -150,7 +150,7 @@ function buildTimeline(
       zeit: k.erstellt_am,
       label: `${k.autor_kuerzel}: "${k.text.slice(0, 60)}${k.text.length > 60 ? "…" : ""}"`,
       typ: "kommentar",
-      farbe: "var(--timeline-kommentar)",
+      farbe: "var(--text-tertiary)",
     });
   }
   return items.sort((a, b) => new Date(a.zeit).getTime() - new Date(b.zeit).getTime());
