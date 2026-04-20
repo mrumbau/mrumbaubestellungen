@@ -38,7 +38,7 @@ export function DashboardNeueHaendler({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-[#d97706]">
+    <div className="card p-5 border-l-[3px] border-l-warning">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
@@ -46,14 +46,14 @@ export function DashboardNeueHaendler({
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Neue Händler erkannt</h2>
+          <h2 className="font-headline text-sm text-foreground tracking-tight">Neue Händler erkannt</h2>
           <span className="font-mono-amount text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
       </div>
 
-      <p className="text-xs text-[#9a9a9a] mb-3">
+      <p className="text-xs text-foreground-subtle mb-3">
         Diese Händler wurden automatisch erkannt – bitte prüfen und bestätigen.
       </p>
 
@@ -62,10 +62,10 @@ export function DashboardNeueHaendler({
           <div key={h.id} className="bg-amber-50/50 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#1a1a1a]">
+                <p className="text-sm font-medium text-foreground">
                   {h.name}
                 </p>
-                <p className="text-[11px] text-[#c4c2bf] truncate">
+                <p className="text-[11px] text-foreground-faint truncate">
                   {h.domain}
                   {h.email_absender?.length > 0 && (
                     <> · {h.email_absender.join(", ")}</>
@@ -86,7 +86,7 @@ export function DashboardNeueHaendler({
                 </button>
                 <Link
                   href="/einstellungen"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

@@ -193,8 +193,8 @@ export default async function DashboardPage() {
     <div>
       <div className="mb-8 flex items-end justify-between">
         <div>
-          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Dashboard</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">Willkommen, {profil.name}.</p>
+          <h1 className="font-headline text-2xl text-foreground tracking-tight">Dashboard</h1>
+          <p className="text-foreground-subtle text-sm mt-1">Willkommen, {profil.name}.</p>
         </div>
         <div className="hidden md:block">
           <svg width="48" height="32" viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.08]">

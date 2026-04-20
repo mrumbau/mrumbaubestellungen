@@ -199,8 +199,8 @@ export function KundenClient({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Kunden</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">
+          <h1 className="font-headline text-2xl text-foreground tracking-tight">Kunden</h1>
+          <p className="text-foreground-subtle text-sm mt-1">
             {kunden.length} Auftraggeber{unbestaetigt.length > 0 ? ` · ${unbestaetigt.length} unbestätigt` : ""}
           </p>
         </div>
@@ -234,17 +234,17 @@ export function KundenClient({
             <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <h2 className="font-headline text-sm text-[#1a1a1a]">Auto-erkannte Kunden</h2>
+            <h2 className="font-headline text-sm text-foreground">Auto-erkannte Kunden</h2>
             <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">{unbestaetigt.length}</span>
           </div>
-          <p className="text-xs text-[#9a9a9a] mb-3">Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.</p>
+          <p className="text-xs text-foreground-subtle mb-3">Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.</p>
           <div className="space-y-2">
             {unbestaetigt.map((k) => (
               <div key={k.id} className="flex items-center justify-between p-3 bg-amber-50/50 rounded-lg">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ background: k.farbe }} />
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-[#1a1a1a]">{k.name}</span>
+                    <span className="text-sm font-medium text-foreground">{k.name}</span>
                     {k.keywords.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {k.keywords.map((kw, i) => (
@@ -267,7 +267,7 @@ export function KundenClient({
                   </button>
                   <button
                     onClick={() => openEdit(k)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -285,10 +285,10 @@ export function KundenClient({
       {showForm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-[#e8e6e3]">
+            <div className="p-6 border-b border-line">
               <div className="flex items-center justify-between">
-                <h2 className="font-headline text-lg text-[#1a1a1a] tracking-tight">{editId ? "Kunde bearbeiten" : "Neuer Kunde"}</h2>
-                <button onClick={resetForm} className="p-1 text-[#9a9a9a] hover:text-[#1a1a1a] transition-colors">
+                <h2 className="font-headline text-lg text-foreground tracking-tight">{editId ? "Kunde bearbeiten" : "Neuer Kunde"}</h2>
+                <button onClick={resetForm} className="p-1 text-foreground-subtle hover:text-foreground transition-colors">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -299,70 +299,70 @@ export function KundenClient({
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Name *</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Name *</label>
                   <input
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                     placeholder="z.B. Familie Müller"
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Kürzel</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Kürzel</label>
                   <input
                     value={formKuerzel}
                     onChange={(e) => setFormKuerzel(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                     placeholder="z.B. MUE"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Adresse</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Adresse</label>
                 <input
                   value={formAdresse}
                   onChange={(e) => setFormAdresse(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   placeholder="Straße Nr, PLZ Ort"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">E-Mail</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">E-Mail</label>
                   <input
                     type="email"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Telefon</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Telefon</label>
                   <input
                     type="tel"
                     value={formTelefon}
                     onChange={(e) => setFormTelefon(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Notizen</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Notizen</label>
                 <textarea
                   value={formNotizen}
                   onChange={(e) => setFormNotizen(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 resize-none"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 resize-none"
                   placeholder="Interne Notizen..."
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Keywords (Enter zum Hinzufügen)</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Keywords (Enter zum Hinzufügen)</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {formKeywords.map((kw, i) => (
                     <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[11px] font-medium">
@@ -377,13 +377,13 @@ export function KundenClient({
                   value={formKeywordInput}
                   onChange={(e) => setFormKeywordInput(e.target.value)}
                   onKeyDown={handleKeywordAdd}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   placeholder="Keyword eingeben + Enter"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Farbe</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Farbe</label>
                 <div className="flex gap-2">
                   {FARBEN.map((f) => (
                     <button
@@ -406,10 +406,10 @@ export function KundenClient({
               {error && <p className="text-red-600 text-sm">{error}</p>}
             </div>
 
-            <div className="p-6 border-t border-[#e8e6e3] flex justify-end gap-3">
+            <div className="p-6 border-t border-line flex justify-end gap-3">
               <button
                 onClick={resetForm}
-                className="px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:text-[#1a1a1a] transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
               >
                 Abbrechen
               </button>
@@ -428,17 +428,17 @@ export function KundenClient({
       {/* Kunden-Grid */}
       {bestaetigt.length === 0 && unbestaetigt.length === 0 ? (
         <div className="card p-16 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#fafaf9] border border-[#e8e6e3] flex items-center justify-center">
-            <svg className="w-5 h-5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-input border border-line flex items-center justify-center">
+            <svg className="w-5 h-5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
             </svg>
           </div>
-          <p className="text-[#6b6b6b] font-medium mb-1">Noch keine Kunden</p>
-          <p className="text-xs text-[#9a9a9a] mb-3">Kunden werden automatisch aus Dokumenten erkannt oder manuell angelegt.</p>
+          <p className="text-foreground-muted font-medium mb-1">Noch keine Kunden</p>
+          <p className="text-xs text-foreground-subtle mb-3">Kunden werden automatisch aus Dokumenten erkannt oder manuell angelegt.</p>
           {istAdmin && (
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="text-[#570006] hover:text-[#7a1a1f] text-sm font-medium transition-colors"
+              className="text-brand hover:text-brand-light text-sm font-medium transition-colors"
             >
               Ersten Kunden anlegen
             </button>
@@ -464,16 +464,16 @@ export function KundenClient({
                   {/* Header */}
                   <div className="flex items-start justify-between mb-1">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-headline text-base text-[#1a1a1a] truncate">{k.name}</h3>
+                      <h3 className="font-headline text-base text-foreground truncate">{k.name}</h3>
                       {k.kuerzel && (
-                        <span className="text-[10px] text-[#c4c2bf] font-mono">{k.kuerzel}</span>
+                        <span className="text-[10px] text-foreground-faint font-mono">{k.kuerzel}</span>
                       )}
                     </div>
                     {istAdmin && (
                       <div className="flex items-center gap-0.5 ml-2 shrink-0">
                         <button
                           onClick={() => openEdit(k)}
-                          className="p-1 rounded hover:bg-[#f5f4f2] transition-colors text-[#c4c2bf] hover:text-[#570006]"
+                          className="p-1 rounded hover:bg-canvas transition-colors text-foreground-faint hover:text-brand"
                           title="Bearbeiten"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -482,7 +482,7 @@ export function KundenClient({
                         </button>
                         <button
                           onClick={() => setDeleteConfirm({ id: k.id, name: k.name })}
-                          className="p-1 rounded hover:bg-red-50 transition-colors text-[#c4c2bf] hover:text-red-600"
+                          className="p-1 rounded hover:bg-red-50 transition-colors text-foreground-faint hover:text-red-600"
                           title="Löschen"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -495,10 +495,10 @@ export function KundenClient({
 
                   {/* Adresse + Kontakt */}
                   {k.adresse && (
-                    <p className="text-xs text-[#6b6b6b] truncate mt-1">{k.adresse}</p>
+                    <p className="text-xs text-foreground-muted truncate mt-1">{k.adresse}</p>
                   )}
                   {(k.email || k.telefon) && (
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[#9a9a9a]">
+                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-foreground-subtle">
                       {k.email && (
                         <span className="flex items-center gap-1 truncate" title={k.email}>
                           <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -519,18 +519,18 @@ export function KundenClient({
                   )}
 
                   {/* Stats */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-[#fafaf9] rounded-lg border border-[#f0eeeb]">
+                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-input rounded-lg border border-line-subtle">
                     <div>
-                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Projekte</p>
-                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{s.projekte}</p>
+                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Projekte</p>
+                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.projekte}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Bestell.</p>
-                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{s.bestellungen}</p>
+                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Bestell.</p>
+                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.bestellungen}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Volumen</p>
-                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{formatBetrag(s.volumen)}</p>
+                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Volumen</p>
+                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{formatBetrag(s.volumen)}</p>
                     </div>
                   </div>
 
@@ -544,10 +544,10 @@ export function KundenClient({
                   )}
 
                   {/* Footer */}
-                  <div className="mt-4 pt-3 border-t border-[#f0eeeb] flex items-center justify-between">
-                    <span className="text-[10px] text-[#c4c2bf]">{formatDatum(k.created_at)}</span>
+                  <div className="mt-4 pt-3 border-t border-line-subtle flex items-center justify-between">
+                    <span className="text-[10px] text-foreground-faint">{formatDatum(k.created_at)}</span>
                     {k.notizen && (
-                      <span className="text-[10px] text-[#9a9a9a] truncate max-w-[60%]" title={k.notizen}>
+                      <span className="text-[10px] text-foreground-subtle truncate max-w-[60%]" title={k.notizen}>
                         {k.notizen}
                       </span>
                     )}

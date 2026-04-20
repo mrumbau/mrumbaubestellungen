@@ -279,29 +279,29 @@ export function BuchhaltungClient({
       {showDatev && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDatev(false)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-[#e8e6e3]">
+            <div className="p-6 border-b border-line">
               <div className="flex items-center justify-between">
-                <h2 className="font-headline text-lg text-[#1a1a1a] tracking-tight">DATEV Export</h2>
-                <button onClick={() => setShowDatev(false)} className="p-1 text-[#9a9a9a] hover:text-[#1a1a1a] transition-colors">
+                <h2 className="font-headline text-lg text-foreground tracking-tight">DATEV Export</h2>
+                <button onClick={() => setShowDatev(false)} className="p-1 text-foreground-subtle hover:text-foreground transition-colors">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-              <p className="text-sm text-[#9a9a9a] mt-1">Buchungsstapel im DATEV-Format exportieren</p>
+              <p className="text-sm text-foreground-subtle mt-1">Buchungsstapel im DATEV-Format exportieren</p>
             </div>
             <div className="p-6 space-y-4">
               {/* Zeitraum */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Von</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Von</label>
                   <input type="date" value={datevVon} onChange={(e) => setDatevVon(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Bis</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Bis</label>
                   <input type="date" value={datevBis} onChange={(e) => setDatevBis(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
                 </div>
               </div>
 
@@ -314,7 +314,8 @@ export function BuchhaltungClient({
                   { label: "Letztes Jahr", fn: () => { const y = new Date().getFullYear() - 1; setDatevVon(`${y}-01-01`); setDatevBis(`${y}-12-31`); } },
                 ].map((btn) => (
                   <button key={btn.label} type="button" onClick={btn.fn}
-                    className="px-2.5 py-1 text-[11px] font-medium text-[#6b6b6b] bg-[#f5f4f2] border border-[#e8e6e3] rounded-md hover:bg-[#ebe9e6] hover:text-[#1a1a1a] transition-colors">
+                    // eslint-disable-next-line no-restricted-syntax -- DATEV quick-range hover darker than canvas, no matching token; revisit when these buttons migrate to <Button variant="secondary">.
+                    className="px-2.5 py-1 text-[11px] font-medium text-foreground-muted bg-canvas border border-line rounded-md hover:bg-[#ebe9e6] hover:text-foreground transition-colors">
                     {btn.label}
                   </button>
                 ))}
@@ -323,9 +324,9 @@ export function BuchhaltungClient({
               {/* Projekt-Filter */}
               {projekte.length > 0 && (
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Projekt (optional)</label>
+                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Projekt (optional)</label>
                   <select value={datevProjekt} onChange={(e) => setDatevProjekt(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30">
+                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30">
                     <option value="">Alle Projekte</option>
                     {projekte.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -340,42 +341,42 @@ export function BuchhaltungClient({
               </div>
 
               {/* Erweiterte Optionen (Collapsible) */}
-              <div className="border border-[#e8e6e3] rounded-lg overflow-hidden">
+              <div className="border border-line rounded-lg overflow-hidden">
                 <button type="button" onClick={() => setShowErweitert(!showErweitert)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-[#6b6b6b] hover:bg-[#fafaf9] transition-colors">
+                  className="w-full flex items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-foreground-muted hover:bg-input transition-colors">
                   <span>Erweiterte Optionen</span>
                   <svg className={`w-3.5 h-3.5 transition-transform ${showErweitert ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
                 {showErweitert && (
-                  <div className="px-3 pb-3 space-y-3 border-t border-[#e8e6e3]">
+                  <div className="px-3 pb-3 space-y-3 border-t border-line">
                     <div className="grid grid-cols-2 gap-3 pt-3">
                       <div>
-                        <label className="block text-[11px] text-[#6b6b6b] mb-1">Berater-Nr.</label>
+                        <label className="block text-[11px] text-foreground-muted mb-1">Berater-Nr.</label>
                         <input type="text" value={datevBeraterNr} onChange={(e) => setDatevBeraterNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
                           maxLength={7} placeholder="231925"
-                          className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
                       </div>
                       <div>
-                        <label className="block text-[11px] text-[#6b6b6b] mb-1">Mandanten-Nr.</label>
+                        <label className="block text-[11px] text-foreground-muted mb-1">Mandanten-Nr.</label>
                         <input type="text" value={datevMandantenNr} onChange={(e) => setDatevMandantenNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
                           maxLength={7} placeholder="30086"
-                          className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-[11px] text-[#6b6b6b] mb-1">Gegenkonto</label>
+                        <label className="block text-[11px] text-foreground-muted mb-1">Gegenkonto</label>
                         <input type="text" value={datevGegenKonto} onChange={(e) => setDatevGegenKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
                           maxLength={4} placeholder="4980"
-                          className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
                       </div>
                       <div>
-                        <label className="block text-[11px] text-[#6b6b6b] mb-1">Aufwandskonto</label>
+                        <label className="block text-[11px] text-foreground-muted mb-1">Aufwandskonto</label>
                         <input type="text" value={datevAufwandsKonto} onChange={(e) => setDatevAufwandsKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
                           maxLength={4} placeholder="Optional"
-                          className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm font-mono-amount text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
                       </div>
                     </div>
                   </div>
@@ -386,8 +387,8 @@ export function BuchhaltungClient({
                 <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700">{datevError}</div>
               )}
             </div>
-            <div className="p-6 border-t border-[#e8e6e3] flex justify-end gap-3">
-              <button onClick={() => setShowDatev(false)} className="px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:text-[#1a1a1a] transition-colors">
+            <div className="p-6 border-t border-line flex justify-end gap-3">
+              <button onClick={() => setShowDatev(false)} className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors">
                 Abbrechen
               </button>
               <button onClick={exportDatev} disabled={datevLoading || !datevVon || !datevBis}
@@ -402,8 +403,8 @@ export function BuchhaltungClient({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Buchhaltung</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">
+          <h1 className="font-headline text-2xl text-foreground tracking-tight">Buchhaltung</h1>
+          <p className="text-foreground-subtle text-sm mt-1">
             {rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen" : "Freigegebene Rechnungen"}
           </p>
         </div>
@@ -411,16 +412,16 @@ export function BuchhaltungClient({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowDatev(true)}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-[#e8e6e3] text-[#1a1a1a] bg-white rounded-lg hover:bg-[#fafaf9] hover:border-[#570006]/30 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-white rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
             >
-              <svg className="w-4 h-4 text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               DATEV Export
             </button>
             <button
               onClick={exportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-[#e8e6e3] text-[#1a1a1a] bg-white rounded-lg hover:bg-[#fafaf9] hover:border-[#570006]/30 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-white rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -435,45 +436,45 @@ export function BuchhaltungClient({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #570006" }}>
           <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #570006, transparent)" }} />
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Offene Rechnungen</p>
-          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
+          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Offene Rechnungen</p>
+          <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeOffen)}
           </p>
-          <p className="text-[11px] text-[#9a9a9a] mt-1 relative">{offeneRows.length} Rechnung{offeneRows.length !== 1 ? "en" : ""}</p>
+          <p className="text-[11px] text-foreground-subtle mt-1 relative">{offeneRows.length} Rechnung{offeneRows.length !== 1 ? "en" : ""}</p>
         </div>
         <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
           <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Bezahlt</p>
-          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
+          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Bezahlt</p>
+          <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
             {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeBezahlt)}
           </p>
-          <p className="text-[11px] text-[#9a9a9a] mt-1 relative">{bezahlteRows.length} Rechnung{bezahlteRows.length !== 1 ? "en" : ""}</p>
+          <p className="text-[11px] text-foreground-subtle mt-1 relative">{bezahlteRows.length} Rechnung{bezahlteRows.length !== 1 ? "en" : ""}</p>
         </div>
         <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #d97706" }}>
           <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #d97706, transparent)" }} />
-          <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Nächste Fällig</p>
-          <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
+          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Nächste Fällig</p>
+          <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
             {naechsteFaellig ? formatDatum(naechsteFaellig.faelligkeitsdatum) : "–"}
           </p>
-          <p className="text-[11px] text-[#9a9a9a] mt-1 relative">Diesen Monat: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}</p>
+          <p className="text-[11px] text-foreground-subtle mt-1 relative">Diesen Monat: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}</p>
         </div>
       </div>
 
       {/* Tabs + Suche */}
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg">
+        <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg">
           <button
             onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               tab === "offen"
-                ? "bg-white text-[#1a1a1a] shadow-sm"
-                : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+                ? "bg-white text-foreground shadow-sm"
+                : "text-foreground-muted hover:text-foreground"
             }`}
           >
             Offen
             {offeneRows.length > 0 && (
               <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                tab === "offen" ? "bg-[#570006] text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+                tab === "offen" ? "bg-brand text-white" : "bg-line text-foreground-muted"
               }`}>
                 {offeneRows.length}
               </span>
@@ -483,14 +484,14 @@ export function BuchhaltungClient({
             onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               tab === "bezahlt"
-                ? "bg-white text-[#1a1a1a] shadow-sm"
-                : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+                ? "bg-white text-foreground shadow-sm"
+                : "text-foreground-muted hover:text-foreground"
             }`}
           >
             Bezahlt
             {bezahlteRows.length > 0 && (
               <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                tab === "bezahlt" ? "bg-emerald-600 text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+                tab === "bezahlt" ? "bg-emerald-600 text-white" : "bg-line text-foreground-muted"
               }`}>
                 {bezahlteRows.length}
               </span>
@@ -502,7 +503,7 @@ export function BuchhaltungClient({
           <select
             value={artFilter}
             onChange={(e) => setArtFilter(e.target.value as "alle" | "material" | "subunternehmer")}
-            className="px-3 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            className="px-3 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
           >
             <option value="alle">Alle Arten</option>
             <option value="material">Material</option>
@@ -510,7 +511,7 @@ export function BuchhaltungClient({
             <option value="abo">Abo / Vertrag</option>
           </select>
           <div className="relative flex-1 min-w-0">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -518,14 +519,14 @@ export function BuchhaltungClient({
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               placeholder="Suche nach Bestellnummer, Händler..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
             />
           </div>
           {tab === "bezahlt" && !selectionMode && (
             <button
               type="button"
               onClick={() => setSelectionMode(true)}
-              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] rounded-lg border border-line transition-colors shrink-0"
               title="Auswahl-Modus"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -540,33 +541,33 @@ export function BuchhaltungClient({
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3] sticky top-0 z-10">
+            <tr className="bg-input border-b border-line sticky top-0 z-10">
               {selectionMode && (
                 <th className="px-3 py-3.5 w-10">
                   <input
                     type="checkbox"
                     checked={gefiltert.length > 0 && selectedIds.size === gefiltert.length}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                    className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
                   />
                 </th>
               )}
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler / SU</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Best.</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">LS</th>
-              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben von</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Freigegeben am</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Fällig</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">{tab === "offen" ? "Bezahlt" : "Bezahlt am"}</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">PDF</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Bestellnr.</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Händler / SU</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Best.</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">LS</th>
+              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Betrag</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Freigegeben von</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Freigegeben am</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Fällig</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">{tab === "offen" ? "Bezahlt" : "Bezahlt am"}</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">PDF</th>
             </tr>
           </thead>
           <tbody>
             {gefiltert.length === 0 ? (
               <tr>
-                <td colSpan={selectionMode ? 11 : 10} className="px-4 py-12 text-center text-[#9a9a9a]">
+                <td colSpan={selectionMode ? 11 : 10} className="px-4 py-12 text-center text-foreground-subtle">
                   {aktiveRows.length === 0
                     ? tab === "offen"
                       ? "Keine offenen Rechnungen."
@@ -576,19 +577,19 @@ export function BuchhaltungClient({
               </tr>
             ) : (
               gefiltert.map((r, i) => (
-                <tr key={r.id} className={`table-row-hover border-b border-[#f0eeeb] ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""} ${selectedIds.has(r.id) ? "bg-[#570006]/[0.03]" : ""}`}>
+                <tr key={r.id} className={`table-row-hover border-b border-line-subtle ${i % 2 === 1 ? "bg-zebra" : ""} ${selectedIds.has(r.id) ? "bg-brand/[0.03]" : ""}`}>
                   {selectionMode && (
                     <td className="px-3 py-3.5">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(r.id)}
                         onChange={() => toggleSelect(r.id)}
-                        className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                        className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
                       />
                     </td>
                   )}
                   <td className="px-4 py-3.5">
-                    <span className="font-mono-amount font-semibold text-[#570006]">
+                    <span className="font-mono-amount font-semibold text-brand">
                       {r.bestellnummer || "–"}
                       {r.mahnung_am && (
                         <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold" title={`Mahnung eingegangen am ${new Date(r.mahnung_am).toLocaleDateString("de-DE")}`}>
@@ -598,7 +599,7 @@ export function BuchhaltungClient({
                       )}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-[#1a1a1a]">
+                  <td className="px-4 py-3.5 text-foreground">
                     <span className="flex items-center gap-1.5">
                       {r.haendler_name || "–"}
                       {r.bestellungsart === "subunternehmer" && (
@@ -608,29 +609,29 @@ export function BuchhaltungClient({
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {r.bestellungsart === "subunternehmer" ? (
-                      <span className="text-[#d4d1cc] text-xs">–</span>
+                      <span className="text-line-strong text-xs">–</span>
                     ) : r.hat_bestellbestaetigung ? (
                       <svg className="w-4 h-4 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#d4d1cc] mx-auto" />
+                      <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {r.bestellungsart === "subunternehmer" ? (
-                      <span className="text-[#d4d1cc] text-xs">–</span>
+                      <span className="text-line-strong text-xs">–</span>
                     ) : r.hat_lieferschein ? (
                       <svg className="w-4 h-4 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-[#d4d1cc] mx-auto" />
+                      <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-right">
-                    <span className="font-mono-amount font-semibold text-[#1a1a1a]">
+                    <span className="font-mono-amount font-semibold text-foreground">
                       {formatBetrag(r.betrag, r.waehrung)}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-[#6b6b6b]">{r.freigegeben_von}</td>
-                  <td className="px-4 py-3.5 text-[#9a9a9a] text-xs">{formatDatum(r.freigegeben_am)}</td>
+                  <td className="px-4 py-3.5 text-foreground-muted">{r.freigegeben_von}</td>
+                  <td className="px-4 py-3.5 text-foreground-subtle text-xs">{formatDatum(r.freigegeben_am)}</td>
                   <td className="px-4 py-3.5">
                     <span
                       className={
@@ -638,7 +639,7 @@ export function BuchhaltungClient({
                           ? "text-red-600 font-semibold font-mono-amount text-xs pulse-urgent"
                           : isFaelligBald(r.faelligkeitsdatum)
                           ? "text-amber-600 font-semibold font-mono-amount text-xs"
-                          : "text-[#9a9a9a] text-xs"
+                          : "text-foreground-subtle text-xs"
                       }
                     >
                       {formatDatum(r.faelligkeitsdatum)}
@@ -648,14 +649,14 @@ export function BuchhaltungClient({
                     {tab === "bezahlt" ? (
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-[11px] text-emerald-600 font-medium">{formatDatum(r.bezahlt_am)}</span>
-                        <span className="text-[10px] text-[#9a9a9a]">{r.bezahlt_von}</span>
+                        <span className="text-[10px] text-foreground-subtle">{r.bezahlt_von}</span>
                         {kannBezahlen && (
                           <div className="flex items-center justify-center gap-1.5 mt-1">
                             <button
                               type="button"
                               onClick={() => archivieren([r.id])}
                               disabled={archivLoading}
-                              className="p-1 rounded text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] transition-colors"
+                              className="p-1 rounded text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] transition-colors"
                               title="Ins Archiv verschieben"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -666,7 +667,7 @@ export function BuchhaltungClient({
                               type="button"
                               onClick={() => toggleBezahlt(r.id, true)}
                               disabled={bezahltLoading === r.id}
-                              className="p-1 rounded text-[#d4d1cc] hover:text-red-500 hover:bg-red-50 transition-colors"
+                              className="p-1 rounded text-line-strong hover:text-red-500 hover:bg-red-50 transition-colors"
                               title="Zahlung zurücksetzen"
                             >
                               {bezahltLoading === r.id ? (
@@ -685,7 +686,7 @@ export function BuchhaltungClient({
                         type="button"
                         onClick={() => toggleBezahlt(r.id, false)}
                         disabled={bezahltLoading === r.id}
-                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-[#d4d1cc] hover:border-emerald-400 text-transparent hover:text-emerald-400 ${
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-line-strong hover:border-emerald-400 text-transparent hover:text-emerald-400 ${
                           bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"
                         }`}
                         title="Als bezahlt markieren"
@@ -695,7 +696,7 @@ export function BuchhaltungClient({
                         </svg>
                       </button>
                     ) : (
-                      <span className="inline-flex items-center justify-center w-6 h-6 text-[#d4d1cc]">–</span>
+                      <span className="inline-flex items-center justify-center w-6 h-6 text-line-strong">–</span>
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-center">
@@ -704,7 +705,7 @@ export function BuchhaltungClient({
                         href={`/api/pdfs/${r.rechnung_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center text-[#570006] hover:text-[#7a1a1f] transition-colors"
+                        className="inline-flex items-center justify-center text-brand hover:text-brand-light transition-colors"
                         title="PDF herunterladen"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -712,7 +713,7 @@ export function BuchhaltungClient({
                         </svg>
                       </a>
                     ) : (
-                      <span className="text-[#d4d1cc]">–</span>
+                      <span className="text-line-strong">–</span>
                     )}
                   </td>
                 </tr>
@@ -725,7 +726,7 @@ export function BuchhaltungClient({
       {/* Bulk Action Bar — sticky bottom */}
       {selectionMode && (
         <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
-          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-sidebar-active text-white rounded-xl shadow-lg shadow-black/20">
             <span className="text-sm font-medium">
               {selectedIds.size > 0
                 ? `${selectedIds.size} ${selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt`
@@ -744,7 +745,7 @@ export function BuchhaltungClient({
                   type="button"
                   onClick={() => archivieren(Array.from(selectedIds))}
                   disabled={archivLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
@@ -759,10 +760,10 @@ export function BuchhaltungClient({
 
       {/* Summenzeile + Paginierung */}
       <div className="mt-4 flex items-center justify-between text-sm">
-        <span className="text-[#9a9a9a]">
+        <span className="text-foreground-subtle">
           {gefiltert.length} {tab === "offen" ? "offen" : "bezahlt"}
           {gefiltert.length > 0 && (
-            <span className="ml-2 font-mono-amount font-semibold text-[#1a1a1a]">
+            <span className="ml-2 font-mono-amount font-semibold text-foreground">
               Summe: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(
                 gefiltert.reduce((sum, r) => sum + (r.betrag || 0), 0)
               )}
@@ -774,17 +775,17 @@ export function BuchhaltungClient({
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage <= 1}
-              className="px-3 py-1.5 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Vorherige
             </button>
-            <span className="text-[#6b6b6b] font-medium px-2 font-mono-amount text-xs">
+            <span className="text-foreground-muted font-medium px-2 font-mono-amount text-xs">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage >= totalPages}
-              className="px-3 py-1.5 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Nächste
             </button>

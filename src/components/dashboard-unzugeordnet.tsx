@@ -123,7 +123,7 @@ export function DashboardUnzugeordnet({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-[#d97706]">
+    <div className="card p-5 border-l-[3px] border-l-warning">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
@@ -131,14 +131,14 @@ export function DashboardUnzugeordnet({
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Nicht zugeordnet</h2>
+          <h2 className="font-headline text-sm text-foreground tracking-tight">Nicht zugeordnet</h2>
           <span className="font-mono-amount text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
       </div>
 
-      <p className="text-xs text-[#9a9a9a] mb-3">
+      <p className="text-xs text-foreground-subtle mb-3">
         Diese Bestellungen konnten keinem Besteller zugeordnet werden.
       </p>
 
@@ -154,11 +154,11 @@ export function DashboardUnzugeordnet({
                 href={`/bestellungen/${b.id}`}
                 className="flex-1 group"
               >
-                <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors">
+                <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors">
                   <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
-                  <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "Unbekannt"}</span>
+                  <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "Unbekannt"}</span>
                 </p>
-                <p className="text-[11px] text-[#c4c2bf]">
+                <p className="text-[11px] text-foreground-faint">
                   {formatDatum(b.created_at)}
                   {b.betrag ? ` · ${formatBetrag(b.betrag, b.waehrung || "EUR")}` : ""}
                 </p>
@@ -171,7 +171,7 @@ export function DashboardUnzugeordnet({
                       key={be.kuerzel}
                       onClick={() => zuordnen(b.id, be.kuerzel)}
                       disabled={loading}
-                      className="w-8 h-8 rounded-lg bg-[#570006] text-white text-[10px] font-bold hover:bg-[#7a1a1f] disabled:opacity-50 transition-colors"
+                      className="w-8 h-8 rounded-lg bg-brand text-white text-[10px] font-bold hover:bg-brand-light disabled:opacity-50 transition-colors"
                       title={be.name}
                     >
                       {be.kuerzel}
@@ -179,7 +179,7 @@ export function DashboardUnzugeordnet({
                   ))}
                   <button
                     onClick={closeAktion}
-                    className="w-8 h-8 rounded-lg bg-[#f0eeeb] text-[#9a9a9a] text-xs hover:bg-[#e8e6e3] transition-colors"
+                    className="w-8 h-8 rounded-lg bg-line-subtle text-foreground-subtle text-xs hover:bg-line transition-colors"
                     title="Abbrechen"
                   >
                     &times;
@@ -197,7 +197,7 @@ export function DashboardUnzugeordnet({
                   </button>
                   <button
                     onClick={closeAktion}
-                    className="px-2 py-1 text-[10px] font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded hover:bg-[#e8e6e3] transition-colors"
+                    className="px-2 py-1 text-[10px] font-medium text-foreground-subtle bg-line-subtle rounded hover:bg-line transition-colors"
                   >
                     Nein
                   </button>
@@ -216,7 +216,7 @@ export function DashboardUnzugeordnet({
                   </button>
                   <button
                     onClick={closeAktion}
-                    className="px-2 py-1 text-[10px] font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded hover:bg-[#e8e6e3] transition-colors"
+                    className="px-2 py-1 text-[10px] font-medium text-foreground-subtle bg-line-subtle rounded hover:bg-line transition-colors"
                   >
                     Nein
                   </button>

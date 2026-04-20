@@ -37,6 +37,7 @@ export function DashboardNeueSubunternehmer({
   }
 
   return (
+    // eslint-disable-next-line no-restricted-syntax -- SU cyan accent part of the admin-widget color-chaos flagged in F13 audit; unified in P4 when widget categories get a proper color token map.
     <div className="card p-5 border-l-[3px] border-l-[#0891b2]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -45,14 +46,14 @@ export function DashboardNeueSubunternehmer({
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
             </svg>
           </div>
-          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Neue Subunternehmer erkannt</h2>
+          <h2 className="font-headline text-sm text-foreground tracking-tight">Neue Subunternehmer erkannt</h2>
           <span className="font-mono-amount text-[10px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
       </div>
 
-      <p className="text-xs text-[#9a9a9a] mb-3">
+      <p className="text-xs text-foreground-subtle mb-3">
         Diese Subunternehmer wurden automatisch erkannt – bitte prüfen und bestätigen.
       </p>
 
@@ -61,10 +62,10 @@ export function DashboardNeueSubunternehmer({
           <div key={s.id} className="bg-cyan-50/50 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#1a1a1a]">
+                <p className="text-sm font-medium text-foreground">
                   {s.firma}
                 </p>
-                <p className="text-[11px] text-[#c4c2bf] truncate">
+                <p className="text-[11px] text-foreground-faint truncate">
                   {s.gewerk && <>{s.gewerk} · </>}
                   {s.email_absender?.length > 0 && (
                     <>{s.email_absender.join(", ")}</>
@@ -85,7 +86,7 @@ export function DashboardNeueSubunternehmer({
                 </button>
                 <Link
                   href="/einstellungen"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

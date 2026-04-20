@@ -300,8 +300,8 @@ export function ArchivClient({
       {/* Header — matches Buchhaltung/Bestellungen pattern */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Archiv</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">Abgeschlossene Projekte und archivierte Rechnungen</p>
+          <h1 className="font-headline text-2xl text-foreground tracking-tight">Archiv</h1>
+          <p className="text-foreground-subtle text-sm mt-1">Abgeschlossene Projekte und archivierte Rechnungen</p>
         </div>
       </div>
 
@@ -322,8 +322,8 @@ export function ArchivClient({
               className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]"
               style={{ background: `linear-gradient(180deg, ${card.color}, transparent)` }}
             />
-            <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">{card.label}</p>
-            <p className="font-mono-amount text-3xl font-bold text-[#1a1a1a] mt-2 relative">
+            <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">{card.label}</p>
+            <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
               {card.isCurrency ? formatBetrag(card.value) : card.value}
             </p>
           </div>
@@ -332,7 +332,7 @@ export function ArchivClient({
 
       {/* Tabs + Search — matches Buchhaltung pattern */}
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg">
+        <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg">
           {([
             { key: "projekte" as TabKey, label: "Projekte" },
             { key: "material" as TabKey, label: "Material" },
@@ -343,14 +343,14 @@ export function ArchivClient({
               onClick={() => { setActiveTab(tab.key); setExpandedIds(new Set()); exitSelectionMode(); }}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                 activeTab === tab.key
-                  ? "bg-white text-[#1a1a1a] shadow-sm"
-                  : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-foreground-muted hover:text-foreground"
               }`}
             >
               {tab.label}
               {tabCounts[tab.key] > 0 && (
                 <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                  activeTab === tab.key ? "bg-[#570006] text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+                  activeTab === tab.key ? "bg-brand text-white" : "bg-line text-foreground-muted"
                 }`}>
                   {tabCounts[tab.key]}
                 </span>
@@ -361,7 +361,7 @@ export function ArchivClient({
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 min-w-0">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -369,7 +369,7 @@ export function ArchivClient({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Projekt, Bestellnummer, Händler..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
             />
           </div>
           <input
@@ -377,20 +377,20 @@ export function ArchivClient({
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             title="Von"
-            className="hidden md:block px-3 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            className="hidden md:block px-3 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
           />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             title="Bis"
-            className="hidden md:block px-3 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            className="hidden md:block px-3 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
           />
           {hasFilters && (
             <button
               type="button"
               onClick={resetFilters}
-              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-red-50 rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-red-50 rounded-lg border border-line transition-colors shrink-0"
               title="Filter zurücksetzen"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -402,7 +402,7 @@ export function ArchivClient({
             <button
               type="button"
               onClick={() => setSelectionMode(true)}
-              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] rounded-lg border border-line transition-colors shrink-0"
               title="Auswahl-Modus"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -462,7 +462,7 @@ export function ArchivClient({
       {/* Floating Bulk Action Bar */}
       {selectionMode && (
         <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
-          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-sidebar-active text-white rounded-xl shadow-lg shadow-black/20">
             <span className="text-sm font-medium">
               {selectedIds.size > 0
                 ? `${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} ausgewählt`
@@ -494,7 +494,7 @@ export function ArchivClient({
                   type="button"
                   onClick={() => setShowDeleteDialog(true)}
                   disabled={deleteLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -548,13 +548,13 @@ function EmptyState({ type }: { type: TabKey }) {
   const msg = EMPTY_MESSAGES[type];
   return (
     <div className="card p-16 text-center">
-      <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#fafaf9] border border-[#e8e6e3] flex items-center justify-center">
-        <svg className="w-5 h-5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-input border border-line flex items-center justify-center">
+        <svg className="w-5 h-5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
         </svg>
       </div>
-      <p className="text-[#6b6b6b] font-medium mb-1">{msg.title}</p>
-      <p className="text-[#9a9a9a] text-sm">{msg.subtitle}</p>
+      <p className="text-foreground-muted font-medium mb-1">{msg.title}</p>
+      <p className="text-foreground-subtle text-sm">{msg.subtitle}</p>
     </div>
   );
 }
@@ -613,10 +613,10 @@ function ProjekteTab({
                       type="checkbox"
                       checked={selectedIds.has(p.id)}
                       onChange={() => toggleSelect?.(p.id)}
-                      className="w-4 h-4 mt-0.5 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer shrink-0"
+                      className="w-4 h-4 mt-0.5 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer shrink-0"
                     />
                   )}
-                  <h3 className="font-headline text-base text-[#1a1a1a] leading-tight pr-2">{p.name}</h3>
+                  <h3 className="font-headline text-base text-foreground leading-tight pr-2">{p.name}</h3>
                 </div>
                 <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap uppercase tracking-wide">
                   Abgeschlossen
@@ -625,38 +625,38 @@ function ProjekteTab({
 
               {/* Description */}
               {p.beschreibung && (
-                <p className="text-xs text-[#6b6b6b] line-clamp-2 mb-3">{p.beschreibung}</p>
+                <p className="text-xs text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
               )}
 
               {/* Stats row */}
               <div className="flex items-center gap-3 mb-3">
                 {stats ? (
                   <>
-                    <span className="text-xs text-[#6b6b6b]">
+                    <span className="text-xs text-foreground-muted">
                       {stats.count} Bestellung{stats.count !== 1 ? "en" : ""}
                     </span>
-                    <div className="h-3 w-px bg-[#e8e6e3]" />
-                    <span className="font-mono-amount text-sm font-semibold text-[#1a1a1a]">
+                    <div className="h-3 w-px bg-line" />
+                    <span className="font-mono-amount text-sm font-semibold text-foreground">
                       {formatBetrag(stats.volumen)}
                     </span>
                   </>
                 ) : (
-                  <span className="text-xs text-[#c4c2bf]">Keine bezahlten Bestellungen</span>
+                  <span className="text-xs text-foreground-faint">Keine bezahlten Bestellungen</span>
                 )}
               </div>
 
               {/* Budget bar */}
               {budgetPercent !== null && p.budget && (
-                <div className="mb-3 p-2.5 bg-[#fafaf9] rounded-lg border border-[#f0eeeb]">
+                <div className="mb-3 p-2.5 bg-input rounded-lg border border-line-subtle">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Budget</span>
+                    <span className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Budget</span>
                     <span className={`font-mono-amount text-[11px] font-medium ${
-                      budgetPercent > 100 ? "text-[#dc2626]" : budgetPercent > 80 ? "text-[#d97706]" : "text-[#6b6b6b]"
+                      budgetPercent > 100 ? "text-error" : budgetPercent > 80 ? "text-warning" : "text-foreground-muted"
                     }`}>
                       {budgetPercent}% von {formatBetrag(p.budget)}
                     </span>
                   </div>
-                  <div className="w-full h-1.5 bg-[#e8e6e3] rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-line rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-700"
                       style={{
@@ -671,12 +671,12 @@ function ProjekteTab({
 
               {/* Footer */}
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[#c4c2bf]">Erstellt {formatDatum(p.created_at)}</span>
+                <span className="text-[10px] text-foreground-faint">Erstellt {formatDatum(p.created_at)}</span>
                 {projektOrders.length > 0 && (
                   <button
                     type="button"
                     onClick={() => toggleExpand(p.id)}
-                    className="flex items-center gap-1 text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors"
+                    className="flex items-center gap-1 text-xs text-brand hover:text-brand-light font-medium transition-colors"
                   >
                     <svg
                       className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
@@ -694,36 +694,36 @@ function ProjekteTab({
 
               {/* Expanded orders */}
               {isExpanded && projektOrders.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-[#f0eeeb]">
+                <div className="mt-3 pt-3 border-t border-line-subtle">
                   <div className="space-y-0">
                     {projektOrders.map((o, i) => (
                       <Link
                         key={o.id}
                         href={`/bestellungen/${o.id}`}
-                        className={`group/row flex items-center justify-between py-2.5 px-2.5 -mx-0.5 rounded-lg hover:bg-[#f0eeeb]/60 transition-all ${
-                          i < projektOrders.length - 1 ? "border-b border-[#f5f4f2]" : ""
+                        className={`group/row flex items-center justify-between py-2.5 px-2.5 -mx-0.5 rounded-lg hover:bg-line-subtle/60 transition-all ${
+                          i < projektOrders.length - 1 ? "border-b border-canvas" : ""
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div
                             className={`w-2 h-2 rounded-full shrink-0 ${
                               o.bestellungsart === "subunternehmer"
-                                ? "bg-[#d97706]"
-                                : "bg-[#2563eb]"
+                                ? "bg-warning"
+                                : "bg-info"
                             }`}
                           />
-                          <span className="font-mono-amount text-xs font-semibold text-[#1a1a1a] group-hover/row:text-[#570006] transition-colors">
+                          <span className="font-mono-amount text-xs font-semibold text-foreground group-hover/row:text-brand transition-colors">
                             {o.bestellnummer || "Ohne Nr."}
                           </span>
-                          <span className="text-xs text-[#6b6b6b] truncate">{o.haendler_name || o.subunternehmer_firma || ""}</span>
+                          <span className="text-xs text-foreground-muted truncate">{o.haendler_name || o.subunternehmer_firma || ""}</span>
                           {o.bestellungsart === "subunternehmer" && (
                             <span className="hidden sm:inline px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 rounded">SU</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-mono-amount text-xs font-medium text-[#1a1a1a]">{formatBetrag(Number(o.betrag))}</span>
-                          <span className="text-[10px] text-[#c4c2bf] hidden sm:inline">{formatDatum(o.bezahlt_am)}</span>
-                          <svg className="w-3 h-3 text-[#c4c2bf] group-hover/row:text-[#570006] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <span className="font-mono-amount text-xs font-medium text-foreground">{formatBetrag(Number(o.betrag))}</span>
+                          <span className="text-[10px] text-foreground-faint hidden sm:inline">{formatDatum(o.bezahlt_am)}</span>
+                          <svg className="w-3 h-3 text-foreground-faint group-hover/row:text-brand transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                           </svg>
                         </div>
@@ -779,10 +779,10 @@ function OrdersTab({
           {/* Month header — clean separator */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h3 className="font-headline text-sm text-[#6b6b6b]">{group.label}</h3>
-              <span className="text-[10px] text-[#c4c2bf]">{group.items.length} Einträge</span>
+              <h3 className="font-headline text-sm text-foreground-muted">{group.label}</h3>
+              <span className="text-[10px] text-foreground-faint">{group.items.length} Einträge</span>
             </div>
-            <span className="font-mono-amount text-sm font-semibold text-[#1a1a1a]">
+            <span className="font-mono-amount text-sm font-semibold text-foreground">
               {formatBetrag(group.subtotal)}
             </span>
           </div>
@@ -791,7 +791,7 @@ function OrdersTab({
           <div className="card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+                <tr className="bg-input border-b border-line">
                   {selectionMode && (
                     <th className="px-3 py-3 w-10">
                       <input
@@ -807,23 +807,23 @@ function OrdersTab({
                             else if (!allSelected && !selectedIds.has(o.id)) toggleSelect?.(o.id);
                           });
                         }}
-                        className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                        className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
                       />
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">
+                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Bestellnr.</th>
+                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">
                     {type === "subunternehmer" ? "Firma" : "Händler"}
                   </th>
                   {istAdmin && (
-                    <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden lg:table-cell">Besteller</th>
+                    <th className="px-4 py-3 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden lg:table-cell">Besteller</th>
                   )}
-                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden md:table-cell">Projekt</th>
+                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden md:table-cell">Projekt</th>
                   {dokConfig.map((dok) => (
-                    <th key={dok.flag} className="px-3 py-3 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">{dok.kurzLabel}</th>
+                    <th key={dok.flag} className="px-3 py-3 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">{dok.kurzLabel}</th>
                   ))}
-                  <th className="px-4 py-3 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
-                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bezahlt am</th>
+                  <th className="px-4 py-3 text-right font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Betrag</th>
+                  <th className="px-4 py-3 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Bezahlt am</th>
                   <th className="px-4 py-3 w-10"></th>
                 </tr>
               </thead>
@@ -856,17 +856,17 @@ function OrdersTab({
 
       {/* Limit hint */}
       {limitReached && (
-        <p className="text-[#9a9a9a] text-sm text-center py-4">
+        <p className="text-foreground-subtle text-sm text-center py-4">
           Maximal 100 Einträge geladen. Ältere Einträge über die Suche finden.
         </p>
       )}
 
       {/* Sum footer */}
       <div className="flex items-center justify-between text-sm">
-        <span className="text-[#9a9a9a]">
+        <span className="text-foreground-subtle">
           {orders.length} archiviert
         </span>
-        <span className="font-mono-amount font-semibold text-[#1a1a1a]">
+        <span className="font-mono-amount font-semibold text-foreground">
           Summe: {formatBetrag(orders.reduce((sum, o) => sum + (Number(o.betrag) || 0), 0))}
         </span>
       </div>
@@ -906,7 +906,7 @@ function OrderRow({
   return (
     <>
       <tr
-        className={`table-row-hover border-b border-[#f0eeeb] ${isOdd ? "bg-[#fdfcfb]" : ""} ${isSelected ? "bg-[#570006]/[0.03]" : ""}`}
+        className={`table-row-hover border-b border-line-subtle ${isOdd ? "bg-zebra" : ""} ${isSelected ? "bg-brand/[0.03]" : ""}`}
         onClick={() => toggleExpand(order.id)}
       >
         {selectionMode && (
@@ -915,16 +915,16 @@ function OrderRow({
               type="checkbox"
               checked={isSelected}
               onChange={() => toggleSelect?.(order.id)}
-              className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+              className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
             />
           </td>
         )}
         <td className="px-4 py-3.5">
-          <span className="font-mono-amount font-semibold text-[#570006]">
+          <span className="font-mono-amount font-semibold text-brand">
             {order.bestellnummer || "–"}
           </span>
         </td>
-        <td className="px-4 py-3.5 text-[#1a1a1a]">
+        <td className="px-4 py-3.5 text-foreground">
           <span className="flex items-center gap-1.5">
             {type === "subunternehmer"
               ? order.subunternehmer_firma || order.haendler_name || "–"
@@ -935,13 +935,13 @@ function OrderRow({
           </span>
         </td>
         {istAdmin && (
-          <td className="px-4 py-3.5 text-[#6b6b6b] hidden lg:table-cell">{order.besteller_name}</td>
+          <td className="px-4 py-3.5 text-foreground-muted hidden lg:table-cell">{order.besteller_name}</td>
         )}
         <td className="px-4 py-3.5 hidden md:table-cell">
           {order.projekt_name ? (
-            <span className="text-xs text-[#6b6b6b]">{order.projekt_name}</span>
+            <span className="text-xs text-foreground-muted">{order.projekt_name}</span>
           ) : (
-            <span className="text-[#d4d1cc]">–</span>
+            <span className="text-line-strong">–</span>
           )}
         </td>
         {dokConfig.map((dok) => {
@@ -953,27 +953,27 @@ function OrderRow({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                <div className="w-4 h-4 rounded-full border-2 border-[#d4d1cc] mx-auto" />
+                <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
               )}
             </td>
           );
         })}
         <td className="px-4 py-3.5 text-right">
-          <span className="font-mono-amount font-semibold text-[#1a1a1a]">
+          <span className="font-mono-amount font-semibold text-foreground">
             {formatBetrag(Number(order.betrag))}
           </span>
         </td>
         <td className="px-4 py-3.5">
           <div className="flex flex-col">
-            <span className="text-[11px] text-[#6b6b6b]">{formatDatum(order.bezahlt_am)}</span>
+            <span className="text-[11px] text-foreground-muted">{formatDatum(order.bezahlt_am)}</span>
             {order.bezahlt_von && (
-              <span className="text-[10px] text-[#c4c2bf]">{order.bezahlt_von}</span>
+              <span className="text-[10px] text-foreground-faint">{order.bezahlt_von}</span>
             )}
           </div>
         </td>
         <td className="px-4 py-3.5 text-center">
           <svg
-            className={`w-4 h-4 text-[#c4c2bf] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+            className={`w-4 h-4 text-foreground-faint transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -988,21 +988,21 @@ function OrderRow({
       {isExpanded && (
         <tr>
           <td colSpan={20} className="p-0">
-            <div className="bg-[#fafaf9] border-b border-[#e8e6e3] px-6 py-4">
+            <div className="bg-input border-b border-line px-6 py-4">
               <div className="flex items-start justify-between gap-6">
                 {/* Documents */}
                 <div className="flex-1">
-                  <p className="text-[10px] text-[#9a9a9a] uppercase tracking-widest font-semibold mb-2">Dokumente</p>
+                  <p className="text-[10px] text-foreground-subtle uppercase tracking-widest font-semibold mb-2">Dokumente</p>
                   {docs.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {docs.map((dok) => (
-                        <div key={dok.id} className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-[#e8e6e3]">
-                          <svg className="w-3.5 h-3.5 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <div key={dok.id} className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-line">
+                          <svg className="w-3.5 h-3.5 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                           </svg>
-                          <span className="text-xs font-medium text-[#1a1a1a] capitalize">{dok.typ}</span>
+                          <span className="text-xs font-medium text-foreground capitalize">{dok.typ}</span>
                           {dok.gesamtbetrag != null && (
-                            <span className="font-mono-amount text-[11px] text-[#6b6b6b]">{formatBetrag(dok.gesamtbetrag)}</span>
+                            <span className="font-mono-amount text-[11px] text-foreground-muted">{formatBetrag(dok.gesamtbetrag)}</span>
                           )}
                           {dok.storage_pfad && (
                             <a
@@ -1010,7 +1010,7 @@ function OrderRow({
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="p-0.5 rounded text-[#9a9a9a] hover:text-[#570006] transition-colors"
+                              className="p-0.5 rounded text-foreground-subtle hover:text-brand transition-colors"
                               title="PDF ansehen"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -1022,7 +1022,7 @@ function OrderRow({
                       ))}
                     </div>
                   ) : (
-                    <span className="text-xs text-[#c4c2bf]">Keine Dokumente vorhanden</span>
+                    <span className="text-xs text-foreground-faint">Keine Dokumente vorhanden</span>
                   )}
                 </div>
 
@@ -1030,7 +1030,7 @@ function OrderRow({
                 <Link
                   href={`/bestellungen/${order.id}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#570006] hover:text-[#7a1a1f] font-medium border border-[#e8e6e3] rounded-lg hover:bg-white transition-colors shrink-0 group/link"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand hover:text-brand-light font-medium border border-line rounded-lg hover:bg-white transition-colors shrink-0 group/link"
                 >
                   Details
                   <svg className="w-3 h-3 transition-transform group-hover/link:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

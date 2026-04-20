@@ -74,7 +74,7 @@ function LoginForm() {
     <div className="min-h-screen flex">
       {/* Left: Brand Panel – kontextabhängig */}
       <div className={`hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 ${
-        isCardScan ? "bg-[#141414]" : "bg-mr-gradient"
+        isCardScan ? "bg-sidebar" : "bg-mr-gradient"
       }`}>
         {/* Patterns */}
         {isCardScan ? (
@@ -230,7 +230,7 @@ function LoginForm() {
       </div>
 
       {/* Right: Login Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-8 md:p-8 bg-[#f5f4f2]">
+      <div className="flex-1 flex items-center justify-center px-6 py-8 md:p-8 bg-canvas">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-12">
@@ -238,8 +238,8 @@ function LoginForm() {
           </div>
 
           <div>
-            <h2 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Anmelden</h2>
-            <p className="text-sm text-[#9a9a9a] mt-2">
+            <h2 className="font-headline text-2xl text-foreground tracking-tight">Anmelden</h2>
+            <p className="text-sm text-foreground-subtle mt-2">
               {isCardScan
                 ? "Melde dich an um CardScan zu nutzen."
                 : "Melde dich mit deinem Firmenkonto an."}
@@ -248,7 +248,7 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="mt-8 space-y-5">
             <div>
-              <label className="block text-[10px] font-semibold text-[#9a9a9a] mb-2 tracking-widest uppercase">
+              <label className="block text-[10px] font-semibold text-foreground-subtle mb-2 tracking-widest uppercase">
                 E-Mail
               </label>
               <input
@@ -256,13 +256,13 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 bg-white border border-[#e8e6e3] rounded-xl text-base text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors min-h-[48px]"
+                className="w-full px-4 py-3.5 bg-white border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
                 placeholder="name@mrumbau.de"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-[#9a9a9a] mb-2 tracking-widest uppercase">
+              <label className="block text-[10px] font-semibold text-foreground-subtle mb-2 tracking-widest uppercase">
                 Passwort
               </label>
               <input
@@ -270,7 +270,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 bg-white border border-[#e8e6e3] rounded-xl text-base text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/20 focus:border-[#570006] transition-colors min-h-[48px]"
+                className="w-full px-4 py-3.5 bg-white border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
                 placeholder="Passwort eingeben"
               />
             </div>
@@ -309,11 +309,11 @@ function LoginForm() {
           <div className={`mt-10 mb-4 h-px ${
             isCardScan
               ? "bg-gradient-to-r from-transparent via-emerald-500/10 to-transparent"
-              : "bg-gradient-to-r from-transparent via-[#570006]/10 to-transparent"
+              : "bg-gradient-to-r from-transparent via-brand/10 to-transparent"
           }`} />
 
           <div className="flex items-center justify-center">
-            <span className="text-[10px] text-[#c4c2bf] tracking-widest uppercase font-mono-amount">cloud.mrumbau.de</span>
+            <span className="text-[10px] text-foreground-faint tracking-widest uppercase font-mono-amount">cloud.mrumbau.de</span>
           </div>
         </div>
       </div>

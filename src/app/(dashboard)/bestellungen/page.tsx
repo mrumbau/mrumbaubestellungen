@@ -56,9 +56,9 @@ export default async function BestellungenPage({
       {/* Breadcrumb bei Projekt-Filter */}
       {projektIdParam && aktiverProjektName && (
         <nav className="flex items-center gap-1.5 text-sm mb-4">
-          <a href="/bestellungen" className="text-[#9a9a9a] hover:text-[#570006] transition-colors">Bestellungen</a>
-          <svg className="w-3.5 h-3.5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-          <span className="inline-flex items-center gap-1.5 font-medium text-[#1a1a1a]">
+          <a href="/bestellungen" className="text-foreground-subtle hover:text-brand transition-colors">Bestellungen</a>
+          <svg className="w-3.5 h-3.5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: aktiverProjektFarbe || "#570006" }} />
             {aktiverProjektName}
           </span>
@@ -67,16 +67,16 @@ export default async function BestellungenPage({
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Bestellungen</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">
+          <h1 className="font-headline text-2xl text-foreground tracking-tight">Bestellungen</h1>
+          <p className="text-foreground-subtle text-sm mt-1">
             {profil?.rolle === "admin"
               ? "Alle Bestellungen"
               : "Deine Bestellungen"}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-mono-amount text-xs text-[#9a9a9a]">{total}</span>
-          <span className="text-[10px] text-[#c4c2bf] uppercase tracking-wide">Gesamt</span>
+          <span className="font-mono-amount text-xs text-foreground-subtle">{total}</span>
+          <span className="text-[10px] text-foreground-faint uppercase tracking-wide">Gesamt</span>
         </div>
       </div>
 

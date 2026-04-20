@@ -36,7 +36,7 @@ export function DashboardNeueKunden({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-[#2563eb]">
+    <div className="card p-5 border-l-[3px] border-l-info">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -44,14 +44,14 @@ export function DashboardNeueKunden({
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">Neue Kunden erkannt</h2>
+          <h2 className="font-headline text-sm text-foreground tracking-tight">Neue Kunden erkannt</h2>
           <span className="font-mono-amount text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
       </div>
 
-      <p className="text-xs text-[#9a9a9a] mb-3">
+      <p className="text-xs text-foreground-subtle mb-3">
         Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.
       </p>
 
@@ -60,7 +60,7 @@ export function DashboardNeueKunden({
           <div key={k.id} className="bg-blue-50/50 rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#1a1a1a]">
+                <p className="text-sm font-medium text-foreground">
                   {k.name}
                 </p>
                 {k.keywords && k.keywords.length > 0 && (
@@ -87,7 +87,7 @@ export function DashboardNeueKunden({
                 </button>
                 <Link
                   href="/kunden"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#9a9a9a] bg-[#f0eeeb] rounded-lg hover:bg-[#e8e6e3] transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

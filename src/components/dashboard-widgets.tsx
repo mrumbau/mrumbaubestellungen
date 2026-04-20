@@ -190,22 +190,22 @@ function CollapsibleCard({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#fafaf9] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-input transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          {icon && <span className="text-[#9a9a9a]">{icon}</span>}
-          <h2 className="font-headline text-sm text-[#1a1a1a] tracking-tight">{title}</h2>
+          {icon && <span className="text-foreground-subtle">{icon}</span>}
+          <h2 className="font-headline text-sm text-foreground tracking-tight">{title}</h2>
           {badge}
         </div>
         <svg
-          className={`w-4 h-4 text-[#c4c2bf] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-foreground-faint transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div className="px-5 pb-5 border-t border-[#f0eeeb]">
+        <div className="px-5 pb-5 border-t border-line-subtle">
           <div className="pt-4">{children}</div>
         </div>
       )}
@@ -250,8 +250,8 @@ function WidgetSettings({
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
           open
-            ? "text-[#570006] bg-[#570006]/5 border border-[#570006]/20"
-            : "text-[#9a9a9a] bg-[#fafaf9] border border-[#e8e6e3] hover:bg-[#f0eeeb] hover:text-[#6b6b6b]"
+            ? "text-brand bg-brand/5 border border-brand/20"
+            : "text-foreground-subtle bg-input border border-line hover:bg-line-subtle hover:text-foreground-muted"
         }`}
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -261,11 +261,11 @@ function WidgetSettings({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-[#e8e6e3] shadow-lg z-50">
-          <div className="px-4 py-3 border-b border-[#f0eeeb]">
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-line shadow-lg z-50">
+          <div className="px-4 py-3 border-b border-line-subtle">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-[#1a1a1a]">Dashboard anpassen</p>
-              <button onClick={onReset} className="text-[10px] text-[#9a9a9a] hover:text-[#570006] transition-colors">
+              <p className="text-xs font-semibold text-foreground">Dashboard anpassen</p>
+              <button onClick={onReset} className="text-[10px] text-foreground-subtle hover:text-brand transition-colors">
                 Zurücksetzen
               </button>
             </div>
@@ -274,7 +274,7 @@ function WidgetSettings({
           <div className="max-h-[400px] overflow-y-auto">
             {/* Statistiken */}
             <div className="px-4 pt-3 pb-1">
-              <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Statistiken</p>
+              <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase">Statistiken</p>
             </div>
             <div className="px-2 pb-2">
               {STAT_DEFS.map((s) => (
@@ -287,11 +287,11 @@ function WidgetSettings({
               ))}
             </div>
 
-            <div className="border-t border-[#f0eeeb]" />
+            <div className="border-t border-line-subtle" />
 
             {/* Widgets */}
             <div className="px-4 pt-3 pb-1">
-              <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase">Widgets</p>
+              <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase">Widgets</p>
             </div>
             <div className="px-2 pb-3">
               {availableWidgets.map((w) => (
@@ -315,13 +315,13 @@ function ToggleRow({ label, active, onToggle, badge }: { label: string; active: 
   return (
     <button
       onClick={onToggle}
-      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#fafaf9] transition-colors text-left"
+      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-input transition-colors text-left"
     >
-      <div className={`w-8 h-5 rounded-full relative transition-colors shrink-0 ${active ? "bg-[#570006]" : "bg-[#e8e6e3]"}`}>
+      <div className={`w-8 h-5 rounded-full relative transition-colors shrink-0 ${active ? "bg-brand" : "bg-line"}`}>
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${active ? "left-3.5" : "left-0.5"}`} />
       </div>
-      <span className={`text-xs flex-1 ${active ? "text-[#1a1a1a] font-medium" : "text-[#9a9a9a]"}`}>{label}</span>
-      {badge && <span className="text-[9px] text-[#c4c2bf] bg-[#f5f4f2] px-1.5 py-0.5 rounded">{badge}</span>}
+      <span className={`text-xs flex-1 ${active ? "text-foreground font-medium" : "text-foreground-subtle"}`}>{label}</span>
+      {badge && <span className="text-[9px] text-foreground-faint bg-canvas px-1.5 py-0.5 rounded">{badge}</span>}
     </button>
   );
 }
@@ -332,9 +332,9 @@ function StatCard({ label, value, color, alert }: { label: string; value: number
   return (
     <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: `3px solid ${color}` }}>
       <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
-      <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">{label}</p>
+      <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">{label}</p>
       <div className="flex items-end justify-between mt-2 relative">
-        <p className={`font-mono-amount text-3xl font-bold text-[#1a1a1a] ${alert ? "text-red-600" : ""}`}>{value}</p>
+        <p className={`font-mono-amount text-3xl font-bold text-foreground ${alert ? "text-red-600" : ""}`}>{value}</p>
         {alert && value > 0 && <span className="pulse-urgent w-2 h-2 rounded-full bg-red-500 mb-2" />}
       </div>
     </div>
@@ -347,7 +347,7 @@ function AktionIcon({ status }: { status: string }) {
   if (status === "erwartet") {
     return (
       <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-        <svg className="w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-4 h-4 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
@@ -439,7 +439,7 @@ function RefreshIndicator({ lastRefresh, onRefresh }: { lastRefresh: Date; onRef
   return (
     <button
       onClick={onRefresh}
-      className="flex items-center gap-1.5 text-[11px] text-[#c4c2bf] hover:text-[#9a9a9a] transition-colors"
+      className="flex items-center gap-1.5 text-[11px] text-foreground-faint hover:text-foreground-subtle transition-colors"
       title="Jetzt aktualisieren"
     >
       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -577,8 +577,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
             {mahnungen.map((m) => (
               <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-red-100 hover:border-red-300 transition-colors text-sm">
                 <span className="flex items-center gap-2">
-                  <span className="font-mono-amount font-semibold text-[#570006]">{m.bestellnummer || "–"}</span>
-                  <span className="text-[#6b6b6b]">{m.haendler_name}</span>
+                  <span className="font-mono-amount font-semibold text-brand">{m.bestellnummer || "–"}</span>
+                  <span className="text-foreground-muted">{m.haendler_name}</span>
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
@@ -624,13 +624,13 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
             <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
-            <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Freigegebenes Volumen</p>
-            <p className="font-mono-amount text-2xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
+            <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Freigegebenes Volumen</p>
+            <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
           </div>
           <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #2563eb" }}>
             <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #2563eb, transparent)" }} />
-            <p className="text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase relative">Gesamt-Volumen</p>
-            <p className="font-mono-amount text-2xl font-bold text-[#1a1a1a] mt-2 relative">{formatBetrag(gesamtVolumen)}</p>
+            <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Gesamt-Volumen</p>
+            <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">{formatBetrag(gesamtVolumen)}</p>
           </div>
         </div>
       )}
@@ -646,7 +646,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               </svg>
             }
             badge={
-              <Link href="/projekte" className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+              <Link href="/projekte" className="text-xs text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
                 Alle anzeigen
               </Link>
             }
@@ -656,22 +656,22 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
                 const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
                 return (
-                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-[#f0eeeb] hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
+                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-all group">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
-                      <span className="text-sm font-semibold text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">{p.name}</span>
+                      <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-[#9a9a9a]">
-                      <span><span className="font-mono-amount font-bold text-[#1a1a1a]">{p.stats.gesamt}</span> Best.</span>
+                    <div className="flex items-center gap-3 text-[11px] text-foreground-subtle">
+                      <span><span className="font-mono-amount font-bold text-foreground">{p.stats.gesamt}</span> Best.</span>
                       {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-amber-600">{p.stats.offen}</span> offen</span>}
-                      <span className="font-mono-amount font-bold text-[#1a1a1a]">{formatBetrag(p.stats.volumen)}</span>
+                      <span className="font-mono-amount font-bold text-foreground">{formatBetrag(p.stats.volumen)}</span>
                     </div>
                     {p.budget && (
                       <div className="mt-2">
-                        <div className="w-full h-1.5 bg-[#f0eeeb] rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-line-subtle rounded-full overflow-hidden">
                           <div className="h-full rounded-full transition-all" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
                         </div>
-                        <p className="text-[10px] text-[#9a9a9a] mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
+                        <p className="text-[10px] text-foreground-subtle mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
                       </div>
                     )}
                   </Link>
@@ -742,7 +742,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg ${h.dringend ? "bg-red-50 border border-red-100" : "bg-amber-50/50 border border-amber-100"}`}>
                     <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-red-500" : "bg-amber-500"}`} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-[#1a1a1a]">{h.name}</span>
+                      <span className="text-sm font-medium text-foreground">{h.name}</span>
                       <span className={`text-[11px] ml-2 ${h.dringend ? "text-red-600" : "text-amber-600"}`}>{h.detail}</span>
                     </div>
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
@@ -756,7 +756,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[#c4c2bf] text-center py-2">Keine Abo-Hinweise.</p>
+              <p className="text-sm text-foreground-faint text-center py-2">Keine Abo-Hinweise.</p>
             )}
           </CollapsibleCard>
         </div>
@@ -782,25 +782,25 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
             >
               {aktionenNoetig.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6">
-                  <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm text-[#c4c2bf]">Keine offenen Aktionen.</p>
+                  <p className="text-sm text-foreground-faint">Keine offenen Aktionen.</p>
                 </div>
               ) : (
                 <div className="space-y-1 max-h-64 overflow-y-auto">
                   {aktionenNoetig.slice(0, 10).map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
-                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
+                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-all group">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <AktionIcon status={b.status} />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">
+                            <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                               <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
-                              <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "–"}</span>
+                              <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                             </p>
-                            <p className="text-[11px] text-[#c4c2bf]">{b.besteller_name} · {formatDatum(b.created_at)}</p>
+                            <p className="text-[11px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -831,34 +831,34 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 </svg>
               }
               badge={
-                <Link href="/bestellungen" className="text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+                <Link href="/bestellungen" className="text-xs text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
                   Alle anzeigen
                 </Link>
               }
             >
               {letzte.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-6">
-                  <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                   </svg>
-                  <p className="text-sm text-[#c4c2bf]">Noch keine Bestellungen.</p>
+                  <p className="text-sm text-foreground-faint">Noch keine Bestellungen.</p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   {letzte.map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
-                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-[#fafaf9] hover:shadow-sm transition-all group">
+                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-all group">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-[#1a1a1a] group-hover:text-[#570006] transition-colors truncate">
+                          <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                             <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
-                            <span className="text-[#9a9a9a] font-normal"> – {b.haendler_name || "–"}</span>
+                            <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                           </p>
-                          <p className="text-[11px] text-[#c4c2bf]">{b.besteller_name} · {formatDatum(b.created_at)}</p>
+                          <p className="text-[11px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
                           {b.betrag && (
-                            <span className="font-mono-amount text-sm font-semibold text-[#1a1a1a] hidden sm:inline">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
+                            <span className="font-mono-amount text-sm font-semibold text-foreground hidden sm:inline">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
                           )}
                           <span className={`status-tag ${s.bg} ${s.text}`}>
                             <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
@@ -901,21 +901,21 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   const maxCount = Math.max(...bestellerEntries.map(([, c]) => c));
                   const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
                   return (
-                    <div key={kuerzel} className="p-4 rounded-lg bg-[#fafaf9] border border-[#f0eeeb] relative overflow-hidden">
+                    <div key={kuerzel} className="p-4 rounded-lg bg-input border border-line-subtle relative overflow-hidden">
                       {/* Background bar */}
                       <div
-                        className="absolute bottom-0 left-0 h-1 bg-[#570006]/10 rounded-full"
+                        className="absolute bottom-0 left-0 h-1 bg-brand/10 rounded-full"
                         style={{ width: `${barWidth}%` }}
                       />
                       <div className="flex items-center gap-3 relative">
-                        <div className="w-10 h-10 rounded-lg bg-[#570006] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-brand text-white flex items-center justify-center text-xs font-bold shrink-0">
                           {kuerzel}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-[#1a1a1a] truncate">{name || kuerzel}</p>
+                          <p className="text-sm font-medium text-foreground truncate">{name || kuerzel}</p>
                           <div className="flex items-baseline gap-1">
-                            <p className="font-mono-amount text-xl font-bold text-[#1a1a1a]">{count}</p>
-                            <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wide">Bestellungen</p>
+                            <p className="font-mono-amount text-xl font-bold text-foreground">{count}</p>
+                            <p className="text-[10px] text-foreground-subtle uppercase tracking-wide">Bestellungen</p>
                           </div>
                         </div>
                       </div>

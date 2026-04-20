@@ -58,7 +58,7 @@ function DokumentIcon({ vorhanden, onClick, onMouseEnter }: { vorhanden: boolean
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   ) : (
-    <div className="w-4 h-4 rounded-full border-2 border-[#d4d1cc]" />
+    <div className="w-4 h-4 rounded-full border-2 border-line-strong" />
   );
 }
 
@@ -277,15 +277,15 @@ export function BestellungenTabelle({
     <>
       {/* Projekt-Filter Banner */}
       {aktiverProjektName && aktiverProjektFilter && (
-        <div className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-[#fafaf9] border border-[#e8e6e3] rounded-lg text-sm">
-          <svg className="w-4 h-4 text-[#9a9a9a] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-input border border-line rounded-lg text-sm">
+          <svg className="w-4 h-4 text-foreground-subtle shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
           </svg>
-          <span className="text-[#9a9a9a]">Gefiltert nach Projekt:</span>
-          <span className="font-semibold text-[#1a1a1a]">{aktiverProjektName}</span>
+          <span className="text-foreground-subtle">Gefiltert nach Projekt:</span>
+          <span className="font-semibold text-foreground">{aktiverProjektName}</span>
           <button
             onClick={() => router.push("/bestellungen")}
-            className="ml-auto p-1 text-[#9a9a9a] hover:text-[#570006] transition-colors"
+            className="ml-auto p-1 text-foreground-subtle hover:text-brand transition-colors"
             title="Filter entfernen"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -298,7 +298,7 @@ export function BestellungenTabelle({
       {/* Art-Tabs + Search + Filters */}
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Pill-toggle tabs for Bestellungsart */}
-        <div className="flex items-center gap-1 p-1 bg-[#f5f4f2] rounded-lg shrink-0">
+        <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg shrink-0">
           {([
             { key: "" as ArtFilter, label: "Alle" },
             { key: "material" as ArtFilter, label: "Material" },
@@ -310,14 +310,14 @@ export function BestellungenTabelle({
               onClick={() => setArtFilter(tab.key)}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
                 artFilter === tab.key
-                  ? "bg-white text-[#1a1a1a] shadow-sm"
-                  : "text-[#6b6b6b] hover:text-[#1a1a1a]"
+                  ? "bg-white text-foreground shadow-sm"
+                  : "text-foreground-muted hover:text-foreground"
               }`}
             >
               {tab.label}
               {tab.key && artCounts[tab.key] > 0 && (
                 <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                  artFilter === tab.key ? "bg-[#570006] text-white" : "bg-[#e8e6e3] text-[#6b6b6b]"
+                  artFilter === tab.key ? "bg-brand text-white" : "bg-line text-foreground-muted"
                 }`}>
                   {artCounts[tab.key]}
                 </span>
@@ -329,7 +329,7 @@ export function BestellungenTabelle({
         {/* Search + Dropdowns */}
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 min-w-0">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9a9a9a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -337,13 +337,13 @@ export function BestellungenTabelle({
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               placeholder="Bestellnummer, Händler, Besteller..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] placeholder-[#c4c2bf] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="hidden md:block px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            className="hidden md:block px-3.5 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -353,7 +353,7 @@ export function BestellungenTabelle({
             <select
               value={projektFilter}
               onChange={(e) => setProjektFilter(e.target.value)}
-              className="hidden md:block px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+              className="hidden md:block px-3.5 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
             >
               <option value="">Alle Projekte</option>
               {projekte.map((p) => (
@@ -365,7 +365,7 @@ export function BestellungenTabelle({
             <button
               type="button"
               onClick={() => { setSuche(""); setStatusFilter(""); setArtFilter(""); setProjektFilter(""); }}
-              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-red-50 rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-red-50 rounded-lg border border-line transition-colors shrink-0"
               title="Filter zurücksetzen"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -377,7 +377,7 @@ export function BestellungenTabelle({
             <button
               type="button"
               onClick={() => setSelectionMode(true)}
-              className="p-2.5 text-[#9a9a9a] hover:text-[#570006] hover:bg-[#570006]/[0.06] rounded-lg border border-[#e8e6e3] transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] rounded-lg border border-line transition-colors shrink-0"
               title="Auswahl-Modus"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -393,7 +393,7 @@ export function BestellungenTabelle({
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="flex-1 px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+          className="flex-1 px-3.5 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
         >
           {STATUS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -403,7 +403,7 @@ export function BestellungenTabelle({
           <select
             value={projektFilter}
             onChange={(e) => setProjektFilter(e.target.value)}
-            className="flex-1 px-3.5 py-2.5 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 transition-colors"
+            className="flex-1 px-3.5 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
           >
             <option value="">Alle Projekte</option>
             {projekte.map((p) => (
@@ -417,27 +417,27 @@ export function BestellungenTabelle({
       <div className="mt-4 card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#fafaf9] border-b border-[#e8e6e3]">
+            <tr className="bg-input border-b border-line">
               {selectionMode && (
                 <th className="px-3 py-3.5 w-10">
                   <input
                     type="checkbox"
                     checked={gefiltert.length > 0 && selected.size === gefiltert.length}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                    className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
                   />
                 </th>
               )}
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Bestellnr.</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Händler / Firma</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden lg:table-cell">Projekt</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden md:table-cell">Datum</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">Best.</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">LS</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">RE</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase hidden sm:table-cell">VS</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Status</th>
-              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-[#9a9a9a] tracking-widest uppercase">Betrag</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Bestellnr.</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Händler / Firma</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden lg:table-cell">Projekt</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden md:table-cell">Datum</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">Best.</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">LS</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">RE</th>
+              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">VS</th>
+              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Status</th>
+              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Betrag</th>
               <th className="px-4 py-3.5 w-10"></th>
             </tr>
           </thead>
@@ -446,10 +446,10 @@ export function BestellungenTabelle({
               <tr>
                 <td colSpan={selectionMode ? 12 : 11} className="px-4 py-16 text-center">
                   <div className="flex flex-col items-center gap-2">
-                    <svg className="w-8 h-8 text-[#d4d1cc]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                     </svg>
-                    <p className="text-[#9a9a9a] text-sm">
+                    <p className="text-foreground-subtle text-sm">
                       {bestellungen.length === 0
                         ? "Noch keine Bestellungen vorhanden."
                         : "Keine Bestellungen gefunden."}
@@ -457,7 +457,7 @@ export function BestellungenTabelle({
                     {hasFilters && (
                       <button
                         onClick={() => { setSuche(""); setStatusFilter(""); setArtFilter(""); setProjektFilter(""); }}
-                        className="text-[#570006] hover:text-[#7a1a1f] text-sm font-medium transition-colors"
+                        className="text-brand hover:text-brand-light text-sm font-medium transition-colors"
                       >
                         Filter zurücksetzen
                       </button>
@@ -475,7 +475,7 @@ export function BestellungenTabelle({
                   <tr
                     key={b.id}
                     onClick={() => router.push(`/bestellungen/${b.id}`)}
-                    className={`table-row-hover border-b border-[#f0eeeb] cursor-pointer group ${i % 2 === 1 ? "bg-[#fdfcfb]" : ""} ${selected.has(b.id) ? "bg-[#570006]/[0.03]" : ""}`}
+                    className={`table-row-hover border-b border-line-subtle cursor-pointer group ${i % 2 === 1 ? "bg-zebra" : ""} ${selected.has(b.id) ? "bg-brand/[0.03]" : ""}`}
                   >
                     {selectionMode && (
                       <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
@@ -483,7 +483,7 @@ export function BestellungenTabelle({
                           type="checkbox"
                           checked={selected.has(b.id)}
                           onChange={() => toggleSelect(b.id)}
-                          className="w-4 h-4 rounded border-[#d4d1cc] text-[#570006] focus:ring-[#570006]/20 cursor-pointer"
+                          className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
                         />
                       </td>
                     )}
@@ -491,7 +491,7 @@ export function BestellungenTabelle({
                       <Link
                         href={`/bestellungen/${b.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="font-mono-amount font-semibold text-[#570006] hover:text-[#7a1a1f] transition-colors"
+                        className="font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
                       >
                         {b.bestellnummer || "–"}
                         {b.mahnung_am && (
@@ -502,7 +502,7 @@ export function BestellungenTabelle({
                         )}
                       </Link>
                     </td>
-                    <td className="px-4 py-3.5 text-[#1a1a1a]">
+                    <td className="px-4 py-3.5 text-foreground">
                       <div className="flex items-center gap-2">
                         <span className="truncate max-w-[150px]">{b.haendler_name || "–"}</span>
                         {isSub && (
@@ -516,7 +516,7 @@ export function BestellungenTabelle({
                       </div>
                       {/* Mobile: show project inline */}
                       {b.projekt_name && (
-                        <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[11px] text-[#6b6b6b]">
+                        <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[11px] text-foreground-muted">
                           <span
                             className="w-1.5 h-1.5 rounded-full shrink-0"
                             style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
@@ -527,7 +527,7 @@ export function BestellungenTabelle({
                     </td>
                     <td className="px-4 py-3.5 hidden lg:table-cell">
                       {b.projekt_name ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-[#1a1a1a] max-w-[120px]">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-foreground max-w-[120px]">
                           <span
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
@@ -535,16 +535,16 @@ export function BestellungenTabelle({
                           <span className="truncate">{b.projekt_name}</span>
                         </span>
                       ) : (
-                        <span className="text-[#d4d1cc] text-xs">–</span>
+                        <span className="text-line-strong text-xs">–</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-[#9a9a9a] text-xs hidden md:table-cell whitespace-nowrap">
+                    <td className="px-4 py-3.5 text-foreground-subtle text-xs hidden md:table-cell whitespace-nowrap">
                       {formatDatum(b.created_at)}
                     </td>
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
                         {(isSub || isAbo) ? (
-                          <span className="text-[#d4d1cc]">&ndash;</span>
+                          <span className="text-line-strong">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_bestellbestaetigung} onClick={b.hat_bestellbestaetigung ? (e) => { e.stopPropagation(); handlePreview(b.id, "bestellbestaetigung"); } : undefined} onMouseEnter={b.hat_bestellbestaetigung ? () => preloadPreview(b.id, "bestellbestaetigung") : undefined} />
                         )}
@@ -553,7 +553,7 @@ export function BestellungenTabelle({
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
                         {(isSub || isAbo) ? (
-                          <span className="text-[#d4d1cc]">&ndash;</span>
+                          <span className="text-line-strong">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_lieferschein} onClick={b.hat_lieferschein ? (e) => { e.stopPropagation(); handlePreview(b.id, "lieferschein"); } : undefined} onMouseEnter={b.hat_lieferschein ? () => preloadPreview(b.id, "lieferschein") : undefined} />
                         )}
@@ -565,7 +565,7 @@ export function BestellungenTabelle({
                     <td className="px-4 py-3.5 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
                         {(isSub || isAbo) ? (
-                          <span className="text-[#d4d1cc]">&ndash;</span>
+                          <span className="text-line-strong">&ndash;</span>
                         ) : (
                           <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} onClick={(b.hat_versandbestaetigung) ? (e) => { e.stopPropagation(); handlePreview(b.id, "versandbestaetigung"); } : undefined} onMouseEnter={b.hat_versandbestaetigung ? () => preloadPreview(b.id, "versandbestaetigung") : undefined} />
                         )}
@@ -581,11 +581,11 @@ export function BestellungenTabelle({
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <span className="font-mono-amount font-semibold text-[#1a1a1a]">
+                      <span className="font-mono-amount font-semibold text-foreground">
                         {formatBetrag(b.betrag, b.waehrung)}
                       </span>
                       {b.betrag_ist_netto && b.betrag != null && (
-                        <span className="text-[10px] text-[#9a9a9a] ml-1">netto</span>
+                        <span className="text-[10px] text-foreground-subtle ml-1">netto</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5">
@@ -599,7 +599,7 @@ export function BestellungenTabelle({
                             className={`p-1.5 rounded-md transition-colors inline-flex ${
                               freigabeLoadingId === b.id
                                 ? "text-emerald-600 animate-pulse"
-                                : "text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-emerald-600 hover:!bg-emerald-50"
+                                : "text-foreground-faint group-hover:text-foreground-subtle hover:!text-emerald-600 hover:!bg-emerald-50"
                             }`}
                             title="Rechnung freigeben"
                           >
@@ -618,8 +618,8 @@ export function BestellungenTabelle({
                           disabled={downloadingId === b.id}
                           className={`p-1.5 rounded-md transition-colors inline-flex ${
                             downloadingId === b.id
-                              ? "text-[#570006] animate-pulse"
-                              : "text-[#c4c2bf] group-hover:text-[#9a9a9a] hover:!text-[#570006] hover:!bg-[#570006]/[0.06]"
+                              ? "text-brand animate-pulse"
+                              : "text-foreground-faint group-hover:text-foreground-subtle hover:!text-brand hover:!bg-brand/[0.06]"
                           }`}
                           title="Alle Dokumente herunterladen"
                         >
@@ -640,27 +640,27 @@ export function BestellungenTabelle({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
-          <span className="text-[#9a9a9a]">
+          <span className="text-foreground-subtle">
             {totalCount} Bestellung{totalCount !== 1 ? "en" : ""} gesamt
           </span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage <= 1}
-              className="p-2 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Vorherige Seite"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-[#6b6b6b] font-medium px-3 font-mono-amount text-xs">
+            <span className="text-foreground-muted font-medium px-3 font-mono-amount text-xs">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage >= totalPages}
-              className="p-2 text-sm font-medium bg-white border border-[#e8e6e3] rounded-lg hover:bg-[#fafaf9] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Nächste Seite"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -674,7 +674,7 @@ export function BestellungenTabelle({
       {/* Floating Bulk Action Bar — matching Buchhaltung archive style */}
       {selectionMode && (
         <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
-          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-[#1a1a1a] text-white rounded-xl shadow-lg shadow-black/20">
+          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-sidebar-active text-white rounded-xl shadow-lg shadow-black/20">
             <span className="text-sm font-medium">
               {selected.size > 0
                 ? `${selected.size} ${selected.size === 1 ? "Bestellung" : "Bestellungen"} ausgewählt`
@@ -693,7 +693,7 @@ export function BestellungenTabelle({
                   type="button"
                   onClick={() => setShowDeleteDialog(true)}
                   disabled={deleteLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-[#570006] hover:bg-[#7a1a1f] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -739,11 +739,11 @@ export function BestellungenTabelle({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-[#f0eeeb]">
-              <h3 className="font-headline text-sm text-[#1a1a1a] tracking-tight">PDF-Vorschau</h3>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-line-subtle">
+              <h3 className="font-headline text-sm text-foreground tracking-tight">PDF-Vorschau</h3>
               <button
                 onClick={closePreview}
-                className="p-1.5 rounded-lg text-[#9a9a9a] hover:text-[#1a1a1a] hover:bg-[#f5f4f2] transition-colors"
+                className="p-1.5 rounded-lg text-foreground-subtle hover:text-foreground hover:bg-canvas transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -754,7 +754,7 @@ export function BestellungenTabelle({
             <div className="flex-1 overflow-hidden">
               {previewLoading ? (
                 <div className="flex items-center justify-center h-full">
-                  <div className="spinner w-8 h-8 text-[#570006]" />
+                  <div className="spinner w-8 h-8 text-brand" />
                 </div>
               ) : previewUrl ? (
                 <iframe
@@ -763,7 +763,7 @@ export function BestellungenTabelle({
                   title="PDF-Vorschau"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-[#c4c2bf]">
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-faint">
                   <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                   </svg>

@@ -145,7 +145,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
             >
               {/* Active indicator - left bar */}
               {active && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#570006] rounded-r-full" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-brand rounded-r-full" />
               )}
               <item.Icon className="w-[18px] h-[18px]" />
               {item.label}
@@ -179,7 +179,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       {/* User */}
       <div className="px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#570006] flex items-center justify-center text-[11px] font-bold text-white">
+          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-[11px] font-bold text-white">
             {profil.kuerzel}
           </div>
           <div className="flex-1 min-w-0">
@@ -214,7 +214,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         type="button"
         onClick={() => setMobileOpen(true)}
         aria-label="Menü öffnen"
-        className="md:hidden fixed top-4 left-4 z-40 p-2.5 bg-[#141414] text-white/80 rounded-lg shadow-lg border border-white/[0.06]"
+        className="md:hidden fixed top-4 left-4 z-40 p-2.5 bg-sidebar text-white/80 rounded-lg shadow-lg border border-white/[0.06]"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
@@ -228,7 +228,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
           onClick={() => setMobileOpen(false)}
         >
           <aside
-            className="w-64 h-full bg-[#141414] text-white flex flex-col"
+            className="w-64 h-full bg-sidebar text-white flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {sidebarContent}
@@ -237,7 +237,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       )}
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-60 bg-[#141414] text-white flex-col shrink-0 border-r border-white/[0.06]">
+      <aside className="hidden md:flex w-60 bg-sidebar text-white flex-col shrink-0 border-r border-white/[0.06]">
         {sidebarContent}
       </aside>
     </>

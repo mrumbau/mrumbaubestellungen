@@ -120,7 +120,7 @@ function StatusDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg shadow-lg border border-[#e8e6e3] py-1 min-w-[160px]">
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg shadow-lg border border-line py-1 min-w-[160px]">
           {STATUS_OPTIONS.map((opt) => {
             const isActive = opt.value === currentStatus;
             return (
@@ -133,10 +133,10 @@ function StatusDropdown({
                 }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${
                   isActive
-                    ? "bg-[#fafaf9] font-semibold text-[#1a1a1a]"
+                    ? "bg-input font-semibold text-foreground"
                     : opt.value === "archiviert"
                       ? "text-red-600 hover:bg-red-50"
-                      : "text-[#6b6b6b] hover:bg-[#fafaf9]"
+                      : "text-foreground-muted hover:bg-input"
                 }`}
               >
                 <span style={{ color: opt.color }}>
@@ -144,7 +144,7 @@ function StatusDropdown({
                 </span>
                 <span>{opt.value === "archiviert" ? "Archivieren" : opt.label}</span>
                 {isActive && (
-                  <svg className="w-3 h-3 ml-auto text-[#570006]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <svg className="w-3 h-3 ml-auto text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -313,8 +313,8 @@ export function ProjekteClient({
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-headline text-2xl text-[#1a1a1a] tracking-tight">Projekte</h1>
-          <p className="text-[#9a9a9a] text-sm mt-1">
+          <h1 className="font-headline text-2xl text-foreground tracking-tight">Projekte</h1>
+          <p className="text-foreground-subtle text-sm mt-1">
             {aktive.length} aktiv{archiviert.length > 0 ? ` · ${archiviert.length} archiviert` : ""}
           </p>
         </div>
@@ -345,10 +345,10 @@ export function ProjekteClient({
       {showForm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-[#e8e6e3]">
+            <div className="p-6 border-b border-line">
               <div className="flex items-center justify-between">
-                <h2 className="font-headline text-lg text-[#1a1a1a] tracking-tight">{editId ? "Projekt bearbeiten" : "Neues Projekt"}</h2>
-                <button onClick={resetForm} className="p-1 text-[#9a9a9a] hover:text-[#1a1a1a] transition-colors">
+                <h2 className="font-headline text-lg text-foreground tracking-tight">{editId ? "Projekt bearbeiten" : "Neues Projekt"}</h2>
+                <button onClick={resetForm} className="p-1 text-foreground-subtle hover:text-foreground transition-colors">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -358,29 +358,29 @@ export function ProjekteClient({
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Name *</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Name *</label>
                 <input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   placeholder="z.B. Umbau Müller Garage"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Beschreibung</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Beschreibung</label>
                 <textarea
                   value={formBeschreibung}
                   onChange={(e) => setFormBeschreibung(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30 resize-none"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 resize-none"
                   placeholder="Optionale Beschreibung..."
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Farbe</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Farbe</label>
                 <div className="flex gap-2">
                   {FARBEN.map((f) => (
                     <button
@@ -401,11 +401,11 @@ export function ProjekteClient({
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Kunde</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Kunde</label>
                 <select
                   value={formKundenId || ""}
                   onChange={(e) => setFormKundenId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                 >
                   <option value="">Kein Kunde zugeordnet</option>
                   {kunden.map((k) => (
@@ -415,12 +415,12 @@ export function ProjekteClient({
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-[#9a9a9a] tracking-widest uppercase mb-1.5">Budget (EUR)</label>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Budget (EUR)</label>
                 <input
                   type="number"
                   value={formBudget}
                   onChange={(e) => setFormBudget(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-[#e8e6e3] rounded-lg text-sm text-[#1a1a1a] font-mono-amount focus:outline-none focus:ring-2 focus:ring-[#570006]/15 focus:border-[#570006]/30"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   placeholder="Optional"
                   min="0"
                   step="0.01"
@@ -430,10 +430,10 @@ export function ProjekteClient({
               {error && <p className="text-red-600 text-sm">{error}</p>}
             </div>
 
-            <div className="p-6 border-t border-[#e8e6e3] flex justify-end gap-3">
+            <div className="p-6 border-t border-line flex justify-end gap-3">
               <button
                 onClick={resetForm}
-                className="px-4 py-2 text-sm font-medium text-[#6b6b6b] hover:text-[#1a1a1a] transition-colors"
+                className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
               >
                 Abbrechen
               </button>
@@ -452,16 +452,16 @@ export function ProjekteClient({
       {/* Projekt-Grid */}
       {aktive.length === 0 ? (
         <div className="card p-16 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#fafaf9] border border-[#e8e6e3] flex items-center justify-center">
-            <svg className="w-5 h-5 text-[#c4c2bf]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-input border border-line flex items-center justify-center">
+            <svg className="w-5 h-5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3H21m-3.75 3H21" />
             </svg>
           </div>
-          <p className="text-[#6b6b6b] font-medium mb-1">Noch keine Projekte</p>
+          <p className="text-foreground-muted font-medium mb-1">Noch keine Projekte</p>
           {istAdmin && (
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="mt-3 text-[#570006] hover:text-[#7a1a1f] text-sm font-medium transition-colors"
+              className="mt-3 text-brand hover:text-brand-light text-sm font-medium transition-colors"
             >
               Erstes Projekt erstellen
             </button>
@@ -489,7 +489,7 @@ export function ProjekteClient({
                   {/* Header */}
                   <div className="flex items-start justify-between mb-1">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-headline text-base text-[#1a1a1a] truncate">{p.name}</h3>
+                      <h3 className="font-headline text-base text-foreground truncate">{p.name}</h3>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 shrink-0">
                       {istAdmin ? (
@@ -501,7 +501,7 @@ export function ProjekteClient({
                           />
                           <button
                             onClick={() => openEdit(p)}
-                            className="p-1 rounded hover:bg-[#f5f4f2] transition-colors text-[#c4c2bf] hover:text-[#570006]"
+                            className="p-1 rounded hover:bg-canvas transition-colors text-foreground-faint hover:text-brand"
                             title="Bearbeiten"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -520,27 +520,27 @@ export function ProjekteClient({
 
                   {/* Kunde */}
                   {p.kunde && (
-                    <p className="text-[11px] text-[#9a9a9a] mt-0.5 truncate">{p.kunde}</p>
+                    <p className="text-[11px] text-foreground-subtle mt-0.5 truncate">{p.kunde}</p>
                   )}
 
                   {/* Description */}
                   {p.beschreibung && (
-                    <p className="text-xs text-[#6b6b6b] line-clamp-2 mb-3">{p.beschreibung}</p>
+                    <p className="text-xs text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
                   )}
 
                   {/* Stats — structured grid */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-[#fafaf9] rounded-lg border border-[#f0eeeb]">
+                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-input rounded-lg border border-line-subtle">
                     <div>
-                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Bestell.</p>
-                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{s.gesamt}</p>
+                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Bestell.</p>
+                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.gesamt}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Volumen</p>
-                      <p className="font-mono-amount text-sm font-semibold text-[#1a1a1a] mt-0.5">{formatBetrag(s.volumen)}</p>
+                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Volumen</p>
+                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{formatBetrag(s.volumen)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-[#9a9a9a] uppercase tracking-wider font-semibold">Offen</p>
-                      <p className={`font-mono-amount text-sm font-semibold mt-0.5 ${s.offen > 0 ? "text-[#570006]" : "text-[#c4c2bf]"}`}>
+                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Offen</p>
+                      <p className={`font-mono-amount text-sm font-semibold mt-0.5 ${s.offen > 0 ? "text-brand" : "text-foreground-faint"}`}>
                         {s.offen}
                       </p>
                     </div>
@@ -550,10 +550,10 @@ export function ProjekteClient({
                   {budgetPercent !== null && p.budget && (
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="text-[#9a9a9a] uppercase tracking-wider font-semibold">Budget</span>
-                        <span className="font-mono-amount text-[#6b6b6b]">{formatBetrag(s.volumen)} / {formatBetrag(p.budget)}</span>
+                        <span className="text-foreground-subtle uppercase tracking-wider font-semibold">Budget</span>
+                        <span className="font-mono-amount text-foreground-muted">{formatBetrag(s.volumen)} / {formatBetrag(p.budget)}</span>
                       </div>
-                      <div className="h-1.5 bg-[#e8e6e3] rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-line rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{
@@ -566,11 +566,11 @@ export function ProjekteClient({
                   )}
 
                   {/* Footer */}
-                  <div className="mt-4 pt-3 border-t border-[#f0eeeb] flex items-center justify-between">
-                    <span className="text-[10px] text-[#c4c2bf]">{formatDatum(p.created_at)}</span>
+                  <div className="mt-4 pt-3 border-t border-line-subtle flex items-center justify-between">
+                    <span className="text-[10px] text-foreground-faint">{formatDatum(p.created_at)}</span>
                     <Link
                       href={`/bestellungen?projekt_id=${p.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-[#570006] hover:text-[#7a1a1f] font-medium transition-colors group/link"
+                      className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-light font-medium transition-colors group/link"
                     >
                       Bestellungen
                       <svg className="w-3 h-3 transition-transform group-hover/link:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -590,7 +590,7 @@ export function ProjekteClient({
         <div className="mt-8">
           <Link
             href="/archiv"
-            className="flex items-center gap-2 text-sm text-[#9a9a9a] hover:text-[#570006] transition-colors group"
+            className="flex items-center gap-2 text-sm text-foreground-subtle hover:text-brand transition-colors group"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />

@@ -26,6 +26,7 @@ export const buttonVariants = cva(
       variant: {
         primary:
           "btn-primary text-white " +
+          // eslint-disable-next-line no-restricted-syntax -- desaturated brand-red for disabled primary; unique visual state not represented by any other token.
           "disabled:bg-[#8b6369] disabled:cursor-not-allowed disabled:shadow-none disabled:hover:bg-[#8b6369] disabled:hover:translate-y-0",
         secondary:
           "bg-surface text-foreground border border-line " +
@@ -39,6 +40,7 @@ export const buttonVariants = cva(
           "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent",
         destructive:
           "bg-error text-white " +
+          // eslint-disable-next-line no-restricted-syntax -- destructive hover needs darker red than `--feedback-error` base; red-700 equivalent, not in palette.
           "hover:bg-[#b91c1c] hover:shadow-[0_4px_12px_rgba(220,38,38,0.25)] hover:-translate-y-px " +
           "active:translate-y-0 active:shadow-none " +
           "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-error disabled:hover:translate-y-0 disabled:hover:shadow-none",

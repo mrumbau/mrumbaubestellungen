@@ -9,7 +9,7 @@ export function ProjektBadge({ name, farbe, size = "sm" }: ProjektBadgeProps) {
   const textSize = size === "md" ? "text-sm" : "text-xs";
 
   return (
-    <span className={`inline-flex items-center gap-1.5 ${textSize} text-[#1a1a1a]`}>
+    <span className={`inline-flex items-center gap-1.5 ${textSize} text-foreground`}>
       <span className={`${dotSize} rounded-full shrink-0`} style={{ background: farbe }} />
       {name}
     </span>

@@ -7,6 +7,7 @@ export const badgeVariants = cva(
   {
     variants: {
       tone: {
+        // eslint-disable-next-line no-restricted-syntax -- cool-gray outside brand palette; used for generic role-badges. Introduce `--neutral-*` tokens if needed beyond this single variant.
         neutral: "bg-[#eef1f5] text-[#3d4350]",
         brand: "bg-[rgba(87,0,6,0.08)] text-[var(--mr-red)]",
         info: "bg-info-bg text-info",

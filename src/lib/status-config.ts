@@ -1,12 +1,55 @@
-// Status-Konfiguration – eckige Tags mit linkem Farbbalken
-
-export const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; text: string }> = {
-  erwartet: { label: "Erwartet", color: "#8b8b8b", bg: "bg-[#f5f5f5]", text: "text-[#6b6b6b]" },
-  offen: { label: "Offen", color: "#2563eb", bg: "bg-blue-50", text: "text-blue-700" },
-  vollstaendig: { label: "Vollständig", color: "#16a34a", bg: "bg-green-50", text: "text-green-700" },
-  abweichung: { label: "Abweichung", color: "#dc2626", bg: "bg-red-50", text: "text-red-700" },
-  ls_fehlt: { label: "LS fehlt", color: "#d97706", bg: "bg-amber-50", text: "text-amber-700" },
-  freigegeben: { label: "Freigegeben", color: "#059669", bg: "bg-emerald-50", text: "text-emerald-700" },
+/**
+ * Status-Konfiguration — eckige Tags mit linkem Farbbalken.
+ *
+ * Drei-Komponenten-Farbschema pro Status, vollständig tokenisiert:
+ *   - `color`: CSS-Variable für den linken Balken / Dot (wird inline als
+ *              `style={{ background: ... }}` oder als `border-color` genutzt).
+ *   - `bg`:    Tailwind-Utility für den Pill-Hintergrund.
+ *   - `text`:  Tailwind-Utility für die Pill-Schrift.
+ *
+ * Änderungen am Status-Look passieren ausschließlich in `globals.css`
+ * (`--status-*` Tokens). Diese Datei bleibt stabil.
+ */
+export const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; bg: string; text: string }
+> = {
+  erwartet: {
+    label: "Erwartet",
+    color: "var(--status-erwartet)",
+    bg: "bg-status-erwartet-bg",
+    text: "text-status-erwartet-text",
+  },
+  offen: {
+    label: "Offen",
+    color: "var(--status-offen)",
+    bg: "bg-status-offen-bg",
+    text: "text-status-offen-text",
+  },
+  vollstaendig: {
+    label: "Vollständig",
+    color: "var(--status-vollstaendig)",
+    bg: "bg-status-vollstaendig-bg",
+    text: "text-status-vollstaendig-text",
+  },
+  abweichung: {
+    label: "Abweichung",
+    color: "var(--status-abweichung)",
+    bg: "bg-status-abweichung-bg",
+    text: "text-status-abweichung-text",
+  },
+  ls_fehlt: {
+    label: "LS fehlt",
+    color: "var(--status-ls-fehlt)",
+    bg: "bg-status-ls-fehlt-bg",
+    text: "text-status-ls-fehlt-text",
+  },
+  freigegeben: {
+    label: "Freigegeben",
+    color: "var(--status-freigegeben)",
+    bg: "bg-status-freigegeben-bg",
+    text: "text-status-freigegeben-text",
+  },
 };
 
 export function getStatusConfig(status: string) {
