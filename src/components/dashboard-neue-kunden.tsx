@@ -44,10 +44,7 @@ export function DashboardNeueKunden({
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <h2 className="font-headline text-sm text-foreground tracking-tight">Neue Kunden erkannt</h2>
-          <span className="font-mono-amount text-[10px] font-bold text-foreground-muted bg-canvas px-2 py-0.5 rounded">
-            {items.length}
-          </span>
+          <h3 className="font-headline text-sm text-foreground tracking-tight">Neue Kunden erkannt</h3>
         </div>
       </div>
 

@@ -554,6 +554,17 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   // Map kuerzel → name
   const bestellerNameMap = new Map(bestellerListe.map((b) => [b.kuerzel, b.name]));
 
+  // "Zu prüfen"-Section: aggregierter Count über alle gerenderten Confirm-Widgets.
+  // Role-dependent: Admin sieht Unzugeordnet (System-Op), Besteller nicht. Das ergibt
+  // unterschiedliche Counts (z.B. MH=12, MT=9) — gewollt, nicht global firmenweit.
+  // Jedes Widget wird nur gezählt wenn es auch tatsächlich rendert (Toggle AN + Items > 0).
+  const confirmCount =
+    (isAdmin && isWidgetVisible("unzugeordnet") ? unzugeordnet.length : 0) +
+    (isWidgetVisible("ki_vorschlaege") ? kiVorschlaege.length : 0) +
+    (isWidgetVisible("neue_kunden") ? neueKunden.length : 0) +
+    (isWidgetVisible("neue_subunternehmer") ? neueSubunternehmer.length : 0) +
+    (isWidgetVisible("neue_haendler") ? neueHaendler.length : 0);
+
   return (
     <div>
       {/* Settings + Live Refresh */}
@@ -595,6 +606,45 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Zu prüfen — Confirm-Queue am Top, direkt unter Mahnungen.
+          Section rendert komplett nicht wenn confirmCount === 0 (keine leere Shell, kein "Aufgeräumt"-Empty).
+          Reihenfolge identisch für Admin + Besteller — Unzugeordnet (admin-only) erscheint oben oder ist einfach null bei Besteller. */}
+      {confirmCount > 0 && (
+        <section aria-labelledby="zu-pruefen-heading" className="mb-6">
+          <div className="flex items-baseline justify-between mb-3">
+            <h2
+              id="zu-pruefen-heading"
+              className="font-headline text-[11px] uppercase tracking-[0.14em] text-foreground-subtle"
+            >
+              Zu prüfen
+            </h2>
+            <span
+              className="font-mono-amount text-[11px] text-foreground-muted"
+              aria-label={`${confirmCount} ${confirmCount === 1 ? "Eintrag" : "Einträge"} zur Prüfung`}
+            >
+              {confirmCount}
+            </span>
+          </div>
+          <div className="space-y-4">
+            {isAdmin && isWidgetVisible("unzugeordnet") && unzugeordnet.length > 0 && (
+              <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
+            )}
+            {isWidgetVisible("ki_vorschlaege") && kiVorschlaege.length > 0 && (
+              <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
+            )}
+            {isWidgetVisible("neue_kunden") && neueKunden.length > 0 && (
+              <DashboardNeueKunden kunden={neueKunden} />
+            )}
+            {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
+              <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
+            )}
+            {isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
+              <DashboardNeueHaendler haendler={neueHaendler} />
+            )}
+          </div>
+        </section>
       )}
 
       {/* Stat Cards Row 1 — responsive grid */}
@@ -688,25 +738,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Confirm-Queue / Kuratierung — Stammdaten-Confirms (KI/Kunden/SU/Händler) für alle,
-          Unzugeordnet ist System-Op (Besteller-Routing) und daher nur Admin */}
-      <div className="space-y-4 mb-6">
-        {isWidgetVisible("ki_vorschlaege") && kiVorschlaege.length > 0 && (
-          <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
-        )}
-        {isWidgetVisible("neue_kunden") && neueKunden.length > 0 && (
-          <DashboardNeueKunden kunden={neueKunden} />
-        )}
-        {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
-          <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
-        )}
-        {isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
-          <DashboardNeueHaendler haendler={neueHaendler} />
-        )}
-        {isAdmin && isWidgetVisible("unzugeordnet") && unzugeordnet.length > 0 && (
-          <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
-        )}
-      </div>
+      {/* Confirm-Queue wurde nach oben verschoben in die "Zu prüfen"-Section (siehe dort).
+          Die Widgets rendern direkt unter Mahnungs-Banner, nicht mehr hier nach Aktive Projekte. */}
 
       {/* Abo-Übersicht — Kosten neutral (informativ), Hinweise semantic (Status-Farben bei echter Dringlichkeit) */}
       {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboJaehrlicheKosten && aboJaehrlicheKosten > 0)) && (
