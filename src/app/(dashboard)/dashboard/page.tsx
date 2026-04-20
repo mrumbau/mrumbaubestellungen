@@ -63,21 +63,21 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] }),
-    profil.rolle === "admin"
-      ? supabase.from("bestellungen")
-          .select("id, bestellnummer, haendler_name, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
-          .is("projekt_id", null)
-          .not("projekt_vorschlag_id", "is", null)
-          .eq("projekt_bestaetigt", false)
-          .order("created_at", { ascending: false })
-          .limit(20)
-      : Promise.resolve({ data: [] as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[] }),
-    profil.rolle === "admin"
-      ? supabase.from("kunden").select("id, name, keywords, created_at").is("confirmed_at", null).order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as { id: string; name: string; keywords: string[] | null; created_at: string }[] }),
-    profil.rolle === "admin"
-      ? supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[] }),
+    // KI-Projekt-Vorschläge — Besteller sieht eigene + Abo/SU (via eigene()), Admin sieht alle.
+    // Besteller dürfen für ihre Bestellungen selbst bestätigen (API nach P4.5 geöffnet).
+    eigene(
+      supabase.from("bestellungen")
+        .select("id, bestellnummer, haendler_name, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
+        .is("projekt_id", null)
+        .not("projekt_vorschlag_id", "is", null)
+        .eq("projekt_bestaetigt", false)
+        .order("created_at", { ascending: false })
+        .limit(20)
+    ),
+    // Neue Kunden — Besteller (Firmeninhaber mit Domain-Wissen) sieht alle unbestätigten
+    supabase.from("kunden").select("id, name, keywords, created_at").is("confirmed_at", null).order("created_at", { ascending: false }),
+    // Neue Subunternehmer — gleich
+    supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false }),
     supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),
     // Mahnungen: Bestellungen mit mahnung_am die noch nicht bezahlt sind
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, mahnung_am, mahnung_count").not("mahnung_am", "is", null).is("bezahlt_am", null).order("mahnung_am", { ascending: false })),
@@ -181,16 +181,18 @@ export default async function DashboardPage() {
     }
   }
 
-  // Stat-Daten als Array für den Client
+  // Stat-Daten als Array für den Client.
+  // Farben referenzieren Status-Tokens (globals.css) — Status-Pills sind die einzige Stelle
+  // wo Farbe semantische Workflow-Bedeutung trägt. Gesamt + Aktive Projekte sind keine Status,
+  // darum Brand-Rot (Identität) bzw. neutrales Grau (informativ).
   const statCards = [
-    { id: "offen", label: "Offen", value: offen, color: "#2563eb", row: 1 },
-    { id: "abweichungen", label: "Abweichungen", value: abweichungen, color: "#dc2626", alert: abweichungen > 0, row: 1 },
-    { id: "ls_fehlt", label: "LS fehlt", value: lsFehlt, color: "#d97706", row: 1 },
-    { id: "freigegeben", label: "Freigegeben", value: freigegeben, color: "#059669", row: 1 },
-    // "erwartet" nicht mehr angezeigt — Extension-Signale erstellen keine Einträge mehr
-    { id: "vollstaendig", label: "Vollständig", value: vollstaendig, color: "#16a34a", row: 2 },
-    { id: "gesamt", label: "Gesamt", value: gesamtAnzahl, color: "#570006", row: 2 },
-    { id: "aktive_projekte", label: "Aktive Projekte", value: (aktiveProjekte || []).length, color: "#7c3aed", row: 2 },
+    { id: "offen", label: "Offen", value: offen, color: "var(--status-offen)", row: 1 },
+    { id: "abweichungen", label: "Abweichungen", value: abweichungen, color: "var(--status-abweichung)", alert: abweichungen > 0, row: 1 },
+    { id: "ls_fehlt", label: "LS fehlt", value: lsFehlt, color: "var(--status-ls-fehlt)", row: 1 },
+    { id: "freigegeben", label: "Freigegeben", value: freigegeben, color: "var(--status-freigegeben)", row: 1 },
+    { id: "vollstaendig", label: "Vollständig", value: vollstaendig, color: "var(--status-vollstaendig)", row: 2 },
+    { id: "gesamt", label: "Gesamt", value: gesamtAnzahl, color: "var(--mr-red)", row: 2 },
+    { id: "aktive_projekte", label: "Aktive Projekte", value: (aktiveProjekte || []).length, color: "var(--text-secondary)", row: 2 },
   ];
 
   return (

@@ -57,9 +57,9 @@ export function DashboardKIZusammenfassung() {
 
   if (error) {
     return (
-      <div className="mb-6 bg-red-50 rounded-xl border border-red-200 p-4">
-        <p className="text-sm text-red-700">{error}</p>
-        <button onClick={laden} className="mt-2 text-xs text-red-600 underline">
+      <div className="mb-6 bg-error-bg rounded-xl border border-error-border p-4">
+        <p className="text-sm text-error">{error}</p>
+        <button onClick={laden} className="mt-2 text-xs text-error underline">
           Erneut versuchen
         </button>
       </div>
@@ -89,11 +89,11 @@ export function DashboardKIZusammenfassung() {
 
       {data.dringend.length > 0 && (
         <div className="mb-3">
-          <p className="text-[10px] font-semibold text-red-700 tracking-widest uppercase mb-1">Dringend:</p>
+          <p className="text-[10px] font-semibold text-error tracking-widest uppercase mb-1">Dringend:</p>
           <ul className="space-y-1">
             {data.dringend.map((d, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-red-600">
-                <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+              <li key={i} className="flex items-start gap-2 text-xs text-error">
+                <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-error shrink-0" />
                 {d}
               </li>
             ))}
@@ -103,11 +103,11 @@ export function DashboardKIZusammenfassung() {
 
       {data.highlights.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold text-green-700 tracking-widest uppercase mb-1">Highlights:</p>
+          <p className="text-[10px] font-semibold text-success tracking-widest uppercase mb-1">Highlights:</p>
           <ul className="space-y-1">
             {data.highlights.map((h, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-green-600">
-                <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+              <li key={i} className="flex items-start gap-2 text-xs text-success">
+                <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-success shrink-0" />
                 {h}
               </li>
             ))}

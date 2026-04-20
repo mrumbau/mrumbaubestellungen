@@ -52,16 +52,16 @@ export function DashboardKiVorschlaege({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-warning">
+    <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="w-8 h-8 rounded-lg bg-brand/5 flex items-center justify-center">
+            <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
           <h2 className="font-headline text-sm text-foreground tracking-tight">KI-Projekt-Vorschläge</h2>
-          <span className="font-mono-amount text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+          <span className="font-mono-amount text-[10px] font-bold text-brand bg-brand/5 px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
@@ -73,7 +73,7 @@ export function DashboardKiVorschlaege({
 
       <div className="space-y-2">
         {items.map((v) => (
-          <div key={v.id} className="bg-amber-50/50 rounded-lg p-3">
+          <div key={v.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -95,7 +95,7 @@ export function DashboardKiVorschlaege({
                   <span className="text-xs font-medium text-foreground-muted">
                     {v.vorschlag_projekt_name || "–"}
                   </span>
-                  <span className="font-mono-amount text-[10px] text-amber-700 font-bold">
+                  <span className="font-mono-amount text-[10px] text-brand font-bold">
                     {Math.round((v.projekt_vorschlag_konfidenz || 0) * 100)}%
                   </span>
                   <span className="text-[10px] text-foreground-faint">
@@ -111,7 +111,7 @@ export function DashboardKiVorschlaege({
                 <button
                   onClick={() => handleAktion(v.id, "bestaetigen")}
                   disabled={loading === v.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

@@ -15,10 +15,11 @@ interface PriorisierungErgebnis {
   zusammenfassung: string;
 }
 
+// Prioritäts-Farben via Feedback-Tokens — semantic: hoch=error, mittel=warning, niedrig=success
 const PRIO_STYLES = {
-  hoch: { bg: "bg-red-50", text: "text-red-700", badge: "bg-red-50 text-red-700", bar: "bg-red-500" },
-  mittel: { bg: "bg-amber-50", text: "text-amber-700", badge: "bg-amber-50 text-amber-700", bar: "bg-amber-500" },
-  niedrig: { bg: "bg-green-50", text: "text-green-700", badge: "bg-green-50 text-green-700", bar: "bg-green-500" },
+  hoch: { bg: "bg-error-bg", text: "text-error", badge: "bg-error-bg text-error", bar: "bg-error" },
+  mittel: { bg: "bg-warning-bg", text: "text-warning", badge: "bg-warning-bg text-warning", bar: "bg-warning" },
+  niedrig: { bg: "bg-success-bg", text: "text-success", badge: "bg-success-bg text-success", bar: "bg-success" },
 };
 
 export function DashboardPriorisierung() {
@@ -79,9 +80,9 @@ export function DashboardPriorisierung() {
 
   if (error) {
     return (
-      <div className="bg-red-50 rounded-xl border border-red-200 p-4">
-        <p className="text-sm text-red-700">{error}</p>
-        <button onClick={laden} className="mt-2 text-xs text-red-600 underline">
+      <div className="bg-error-bg rounded-xl border border-error-border p-4">
+        <p className="text-sm text-error">{error}</p>
+        <button onClick={laden} className="mt-2 text-xs text-error underline">
           Erneut versuchen
         </button>
       </div>

@@ -143,15 +143,21 @@ interface WidgetDef {
   adminOnly?: boolean;
 }
 
+// Widget-Role-Matrix:
+//   adminOnly = true  →  nur Admin sieht das Widget (echte System-Pflege)
+//   adminOnly = false →  Besteller + Admin (fachliche Entscheidungen, Firmeninhaber-Kontext)
+// Buchhaltung sieht das Dashboard gar nicht (Middleware + Page-Guard redirecten nach /buchhaltung).
 const WIDGET_DEFS: WidgetDef[] = [
   { id: "ki_zusammenfassung", label: "KI-Zusammenfassung", defaultVisible: true },
   { id: "volumen", label: "Volumen-Übersicht", defaultVisible: true },
   { id: "projekte", label: "Aktive Projekte", defaultVisible: true },
-  { id: "ki_vorschlaege", label: "KI-Projekt-Vorschläge", defaultVisible: true, adminOnly: true },
-  { id: "neue_kunden", label: "Neue Kunden", defaultVisible: true, adminOnly: true },
+  // KI-Vorschläge + Neue Kunden/SU: Besteller = Firmeninhaber entscheidet fachlich mit
+  { id: "ki_vorschlaege", label: "KI-Projekt-Vorschläge", defaultVisible: true },
+  { id: "neue_kunden", label: "Neue Kunden", defaultVisible: true },
+  { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true },
+  // Unzugeordnet + Neue Händler: System-Pflege / Stammdaten-Kuratierung (Admin-only)
   { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
   { id: "neue_haendler", label: "Neue Händler", defaultVisible: true, adminOnly: true },
-  { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true, adminOnly: true },
   { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true },
   { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
@@ -334,8 +340,8 @@ function StatCard({ label, value, color, alert }: { label: string; value: number
       <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
       <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">{label}</p>
       <div className="flex items-end justify-between mt-2 relative">
-        <p className={`font-mono-amount text-3xl font-bold text-foreground ${alert ? "text-red-600" : ""}`}>{value}</p>
-        {alert && value > 0 && <span className="pulse-urgent w-2 h-2 rounded-full bg-red-500 mb-2" />}
+        <p className={`font-mono-amount text-3xl font-bold text-foreground ${alert ? "text-error" : ""}`}>{value}</p>
+        {alert && value > 0 && <span className="pulse-urgent w-2 h-2 rounded-full bg-error mb-2" />}
       </div>
     </div>
   );
@@ -346,7 +352,7 @@ function StatCard({ label, value, color, alert }: { label: string; value: number
 function AktionIcon({ status }: { status: string }) {
   if (status === "erwartet") {
     return (
-      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+      <div className="w-8 h-8 rounded-lg bg-canvas flex items-center justify-center shrink-0">
         <svg className="w-4 h-4 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
@@ -355,8 +361,8 @@ function AktionIcon({ status }: { status: string }) {
   }
   if (status === "abweichung") {
     return (
-      <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
-        <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="w-8 h-8 rounded-lg bg-error-bg flex items-center justify-center shrink-0">
+        <svg className="w-4 h-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
       </div>
@@ -364,16 +370,16 @@ function AktionIcon({ status }: { status: string }) {
   }
   if (status === "ls_fehlt") {
     return (
-      <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-        <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="w-8 h-8 rounded-lg bg-warning-bg flex items-center justify-center shrink-0">
+        <svg className="w-4 h-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
     );
   }
   return (
-    <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-      <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <div className="w-8 h-8 rounded-lg bg-success-bg flex items-center justify-center shrink-0">
+      <svg className="w-4 h-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     </div>
@@ -407,7 +413,7 @@ function QuickAction({ bestellungId, status, onSuccess }: { bestellungId: string
     <button
       onClick={handleAction}
       disabled={loading}
-      className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 disabled:opacity-50 transition-colors shrink-0"
+      className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-success bg-success-bg border border-success-border rounded-md hover:opacity-80 disabled:opacity-50 transition-colors shrink-0"
       title="Rechnung freigeben"
     >
       {loading ? (
@@ -563,27 +569,27 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         />
       </div>
 
-      {/* Mahnungen — prominente Warnung */}
+      {/* Mahnungen — prominente Warnung (Error-Semantik) */}
       {mahnungen && mahnungen.length > 0 && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4">
+        <div className="mb-4 bg-error-bg border border-error-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-5 h-5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <h3 className="font-semibold text-red-700 text-sm">{mahnungen.length} {mahnungen.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
+            <h3 className="font-semibold text-error text-sm">{mahnungen.length} {mahnungen.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
           </div>
           <div className="space-y-1.5">
             {mahnungen.map((m) => (
-              <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-white rounded-lg border border-red-100 hover:border-red-300 transition-colors text-sm">
+              <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-surface rounded-lg border border-error-border/60 hover:border-error-border transition-colors text-sm">
                 <span className="flex items-center gap-2">
                   <span className="font-mono-amount font-semibold text-brand">{m.bestellnummer || "–"}</span>
                   <span className="text-foreground-muted">{m.haendler_name}</span>
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
-                  {m.mahnung_count && m.mahnung_count > 1 && <span className="text-[10px] font-bold text-red-600">{m.mahnung_count}.</span>}
-                  <span className="text-[10px] text-red-500">{new Date(m.mahnung_am).toLocaleDateString("de-DE")}</span>
+                  {m.mahnung_count && m.mahnung_count > 1 && <span className="text-[10px] font-bold text-error">{m.mahnung_count}.</span>}
+                  <span className="text-[10px] text-error">{new Date(m.mahnung_am).toLocaleDateString("de-DE")}</span>
                 </span>
               </a>
             ))}
@@ -619,16 +625,16 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         <DashboardKIZusammenfassung />
       )}
 
-      {/* Volumen-Übersicht — bigger amounts */}
+      {/* Volumen-Übersicht — Freigegeben = Status-Farbe, Gesamt = Brand-Identität */}
       {isWidgetVisible("volumen") && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
-            <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
+          <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid var(--status-freigegeben)" }}>
+            <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, var(--status-freigegeben), transparent)" }} />
             <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Freigegebenes Volumen</p>
             <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
           </div>
-          <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #2563eb" }}>
-            <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, #2563eb, transparent)" }} />
+          <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid var(--mr-red)" }}>
+            <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, var(--mr-red), transparent)" }} />
             <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Gesamt-Volumen</p>
             <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">{formatBetrag(gesamtVolumen)}</p>
           </div>
@@ -663,7 +669,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                     </div>
                     <div className="flex items-center gap-3 text-[11px] text-foreground-subtle">
                       <span><span className="font-mono-amount font-bold text-foreground">{p.stats.gesamt}</span> Best.</span>
-                      {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-amber-600">{p.stats.offen}</span> offen</span>}
+                      {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-warning">{p.stats.offen}</span> offen</span>}
                       <span className="font-mono-amount font-bold text-foreground">{formatBetrag(p.stats.volumen)}</span>
                     </div>
                     {p.budget && (
@@ -682,55 +688,54 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Admin Widgets */}
-      {isAdmin && (
-        <div className="space-y-4 mb-6">
-          {isWidgetVisible("ki_vorschlaege") && kiVorschlaege.length > 0 && (
-            <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
-          )}
-          {isWidgetVisible("neue_kunden") && neueKunden.length > 0 && (
-            <DashboardNeueKunden kunden={neueKunden} />
-          )}
-          {isWidgetVisible("unzugeordnet") && unzugeordnet.length > 0 && (
-            <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
-          )}
-          {isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
-            <DashboardNeueHaendler haendler={neueHaendler} />
-          )}
-          {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
-            <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
-          )}
-        </div>
-      )}
+      {/* Confirm-Queue / Kuratierung — gemischte Widget-Sichtbarkeit:
+          KI-Vorschläge + Neue Kunden/SU: alle Besteller (Firmeninhaber kennen das Fach)
+          Nicht zugeordnet + Neue Händler: Admin-only (System-Pflege) */}
+      <div className="space-y-4 mb-6">
+        {isWidgetVisible("ki_vorschlaege") && kiVorschlaege.length > 0 && (
+          <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
+        )}
+        {isWidgetVisible("neue_kunden") && neueKunden.length > 0 && (
+          <DashboardNeueKunden kunden={neueKunden} />
+        )}
+        {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
+          <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
+        )}
+        {isAdmin && isWidgetVisible("unzugeordnet") && unzugeordnet.length > 0 && (
+          <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
+        )}
+        {isAdmin && isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
+          <DashboardNeueHaendler haendler={neueHaendler} />
+        )}
+      </div>
 
-      {/* Abo-Übersicht */}
+      {/* Abo-Übersicht — Kosten neutral (informativ), Hinweise semantic (Status-Farben bei echter Dringlichkeit) */}
       {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboJaehrlicheKosten && aboJaehrlicheKosten > 0)) && (
         <div className="mb-6">
           <CollapsibleCard
             title="Abo-Übersicht"
-            borderColor="#7c3aed"
             icon={
-              <svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
               </svg>
             }
             badge={aboHinweise && aboHinweise.some(h => h.dringend) ? (
-              <span className="font-mono-amount text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+              <span className="font-mono-amount text-[10px] font-bold text-error bg-error-bg px-2 py-0.5 rounded">
                 {aboHinweise.filter(h => h.dringend).length}
               </span>
             ) : undefined}
           >
             {aboJaehrlicheKosten && aboJaehrlicheKosten > 0 ? (
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <div className="p-2.5 bg-violet-50/50 rounded-lg border border-violet-100 text-center">
-                  <p className="text-[10px] text-violet-500 font-medium uppercase tracking-wider">Pro Monat</p>
-                  <p className="font-mono-amount text-lg font-bold text-violet-700 mt-0.5">
+                <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
+                  <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Monat</p>
+                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
                     {(aboJaehrlicheKosten / 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                   </p>
                 </div>
-                <div className="p-2.5 bg-violet-50/50 rounded-lg border border-violet-100 text-center">
-                  <p className="text-[10px] text-violet-500 font-medium uppercase tracking-wider">Pro Jahr</p>
-                  <p className="font-mono-amount text-lg font-bold text-violet-700 mt-0.5">
+                <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
+                  <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Jahr</p>
+                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
                     {aboJaehrlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                   </p>
                 </div>
@@ -739,16 +744,16 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
             {aboHinweise && aboHinweise.length > 0 ? (
               <div className="space-y-1.5">
                 {aboHinweise.map((h, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg ${h.dringend ? "bg-red-50 border border-red-100" : "bg-amber-50/50 border border-amber-100"}`}>
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-red-500" : "bg-amber-500"}`} />
+                  <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border ${h.dringend ? "bg-error-bg border-error-border" : "bg-warning-bg border-warning-border"}`}>
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-error" : "bg-warning"}`} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium text-foreground">{h.name}</span>
-                      <span className={`text-[11px] ml-2 ${h.dringend ? "text-red-600" : "text-amber-600"}`}>{h.detail}</span>
+                      <span className={`text-[11px] ml-2 ${h.dringend ? "text-error" : "text-warning"}`}>{h.detail}</span>
                     </div>
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      h.typ === "ueberfaellig" ? "bg-red-100 text-red-700" :
-                      h.typ === "kuendigung" ? "bg-amber-100 text-amber-700" :
-                      "bg-violet-100 text-violet-700"
+                      h.typ === "ueberfaellig" ? "bg-error-bg text-error" :
+                      h.typ === "kuendigung" ? "bg-warning-bg text-warning" :
+                      "bg-canvas text-foreground-muted"
                     }`}>
                       {{ ueberfaellig: "Überfällig", kuendigung: "Kündigung", vertragsende: "Vertragsende" }[h.typ]}
                     </span>
@@ -770,12 +775,12 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               title="Aktion erforderlich"
               borderColor="#dc2626"
               icon={
-                <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               }
               badge={aktionenNoetig.length > 0 ? (
-                <span className="font-mono-amount text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                <span className="font-mono-amount text-[10px] font-bold text-error bg-error-bg px-2 py-0.5 rounded">
                   {aktionenNoetig.length}
                 </span>
               ) : undefined}

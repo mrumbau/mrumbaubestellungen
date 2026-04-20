@@ -36,16 +36,16 @@ export function DashboardNeueKunden({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-info">
+    <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-            <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="w-8 h-8 rounded-lg bg-canvas flex items-center justify-center">
+            <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
           <h2 className="font-headline text-sm text-foreground tracking-tight">Neue Kunden erkannt</h2>
-          <span className="font-mono-amount text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+          <span className="font-mono-amount text-[10px] font-bold text-foreground-muted bg-canvas px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
@@ -57,7 +57,7 @@ export function DashboardNeueKunden({
 
       <div className="space-y-2">
         {items.map((k) => (
-          <div key={k.id} className="bg-blue-50/50 rounded-lg p-3">
+          <div key={k.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
@@ -66,7 +66,7 @@ export function DashboardNeueKunden({
                 {k.keywords && k.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {k.keywords.map((kw, i) => (
-                      <span key={i} className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                      <span key={i} className="text-[10px] px-1.5 py-0.5 bg-surface text-foreground-muted border border-line rounded">
                         {kw}
                       </span>
                     ))}
@@ -78,7 +78,7 @@ export function DashboardNeueKunden({
                 <button
                   onClick={() => bestaetigen(k.id)}
                   disabled={loading === k.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

@@ -123,16 +123,16 @@ export function DashboardUnzugeordnet({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-warning">
+    <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="w-8 h-8 rounded-lg bg-canvas flex items-center justify-center">
+            <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
           <h2 className="font-headline text-sm text-foreground tracking-tight">Nicht zugeordnet</h2>
-          <span className="font-mono-amount text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+          <span className="font-mono-amount text-[10px] font-bold text-foreground-muted bg-canvas px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
@@ -143,12 +143,12 @@ export function DashboardUnzugeordnet({
       </p>
 
       {fehler && (
-        <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mb-2">{fehler}</p>
+        <p className="text-xs text-error bg-error-bg rounded px-2 py-1 mb-2">{fehler}</p>
       )}
 
       <div className="space-y-2">
         {items.map((b) => (
-          <div key={b.id} className="bg-amber-50/50 rounded-lg p-3">
+          <div key={b.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-center justify-between">
               <Link
                 href={`/bestellungen/${b.id}`}
@@ -187,11 +187,11 @@ export function DashboardUnzugeordnet({
                 </div>
               ) : aktionId === b.id && aktionModus === "verwerfen" ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-red-600">Löschen?</span>
+                  <span className="text-[10px] text-error">Löschen?</span>
                   <button
                     onClick={() => verwerfen(b.id)}
                     disabled={loading}
-                    className="px-2 py-1 text-[10px] font-bold text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    className="px-2 py-1 text-[10px] font-bold text-white bg-error rounded hover:opacity-90 disabled:opacity-50 transition-colors"
                   >
                     Ja
                   </button>
@@ -204,13 +204,13 @@ export function DashboardUnzugeordnet({
                 </div>
               ) : aktionId === b.id && aktionModus === "blockieren" ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-red-600 max-w-[120px] truncate">
+                  <span className="text-[10px] text-error max-w-[120px] truncate">
                     {b.haendler_name} blockieren?
                   </span>
                   <button
                     onClick={() => blockieren(b.id, b.haendler_name || "")}
                     disabled={loading || !b.haendler_name}
-                    className="px-2 py-1 text-[10px] font-bold text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    className="px-2 py-1 text-[10px] font-bold text-white bg-error rounded hover:opacity-90 disabled:opacity-50 transition-colors"
                   >
                     Ja
                   </button>
@@ -225,7 +225,7 @@ export function DashboardUnzugeordnet({
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => openAktion(b.id, "zuordnen")}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-100 rounded-lg hover:bg-amber-200 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-brand bg-brand/5 rounded-lg hover:bg-brand/10 transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -234,7 +234,7 @@ export function DashboardUnzugeordnet({
                   </button>
                   <button
                     onClick={() => openAktion(b.id, "verwerfen")}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error bg-error-bg rounded-lg hover:opacity-80 transition-colors"
                     title="Einmalig verwerfen"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -244,7 +244,7 @@ export function DashboardUnzugeordnet({
                   </button>
                   <button
                     onClick={() => openAktion(b.id, "blockieren")}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-800 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error bg-error-bg border border-error-border rounded-lg hover:opacity-80 transition-colors"
                     title="Absender dauerhaft blockieren (Newsletter/Spam)"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

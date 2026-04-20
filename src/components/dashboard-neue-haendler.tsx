@@ -38,16 +38,16 @@ export function DashboardNeueHaendler({
   }
 
   return (
-    <div className="card p-5 border-l-[3px] border-l-warning">
+    <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="w-8 h-8 rounded-lg bg-canvas flex items-center justify-center">
+            <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
           <h2 className="font-headline text-sm text-foreground tracking-tight">Neue Händler erkannt</h2>
-          <span className="font-mono-amount text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+          <span className="font-mono-amount text-[10px] font-bold text-foreground-muted bg-canvas px-2 py-0.5 rounded">
             {items.length}
           </span>
         </div>
@@ -59,7 +59,7 @@ export function DashboardNeueHaendler({
 
       <div className="space-y-2">
         {items.map((h) => (
-          <div key={h.id} className="bg-amber-50/50 rounded-lg p-3">
+          <div key={h.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">
@@ -77,7 +77,7 @@ export function DashboardNeueHaendler({
                 <button
                   onClick={() => bestaetigen(h.id)}
                   disabled={loading === h.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
