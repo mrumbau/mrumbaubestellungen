@@ -1,39 +1,23 @@
-import { getBenutzerProfil } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { SystemClient } from "./system-client";
+import { SystemOverviewClient } from "./system-overview-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function SystemPage() {
-  const profil = await getBenutzerProfil();
-  if (!profil) redirect("/login");
-  if (profil.rolle !== "admin") redirect("/einstellungen");
-
+export default async function SystemOverviewPage() {
+  // Role-gate is handled in /einstellungen/system/layout.tsx
   const supabase = await createServerSupabaseClient();
 
-  const [
-    { data: firmaRaw },
-    { data: webhookLogs },
-    { data: benutzer },
-    { data: signale },
-    { data: testCheck },
-  ] = await Promise.all([
+  const [{ data: firmaRaw }, { data: besteller }, { data: signale }] = await Promise.all([
     supabase.from("firma_einstellungen").select("schluessel, wert"),
-    supabase
-      .from("webhook_logs")
-      .select("id, typ, status, bestellnummer, fehler_text, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
     supabase
       .from("benutzer_rollen")
       .select("id, email, name, kuerzel, rolle")
+      .eq("rolle", "besteller")
       .order("name"),
     supabase
       .from("bestellung_signale")
       .select("kuerzel, zeitstempel")
       .order("zeitstempel", { ascending: false }),
-    supabase.from("bestellungen").select("id").like("bestellnummer", "TEST-%").limit(1),
   ]);
 
   const firmaMap: Record<string, string> = {};
@@ -47,33 +31,16 @@ export default async function SystemPage() {
   }
 
   return (
-    <SystemClient
+    <SystemOverviewClient
       firma={{
         bueroAdresse: firmaMap["buero_adresse"] ?? "",
         konfidenzDirekt: firmaMap["konfidenz_direkt"] ?? "0.85",
         konfidenzVorschlag: firmaMap["konfidenz_vorschlag"] ?? "0.60",
       }}
-      initialWebhookLogs={
-        (webhookLogs as {
-          id: string;
-          typ: string;
-          status: string;
-          bestellnummer: string | null;
-          fehler_text: string | null;
-          created_at: string;
-        }[]) || []
-      }
-      benutzer={
-        (benutzer as {
-          id: string;
-          email: string;
-          name: string;
-          kuerzel: string;
-          rolle: string;
-        }[]) || []
+      besteller={
+        (besteller as { id: string; name: string; kuerzel: string }[]) || []
       }
       extensionSignale={signalMap}
-      hatTestdaten={!!testCheck && testCheck.length > 0}
     />
   );
 }

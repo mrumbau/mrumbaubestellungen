@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { IconAlertCircle } from "@/components/ui/icons";
+
 export default function EinstellungenError({
   reset,
 }: {
@@ -7,22 +10,19 @@ export default function EinstellungenError({
   reset: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24">
-      <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
-        <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-        </svg>
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-error-bg text-error mb-4 [&_svg]:h-6 [&_svg]:w-6">
+        <IconAlertCircle />
       </div>
-      <h2 className="font-headline text-lg text-[#1a1a1a] mb-1">Einstellungen konnten nicht geladen werden</h2>
-      <p className="text-sm text-[#9a9a9a] mb-6">
+      <h2 className="font-headline text-[17px] tracking-tight text-foreground mb-1">
+        Einstellungen konnten nicht geladen werden
+      </h2>
+      <p className="max-w-sm text-[13px] leading-relaxed text-foreground-muted mb-6">
         Beim Laden der Einstellungen ist ein Fehler aufgetreten. Bitte versuche es erneut.
       </p>
-      <button
-        onClick={reset}
-        className="px-5 py-2.5 text-sm font-medium bg-[#570006] text-white rounded-lg hover:bg-[#7a1a1f] transition-colors"
-      >
+      <Button onClick={reset} size="lg">
         Neu laden
-      </button>
+      </Button>
     </div>
   );
 }
