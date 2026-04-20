@@ -1,36 +1,36 @@
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-type AlertTone = "error" | "success" | "warning" | "info";
+/**
+ * Alert — persistent, non-dismissable feedback bound to a region.
+ * For transient feedback use <Toast> via useToast() instead.
+ */
+export const alertVariants = cva(
+  "flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed",
+  {
+    variants: {
+      tone: {
+        error: "bg-error-bg border-error-border",
+        success: "bg-success-bg border-success-border",
+        warning: "bg-warning-bg border-warning-border",
+        info: "bg-info-bg border-info-border",
+      },
+    },
+    defaultVariants: { tone: "info" },
+  },
+);
 
-const toneClasses: Record<AlertTone, { bg: string; border: string; icon: string; title: string }> = {
-  error: {
-    bg: "bg-error-bg",
-    border: "border-error-border",
-    icon: "text-error",
-    title: "text-error",
-  },
-  success: {
-    bg: "bg-success-bg",
-    border: "border-success-border",
-    icon: "text-success",
-    title: "text-success",
-  },
-  warning: {
-    bg: "bg-warning-bg",
-    border: "border-warning-border",
-    icon: "text-warning",
-    title: "text-warning",
-  },
-  info: {
-    bg: "bg-info-bg",
-    border: "border-info-border",
-    icon: "text-info",
-    title: "text-info",
-  },
+const iconToneClass: Record<NonNullable<VariantProps<typeof alertVariants>["tone"]>, string> = {
+  error: "text-error",
+  success: "text-success",
+  warning: "text-warning",
+  info: "text-info",
 };
 
-const icons: Record<AlertTone, React.ReactNode> = {
+const titleToneClass = iconToneClass;
+
+const icons: Record<NonNullable<VariantProps<typeof alertVariants>["tone"]>, React.ReactNode> = {
   error: (
     <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
       <path
@@ -69,6 +69,15 @@ const icons: Record<AlertTone, React.ReactNode> = {
   ),
 };
 
+export type AlertProps = VariantProps<typeof alertVariants> & {
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  icon?: React.ReactNode;
+  onDismiss?: () => void;
+  className?: string;
+  role?: "alert" | "status";
+};
+
 export function Alert({
   tone = "info",
   title,
@@ -77,34 +86,28 @@ export function Alert({
   onDismiss,
   className,
   role,
-}: {
-  tone?: AlertTone;
-  title?: React.ReactNode;
-  children?: React.ReactNode;
-  icon?: React.ReactNode;
-  onDismiss?: () => void;
-  className?: string;
-  role?: "alert" | "status";
-}) {
-  const t = toneClasses[tone];
-  const computedRole = role ?? (tone === "error" ? "alert" : "status");
+}: AlertProps) {
+  const resolvedTone = tone ?? "info";
+  const computedRole = role ?? (resolvedTone === "error" ? "alert" : "status");
 
   return (
     <div
       role={computedRole}
       aria-live={computedRole === "alert" ? "assertive" : "polite"}
-      className={cn(
-        "flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed",
-        t.bg,
-        t.border,
-        className,
-      )}
+      className={cn(alertVariants({ tone }), className)}
     >
-      <span aria-hidden="true" className={cn("mt-0.5 shrink-0", t.icon)}>
-        {customIcon ?? icons[tone]}
+      <span
+        aria-hidden="true"
+        className={cn("mt-0.5 shrink-0", iconToneClass[resolvedTone])}
+      >
+        {customIcon ?? icons[resolvedTone]}
       </span>
       <div className="flex-1 min-w-0">
-        {title && <div className={cn("font-semibold mb-0.5", t.title)}>{title}</div>}
+        {title && (
+          <div className={cn("font-semibold mb-0.5", titleToneClass[resolvedTone])}>
+            {title}
+          </div>
+        )}
         {children && <div className="text-foreground">{children}</div>}
       </div>
       {onDismiss && (

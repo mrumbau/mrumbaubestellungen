@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 import { Label } from "./label";
 
@@ -20,13 +21,20 @@ export const inputBase =
   "aria-[invalid=true]:border-error aria-[invalid=true]:focus:shadow-[0_0_0_3px_rgba(220,38,38,0.18)] " +
   "text-base md:text-sm";
 
-const sizeClasses = {
-  sm: "h-8 px-2.5 py-1",
-  md: "h-9 px-3 py-1.5",
-  lg: "h-11 px-3.5 py-2",
-} as const;
+export const inputSizeVariants = cva("", {
+  variants: {
+    inputSize: {
+      sm: "h-8 px-2.5 py-1",
+      md: "h-9 px-3 py-1.5",
+      lg: "h-11 px-3.5 py-2",
+    },
+  },
+  defaultVariants: {
+    inputSize: "md",
+  },
+});
 
-type InputSize = keyof typeof sizeClasses;
+type InputSizeVariant = VariantProps<typeof inputSizeVariants>;
 
 type FieldShellProps = {
   label?: React.ReactNode;
@@ -83,21 +91,21 @@ export function FieldShell({
   );
 }
 
-export type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> & {
-  label?: React.ReactNode;
-  hint?: React.ReactNode;
-  error?: React.ReactNode;
-  inputSize?: InputSize;
-  wrapperClassName?: string;
-  iconLeft?: React.ReactNode;
-  iconRight?: React.ReactNode;
-};
+export type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> &
+  InputSizeVariant & {
+    label?: React.ReactNode;
+    hint?: React.ReactNode;
+    error?: React.ReactNode;
+    wrapperClassName?: string;
+    iconLeft?: React.ReactNode;
+    iconRight?: React.ReactNode;
+  };
 
 export function Input({
   label,
   hint,
   error,
-  inputSize = "md",
+  inputSize,
   required,
   className,
   wrapperClassName,
@@ -132,7 +140,7 @@ export function Input({
             required={required}
             className={cn(
               inputBase,
-              sizeClasses[inputSize],
+              inputSizeVariants({ inputSize }),
               iconLeft ? "pl-8" : null,
               iconRight ? "pr-8" : null,
               className,

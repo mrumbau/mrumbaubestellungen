@@ -1,138 +1,199 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { EinstellungenClient } from "@/components/einstellungen-client";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PasswortAendern } from "@/components/passwort-aendern";
+import {
+  IconBuilding,
+  IconTool,
+  IconFolderOpen,
+  IconRepeat,
+  IconShield,
+  IconSettings,
+  IconArrowRight,
+} from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
 
-export default async function EinstellungenPage() {
+const ROLLEN_LABEL: Record<string, string> = {
+  admin: "Administrator",
+  besteller: "Besteller",
+  buchhaltung: "Buchhaltung",
+};
+
+export default async function EinstellungenIndexPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 
-  // Buchhaltung: nur Passwort ändern anzeigen
-  if (profil.rolle === "buchhaltung") {
-    return (
-      <div className="p-6 md:p-10 max-w-2xl">
-        <h1 className="text-2xl font-headline font-bold text-[#1a1a1a] mb-8">Einstellungen</h1>
-        <PasswortAendern />
-      </div>
-    );
-  }
+  const istAdmin = profil.rolle === "admin";
+  const istBuchhaltung = profil.rolle === "buchhaltung";
 
-  const supabase = await createServerSupabaseClient();
-
-  // Besteller: Projekte, Subunternehmer (read-only) + Passwort
-  if (profil.rolle === "besteller") {
-    const [{ data: projekte }, { data: subunternehmer }] = await Promise.all([
-      supabase
-        .from("projekte")
-        .select("id, name, farbe, budget, status, beschreibung, kunde, adresse, adresse_keywords")
-        .order("name"),
-      supabase
-        .from("subunternehmer")
-        .select("id, firma, ansprechpartner, gewerk, telefon, email, email_absender, steuer_nr, iban, notizen, confirmed_at, created_at")
-        .order("firma"),
+  // Load counts only for admins — besteller landing stays minimal.
+  let counts: Record<string, number> = {};
+  if (istAdmin) {
+    const supabase = await createServerSupabaseClient();
+    const [h, su, p, a, bl, u] = await Promise.all([
+      supabase.from("haendler").select("id", { count: "exact", head: true }),
+      supabase.from("subunternehmer").select("id", { count: "exact", head: true }),
+      supabase.from("projekte").select("id", { count: "exact", head: true }),
+      supabase.from("abo_anbieter").select("id", { count: "exact", head: true }),
+      supabase.from("email_blacklist").select("muster", { count: "exact", head: true }),
+      supabase.from("benutzer_rollen").select("id", { count: "exact", head: true }),
     ]);
-
-    return (
-      <EinstellungenClient
-        haendler={[]}
-        benutzer={[]}
-        hatTestdaten={false}
-        haendlerStats={{}}
-        extensionSignale={{}}
-        webhookLogs={[]}
-        projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
-        subunternehmer={(subunternehmer || []) as { id: string; firma: string; ansprechpartner: string | null; gewerk: string | null; telefon: string | null; email: string | null; email_absender: string[]; steuer_nr: string | null; iban: string | null; notizen: string | null; confirmed_at: string | null; created_at: string }[]}
-        rolle="besteller"
-      />
-    );
-  }
-
-  // Admin: alles laden
-  const [
-    { data: haendler },
-    { data: benutzer },
-    { data: testCheck },
-    { data: haendlerStats },
-    { data: extensionSignale },
-    { data: webhookLogs },
-    { data: projekte },
-    { data: firmaEinstellungen },
-    { data: subunternehmer },
-    { data: aboAnbieter },
-    { data: emailBlacklist },
-  ] = await Promise.all([
-    supabase.from("haendler").select("id, name, domain, email_absender, url_muster, confirmed_at, created_at").order("name", { ascending: true }),
-    supabase.from("benutzer_rollen").select("id, email, name, kuerzel, rolle").order("name", { ascending: true }),
-    supabase.from("bestellungen").select("id").like("bestellnummer", "TEST-%").limit(1),
-    supabase.from("bestellungen").select("haendler_name, status, created_at"),
-    supabase
-      .from("bestellung_signale")
-      .select("kuerzel, zeitstempel")
-      .order("zeitstempel", { ascending: false }),
-    supabase
-      .from("webhook_logs")
-      .select("id, typ, status, bestellnummer, fehler_text, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("projekte")
-      .select("id, name, farbe, budget, status, beschreibung, kunde, adresse, adresse_keywords")
-      .order("name"),
-    supabase
-      .from("firma_einstellungen")
-      .select("schluessel, wert"),
-    supabase
-      .from("subunternehmer")
-      .select("id, firma, ansprechpartner, gewerk, telefon, email, email_absender, steuer_nr, iban, notizen, confirmed_at, created_at")
-      .order("firma"),
-    supabase
-      .from("abo_anbieter")
-      .select("id, name, domain, email_absender, intervall, erwarteter_betrag, toleranz, naechste_rechnung, vertragsbeginn, vertragsende, kuendigungsfrist_tage, notizen, letzter_betrag, created_at")
-      .order("name"),
-    supabase
-      .from("email_blacklist")
-      .select("muster, typ, grund, erstellt_am")
-      .order("erstellt_am", { ascending: false }),
-  ]);
-
-  const statsMap: Record<string, { gesamt: number; letzte: string | null; abweichungen: number }> = {};
-  for (const b of haendlerStats || []) {
-    if (!b.haendler_name) continue;
-    if (!statsMap[b.haendler_name]) {
-      statsMap[b.haendler_name] = { gesamt: 0, letzte: null, abweichungen: 0 };
-    }
-    statsMap[b.haendler_name].gesamt++;
-    if (b.status === "abweichung") statsMap[b.haendler_name].abweichungen++;
-    if (!statsMap[b.haendler_name].letzte || b.created_at > statsMap[b.haendler_name].letzte!) {
-      statsMap[b.haendler_name].letzte = b.created_at;
-    }
-  }
-
-  const signalMap: Record<string, string> = {};
-  for (const s of extensionSignale || []) {
-    if (!signalMap[s.kuerzel]) {
-      signalMap[s.kuerzel] = s.zeitstempel;
-    }
+    counts = {
+      haendler: h.count ?? 0,
+      subunternehmer: su.count ?? 0,
+      projekte: p.count ?? 0,
+      abo: a.count ?? 0,
+      blacklist: bl.count ?? 0,
+      benutzer: u.count ?? 0,
+    };
   }
 
   return (
-    <EinstellungenClient
-      haendler={haendler || []}
-      benutzer={benutzer || []}
-      hatTestdaten={!!testCheck && testCheck.length > 0}
-      haendlerStats={statsMap}
-      extensionSignale={signalMap}
-      webhookLogs={(webhookLogs || []) as { id: string; typ: string; status: string; bestellnummer: string | null; fehler_text: string | null; created_at: string }[]}
-      projekte={(projekte || []) as { id: string; name: string; farbe: string; budget: number | null; status: string; beschreibung: string | null; kunde: string | null; adresse: string | null; adresse_keywords: string[] | null }[]}
-      subunternehmer={(subunternehmer || []) as { id: string; firma: string; ansprechpartner: string | null; gewerk: string | null; telefon: string | null; email: string | null; email_absender: string[]; steuer_nr: string | null; iban: string | null; notizen: string | null; confirmed_at: string | null; created_at: string }[]}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      aboAnbieter={(aboAnbieter || []) as any[]}
-      firmaEinstellungen={(firmaEinstellungen || []) as { schluessel: string; wert: string }[]}
-      emailBlacklist={(emailBlacklist || []) as { muster: string; typ: string; grund: string | null; erstellt_am: string }[]}
-      rolle="admin"
-    />
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="Einstellungen"
+        title={`Hallo, ${profil.name.split(" ")[0]}`}
+        description={
+          istBuchhaltung
+            ? "Hier änderst du dein Passwort. Bestellwesen-Daten sind für deine Rolle ausgeblendet."
+            : "Verwalte Stammdaten, System-Status und dein Konto. Die Menü-Punkte oben führen zu den einzelnen Bereichen."
+        }
+        meta={
+          <>
+            <Badge tone="neutral" size="md">
+              {profil.kuerzel}
+            </Badge>
+            <span className="text-[12px] text-foreground-subtle">
+              {ROLLEN_LABEL[profil.rolle] ?? profil.rolle}
+            </span>
+            <span className="text-[12px] text-foreground-subtle">·</span>
+            <span className="text-[12px] text-foreground-subtle">{profil.email}</span>
+          </>
+        }
+      />
+
+      {istAdmin && (
+        <section aria-labelledby="bereiche-heading" className="flex flex-col gap-3">
+          <h2
+            id="bereiche-heading"
+            className="font-headline text-[13px] uppercase tracking-[0.14em] text-foreground-subtle"
+          >
+            Bereiche
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <NavCard
+              href="/einstellungen/haendler"
+              icon={<IconBuilding />}
+              title="Händler"
+              count={counts.haendler}
+              description="Webshop-Muster, E-Mail-Absender, Statistiken"
+            />
+            <NavCard
+              href="/einstellungen/subunternehmer"
+              icon={<IconTool />}
+              title="Subunternehmer"
+              count={counts.subunternehmer}
+              description="Gewerke, Ansprechpartner, Stammdaten"
+            />
+            <NavCard
+              href="/einstellungen/projekte"
+              icon={<IconFolderOpen />}
+              title="Projekte"
+              count={counts.projekte}
+              description="Farbe, Budget, Adresse, Status"
+            />
+            <NavCard
+              href="/einstellungen/abo-anbieter"
+              icon={<IconRepeat />}
+              title="Abo-Anbieter"
+              count={counts.abo}
+              description="Wiederkehrende Verträge, Fristen, Toleranz"
+            />
+            <NavCard
+              href="/einstellungen/blacklist"
+              icon={<IconShield />}
+              title="E-Mail Blacklist"
+              count={counts.blacklist}
+              description="Ignorierte Absender und Domains"
+            />
+            <NavCard
+              href="/einstellungen/system"
+              icon={<IconSettings />}
+              title="System"
+              subtitle={`${counts.benutzer} Benutzer`}
+              description="Health, KI-Erkennung, Webhooks, Extension, Testdaten"
+            />
+          </div>
+        </section>
+      )}
+
+      <section aria-labelledby="konto-heading" className="max-w-md">
+        <h2
+          id="konto-heading"
+          className="font-headline text-[13px] uppercase tracking-[0.14em] text-foreground-subtle mb-3"
+        >
+          Konto
+        </h2>
+        <PasswortAendern />
+      </section>
+    </div>
+  );
+}
+
+function NavCard({
+  href,
+  icon,
+  title,
+  count,
+  subtitle,
+  description,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  count?: number;
+  subtitle?: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group focus-visible:outline-none rounded-lg focus-visible:shadow-[var(--shadow-focus-ring)]"
+    >
+      <Card
+        interactive
+        padding="md"
+        className="h-full flex flex-col justify-between group-hover:border-line-strong"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-canvas border border-line-subtle text-foreground-muted group-hover:text-brand group-hover:border-line-strong transition-colors [&_svg]:h-4 [&_svg]:w-4">
+              {icon}
+            </span>
+            <div className="flex flex-col">
+              <span className="font-headline text-[14px] tracking-tight text-foreground">
+                {title}
+              </span>
+              {(count !== undefined || subtitle) && (
+                <span className="text-[11.5px] text-foreground-subtle font-mono-amount">
+                  {count !== undefined ? `${count} Einträge` : subtitle}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className="shrink-0 text-foreground-subtle group-hover:text-brand transition-colors opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 duration-150">
+            <IconArrowRight className="h-4 w-4" />
+          </span>
+        </div>
+        <p className="mt-2.5 text-[12.5px] leading-relaxed text-foreground-muted">
+          {description}
+        </p>
+      </Card>
+    </Link>
   );
 }

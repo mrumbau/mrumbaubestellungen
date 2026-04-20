@@ -1,53 +1,40 @@
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-type BadgeTone =
-  | "neutral"
-  | "brand"
-  | "info"
-  | "success"
-  | "warning"
-  | "error"
-  | "muted";
+export const badgeVariants = cva(
+  "inline-flex items-center gap-1 rounded font-semibold uppercase tracking-wide whitespace-nowrap",
+  {
+    variants: {
+      tone: {
+        neutral: "bg-[#eef1f5] text-[#3d4350]",
+        brand: "bg-[rgba(87,0,6,0.08)] text-[var(--mr-red)]",
+        info: "bg-info-bg text-info",
+        success: "bg-success-bg text-success",
+        warning: "bg-warning-bg text-warning",
+        error: "bg-error-bg text-error",
+        muted: "bg-canvas text-foreground-muted border border-line",
+      },
+      size: {
+        sm: "text-[10px] px-1.5 py-0.5 h-4",
+        md: "text-[11px] px-2 py-0.5 h-5",
+      },
+    },
+    defaultVariants: {
+      tone: "neutral",
+      size: "md",
+    },
+  },
+);
 
-const toneClasses: Record<BadgeTone, string> = {
-  neutral: "bg-[#eef1f5] text-[#3d4350]",
-  brand: "bg-[rgba(87,0,6,0.08)] text-[var(--mr-red)]",
-  info: "bg-info-bg text-info",
-  success: "bg-success-bg text-success",
-  warning: "bg-warning-bg text-warning",
-  error: "bg-error-bg text-error",
-  muted: "bg-canvas text-foreground-muted border border-line",
-};
+export type BadgeProps = VariantProps<typeof badgeVariants> &
+  Omit<React.HTMLAttributes<HTMLSpanElement>, "children"> & {
+    children?: React.ReactNode;
+  };
 
-type BadgeSize = "sm" | "md";
-const sizeClasses: Record<BadgeSize, string> = {
-  sm: "text-[10px] px-1.5 py-0.5 h-4",
-  md: "text-[11px] px-2 py-0.5 h-5",
-};
-
-export function Badge({
-  tone = "neutral",
-  size = "md",
-  className,
-  children,
-  ...rest
-}: {
-  tone?: BadgeTone;
-  size?: BadgeSize;
-  className?: string;
-  children?: React.ReactNode;
-} & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">) {
+export function Badge({ tone, size, className, children, ...rest }: BadgeProps) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded font-semibold uppercase tracking-wide whitespace-nowrap",
-        toneClasses[tone],
-        sizeClasses[size],
-        className,
-      )}
-      {...rest}
-    >
+    <span className={cn(badgeVariants({ tone, size }), className)} {...rest}>
       {children}
     </span>
   );
@@ -104,14 +91,18 @@ export function StatusBadge({
   return (
     <span
       className={cn("status-tag", className)}
-      style={{
-        color: meta.color,
-        backgroundColor: meta.bg,
-      }}
+      style={{ color: meta.color, backgroundColor: meta.bg }}
     >
       <span
         aria-hidden="true"
-        style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, backgroundColor: meta.color }}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 3,
+          backgroundColor: meta.color,
+        }}
       />
       {label ?? meta.label}
     </span>

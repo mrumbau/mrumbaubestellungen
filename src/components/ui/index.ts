@@ -1,7 +1,7 @@
-export { Button } from "./button";
-export type { ButtonProps } from "./button";
+export { Button, buttonVariants } from "./button";
+export type { ButtonProps, ButtonVariants } from "./button";
 
-export { Input, FieldShell, inputBase } from "./input";
+export { Input, FieldShell, inputBase, inputSizeVariants } from "./input";
 export type { InputProps } from "./input";
 
 export { Textarea } from "./textarea";
@@ -12,9 +12,11 @@ export type { SelectProps } from "./select";
 
 export { Label } from "./label";
 
-export { Alert } from "./alert";
+export { Alert, alertVariants } from "./alert";
+export type { AlertProps } from "./alert";
 
-export { Badge, StatusBadge } from "./badge";
+export { Badge, badgeVariants, StatusBadge } from "./badge";
+export type { BadgeProps } from "./badge";
 
 export { EmptyState } from "./empty-state";
 
@@ -23,3 +25,14 @@ export { Spinner } from "./spinner";
 export { Modal } from "./modal";
 
 export { ToastProvider, useToast } from "./toast";
+
+export { Card, SectionCard, cardVariants } from "./card";
+export type { CardProps } from "./card";
+
+export { PageHeader } from "./page-header";
+export type { Breadcrumb } from "./page-header";
+
+export { SubNav } from "./sub-nav";
+export type { SubNavItem } from "./sub-nav";
+
+export * as Icons from "./icons";
