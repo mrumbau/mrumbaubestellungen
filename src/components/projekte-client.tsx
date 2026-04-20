@@ -1,10 +1,24 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatBetrag, formatDatum } from "@/lib/formatters";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  DataTable,
+  DensityToggle,
+  useTableDensity,
+  SavedViewsMenu,
+  useSavedViews,
+  type DataTableColumn,
+  type SortState,
+  type Density,
+} from "@/components/ui";
+import { exportToCsv, csvFilename } from "@/lib/export-csv";
+import { cn } from "@/lib/cn";
+
+type ViewMode = "grid" | "table";
 
 interface Projekt {
   id: string;
@@ -185,6 +199,222 @@ export function ProjekteClient({
   const aktive = projekte.filter((p) => p.status !== "archiviert" && p.status !== "abgeschlossen");
   const archiviert = projekte.filter((p) => p.status === "archiviert" || p.status === "abgeschlossen");
 
+  // View state (P3 Stop 3)
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [density, setDensity] = useTableDensity("projekte.density");
+  const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
+
+  type ProjekteViewConfig = {
+    viewMode: ViewMode;
+    density: Density;
+    sort: SortState;
+  };
+  const savedViews = useSavedViews<ProjekteViewConfig>("projekte");
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const didApplyDefault = useRef(false);
+  useEffect(() => {
+    if (didApplyDefault.current) return;
+    if (savedViews.defaultView) {
+      const d = savedViews.defaultView;
+      setViewMode(d.config.viewMode);
+      setDensity(d.config.density);
+      setSort(d.config.sort);
+      setActiveViewId(d.id);
+    }
+    didApplyDefault.current = true;
+  }, [savedViews.defaultView, setDensity]);
+
+  const currentConfig: ProjekteViewConfig = { viewMode, density, sort };
+  const activeCfg =
+    activeViewId && savedViews.views.find((v) => v.id === activeViewId)?.config;
+  const currentConfigIsDirty = activeCfg
+    ? JSON.stringify(activeCfg) !== JSON.stringify(currentConfig)
+    : false;
+
+  function applyView(view: { id: string; config: ProjekteViewConfig }) {
+    setViewMode(view.config.viewMode);
+    setDensity(view.config.density);
+    setSort(view.config.sort);
+    setActiveViewId(view.id);
+  }
+
+  // Sorted + combined list for table view (aktive first, archiviert last, with dim)
+  const tableRows = useMemo(() => {
+    if (!sort) return aktive;
+    const arr = [...aktive];
+    const dir = sort.direction === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      let av: string | number = "";
+      let bv: string | number = "";
+      switch (sort.key) {
+        case "name":
+          av = a.name.toLowerCase();
+          bv = b.name.toLowerCase();
+          break;
+        case "kunde":
+          av = (a.kunde || "").toLowerCase();
+          bv = (b.kunde || "").toLowerCase();
+          break;
+        case "status":
+          av = a.status;
+          bv = b.status;
+          break;
+        case "budget":
+          av = a.budget ?? 0;
+          bv = b.budget ?? 0;
+          break;
+        case "volumen":
+          av = stats[a.id]?.volumen ?? 0;
+          bv = stats[b.id]?.volumen ?? 0;
+          break;
+        case "gesamt":
+          av = stats[a.id]?.gesamt ?? 0;
+          bv = stats[b.id]?.gesamt ?? 0;
+          break;
+        case "offen":
+          av = stats[a.id]?.offen ?? 0;
+          bv = stats[b.id]?.offen ?? 0;
+          break;
+        case "created_at":
+          av = a.created_at;
+          bv = b.created_at;
+          break;
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }, [aktive, sort, stats]);
+
+  function handleCsvExport() {
+    exportToCsv(csvFilename("projekte"), tableRows, [
+      { header: "Name", value: (p) => p.name },
+      { header: "Status", value: (p) => p.status },
+      { header: "Kunde", value: (p) => p.kunde ?? "" },
+      { header: "Beschreibung", value: (p) => p.beschreibung ?? "" },
+      { header: "Budget", value: (p) => p.budget ?? 0, numeric: true },
+      { header: "Bestellungen gesamt", value: (p) => stats[p.id]?.gesamt ?? 0 },
+      { header: "Bestellungen offen", value: (p) => stats[p.id]?.offen ?? 0 },
+      { header: "Volumen", value: (p) => stats[p.id]?.volumen ?? 0, numeric: true },
+      { header: "Angelegt", value: (p) => p.created_at.slice(0, 10) },
+    ]);
+  }
+
+  const projektColumns: DataTableColumn<Projekt>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      render: (p) => (
+        <Link
+          href={`/bestellungen?projekt=${p.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-2 min-w-0 hover:text-brand transition-colors"
+        >
+          <span
+            aria-hidden="true"
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ background: p.farbe }}
+          />
+          <span className="font-medium text-foreground truncate">{p.name}</span>
+        </Link>
+      ),
+    },
+    {
+      key: "kunde",
+      label: "Kunde",
+      sortable: true,
+      hideBelow: "md",
+      className: "text-foreground-muted truncate max-w-[160px]",
+      render: (p) => p.kunde ?? "–",
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: true,
+      render: (p) => {
+        const cfg = getStatusCfg(p.status);
+        return (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide border",
+              cfg.bg,
+              cfg.text,
+              cfg.border,
+            )}
+          >
+            <StatusIcon type={cfg.icon} className="w-2.5 h-2.5" />
+            {cfg.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "gesamt",
+      label: "Bestellungen",
+      sortable: true,
+      align: "right",
+      hideBelow: "sm",
+      className: "font-mono-amount text-foreground-muted",
+      render: (p) => {
+        const s = stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 };
+        return (
+          <span>
+            {s.gesamt}
+            {s.offen > 0 && (
+              <span className="ml-1 text-[11px] text-warning">
+                · {s.offen} offen
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: "volumen",
+      label: "Volumen",
+      sortable: true,
+      align: "right",
+      className: "font-mono-amount font-semibold text-foreground",
+      render: (p) => formatBetrag(stats[p.id]?.volumen ?? 0),
+    },
+    {
+      key: "budget",
+      label: "Budget",
+      sortable: true,
+      align: "right",
+      hideBelow: "lg",
+      className: "font-mono-amount text-foreground-muted",
+      render: (p) => {
+        if (!p.budget) return "–";
+        const volumen = stats[p.id]?.volumen ?? 0;
+        const prozent = p.budget > 0 ? (volumen / p.budget) * 100 : 0;
+        return (
+          <div className="inline-flex flex-col items-end gap-0.5">
+            <span>{formatBetrag(p.budget)}</span>
+            <span
+              className={cn(
+                "text-[10px]",
+                prozent >= 100 ? "text-error" : prozent >= 80 ? "text-warning" : "text-foreground-subtle",
+              )}
+            >
+              {prozent.toFixed(0)}%
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "created_at",
+      label: "Angelegt",
+      sortable: true,
+      hideBelow: "xl",
+      className: "text-foreground-subtle whitespace-nowrap",
+      render: (p) => formatDatum(p.created_at),
+    },
+  ];
+
   const resetForm = useCallback(() => {
     setShowForm(false);
     setEditId(null);
@@ -311,24 +541,115 @@ export function ProjekteClient({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
         <div>
           <h1 className="font-headline text-2xl text-foreground tracking-tight">Projekte</h1>
           <p className="text-foreground-subtle text-sm mt-1">
             {aktive.length} aktiv{archiviert.length > 0 ? ` · ${archiviert.length} archiviert` : ""}
           </p>
         </div>
-        {istAdmin && (
-          <button
-            onClick={() => { resetForm(); setShowForm(true); }}
-            className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View-Mode Toggle */}
+          <div
+            role="radiogroup"
+            aria-label="Ansicht"
+            className="inline-flex bg-input border border-line rounded-md p-0.5"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            <button
+              type="button"
+              role="radio"
+              aria-checked={viewMode === "grid"}
+              onClick={() => setViewMode("grid")}
+              title="Karten-Ansicht"
+              className={cn(
+                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+                viewMode === "grid"
+                  ? "bg-surface text-foreground shadow-card"
+                  : "text-foreground-subtle hover:text-foreground-muted",
+              )}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-3.5 w-3.5">
+                <rect x="2" y="2" width="5" height="5" rx="1" />
+                <rect x="9" y="2" width="5" height="5" rx="1" />
+                <rect x="2" y="9" width="5" height="5" rx="1" />
+                <rect x="9" y="9" width="5" height="5" rx="1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={viewMode === "table"}
+              onClick={() => setViewMode("table")}
+              title="Tabellen-Ansicht"
+              className={cn(
+                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+                viewMode === "table"
+                  ? "bg-surface text-foreground shadow-card"
+                  : "text-foreground-subtle hover:text-foreground-muted",
+              )}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" className="h-3.5 w-3.5">
+                <path d="M2 4h12M2 8h12M2 12h12" />
+              </svg>
+            </button>
+          </div>
+
+          {viewMode === "table" && (
+            <DensityToggle density={density} onChange={setDensity} />
+          )}
+
+          <SavedViewsMenu<ProjekteViewConfig>
+            views={savedViews.views}
+            activeViewId={activeViewId}
+            currentConfigIsDirty={currentConfigIsDirty}
+            onApply={(view) => applyView(view)}
+            onSave={(name) => {
+              const id = savedViews.saveView(name, currentConfig, false);
+              setActiveViewId(id);
+            }}
+            onDelete={(id) => {
+              savedViews.deleteView(id);
+              if (activeViewId === id) setActiveViewId(null);
+            }}
+            onToggleDefault={(id) => savedViews.toggleDefault(id)}
+          />
+
+          <button
+            type="button"
+            onClick={handleCsvExport}
+            disabled={tableRows.length === 0}
+            title="Projekte als CSV exportieren"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5 text-foreground-subtle"
+              aria-hidden="true"
+            >
+              <path d="M3 11v1.5a1 1 0 001 1h8a1 1 0 001-1V11M5.5 7.5L8 10l2.5-2.5M8 10V2" />
             </svg>
-            Neues Projekt
+            CSV
           </button>
-        )}
+
+          {istAdmin && (
+            <button
+              onClick={() => { resetForm(); setShowForm(true); }}
+              className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Neues Projekt
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error banner */}
@@ -467,6 +788,20 @@ export function ProjekteClient({
             </button>
           )}
         </div>
+      ) : viewMode === "table" ? (
+        <DataTable<Projekt>
+          columns={projektColumns}
+          data={tableRows}
+          getRowId={(p) => p.id}
+          ariaLabel="Projekt-Liste"
+          density={density}
+          sort={sort}
+          onSortChange={setSort}
+          onRowClick={(p) => router.push(`/bestellungen?projekt=${p.id}`)}
+          emptyState={
+            <p className="text-foreground-subtle text-[13px]">Keine Projekte.</p>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {aktive.map((p) => {

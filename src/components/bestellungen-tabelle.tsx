@@ -6,6 +6,27 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  DataTable,
+  DensityToggle,
+  useTableDensity,
+  BulkToolbar,
+  Button,
+  Badge,
+  SavedViewsMenu,
+  useSavedViews,
+  type DataTableColumn,
+  type SortState,
+  type Density,
+} from "@/components/ui";
+import {
+  IconSearch,
+  IconX,
+  IconCheck,
+  IconTrash,
+  IconAlertCircle,
+} from "@/components/ui/icons";
+import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Bestellung {
@@ -37,31 +58,6 @@ interface ProjektOption {
   farbe: string;
 }
 
-function DokumentIcon({ vorhanden, onClick, onMouseEnter }: { vorhanden: boolean; onClick?: (e: React.MouseEvent) => void; onMouseEnter?: () => void }) {
-  if (vorhanden && onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        onMouseEnter={onMouseEnter}
-        className="p-1 -m-1 rounded-md transition-all hover:bg-green-50 hover:scale-125 cursor-pointer group/dok"
-        title="Klicken für Vorschau"
-      >
-        <svg className="w-4 h-4 text-green-600 group-hover/dok:text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </button>
-    );
-  }
-  return vorhanden ? (
-    <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  ) : (
-    <div className="w-4 h-4 rounded-full border-2 border-line-strong" />
-  );
-}
-
 type ArtFilter = "" | "material" | "subunternehmer" | "abo";
 
 const STATUS_OPTIONS = [
@@ -73,6 +69,35 @@ const STATUS_OPTIONS = [
   { value: "freigegeben", label: "Freigegeben" },
 ];
 
+function DokumentIcon({
+  vorhanden,
+  onClick,
+  onMouseEnter,
+}: {
+  vorhanden: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+  onMouseEnter?: () => void;
+}) {
+  if (vorhanden && onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        className="p-1 -m-1 rounded-md transition-all hover:bg-green-50 hover:scale-125 cursor-pointer group/dok"
+        title="Klicken für Vorschau"
+      >
+        <IconCheck className="w-4 h-4 text-green-600 group-hover/dok:text-green-700" />
+      </button>
+    );
+  }
+  return vorhanden ? (
+    <IconCheck className="w-4 h-4 text-green-600" />
+  ) : (
+    <div className="w-4 h-4 rounded-full border-2 border-line-strong" aria-hidden="true" />
+  );
+}
+
 export function BestellungenTabelle({
   bestellungen,
   currentPage,
@@ -81,7 +106,6 @@ export function BestellungenTabelle({
   projekte = [],
   aktiverProjektFilter,
   aktiverProjektName,
-  isAdmin = false,
 }: {
   bestellungen: Bestellung[];
   currentPage: number;
@@ -92,13 +116,80 @@ export function BestellungenTabelle({
   aktiverProjektName?: string | null;
   isAdmin?: boolean;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Filters
   const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState("offen");
   const [artFilter, setArtFilter] = useState<ArtFilter>("");
   const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [selectionMode, setSelectionMode] = useState(false);
+  useEffect(() => {
+    setProjektFilter(aktiverProjektFilter || "");
+  }, [aktiverProjektFilter]);
+
+  // Table state
+  const [density, setDensity] = useTableDensity("bestellungen.density");
+  const [sort, setSort] = useState<SortState>({ key: "created_at", direction: "desc" });
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Saved Views — shape of what's persisted per view
+  type ViewConfig = {
+    suche: string;
+    statusFilter: string;
+    artFilter: ArtFilter;
+    projektFilter: string;
+    density: Density;
+    sort: SortState;
+  };
+  const savedViews = useSavedViews<ViewConfig>("bestellungen");
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+
+  // Auto-apply default view on first mount (once)
+  const didApplyDefault = useRef(false);
+  useEffect(() => {
+    if (didApplyDefault.current) return;
+    if (savedViews.defaultView) {
+      const d = savedViews.defaultView;
+      setSuche(d.config.suche);
+      setStatusFilter(d.config.statusFilter);
+      setArtFilter(d.config.artFilter);
+      setProjektFilter(d.config.projektFilter);
+      setDensity(d.config.density);
+      setSort(d.config.sort);
+      setActiveViewId(d.id);
+    }
+    didApplyDefault.current = true;
+    // Intentionally only runs once (on first render after views load)
+  }, [savedViews.defaultView, setDensity]);
+
+  const currentConfig: ViewConfig = {
+    suche,
+    statusFilter,
+    artFilter,
+    projektFilter,
+    density,
+    sort,
+  };
+
+  function applyView(view: { id: string; config: ViewConfig }) {
+    setSuche(view.config.suche);
+    setStatusFilter(view.config.statusFilter);
+    setArtFilter(view.config.artFilter);
+    setProjektFilter(view.config.projektFilter);
+    setDensity(view.config.density);
+    setSort(view.config.sort);
+    setActiveViewId(view.id);
+  }
+
+  const activeViewConfig =
+    activeViewId && savedViews.views.find((v) => v.id === activeViewId)?.config;
+  const currentConfigIsDirty = activeViewConfig
+    ? JSON.stringify(activeViewConfig) !== JSON.stringify(currentConfig)
+    : false;
+
+  // Async UI state
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [freigabeLoadingId, setFreigabeLoadingId] = useState<string | null>(null);
@@ -107,29 +198,85 @@ export function BestellungenTabelle({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const previewCache = useRef<Map<string, string>>(new Map());
-  useEffect(() => { setProjektFilter(aktiverProjektFilter || ""); }, [aktiverProjektFilter]);
-  const router = useRouter();
-  const searchParams = useSearchParams();
+
+  // Search input focus (/ shortcut)
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Clear selection when filters change
-  useEffect(() => { setSelected(new Set()); setSelectionMode(false); }, [suche, statusFilter, artFilter, projektFilter]);
+  useEffect(() => {
+    setSelected(new Set());
+  }, [suche, statusFilter, artFilter, projektFilter]);
 
-  const gefiltert = useMemo(() => bestellungen.filter((b) => {
-    const suchMatch =
-      !suche ||
-      b.bestellnummer?.toLowerCase().includes(suche.toLowerCase()) ||
-      b.haendler_name?.toLowerCase().includes(suche.toLowerCase()) ||
-      b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
+  const gefiltert = useMemo(
+    () =>
+      bestellungen.filter((b) => {
+        const suchMatch =
+          !suche ||
+          b.bestellnummer?.toLowerCase().includes(suche.toLowerCase()) ||
+          b.haendler_name?.toLowerCase().includes(suche.toLowerCase()) ||
+          b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
 
-    const statusMatch = !statusFilter
-      || (statusFilter === "offen" ? b.status !== "freigegeben" : b.status === statusFilter);
-    const artMatch = !artFilter || (b.bestellungsart || "material") === artFilter;
-    const projektMatch = !projektFilter || b.projekt_id === projektFilter;
+        const statusMatch =
+          !statusFilter ||
+          (statusFilter === "offen" ? b.status !== "freigegeben" : b.status === statusFilter);
+        const artMatch = !artFilter || (b.bestellungsart || "material") === artFilter;
+        const projektMatch = !projektFilter || b.projekt_id === projektFilter;
 
-    return suchMatch && statusMatch && artMatch && projektMatch;
-  }), [bestellungen, suche, statusFilter, artFilter, projektFilter]);
+        return suchMatch && statusMatch && artMatch && projektMatch;
+      }),
+    [bestellungen, suche, statusFilter, artFilter, projektFilter],
+  );
 
-  // Count per art for tab badges
+  // Client-side sort
+  const sorted = useMemo(() => {
+    if (!sort) return gefiltert;
+    const arr = [...gefiltert];
+    const dir = sort.direction === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      let av: string | number | null | undefined;
+      let bv: string | number | null | undefined;
+      switch (sort.key) {
+        case "bestellnummer":
+          av = a.bestellnummer ?? "";
+          bv = b.bestellnummer ?? "";
+          break;
+        case "haendler_name":
+          av = (a.haendler_name || "").toLowerCase();
+          bv = (b.haendler_name || "").toLowerCase();
+          break;
+        case "created_at":
+          av = a.created_at;
+          bv = b.created_at;
+          break;
+        case "betrag":
+          av = a.betrag ?? 0;
+          bv = b.betrag ?? 0;
+          break;
+        case "status":
+          av = a.status;
+          bv = b.status;
+          break;
+        default:
+          return 0;
+      }
+      if (av! < bv!) return -1 * dir;
+      if (av! > bv!) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }, [gefiltert, sort]);
+
   const artCounts = useMemo(() => {
     const counts = { material: 0, subunternehmer: 0, abo: 0 };
     for (const b of bestellungen) {
@@ -139,7 +286,10 @@ export function BestellungenTabelle({
     return counts;
   }, [bestellungen]);
 
-  const projektFarbenMap = new Map(projekte.map((p) => [p.id, p.farbe]));
+  const projektFarbenMap = useMemo(
+    () => new Map(projekte.map((p) => [p.id, p.farbe])),
+    [projekte],
+  );
 
   const hasFilters = suche || statusFilter || artFilter || projektFilter;
 
@@ -149,7 +299,6 @@ export function BestellungenTabelle({
     router.push(`/bestellungen?${params.toString()}`);
   }
 
-  // Quick-Freigabe direkt aus der Tabelle
   async function handleQuickFreigabe(bestellungId: string) {
     setFreigabeConfirmId(null);
     setFreigabeLoadingId(bestellungId);
@@ -158,40 +307,43 @@ export function BestellungenTabelle({
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      if (res.ok) {
-        router.refresh();
-      }
+      if (res.ok) router.refresh();
     } catch {
       window.alert("Freigabe fehlgeschlagen. Bitte erneut versuchen.");
-    } finally { setFreigabeLoadingId(null); }
+    } finally {
+      setFreigabeLoadingId(null);
+    }
   }
 
-  // Signed URL holen (mit Cache)
-  const fetchSignedUrl = useCallback(async (bestellungId: string, typ: string): Promise<string | null> => {
-    const cacheKey = `${bestellungId}:${typ}`;
-    const cached = previewCache.current.get(cacheKey);
-    if (cached) return cached;
-    try {
-      const res = await fetch(`/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}&mode=url`);
-      if (res.ok) {
-        const { url } = await res.json();
-        if (url) {
-          previewCache.current.set(cacheKey, url);
-          // Cache nach 4 Min invalidieren (Signed URL gilt 5 Min)
-          setTimeout(() => previewCache.current.delete(cacheKey), 240_000);
-          return url;
+  const fetchSignedUrl = useCallback(
+    async (bestellungId: string, typ: string): Promise<string | null> => {
+      const cacheKey = `${bestellungId}:${typ}`;
+      const cached = previewCache.current.get(cacheKey);
+      if (cached) return cached;
+      try {
+        const res = await fetch(
+          `/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}&mode=url`,
+        );
+        if (res.ok) {
+          const { url } = await res.json();
+          if (url) {
+            previewCache.current.set(cacheKey, url);
+            setTimeout(() => previewCache.current.delete(cacheKey), 240_000);
+            return url;
+          }
         }
+      } catch {
+        /* ignore */
       }
-    } catch { /* ignore */ }
-    return null;
-  }, []);
+      return null;
+    },
+    [],
+  );
 
-  // Hover-Preload: Signed URL im Hintergrund laden
   function preloadPreview(bestellungId: string, typ: string) {
     fetchSignedUrl(bestellungId, typ);
   }
 
-  // Klick: PDF-Vorschau öffnen (Signed URL → direkt im iframe, kein Blob)
   async function handlePreview(bestellungId: string, typ: string) {
     setPreviewId(bestellungId);
     setPreviewUrl(null);
@@ -211,7 +363,7 @@ export function BestellungenTabelle({
     try {
       const res = await fetch(`/api/pdfs/zip?bestellung_id=${bestellungId}`);
       if (!res.ok) {
-        window.alert("Fehler beim Herunterladen der Dokumente. Bitte versuchen Sie es erneut.");
+        window.alert("Fehler beim Herunterladen der Dokumente.");
         return;
       }
       const blob = await res.blob();
@@ -226,27 +378,31 @@ export function BestellungenTabelle({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch {
-      window.alert("Fehler beim Herunterladen der Dokumente. Bitte versuchen Sie es erneut.");
+      window.alert("Fehler beim Herunterladen der Dokumente.");
     } finally {
       setDownloadingId(null);
     }
   }
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    if (selected.size === gefiltert.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(gefiltert.map((b) => b.id)));
-    }
+  function handleCsvExport(rowsToExport: Bestellung[]) {
+    const rows = rowsToExport.length > 0 ? rowsToExport : [];
+    exportToCsv(csvFilename("bestellungen"), rows, [
+      { header: "Bestellnr.", value: (b) => b.bestellnummer ?? "" },
+      { header: "Händler", value: (b) => b.haendler_name ?? "" },
+      { header: "Besteller", value: (b) => b.besteller_name },
+      { header: "Bestellungsart", value: (b) => b.bestellungsart ?? "material" },
+      { header: "Projekt", value: (b) => b.projekt_name ?? "" },
+      { header: "Status", value: (b) => b.status },
+      { header: "Betrag", value: (b) => b.betrag ?? 0, numeric: true },
+      { header: "Währung", value: (b) => b.waehrung },
+      { header: "Netto?", value: (b) => (b.betrag_ist_netto ? "Ja" : "Nein") },
+      { header: "Bestellbestätigung", value: (b) => (b.hat_bestellbestaetigung ? "Ja" : "Nein") },
+      { header: "Lieferschein", value: (b) => (b.hat_lieferschein ? "Ja" : "Nein") },
+      { header: "Rechnung", value: (b) => (b.hat_rechnung ? "Ja" : "Nein") },
+      { header: "Versand", value: (b) => (b.hat_versandbestaetigung ? "Ja" : "Nein") },
+      { header: "Mahnung", value: (b) => (b.mahnung_am ? `${b.mahnung_count ?? 1}× seit ${b.mahnung_am.slice(0, 10)}` : "") },
+      { header: "Erstellt", value: (b) => b.created_at.slice(0, 10) },
+    ]);
   }
 
   async function handleBulkDelete() {
@@ -259,7 +415,6 @@ export function BestellungenTabelle({
       });
       if (res.ok) {
         setSelected(new Set());
-        setSelectionMode(false);
         setShowDeleteDialog(false);
         router.refresh();
       } else {
@@ -273,13 +428,341 @@ export function BestellungenTabelle({
     }
   }
 
+  // ─── Column definitions ────────────────────────────────────────
+
+  const columns: DataTableColumn<Bestellung>[] = useMemo(
+    () => [
+      {
+        key: "bestellnummer",
+        label: "Bestellnr.",
+        sortable: true,
+        stopPropagation: true,
+        render: (b) => (
+          <Link
+            href={`/bestellungen/${b.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
+          >
+            {b.bestellnummer || "–"}
+            {b.mahnung_am && (
+              <span
+                className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold"
+                title={`Mahnung eingegangen am ${new Date(b.mahnung_am).toLocaleDateString("de-DE")}`}
+              >
+                <IconAlertCircle className="w-3 h-3" />
+                {b.mahnung_count && b.mahnung_count > 1
+                  ? `${b.mahnung_count}. Mahnung`
+                  : "Mahnung"}
+              </span>
+            )}
+          </Link>
+        ),
+      },
+      {
+        key: "haendler_name",
+        label: "Händler / Firma",
+        sortable: true,
+        render: (b) => {
+          const artValue = b.bestellungsart || "material";
+          const isSub = artValue === "subunternehmer";
+          const isAbo = artValue === "abo";
+          return (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="truncate max-w-[150px]">{b.haendler_name || "–"}</span>
+                {isSub && (
+                  <Badge tone="warning" size="sm">
+                    SUB
+                  </Badge>
+                )}
+                {isAbo && (
+                  <Badge tone="info" size="sm">
+                    ABO
+                  </Badge>
+                )}
+              </div>
+              {b.projekt_name && (
+                <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[11px] text-foreground-muted">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{
+                      background:
+                        projektFarbenMap.get(b.projekt_id!) || "var(--mr-red)",
+                    }}
+                  />
+                  {b.projekt_name}
+                </div>
+              )}
+            </>
+          );
+        },
+      },
+      {
+        key: "projekt_name",
+        label: "Projekt",
+        hideBelow: "lg",
+        render: (b) =>
+          b.projekt_name ? (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-foreground max-w-[120px]">
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{
+                  background:
+                    projektFarbenMap.get(b.projekt_id!) || "var(--mr-red)",
+                }}
+              />
+              <span className="truncate">{b.projekt_name}</span>
+            </span>
+          ) : (
+            <span className="text-line-strong text-[12px]">–</span>
+          ),
+      },
+      {
+        key: "created_at",
+        label: "Datum",
+        sortable: true,
+        hideBelow: "md",
+        className: "text-foreground-subtle whitespace-nowrap",
+        render: (b) => formatDatum(b.created_at),
+      },
+      {
+        key: "hat_bestellbestaetigung",
+        label: "Best.",
+        align: "center",
+        hideBelow: "sm",
+        stopPropagation: true,
+        render: (b) => {
+          const artValue = b.bestellungsart || "material";
+          if (artValue === "subunternehmer" || artValue === "abo") {
+            return <span className="text-line-strong">–</span>;
+          }
+          return (
+            <div className="flex justify-center">
+              <DokumentIcon
+                vorhanden={b.hat_bestellbestaetigung}
+                onClick={
+                  b.hat_bestellbestaetigung
+                    ? (e) => {
+                        e.stopPropagation();
+                        handlePreview(b.id, "bestellbestaetigung");
+                      }
+                    : undefined
+                }
+                onMouseEnter={
+                  b.hat_bestellbestaetigung
+                    ? () => preloadPreview(b.id, "bestellbestaetigung")
+                    : undefined
+                }
+              />
+            </div>
+          );
+        },
+      },
+      {
+        key: "hat_lieferschein",
+        label: "LS",
+        align: "center",
+        hideBelow: "sm",
+        stopPropagation: true,
+        render: (b) => {
+          const artValue = b.bestellungsart || "material";
+          if (artValue === "subunternehmer" || artValue === "abo") {
+            return <span className="text-line-strong">–</span>;
+          }
+          return (
+            <div className="flex justify-center">
+              <DokumentIcon
+                vorhanden={b.hat_lieferschein}
+                onClick={
+                  b.hat_lieferschein
+                    ? (e) => {
+                        e.stopPropagation();
+                        handlePreview(b.id, "lieferschein");
+                      }
+                    : undefined
+                }
+                onMouseEnter={
+                  b.hat_lieferschein
+                    ? () => preloadPreview(b.id, "lieferschein")
+                    : undefined
+                }
+              />
+            </div>
+          );
+        },
+      },
+      {
+        key: "hat_rechnung",
+        label: "RE",
+        align: "center",
+        hideBelow: "sm",
+        stopPropagation: true,
+        render: (b) => (
+          <div className="flex justify-center">
+            <DokumentIcon
+              vorhanden={b.hat_rechnung}
+              onClick={
+                b.hat_rechnung
+                  ? (e) => {
+                      e.stopPropagation();
+                      handlePreview(b.id, "rechnung");
+                    }
+                  : undefined
+              }
+              onMouseEnter={
+                b.hat_rechnung ? () => preloadPreview(b.id, "rechnung") : undefined
+              }
+            />
+          </div>
+        ),
+      },
+      {
+        key: "hat_versandbestaetigung",
+        label: "VS",
+        align: "center",
+        hideBelow: "sm",
+        stopPropagation: true,
+        render: (b) => {
+          const artValue = b.bestellungsart || "material";
+          if (artValue === "subunternehmer" || artValue === "abo") {
+            return <span className="text-line-strong">–</span>;
+          }
+          return (
+            <div className="flex justify-center">
+              <DokumentIcon
+                vorhanden={b.hat_versandbestaetigung ?? false}
+                onClick={
+                  b.hat_versandbestaetigung
+                    ? (e) => {
+                        e.stopPropagation();
+                        handlePreview(b.id, "versandbestaetigung");
+                      }
+                    : undefined
+                }
+                onMouseEnter={
+                  b.hat_versandbestaetigung
+                    ? () => preloadPreview(b.id, "versandbestaetigung")
+                    : undefined
+                }
+              />
+            </div>
+          );
+        },
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        render: (b) => {
+          const status = getStatusConfig(b.status);
+          return (
+            <span
+              className={`status-tag ${status.bg} ${status.text}`}
+              style={{ position: "relative" }}
+            >
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
+                style={{ background: status.color }}
+              />
+              {status.label}
+            </span>
+          );
+        },
+      },
+      {
+        key: "betrag",
+        label: "Betrag",
+        sortable: true,
+        align: "right",
+        className: "font-mono-amount font-semibold",
+        render: (b) => (
+          <>
+            {formatBetrag(b.betrag, b.waehrung)}
+            {b.betrag_ist_netto && b.betrag != null && (
+              <span className="text-[10px] text-foreground-subtle ml-1">netto</span>
+            )}
+          </>
+        ),
+      },
+      {
+        key: "actions",
+        label: "",
+        stopPropagation: true,
+        width: 90,
+        align: "right",
+        render: (b) => (
+          <div className="flex items-center justify-end gap-1">
+            {b.status !== "freigegeben" && b.hat_rechnung && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFreigabeConfirmId(b.id);
+                }}
+                disabled={freigabeLoadingId === b.id}
+                className={`p-1.5 rounded-md transition-colors inline-flex ${
+                  freigabeLoadingId === b.id
+                    ? "text-emerald-600 animate-pulse"
+                    : "text-foreground-faint group-hover:text-foreground-subtle hover:!text-emerald-600 hover:!bg-emerald-50"
+                }`}
+                title="Rechnung freigeben"
+              >
+                <IconCheck className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                downloadZip(b.id);
+              }}
+              disabled={downloadingId === b.id}
+              className={`p-1.5 rounded-md transition-colors inline-flex ${
+                downloadingId === b.id
+                  ? "text-brand animate-pulse"
+                  : "text-foreground-faint group-hover:text-foreground-subtle hover:!text-brand hover:!bg-brand/[0.06]"
+              }`}
+              title="Alle Dokumente herunterladen"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className="w-4 h-4"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [projektFarbenMap, freigabeLoadingId, downloadingId],
+  );
+
   return (
     <>
       {/* Projekt-Filter Banner */}
       {aktiverProjektName && aktiverProjektFilter && (
         <div className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-input border border-line rounded-lg text-sm">
-          <svg className="w-4 h-4 text-foreground-subtle shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          <svg
+            className="w-4 h-4 text-foreground-subtle shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+            />
           </svg>
           <span className="text-foreground-subtle">Gefiltert nach Projekt:</span>
           <span className="font-semibold text-foreground">{aktiverProjektName}</span>
@@ -288,23 +771,22 @@ export function BestellungenTabelle({
             className="ml-auto p-1 text-foreground-subtle hover:text-brand transition-colors"
             title="Filter entfernen"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <IconX className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Art-Tabs + Search + Filters */}
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Pill-toggle tabs for Bestellungsart */}
         <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg shrink-0">
-          {([
-            { key: "" as ArtFilter, label: "Alle" },
-            { key: "material" as ArtFilter, label: "Material" },
-            { key: "subunternehmer" as ArtFilter, label: "Subunternehmer" },
-            { key: "abo" as ArtFilter, label: "Abo" },
-          ]).map((tab) => (
+          {(
+            [
+              { key: "" as ArtFilter, label: "Alle" },
+              { key: "material" as ArtFilter, label: "Material" },
+              { key: "subunternehmer" as ArtFilter, label: "Subunternehmer" },
+              { key: "abo" as ArtFilter, label: "Abo" },
+            ]
+          ).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setArtFilter(tab.key)}
@@ -316,9 +798,13 @@ export function BestellungenTabelle({
             >
               {tab.label}
               {tab.key && artCounts[tab.key] > 0 && (
-                <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                  artFilter === tab.key ? "bg-brand text-white" : "bg-line text-foreground-muted"
-                }`}>
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                    artFilter === tab.key
+                      ? "bg-brand text-white"
+                      : "bg-line text-foreground-muted"
+                  }`}
+                >
                   {artCounts[tab.key]}
                 </span>
               )}
@@ -326,17 +812,15 @@ export function BestellungenTabelle({
           ))}
         </div>
 
-        {/* Search + Dropdowns */}
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 min-w-0">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle pointer-events-none" />
             <input
+              ref={searchInputRef}
               type="text"
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
-              placeholder="Bestellnummer, Händler, Besteller..."
+              placeholder="Suchen… (Taste /)"
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
             />
           </div>
@@ -346,7 +830,9 @@ export function BestellungenTabelle({
             className="hidden md:block px-3.5 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
           >
             {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
           {projekte.length > 0 && (
@@ -357,34 +843,70 @@ export function BestellungenTabelle({
             >
               <option value="">Alle Projekte</option>
               {projekte.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           )}
           {hasFilters && (
             <button
               type="button"
-              onClick={() => { setSuche(""); setStatusFilter(""); setArtFilter(""); setProjektFilter(""); }}
+              onClick={() => {
+                setSuche("");
+                setStatusFilter("");
+                setArtFilter("");
+                setProjektFilter("");
+              }}
               className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-red-50 rounded-lg border border-line transition-colors shrink-0"
               title="Filter zurücksetzen"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <IconX className="w-4 h-4" />
             </button>
           )}
-          {!selectionMode && (
-            <button
-              type="button"
-              onClick={() => setSelectionMode(true)}
-              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] rounded-lg border border-line transition-colors shrink-0"
-              title="Auswahl-Modus"
+          <DensityToggle density={density} onChange={setDensity} />
+          <SavedViewsMenu<ViewConfig>
+            views={savedViews.views}
+            activeViewId={activeViewId}
+            currentConfigIsDirty={currentConfigIsDirty}
+            onApply={(view) => applyView(view)}
+            onSave={(name) => {
+              const id = savedViews.saveView(name, currentConfig, false);
+              setActiveViewId(id);
+            }}
+            onDelete={(id) => {
+              savedViews.deleteView(id);
+              if (activeViewId === id) setActiveViewId(null);
+            }}
+            onToggleDefault={(id) => savedViews.toggleDefault(id)}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const rows = selected.size > 0 ? sorted.filter((b) => selected.has(b.id)) : sorted;
+              handleCsvExport(rows);
+            }}
+            title={
+              selected.size > 0
+                ? `${selected.size} ausgewählte als CSV exportieren`
+                : "Alle sichtbaren als CSV exportieren"
+            }
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5 text-foreground-subtle"
+              aria-hidden="true"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-            </button>
-          )}
+              <path d="M3 11v1.5a1 1 0 001 1h8a1 1 0 001-1V11M5.5 7.5L8 10l2.5-2.5M8 10V2" />
+            </svg>
+            CSV
+          </button>
         </div>
       </div>
 
@@ -396,7 +918,9 @@ export function BestellungenTabelle({
           className="flex-1 px-3.5 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
         >
           {STATUS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
           ))}
         </select>
         {projekte.length > 0 && (
@@ -407,234 +931,86 @@ export function BestellungenTabelle({
           >
             <option value="">Alle Projekte</option>
             {projekte.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
         )}
       </div>
 
-      {/* Table */}
-      <div className="mt-4 card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-input border-b border-line">
-              {selectionMode && (
-                <th className="px-3 py-3.5 w-10">
-                  <input
-                    type="checkbox"
-                    checked={gefiltert.length > 0 && selected.size === gefiltert.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
-                  />
-                </th>
+      {/* Bulk toolbar — sticky-top, Linear-Style */}
+      <div className="mt-4">
+        <BulkToolbar
+          count={selected.size}
+          label="Bestellungen"
+          onClear={() => setSelected(new Set())}
+          totalHint={`von ${sorted.length} sichtbar`}
+        >
+          <Button
+            size="sm"
+            variant="destructive"
+            iconLeft={<IconTrash />}
+            onClick={() => setShowDeleteDialog(true)}
+            loading={deleteLoading}
+          >
+            Entfernen
+          </Button>
+        </BulkToolbar>
+      </div>
+
+      {/* DataTable */}
+      <div className="mt-4">
+        <DataTable<Bestellung>
+          columns={columns}
+          data={sorted}
+          getRowId={(b) => b.id}
+          ariaLabel="Bestellübersicht"
+          density={density}
+          selection={selected}
+          onSelectionChange={setSelected}
+          getSelectionAriaLabel={(b) =>
+            `Bestellung ${b.bestellnummer || "ohne Nummer"} auswählen`
+          }
+          sort={sort}
+          onSortChange={setSort}
+          onRowClick={(b) => router.push(`/bestellungen/${b.id}`)}
+          emptyState={
+            <div className="flex flex-col items-center gap-2">
+              <svg
+                className="w-8 h-8 text-line-strong"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                />
+              </svg>
+              <p className="text-foreground-subtle text-sm">
+                {bestellungen.length === 0
+                  ? "Noch keine Bestellungen vorhanden."
+                  : "Keine Bestellungen gefunden."}
+              </p>
+              {hasFilters && (
+                <button
+                  onClick={() => {
+                    setSuche("");
+                    setStatusFilter("");
+                    setArtFilter("");
+                    setProjektFilter("");
+                  }}
+                  className="text-brand hover:text-brand-light text-sm font-medium transition-colors"
+                >
+                  Filter zurücksetzen
+                </button>
               )}
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Bestellnr.</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Händler / Firma</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden lg:table-cell">Projekt</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden md:table-cell">Datum</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">Best.</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">LS</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">RE</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase hidden sm:table-cell">VS</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Status</th>
-              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Betrag</th>
-              <th className="px-4 py-3.5 w-10"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {gefiltert.length === 0 ? (
-              <tr>
-                <td colSpan={selectionMode ? 12 : 11} className="px-4 py-16 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                    </svg>
-                    <p className="text-foreground-subtle text-sm">
-                      {bestellungen.length === 0
-                        ? "Noch keine Bestellungen vorhanden."
-                        : "Keine Bestellungen gefunden."}
-                    </p>
-                    {hasFilters && (
-                      <button
-                        onClick={() => { setSuche(""); setStatusFilter(""); setArtFilter(""); setProjektFilter(""); }}
-                        className="text-brand hover:text-brand-light text-sm font-medium transition-colors"
-                      >
-                        Filter zurücksetzen
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              gefiltert.map((b, i) => {
-                const status = getStatusConfig(b.status);
-                const artValue = b.bestellungsart || "material";
-                const isSub = artValue === "subunternehmer";
-                const isAbo = artValue === "abo";
-                return (
-                  <tr
-                    key={b.id}
-                    onClick={() => router.push(`/bestellungen/${b.id}`)}
-                    className={`table-row-hover border-b border-line-subtle cursor-pointer group ${i % 2 === 1 ? "bg-zebra" : ""} ${selected.has(b.id) ? "bg-brand/[0.03]" : ""}`}
-                  >
-                    {selectionMode && (
-                      <td className="px-3 py-3.5" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(b.id)}
-                          onChange={() => toggleSelect(b.id)}
-                          className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
-                        />
-                      </td>
-                    )}
-                    <td className="px-4 py-3.5">
-                      <Link
-                        href={`/bestellungen/${b.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
-                      >
-                        {b.bestellnummer || "–"}
-                        {b.mahnung_am && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold" title={`Mahnung eingegangen am ${new Date(b.mahnung_am).toLocaleDateString("de-DE")}`}>
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" /></svg>
-                            {b.mahnung_count && b.mahnung_count > 1 ? `${b.mahnung_count}. Mahnung` : "Mahnung"}
-                          </span>
-                        )}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-foreground">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate max-w-[150px]">{b.haendler_name || "–"}</span>
-                        {isSub && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">SUB</span>
-                        )}
-                        {isAbo && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-50 text-violet-700 border border-violet-200 shrink-0">
-                            ABO
-                          </span>
-                        )}
-                      </div>
-                      {/* Mobile: show project inline */}
-                      {b.projekt_name && (
-                        <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[11px] text-foreground-muted">
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
-                          />
-                          {b.projekt_name}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 hidden lg:table-cell">
-                      {b.projekt_name ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-foreground max-w-[120px]">
-                          <span
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ background: projektFarbenMap.get(b.projekt_id!) || "#570006" }}
-                          />
-                          <span className="truncate">{b.projekt_name}</span>
-                        </span>
-                      ) : (
-                        <span className="text-line-strong text-xs">–</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-foreground-subtle text-xs hidden md:table-cell whitespace-nowrap">
-                      {formatDatum(b.created_at)}
-                    </td>
-                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <div className="flex justify-center">
-                        {(isSub || isAbo) ? (
-                          <span className="text-line-strong">&ndash;</span>
-                        ) : (
-                          <DokumentIcon vorhanden={b.hat_bestellbestaetigung} onClick={b.hat_bestellbestaetigung ? (e) => { e.stopPropagation(); handlePreview(b.id, "bestellbestaetigung"); } : undefined} onMouseEnter={b.hat_bestellbestaetigung ? () => preloadPreview(b.id, "bestellbestaetigung") : undefined} />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <div className="flex justify-center">
-                        {(isSub || isAbo) ? (
-                          <span className="text-line-strong">&ndash;</span>
-                        ) : (
-                          <DokumentIcon vorhanden={b.hat_lieferschein} onClick={b.hat_lieferschein ? (e) => { e.stopPropagation(); handlePreview(b.id, "lieferschein"); } : undefined} onMouseEnter={b.hat_lieferschein ? () => preloadPreview(b.id, "lieferschein") : undefined} />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <div className="flex justify-center"><DokumentIcon vorhanden={b.hat_rechnung} onClick={b.hat_rechnung ? (e) => { e.stopPropagation(); handlePreview(b.id, "rechnung"); } : undefined} onMouseEnter={b.hat_rechnung ? () => preloadPreview(b.id, "rechnung") : undefined} /></div>
-                    </td>
-                    <td className="px-4 py-3.5 text-center hidden sm:table-cell">
-                      <div className="flex justify-center">
-                        {(isSub || isAbo) ? (
-                          <span className="text-line-strong">&ndash;</span>
-                        ) : (
-                          <DokumentIcon vorhanden={b.hat_versandbestaetigung ?? false} onClick={(b.hat_versandbestaetigung) ? (e) => { e.stopPropagation(); handlePreview(b.id, "versandbestaetigung"); } : undefined} onMouseEnter={b.hat_versandbestaetigung ? () => preloadPreview(b.id, "versandbestaetigung") : undefined} />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`status-tag ${status.bg} ${status.text}`}
-                        style={{ ["--tag-color" as string]: status.color }}
-                      >
-                        <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: status.color }} />
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <span className="font-mono-amount font-semibold text-foreground">
-                        {formatBetrag(b.betrag, b.waehrung)}
-                      </span>
-                      {b.betrag_ist_netto && b.betrag != null && (
-                        <span className="text-[10px] text-foreground-subtle ml-1">netto</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-end gap-1">
-                        {/* Quick-Freigabe */}
-                        {b.status !== "freigegeben" && b.hat_rechnung && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setFreigabeConfirmId(b.id); }}
-                            disabled={freigabeLoadingId === b.id}
-                            className={`p-1.5 rounded-md transition-colors inline-flex ${
-                              freigabeLoadingId === b.id
-                                ? "text-emerald-600 animate-pulse"
-                                : "text-foreground-faint group-hover:text-foreground-subtle hover:!text-emerald-600 hover:!bg-emerald-50"
-                            }`}
-                            title="Rechnung freigeben"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            </svg>
-                          </button>
-                        )}
-                        {/* Download */}
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            downloadZip(b.id);
-                          }}
-                          disabled={downloadingId === b.id}
-                          className={`p-1.5 rounded-md transition-colors inline-flex ${
-                            downloadingId === b.id
-                              ? "text-brand animate-pulse"
-                              : "text-foreground-faint group-hover:text-foreground-subtle hover:!text-brand hover:!bg-brand/[0.06]"
-                          }`}
-                          title="Alle Dokumente herunterladen"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+            </div>
+          }
+        />
       </div>
 
       {/* Pagination */}
@@ -650,8 +1026,18 @@ export function BestellungenTabelle({
               className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Vorherige Seite"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
             <span className="text-foreground-muted font-medium px-3 font-mono-amount text-xs">
@@ -663,45 +1049,20 @@ export function BestellungenTabelle({
               className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Nächste Seite"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Bulk Action Bar — matching Buchhaltung archive style */}
-      {selectionMode && (
-        <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
-          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-sidebar-active text-white rounded-xl shadow-lg shadow-black/20">
-            <span className="text-sm font-medium">
-              {selected.size > 0
-                ? `${selected.size} ${selected.size === 1 ? "Bestellung" : "Bestellungen"} ausgewählt`
-                : "Bestellungen auswählen"}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => { setSelectionMode(false); setSelected(new Set()); }}
-                className="px-3 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
-              >
-                Abbrechen
-              </button>
-              {selected.size > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteDialog(true)}
-                  disabled={deleteLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  {deleteLoading ? "Lösche..." : "Entfernen"}
-                </button>
-              )}
-            </div>
           </div>
         </div>
       )}
@@ -709,12 +1070,16 @@ export function BestellungenTabelle({
       {/* Confirm Delete Dialog */}
       <ConfirmDialog
         open={showDeleteDialog}
-        onCancel={() => { setShowDeleteDialog(false); setDeleteLoading(false); }}
+        onCancel={() => {
+          setShowDeleteDialog(false);
+          setDeleteLoading(false);
+        }}
         onConfirm={handleBulkDelete}
         title="Bestellungen entfernen"
         message={`${selected.size} Bestellung${selected.size !== 1 ? "en" : ""} und alle zugehörigen Dokumente unwiderruflich löschen?`}
         confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
         variant="danger"
+        loading={deleteLoading}
       />
 
       {/* Quick-Freigabe Bestätigung */}
@@ -738,19 +1103,17 @@ export function BestellungenTabelle({
             className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-4xl h-[85vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-line-subtle">
-              <h3 className="font-headline text-sm text-foreground tracking-tight">PDF-Vorschau</h3>
+              <h3 className="font-headline text-sm text-foreground tracking-tight">
+                PDF-Vorschau
+              </h3>
               <button
                 onClick={closePreview}
                 className="p-1.5 rounded-lg text-foreground-subtle hover:text-foreground hover:bg-canvas transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <IconX className="w-5 h-5" />
               </button>
             </div>
-            {/* Content */}
             <div className="flex-1 overflow-hidden">
               {previewLoading ? (
                 <div className="flex items-center justify-center h-full">
@@ -764,8 +1127,18 @@ export function BestellungenTabelle({
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-faint">
-                  <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  <svg
+                    className="w-12 h-12"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
+                    />
                   </svg>
                   <p className="text-sm">Keine PDF verfügbar</p>
                 </div>

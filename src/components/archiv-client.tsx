@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { BulkToolbar, Button } from "@/components/ui";
+import { IconTrash } from "@/components/ui/icons";
+import { exportToCsv, csvFilename } from "@/lib/export-csv";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -410,6 +413,54 @@ export function ArchivClient({
               </svg>
             </button>
           )}
+          {activeTab !== "projekte" && (
+            <button
+              type="button"
+              onClick={() => {
+                const items =
+                  activeTab === "material" ? filteredMaterial : filteredSU;
+                const rows =
+                  selectedIds.size > 0
+                    ? items.filter((o) => selectedIds.has(o.id))
+                    : items;
+                exportToCsv(csvFilename(`archiv-${activeTab}`), rows, [
+                  { header: "Bestellnr.", value: (b) => b.bestellnummer ?? "" },
+                  {
+                    header: activeTab === "subunternehmer" ? "Firma" : "Händler",
+                    value: (b) =>
+                      activeTab === "subunternehmer"
+                        ? b.subunternehmer_firma || b.haendler_name || ""
+                        : b.haendler_name ?? "",
+                  },
+                  { header: "Besteller", value: (b) => b.besteller_name },
+                  { header: "Projekt", value: (b) => b.projekt_name ?? "" },
+                  { header: "Betrag", value: (b) => b.betrag ?? 0, numeric: true },
+                  { header: "Bezahlt am", value: (b) => b.bezahlt_am.slice(0, 10) },
+                  { header: "Bezahlt von", value: (b) => b.bezahlt_von ?? "" },
+                ]);
+              }}
+              title={
+                selectedIds.size > 0
+                  ? `${selectedIds.size} ausgewählte als CSV exportieren`
+                  : "Alle sichtbaren als CSV exportieren"
+              }
+              className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] shrink-0"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5 text-foreground-subtle"
+                aria-hidden="true"
+              >
+                <path d="M3 11v1.5a1 1 0 001 1h8a1 1 0 001-1V11M5.5 7.5L8 10l2.5-2.5M8 10V2" />
+              </svg>
+              CSV
+            </button>
+          )}
         </div>
       </div>
 
@@ -459,51 +510,50 @@ export function ArchivClient({
         )}
       </div>
 
-      {/* Floating Bulk Action Bar */}
+      {/* Bulk Toolbar — sticky top, appears when selection > 0. Linear-Style. */}
       {selectionMode && (
-        <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
-          <div className="flex items-center justify-between gap-4 px-5 py-3 bg-sidebar-active text-white rounded-xl shadow-lg shadow-black/20">
-            <span className="text-sm font-medium">
-              {selectedIds.size > 0
-                ? `${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} ausgewählt`
-                : "Einträge auswählen"}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={exitSelectionMode}
-                className="px-3 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
+        <div className="mt-4">
+          <BulkToolbar
+            count={selectedIds.size}
+            label={activeTab === "projekte" ? "Projekte" : "Einträge"}
+            onClear={exitSelectionMode}
+          >
+            {activeTab === "projekte" && (
+              <Button
+                size="sm"
+                variant="subtle"
+                onClick={() => setShowReactivateDialog(true)}
+                loading={reactivateLoading}
+                className="bg-success-bg text-success hover:bg-success-bg/80 border-success-border"
+                iconLeft={
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    className="h-3.5 w-3.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+                    />
+                  </svg>
+                }
               >
-                Abbrechen
-              </button>
-              {selectedIds.size > 0 && activeTab === "projekte" && (
-                <button
-                  type="button"
-                  onClick={() => setShowReactivateDialog(true)}
-                  disabled={reactivateLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                  </svg>
-                  {reactivateLoading ? "..." : "Reaktivieren"}
-                </button>
-              )}
-              {selectedIds.size > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteDialog(true)}
-                  disabled={deleteLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  {deleteLoading ? "Lösche..." : "Entfernen"}
-                </button>
-              )}
-            </div>
-          </div>
+                Reaktivieren
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+              loading={deleteLoading}
+              iconLeft={<IconTrash />}
+            >
+              Entfernen
+            </Button>
+          </BulkToolbar>
         </div>
       )}
 

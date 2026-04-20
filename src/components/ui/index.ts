@@ -35,4 +35,18 @@ export type { Breadcrumb } from "./page-header";
 export { SubNav } from "./sub-nav";
 export type { SubNavItem } from "./sub-nav";
 
+export { DataTable, DensityToggle, useTableDensity } from "./data-table";
+export type {
+  DataTableColumn,
+  DataTableProps,
+  Density,
+  SortDirection,
+  SortState,
+} from "./data-table";
+
+export { BulkToolbar } from "./bulk-toolbar";
+
+export { SavedViewsMenu, useSavedViews } from "./saved-views";
+export type { SavedView, UseSavedViewsResult } from "./saved-views";
+
 export * as Icons from "./icons";

@@ -1,9 +1,25 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { formatBetrag, formatDatum } from "@/lib/formatters";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  DataTable,
+  DensityToggle,
+  useTableDensity,
+  SavedViewsMenu,
+  useSavedViews,
+  Badge,
+  type DataTableColumn,
+  type SortState,
+  type Density,
+} from "@/components/ui";
+import { exportToCsv, csvFilename } from "@/lib/export-csv";
+import { IconCheck, IconEdit, IconTrash } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
+
+type ViewMode = "grid" | "table";
 
 interface Kunde {
   id: string;
@@ -51,6 +67,38 @@ export function KundenClient({
   const [error, setError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [confirmLoading, setConfirmLoading] = useState<string | null>(null);
+
+  // View state (P3 Stop 3 — table/grid toggle, density, sort, saved views)
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [density, setDensity] = useTableDensity("kunden.density");
+  const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
+
+  type KundenViewConfig = {
+    viewMode: ViewMode;
+    density: Density;
+    sort: SortState;
+  };
+  const savedViews = useSavedViews<KundenViewConfig>("kunden");
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const didApplyDefault = useRef(false);
+  useEffect(() => {
+    if (didApplyDefault.current) return;
+    if (savedViews.defaultView) {
+      const d = savedViews.defaultView;
+      setViewMode(d.config.viewMode);
+      setDensity(d.config.density);
+      setSort(d.config.sort);
+      setActiveViewId(d.id);
+    }
+    didApplyDefault.current = true;
+  }, [savedViews.defaultView, setDensity]);
+
+  const currentConfig: KundenViewConfig = { viewMode, density, sort };
+  const activeCfg =
+    activeViewId && savedViews.views.find((v) => v.id === activeViewId)?.config;
+  const currentConfigIsDirty = activeCfg
+    ? JSON.stringify(activeCfg) !== JSON.stringify(currentConfig)
+    : false;
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -194,27 +242,302 @@ export function KundenClient({
   const bestaetigt = kunden.filter((k) => k.confirmed_at);
   const unbestaetigt = kunden.filter((k) => !k.confirmed_at);
 
+  // Client-side sort (table mode only — card grid stays in DB order)
+  const bestaetigtSorted = useMemo(() => {
+    if (!sort) return bestaetigt;
+    const arr = [...bestaetigt];
+    const dir = sort.direction === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      let av: string | number = "";
+      let bv: string | number = "";
+      switch (sort.key) {
+        case "name":
+          av = a.name.toLowerCase();
+          bv = b.name.toLowerCase();
+          break;
+        case "kuerzel":
+          av = (a.kuerzel || "").toLowerCase();
+          bv = (b.kuerzel || "").toLowerCase();
+          break;
+        case "projekte":
+          av = stats[a.id]?.projekte ?? 0;
+          bv = stats[b.id]?.projekte ?? 0;
+          break;
+        case "bestellungen":
+          av = stats[a.id]?.bestellungen ?? 0;
+          bv = stats[b.id]?.bestellungen ?? 0;
+          break;
+        case "volumen":
+          av = stats[a.id]?.volumen ?? 0;
+          bv = stats[b.id]?.volumen ?? 0;
+          break;
+        case "created_at":
+          av = a.created_at;
+          bv = b.created_at;
+          break;
+        default:
+          return 0;
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }, [bestaetigt, sort, stats]);
+
+  function handleCsvExport() {
+    exportToCsv(csvFilename("kunden"), bestaetigtSorted, [
+      { header: "Name", value: (k) => k.name },
+      { header: "Kürzel", value: (k) => k.kuerzel ?? "" },
+      { header: "Adresse", value: (k) => k.adresse ?? "" },
+      { header: "E-Mail", value: (k) => k.email ?? "" },
+      { header: "Telefon", value: (k) => k.telefon ?? "" },
+      { header: "Projekte", value: (k) => stats[k.id]?.projekte ?? 0 },
+      { header: "Bestellungen", value: (k) => stats[k.id]?.bestellungen ?? 0 },
+      { header: "Volumen", value: (k) => stats[k.id]?.volumen ?? 0, numeric: true },
+      { header: "Keywords", value: (k) => k.keywords.join(", ") },
+      { header: "Angelegt", value: (k) => k.created_at.slice(0, 10) },
+    ]);
+  }
+
+  function applyView(view: { id: string; config: KundenViewConfig }) {
+    setViewMode(view.config.viewMode);
+    setDensity(view.config.density);
+    setSort(view.config.sort);
+    setActiveViewId(view.id);
+  }
+
+  const kundenColumns: DataTableColumn<Kunde>[] = [
+    {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      render: (k) => (
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            aria-hidden="true"
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ background: k.farbe }}
+          />
+          <span className="font-medium text-foreground truncate">{k.name}</span>
+          {k.kuerzel && (
+            <span className="text-[11px] font-mono-amount text-foreground-subtle">
+              {k.kuerzel}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "adresse",
+      label: "Adresse",
+      hideBelow: "md",
+      className: "text-foreground-muted truncate max-w-[220px]",
+      render: (k) => k.adresse ?? "–",
+    },
+    {
+      key: "email",
+      label: "E-Mail",
+      hideBelow: "lg",
+      className: "text-foreground-muted truncate max-w-[180px]",
+      render: (k) => k.email ?? "–",
+    },
+    {
+      key: "projekte",
+      label: "Projekte",
+      sortable: true,
+      align: "right",
+      className: "font-mono-amount text-foreground-muted",
+      hideBelow: "sm",
+      render: (k) => stats[k.id]?.projekte ?? 0,
+    },
+    {
+      key: "bestellungen",
+      label: "Bestellungen",
+      sortable: true,
+      align: "right",
+      className: "font-mono-amount text-foreground-muted",
+      hideBelow: "sm",
+      render: (k) => stats[k.id]?.bestellungen ?? 0,
+    },
+    {
+      key: "volumen",
+      label: "Volumen",
+      sortable: true,
+      align: "right",
+      className: "font-mono-amount font-semibold text-foreground",
+      render: (k) => formatBetrag(stats[k.id]?.volumen ?? 0),
+    },
+    {
+      key: "keywords",
+      label: "Keywords",
+      hideBelow: "xl",
+      render: (k) =>
+        k.keywords.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {k.keywords.slice(0, 3).map((kw, i) => (
+              <Badge key={i} tone="info" size="sm">
+                {kw}
+              </Badge>
+            ))}
+            {k.keywords.length > 3 && (
+              <span className="text-[11px] text-foreground-subtle">
+                +{k.keywords.length - 3}
+              </span>
+            )}
+          </div>
+        ) : (
+          "–"
+        ),
+    },
+    {
+      key: "actions",
+      label: "",
+      stopPropagation: true,
+      align: "right",
+      width: 72,
+      render: (k) =>
+        istAdmin ? (
+          <div className="flex items-center justify-end gap-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openEdit(k);
+              }}
+              className="p-1 rounded hover:bg-canvas transition-colors text-foreground-faint hover:text-brand"
+              title="Bearbeiten"
+              aria-label={`${k.name} bearbeiten`}
+            >
+              <IconEdit className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirm({ id: k.id, name: k.name });
+              }}
+              className="p-1 rounded hover:bg-error-bg transition-colors text-foreground-faint hover:text-error"
+              title="Löschen"
+              aria-label={`${k.name} löschen`}
+            >
+              <IconTrash className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : null,
+    },
+  ];
+
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
         <div>
           <h1 className="font-headline text-2xl text-foreground tracking-tight">Kunden</h1>
           <p className="text-foreground-subtle text-sm mt-1">
             {kunden.length} Auftraggeber{unbestaetigt.length > 0 ? ` · ${unbestaetigt.length} unbestätigt` : ""}
           </p>
         </div>
-        {istAdmin && (
-          <button
-            onClick={() => { resetForm(); setShowForm(true); }}
-            className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View-Mode Toggle */}
+          <div
+            role="radiogroup"
+            aria-label="Ansicht"
+            className="inline-flex bg-input border border-line rounded-md p-0.5"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            <button
+              type="button"
+              role="radio"
+              aria-checked={viewMode === "grid"}
+              onClick={() => setViewMode("grid")}
+              title="Karten-Ansicht"
+              className={cn(
+                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+                viewMode === "grid"
+                  ? "bg-surface text-foreground shadow-card"
+                  : "text-foreground-subtle hover:text-foreground-muted",
+              )}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-3.5 w-3.5">
+                <rect x="2" y="2" width="5" height="5" rx="1" />
+                <rect x="9" y="2" width="5" height="5" rx="1" />
+                <rect x="2" y="9" width="5" height="5" rx="1" />
+                <rect x="9" y="9" width="5" height="5" rx="1" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={viewMode === "table"}
+              onClick={() => setViewMode("table")}
+              title="Tabellen-Ansicht"
+              className={cn(
+                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+                viewMode === "table"
+                  ? "bg-surface text-foreground shadow-card"
+                  : "text-foreground-subtle hover:text-foreground-muted",
+              )}
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" className="h-3.5 w-3.5">
+                <path d="M2 4h12M2 8h12M2 12h12" />
+              </svg>
+            </button>
+          </div>
+
+          {viewMode === "table" && (
+            <DensityToggle density={density} onChange={setDensity} />
+          )}
+
+          <SavedViewsMenu<KundenViewConfig>
+            views={savedViews.views}
+            activeViewId={activeViewId}
+            currentConfigIsDirty={currentConfigIsDirty}
+            onApply={(view) => applyView(view)}
+            onSave={(name) => {
+              const id = savedViews.saveView(name, currentConfig, false);
+              setActiveViewId(id);
+            }}
+            onDelete={(id) => {
+              savedViews.deleteView(id);
+              if (activeViewId === id) setActiveViewId(null);
+            }}
+            onToggleDefault={(id) => savedViews.toggleDefault(id)}
+          />
+
+          <button
+            type="button"
+            onClick={handleCsvExport}
+            disabled={bestaetigtSorted.length === 0}
+            title="Kunden als CSV exportieren"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5 text-foreground-subtle"
+              aria-hidden="true"
+            >
+              <path d="M3 11v1.5a1 1 0 001 1h8a1 1 0 001-1V11M5.5 7.5L8 10l2.5-2.5M8 10V2" />
             </svg>
-            Neuer Kunde
+            CSV
           </button>
-        )}
+
+          {istAdmin && (
+            <button
+              onClick={() => { resetForm(); setShowForm(true); }}
+              className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Neuer Kunde
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error banner */}
@@ -444,6 +767,20 @@ export function KundenClient({
             </button>
           )}
         </div>
+      ) : viewMode === "table" ? (
+        <DataTable<Kunde>
+          columns={kundenColumns}
+          data={bestaetigtSorted}
+          getRowId={(k) => k.id}
+          ariaLabel="Kunden-Liste"
+          density={density}
+          sort={sort}
+          onSortChange={setSort}
+          getSelectionAriaLabel={(k) => `Kunde ${k.name} auswählen`}
+          emptyState={
+            <p className="text-foreground-subtle text-[13px]">Keine Kunden.</p>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {bestaetigt.map((k) => {
