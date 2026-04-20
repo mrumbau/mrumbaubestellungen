@@ -513,7 +513,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Abo-Anbieter-Erkennung: Emails von bekannten Abo-Anbietern automatisch als "abo" markieren ──
-    if (!haendler && !erkannterSubunternehmer && bestellungsart === "material") {
+    // Prüft IMMER (auch wenn Händler gefunden) — Abo hat Priorität über Material-Händler
+    if (bestellungsart === "material") {
       const { data: aboListe } = await supabase.from("abo_anbieter").select("*");
       if (aboListe && aboListe.length > 0) {
         const aboMatch = aboListe.find((ab) => {
@@ -525,7 +526,7 @@ export async function POST(request: NextRequest) {
         });
         if (aboMatch) {
           bestellungsart = "abo";
-          haendler = { id: null, name: aboMatch.name, domain: aboMatch.domain };
+          if (!haendler) haendler = { id: null, name: aboMatch.name, domain: aboMatch.domain };
           logInfo("webhook/email", `Abo-Anbieter erkannt: ${aboMatch.name}`, { absenderDomain, absenderAdresse });
         }
       }
