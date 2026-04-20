@@ -29,11 +29,12 @@ export async function POST(
 
     const { data: profil } = await supabase
       .from("benutzer_rollen")
-      .select("rolle")
+      .select("rolle, kuerzel")
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin")) {
+    // Nur Admin + Besteller (auf eigene + Abo/SU) — Buchhaltung ausgeschlossen
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -47,12 +48,21 @@ export async function POST(
     // Bestellung laden
     const { data: bestellung } = await supabase
       .from("bestellungen")
-      .select("id, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
+      .select("id, besteller_kuerzel, bestellungsart, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
       .eq("id", id)
       .single();
 
     if (!bestellung) {
       return NextResponse.json({ error: "Bestellung nicht gefunden" }, { status: 404 });
+    }
+
+    // Owner-Check für Besteller: nur eigene Bestellungen oder Abo/SU (firmenweit)
+    if (profil!.rolle === "besteller") {
+      const istSuOderAbo =
+        bestellung.bestellungsart === "subunternehmer" || bestellung.bestellungsart === "abo";
+      if (bestellung.besteller_kuerzel !== profil!.kuerzel && !istSuOderAbo) {
+        return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
+      }
     }
 
     if (aktion === "bestaetigen") {

@@ -4,6 +4,7 @@ import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { requireRoles } from "@/lib/auth";
 
 // POST /api/bestellungen/[id]/freigeben – Rechnung freigeben
 export async function POST(
@@ -41,6 +42,11 @@ export async function POST(
 
     if (!profil) {
       return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 403 });
+    }
+
+    // Defense-in-Depth: Buchhaltung explizit ausschließen (Freigabe ist Besteller-/Admin-Aufgabe)
+    if (!requireRoles(profil, "admin", "besteller")) {
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     // Bestellung prüfen

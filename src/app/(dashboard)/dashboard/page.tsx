@@ -10,6 +10,10 @@ export default async function DashboardPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 
+  // Defense-in-Depth: Buchhaltung hat kein Dashboard (Middleware redirected bereits,
+  // aber Page-Guard schützt, falls Middleware-Config sich ändert)
+  if (profil.rolle === "buchhaltung") redirect("/buchhaltung");
+
   const supabase = await createServerSupabaseClient();
 
   const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

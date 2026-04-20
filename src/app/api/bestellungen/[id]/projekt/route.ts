@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { requireRoles } from "@/lib/auth";
 
 // POST /api/bestellungen/[id]/projekt – Projekt zuordnen
 export async function POST(
@@ -36,6 +37,11 @@ export async function POST(
 
     if (!profil) {
       return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 401 });
+    }
+
+    // Defense-in-Depth: Buchhaltung explizit ausschließen
+    if (!requireRoles(profil, "admin", "besteller")) {
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     if (profil.rolle !== "admin") {

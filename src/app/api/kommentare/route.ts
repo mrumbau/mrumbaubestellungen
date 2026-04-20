@@ -50,6 +50,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Kommentar zu lang (max. 2000 Zeichen)" }, { status: 400 });
     }
 
+    // Defense-in-Depth: User muss die Bestellung überhaupt sehen dürfen.
+    // RLS filtert den SELECT — wer keinen Row bekommt, darf auch nicht kommentieren.
+    const { data: sichtbareBestellung } = await supabase
+      .from("bestellungen")
+      .select("id")
+      .eq("id", bestellung_id)
+      .maybeSingle();
+
+    if (!sichtbareBestellung) {
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
+    }
+
     const { error } = await supabase.from("kommentare").insert({
       bestellung_id,
       autor_kuerzel: profil.kuerzel,

@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin", "besteller")) {
+    // Nur Admin kuratiert Stammdaten (Besteller bringt SU via Bestellung ein, Admin validiert)
+    if (!requireRoles(profil, "admin")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

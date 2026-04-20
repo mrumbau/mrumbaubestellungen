@@ -5,6 +5,7 @@ import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
+import { requireRoles } from "@/lib/auth";
 
 // GET /api/bestellungen/[id] – Details + Dokumente + Abgleich
 export async function GET(
@@ -115,6 +116,11 @@ export async function PATCH(
 
     if (!profil) {
       return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 401 });
+    }
+
+    // Defense-in-Depth: Buchhaltung hat keine Edit-Rechte auf Bestellung-Metadaten
+    if (!requireRoles(profil, "admin", "besteller")) {
+      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
     if (profil.rolle !== "admin") {
