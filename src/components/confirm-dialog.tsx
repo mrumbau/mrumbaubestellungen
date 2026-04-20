@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Modal } from "./ui/modal";
+import { Button } from "./ui/button";
 
+/**
+ * ConfirmDialog — kept as a stable façade over the new Modal + Button primitives.
+ * Existing call-sites across the codebase continue to work without changes.
+ * Use `variant="danger"` for irreversible actions (delete, archive with cascade).
+ */
 export function ConfirmDialog({
   open,
   title,
@@ -11,6 +17,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   variant = "default",
+  loading = false,
 }: {
   open: boolean;
   title: string;
@@ -20,57 +27,50 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   variant?: "default" | "danger";
+  loading?: boolean;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      dialogRef.current?.showModal();
-    } else {
-      dialogRef.current?.close();
-    }
-  }, [open]);
-
-  if (!open) return null;
-
   return (
-    <dialog
-      ref={dialogRef}
-      className="fixed inset-0 z-50 m-auto rounded-xl border border-[#e8e6e3] p-0"
-      style={{ boxShadow: "var(--shadow-modal)" }}
+    <Modal
+      open={open}
       onClose={onCancel}
-    >
-      <div className="p-6 max-w-sm bg-white rounded-xl">
-        {variant === "danger" && (
-          <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center mb-4">
-            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-        )}
-        <h3 className="font-headline text-base text-[#1a1a1a] tracking-tight mb-2">{title}</h3>
-        <p className="text-sm text-[#6b6b6b] leading-relaxed mb-6">{message}</p>
-        <div className="flex gap-3 justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-[#6b6b6b] bg-[#f5f4f2] border border-[#e8e6e3] rounded-lg hover:bg-[#ebe9e6] transition-colors"
-          >
+      size="sm"
+      title={
+        <span className="inline-flex items-center gap-2.5">
+          {variant === "danger" && (
+            <span
+              aria-hidden="true"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-error-bg text-error"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+            </span>
+          )}
+          {title}
+        </span>
+      }
+      footer={
+        <>
+          <Button variant="secondary" size="md" onClick={onCancel} disabled={loading}>
             {cancelLabel}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={variant === "danger" ? "destructive" : "primary"}
+            size="md"
             onClick={onConfirm}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              variant === "danger"
-                ? "bg-red-600 hover:bg-red-700 text-white"
-                : "bg-[#570006] hover:bg-[#7a1a1f] text-white"
-            }`}
+            loading={loading}
+            autoFocus
           >
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </dialog>
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[13px] leading-relaxed text-foreground-muted">{message}</p>
+    </Modal>
   );
 }

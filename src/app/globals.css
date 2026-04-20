@@ -19,6 +19,8 @@
   --bg-sidebar-hover: #1f1f1f;
   --bg-sidebar-active: #1a1a1a;
   --bg-input: #fafaf9;
+  --bg-input-hover: #f5f4f2;
+  --bg-hover: #faf9f7;
 
   /* Text */
   --text-primary: #1a1a1a;
@@ -36,6 +38,7 @@
   --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
   --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.2), 0 12px 24px rgba(0, 0, 0, 0.1);
+  --shadow-focus-ring: 0 0 0 3px rgba(87, 0, 6, 0.18);
 
   /* Radii */
   --radius-sm: 4px;
@@ -50,6 +53,87 @@
   --status-abweichung: #dc2626;
   --status-ls-fehlt: #d97706;
   --status-freigegeben: #059669;
+
+  /* Feedback (semantic — form errors, alerts, toasts) */
+  --feedback-error: #dc2626;
+  --feedback-error-bg: #fef2f2;
+  --feedback-error-border: #fecaca;
+  --feedback-success: #16a34a;
+  --feedback-success-bg: #f0fdf4;
+  --feedback-success-border: #bbf7d0;
+  --feedback-warning: #d97706;
+  --feedback-warning-bg: #fffbeb;
+  --feedback-warning-border: #fde68a;
+  --feedback-info: #2563eb;
+  --feedback-info-bg: #eff6ff;
+  --feedback-info-border: #bfdbfe;
+}
+
+/* ============================================
+   Tailwind v4 Theme — expose design tokens
+   as utility classes (bg-surface, text-brand, …)
+   ============================================ */
+
+@theme inline {
+  /* Brand */
+  --color-brand: var(--mr-red);
+  --color-brand-light: var(--mr-red-light);
+  --color-brand-glow: var(--mr-red-glow);
+
+  /* Surfaces */
+  --color-canvas: var(--bg-main);
+  --color-surface: var(--bg-card);
+  --color-surface-hover: var(--bg-hover);
+  --color-sidebar: var(--bg-sidebar);
+  --color-sidebar-hover: var(--bg-sidebar-hover);
+  --color-sidebar-active: var(--bg-sidebar-active);
+  --color-input: var(--bg-input);
+  --color-input-hover: var(--bg-input-hover);
+
+  /* Foreground (text) */
+  --color-foreground: var(--text-primary);
+  --color-foreground-muted: var(--text-secondary);
+  --color-foreground-subtle: var(--text-tertiary);
+  --color-foreground-inverse: var(--text-inverse);
+
+  /* Borders (as colors so border-subtle works) */
+  --color-line: var(--border-default);
+  --color-line-subtle: var(--border-subtle);
+  --color-line-strong: var(--border-strong);
+
+  /* Status (Bestellungs-Workflow) */
+  --color-status-erwartet: var(--status-erwartet);
+  --color-status-offen: var(--status-offen);
+  --color-status-vollstaendig: var(--status-vollstaendig);
+  --color-status-abweichung: var(--status-abweichung);
+  --color-status-ls-fehlt: var(--status-ls-fehlt);
+  --color-status-freigegeben: var(--status-freigegeben);
+
+  /* Feedback (semantic — forms, alerts, toasts) */
+  --color-error: var(--feedback-error);
+  --color-error-bg: var(--feedback-error-bg);
+  --color-error-border: var(--feedback-error-border);
+  --color-success: var(--feedback-success);
+  --color-success-bg: var(--feedback-success-bg);
+  --color-success-border: var(--feedback-success-border);
+  --color-warning: var(--feedback-warning);
+  --color-warning-bg: var(--feedback-warning-bg);
+  --color-warning-border: var(--feedback-warning-border);
+  --color-info: var(--feedback-info);
+  --color-info-bg: var(--feedback-info-bg);
+  --color-info-border: var(--feedback-info-border);
+
+  /* Shadows */
+  --shadow-card: var(--shadow-card);
+  --shadow-hover: var(--shadow-hover);
+  --shadow-elevated: var(--shadow-elevated);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-focus-ring: var(--shadow-focus-ring);
+
+  /* Fonts */
+  --font-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-barlow), system-ui, sans-serif;
+  --font-mono: var(--font-mono), "SF Mono", "Fira Code", monospace;
 }
 
 /* ============================================
