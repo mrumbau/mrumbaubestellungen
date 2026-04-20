@@ -60,9 +60,8 @@ export default async function DashboardPage() {
     profil.rolle === "admin"
       ? supabase.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller")
       : Promise.resolve({ data: [] as { kuerzel: string; name: string }[] }),
-    profil.rolle === "admin"
-      ? supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[] }),
+    // Neue Händler — fachliche Stammdaten-Pflege: beide Rollen sehen die 7-Tages-Liste
+    supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false }),
     // KI-Projekt-Vorschläge — Besteller sieht eigene + Abo/SU (via eigene()), Admin sieht alle.
     // Besteller dürfen für ihre Bestellungen selbst bestätigen (API nach P4.5 geöffnet).
     eigene(

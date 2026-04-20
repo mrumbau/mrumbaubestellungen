@@ -31,9 +31,10 @@ export default async function EinstellungenIndexPage() {
   const istAdmin = profil.rolle === "admin";
   const istBuchhaltung = profil.rolle === "buchhaltung";
 
-  // Load counts only for admins — besteller landing stays minimal.
+  // Counts für fachliche Stammdaten: Admin + Besteller brauchen sie.
+  // Benutzer-Count ist System-Info und bleibt Admin-exklusiv.
   let counts: Record<string, number> = {};
-  if (istAdmin) {
+  if (!istBuchhaltung) {
     const supabase = await createServerSupabaseClient();
     const [h, su, p, a, bl, u] = await Promise.all([
       supabase.from("haendler").select("id", { count: "exact", head: true }),
@@ -41,7 +42,9 @@ export default async function EinstellungenIndexPage() {
       supabase.from("projekte").select("id", { count: "exact", head: true }),
       supabase.from("abo_anbieter").select("id", { count: "exact", head: true }),
       supabase.from("email_blacklist").select("muster", { count: "exact", head: true }),
-      supabase.from("benutzer_rollen").select("id", { count: "exact", head: true }),
+      istAdmin
+        ? supabase.from("benutzer_rollen").select("id", { count: "exact", head: true })
+        : Promise.resolve({ count: 0 }),
     ]);
     counts = {
       haendler: h.count ?? 0,
@@ -77,7 +80,7 @@ export default async function EinstellungenIndexPage() {
         }
       />
 
-      {istAdmin && (
+      {!istBuchhaltung && (
         <section aria-labelledby="bereiche-heading" className="flex flex-col gap-3">
           <h2
             id="bereiche-heading"
@@ -121,13 +124,15 @@ export default async function EinstellungenIndexPage() {
               count={counts.blacklist}
               description="Ignorierte Absender und Domains"
             />
-            <NavCard
-              href="/einstellungen/system"
-              icon={<IconSettings />}
-              title="System"
-              subtitle={`${counts.benutzer} Benutzer`}
-              description="Health, KI-Erkennung, Webhooks, Extension, Testdaten"
-            />
+            {istAdmin && (
+              <NavCard
+                href="/einstellungen/system"
+                icon={<IconSettings />}
+                title="System"
+                subtitle={`${counts.benutzer} Benutzer`}
+                description="Health, KI-Erkennung, Webhooks, Extension, Testdaten"
+              />
+            )}
           </div>
         </section>
       )}

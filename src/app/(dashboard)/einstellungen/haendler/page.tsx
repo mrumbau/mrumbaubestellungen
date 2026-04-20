@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 export default async function HaendlerPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
-  if (profil.rolle !== "admin") redirect("/einstellungen");
+  // Fachliche Stammdaten-Pflege: Admin + Besteller dürfen, Buchhaltung nicht
+  if (profil.rolle === "buchhaltung") redirect("/einstellungen");
 
   const supabase = await createServerSupabaseClient();
 

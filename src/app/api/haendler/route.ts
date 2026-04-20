@@ -25,7 +25,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

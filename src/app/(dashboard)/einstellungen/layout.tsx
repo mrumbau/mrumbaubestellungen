@@ -29,6 +29,8 @@ export default async function EinstellungenLayout({
     return <div className="max-w-5xl mx-auto">{children}</div>;
   }
 
+  // Rollen-Logik: fachliche Stammdaten (Händler, SU, Projekte, Abo-Anbieter, Blacklist)
+  // sind für Admin + Besteller sichtbar. System (Benutzer-Mgmt, Logs, Testdaten, Firma) nur Admin.
   const items: SubNavItem[] = [
     {
       label: "Übersicht",
@@ -40,31 +42,26 @@ export default async function EinstellungenLayout({
       label: "Händler",
       href: "/einstellungen/haendler",
       icon: <IconBuilding />,
-      hidden: !istAdmin,
     },
     {
       label: "Subunternehmer",
       href: "/einstellungen/subunternehmer",
       icon: <IconTool />,
-      // Visible to all; besteller see read-only
     },
     {
       label: "Projekte",
       href: "/einstellungen/projekte",
       icon: <IconFolderOpen />,
-      // Visible to all; besteller see read-only
     },
     {
       label: "Abo-Anbieter",
       href: "/einstellungen/abo-anbieter",
       icon: <IconRepeat />,
-      hidden: !istAdmin,
     },
     {
       label: "Blacklist",
       href: "/einstellungen/blacklist",
       icon: <IconShield />,
-      hidden: !istAdmin,
     },
     {
       label: "System",

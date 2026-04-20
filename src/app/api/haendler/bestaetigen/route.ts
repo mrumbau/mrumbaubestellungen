@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin")) {
+    // Fachliche Stammdaten-Pflege: Besteller (Firmeninhaber) kennen die Händler aus dem Alltag
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

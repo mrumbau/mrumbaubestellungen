@@ -16,10 +16,11 @@ export default async function ProjektePage() {
     .select("id, name, farbe, budget, status, beschreibung, kunde, adresse, adresse_keywords")
     .order("name");
 
+  // Buchhaltung wurde oben redirected — die restlichen Rollen (Admin + Besteller) dürfen fachlich editieren
   return (
     <ProjekteClient
       initialProjekte={(projekte as Projekt[]) || []}
-      canEdit={profil.rolle === "admin"}
+      canEdit={true}
     />
   );
 }

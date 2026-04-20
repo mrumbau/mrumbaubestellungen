@@ -151,13 +151,13 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "ki_zusammenfassung", label: "KI-Zusammenfassung", defaultVisible: true },
   { id: "volumen", label: "Volumen-Übersicht", defaultVisible: true },
   { id: "projekte", label: "Aktive Projekte", defaultVisible: true },
-  // KI-Vorschläge + Neue Kunden/SU: Besteller = Firmeninhaber entscheidet fachlich mit
+  // Fachliche Stammdaten-Pflege: Admin + Besteller (Firmeninhaber kennen die Fachdaten)
   { id: "ki_vorschlaege", label: "KI-Projekt-Vorschläge", defaultVisible: true },
   { id: "neue_kunden", label: "Neue Kunden", defaultVisible: true },
   { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true },
-  // Unzugeordnet + Neue Händler: System-Pflege / Stammdaten-Kuratierung (Admin-only)
+  { id: "neue_haendler", label: "Neue Händler", defaultVisible: true },
+  // System-Operation (Bestellung einem Besteller zuweisen): nur Admin
   { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
-  { id: "neue_haendler", label: "Neue Händler", defaultVisible: true, adminOnly: true },
   { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true },
   { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
@@ -688,9 +688,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Confirm-Queue / Kuratierung — gemischte Widget-Sichtbarkeit:
-          KI-Vorschläge + Neue Kunden/SU: alle Besteller (Firmeninhaber kennen das Fach)
-          Nicht zugeordnet + Neue Händler: Admin-only (System-Pflege) */}
+      {/* Confirm-Queue / Kuratierung — Stammdaten-Confirms (KI/Kunden/SU/Händler) für alle,
+          Unzugeordnet ist System-Op (Besteller-Routing) und daher nur Admin */}
       <div className="space-y-4 mb-6">
         {isWidgetVisible("ki_vorschlaege") && kiVorschlaege.length > 0 && (
           <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
@@ -701,11 +700,11 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
           <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
         )}
+        {isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
+          <DashboardNeueHaendler haendler={neueHaendler} />
+        )}
         {isAdmin && isWidgetVisible("unzugeordnet") && unzugeordnet.length > 0 && (
           <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
-        )}
-        {isAdmin && isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
-          <DashboardNeueHaendler haendler={neueHaendler} />
         )}
       </div>
 
