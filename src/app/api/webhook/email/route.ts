@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
-import { analysiereDokument, erkenneHaendlerAusEmail, type DokumentAnalyse } from "@/lib/openai";
-import { isFileSizeOk } from "@/lib/validation";
+import { analysiereDokument, erkenneHaendlerAusEmail, fuehreAbgleichDurch, erkenneBestellerIntelligent, pruefePreisanomalien, type DokumentAnalyse } from "@/lib/openai";
+import { isFileSizeOk, safeBestellnummer } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
@@ -181,7 +181,10 @@ export async function POST(request: NextRequest) {
 
     // 5. Idempotenz-Check (24h-Fenster, SHA-256 für kollisionsarmen Hash)
     // Fail-open: Bei DB-Fehler Email trotzdem verarbeiten (lieber Duplikat als Datenverlust)
-    const idempotencyKey = `${email_absender || ""}|${email_betreff || ""}|${email_datum || ""}`;
+    // Einbeziehung des Body-Anfangs verhindert False-Positives bei gleichem Betreff aber anderem Inhalt
+    const emailBodyHead = (body.email_text || body.email_body || "").slice(0, 200);
+    const anhaengeSignatur = Array.isArray(body.anhaenge) ? `n${body.anhaenge.length}` : "";
+    const idempotencyKey = `${email_absender || ""}|${email_betreff || ""}|${email_datum || ""}|${emailBodyHead}|${anhaengeSignatur}`;
     const { createHash } = await import("crypto");
     const idempotencyHash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 64);
     try {
@@ -489,11 +492,18 @@ export async function POST(request: NextRequest) {
           if (suMatch) {
             erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
             bestellungsart = "subunternehmer";
-          } else {
+          } else if (absenderDomain) {
+            // Domain-Match-Fallback: zuerst su.domain Feld, dann email_absender[] Einträge
             const suDomainMatch = suListe.find((su) => {
-              const suDomain = su.email?.split("@")[1]?.toLowerCase();
-              if (suDomain === absenderDomain) return true;
-              return su.email_absender?.some((addr: string) => addr.split("@")[1]?.toLowerCase() === absenderDomain);
+              const suDomainField = su.domain?.toLowerCase?.();
+              if (suDomainField && (absenderDomain === suDomainField || absenderDomain.endsWith("." + suDomainField))) return true;
+              const suEmailDomain = su.email?.split("@")[1]?.toLowerCase();
+              if (suEmailDomain === absenderDomain) return true;
+              return su.email_absender?.some((addr: string) => {
+                const normalized = addr.toLowerCase().trim();
+                if (normalized.startsWith("*@")) return absenderDomain === normalized.slice(2) || absenderDomain.endsWith("." + normalized.slice(2));
+                return addr.split("@")[1]?.toLowerCase() === absenderDomain;
+              });
             });
             if (suDomainMatch) {
               erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
@@ -711,6 +721,52 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // STUFE 4.5: KI-gestützte Besteller-Erkennung anhand Artikel + Historie
+    // Nur als Fallback aufrufen — wenn Händler bekannt und Artikel aus GPT extrahiert
+    if (!bestellerKuerzel && haendlerName && haendlerName !== absenderDomain) {
+      const gptArtikel = analyseErgebnisse.flatMap((e) => e.analyse.artikel || []).slice(0, 10);
+      if (gptArtikel.length > 0) {
+        try {
+          // Historie der letzten 50 Bestellungen pro Besteller bei diesem Händler laden
+          const { data: historie } = await supabase
+            .from("bestellungen")
+            .select("besteller_kuerzel, besteller_name, haendler_name")
+            .ilike("haendler_name", haendlerName)
+            .neq("besteller_kuerzel", "UNBEKANNT")
+            .limit(50);
+
+          if (historie && historie.length >= 5) {
+            // Besteller-Histories gruppieren (mit Artikeln aus dokumente)
+            const bestellerIds = [...new Set(historie.map((b) => b.besteller_kuerzel))];
+            const bestellerInfo = await Promise.all(bestellerIds.map(async (kuerzel) => {
+              const benutzer = historie.find((b) => b.besteller_kuerzel === kuerzel);
+              return {
+                kuerzel,
+                name: benutzer?.besteller_name || kuerzel,
+                artikel_namen: [] as string[],
+                haendler: [haendlerName],
+              };
+            }));
+
+            const artikelInput = gptArtikel.map((a) => ({
+              name: a.name,
+              menge: typeof a.menge === "number" ? a.menge : 1,
+              einzelpreis: typeof a.einzelpreis === "number" ? a.einzelpreis : 0,
+            }));
+
+            const ergebnis = await erkenneBestellerIntelligent(artikelInput, haendlerName, bestellerInfo);
+            if (ergebnis.kuerzel && ergebnis.kuerzel !== "UNBEKANNT" && ergebnis.konfidenz >= 0.6) {
+              bestellerKuerzel = ergebnis.kuerzel;
+              zuordnungsMethode = "ki_historisch";
+              logInfo("webhook/email", `Besteller via KI-Historie erkannt: ${ergebnis.kuerzel}`, { konfidenz: ergebnis.konfidenz, begruendung: ergebnis.begruendung });
+            }
+          }
+        } catch (e) {
+          logError("webhook/email", "erkenneBestellerIntelligent fehlgeschlagen", e);
+        }
+      }
+    }
+
     // STUFE 5: Fallback → UNBEKANNT
     if (!bestellerKuerzel) {
       bestellerKuerzel = "UNBEKANNT";
@@ -730,9 +786,10 @@ export async function POST(request: NextRequest) {
     let bestellungId: string;
     let bestellungNeuErstellt = false;
 
-    const erkannteBestellnummer = analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer || null;
-    const erkannteAuftragsnummer = analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer || null;
-    const erkannteLieferscheinnummer = analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer || null;
+    // safeBestellnummer: validiert Länge (max 60) + filtert Unsinn (GPT-Halluzinationen)
+    const erkannteBestellnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer);
+    const erkannteAuftragsnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer);
+    const erkannteLieferscheinnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer);
 
     // STUFE 0 Nachlauf: GPT-Bestellnummer für Matching nutzen
     if (erkannteBestellnummer) {
@@ -888,15 +945,22 @@ export async function POST(request: NextRequest) {
         const flag24h = typFlag24h[hauptTyp24h];
 
         if (flag24h) {
-          const { data: betragMatch } = await supabase
+          // Präziser Match: zuerst per haendler_id, dann exakter Name (ilike %...% war zu lose)
+          let betragQuery = supabase
             .from("bestellungen")
             .select("id, bestellnummer, auftragsnummer, betrag")
-            .ilike("haendler_name", `%${haendlerName}%`)
             .eq("betrag", erkannterBetrag24h)
             .gte("created_at", betragMatchZeitraum)
             .in("status", ["offen", "vollstaendig"])
-            .limit(1)
-            .maybeSingle();
+            .limit(1);
+
+          if (haendler?.id) {
+            betragQuery = betragQuery.eq("haendler_id", haendler.id);
+          } else {
+            betragQuery = betragQuery.eq("haendler_name", haendlerName);
+          }
+
+          const { data: betragMatch } = await betragQuery.maybeSingle();
 
           if (betragMatch) {
             // Gleiche Bestellung mit anderer Nummer → Nummern ergänzen, Duplikat verhindern
@@ -952,8 +1016,8 @@ export async function POST(request: NextRequest) {
           } else if (erkannterSubunternehmer?.id) {
             erweiterteQuery = erweiterteQuery.eq("subunternehmer_id", erkannterSubunternehmer.id);
           } else if (haendlerName) {
-            // Kein Händler in DB, aber Name erkannt → über haendler_name suchen
-            erweiterteQuery = erweiterteQuery.ilike("haendler_name", `%${haendlerName}%`);
+            // Kein Händler in DB, aber Name erkannt → exakter Name-Match (ilike ohne Prozent = case-insensitive exact)
+            erweiterteQuery = erweiterteQuery.ilike("haendler_name", haendlerName);
           } else {
             // Weder Händler-ID noch Name → erweiterte Suche nicht sinnvoll
             erweiterteQuery = null as unknown as typeof erweiterteQuery;
@@ -1522,6 +1586,128 @@ export async function POST(request: NextRequest) {
     // STATUS AKTUALISIEREN
     // =====================================================================
     await updateBestellungStatus(supabase, bestellungId);
+
+    // =====================================================================
+    // KI-ABGLEICH: Wenn alle 3 Dokumente (Bestellbestätigung + Lieferschein + Rechnung)
+    // für Material-Bestellung vorhanden, automatisch abgleichen
+    // =====================================================================
+    if (bestellungsart === "material" && dokumenteGespeichert > 0) {
+      try {
+        const { data: aktuelleBestellung } = await supabase
+          .from("bestellungen")
+          .select("hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, status")
+          .eq("id", bestellungId)
+          .maybeSingle();
+
+        // Nur wenn alle 3 Dokumente vorhanden und noch kein Abgleich existiert
+        if (aktuelleBestellung?.hat_bestellbestaetigung && aktuelleBestellung?.hat_lieferschein && aktuelleBestellung?.hat_rechnung && aktuelleBestellung.status !== "abweichung") {
+          const { data: existierenderAbgleich } = await supabase
+            .from("abgleiche")
+            .select("id")
+            .eq("bestellung_id", bestellungId)
+            .maybeSingle();
+
+          if (!existierenderAbgleich) {
+            // Alle 3 Dokumente mit ki_roh_daten laden
+            const { data: dokumenteFuerAbgleich } = await supabase
+              .from("dokumente")
+              .select("typ, ki_roh_daten")
+              .eq("bestellung_id", bestellungId)
+              .in("typ", ["bestellbestaetigung", "lieferschein", "rechnung"]);
+
+            const bb = dokumenteFuerAbgleich?.find((d) => d.typ === "bestellbestaetigung")?.ki_roh_daten as DokumentAnalyse | null;
+            const ls = dokumenteFuerAbgleich?.find((d) => d.typ === "lieferschein")?.ki_roh_daten as DokumentAnalyse | null;
+            const re = dokumenteFuerAbgleich?.find((d) => d.typ === "rechnung")?.ki_roh_daten as DokumentAnalyse | null;
+
+            if (bb && ls && re) {
+              const abgleichErgebnis = await fuehreAbgleichDurch(bb, ls, re);
+              await supabase.from("abgleiche").insert({
+                bestellung_id: bestellungId,
+                status: abgleichErgebnis.status,
+                abweichungen: abgleichErgebnis.abweichungen,
+                ki_zusammenfassung: abgleichErgebnis.zusammenfassung,
+              });
+
+              if (abgleichErgebnis.status === "abweichung") {
+                await supabase.from("bestellungen").update({ status: "abweichung", updated_at: new Date().toISOString() }).eq("id", bestellungId);
+                // Automatischer Kommentar mit Details
+                await supabase.from("kommentare").insert({
+                  bestellung_id: bestellungId,
+                  autor_kuerzel: "SYSTEM",
+                  autor_name: "KI-Abgleich",
+                  text: `Abweichungen erkannt: ${abgleichErgebnis.zusammenfassung}`,
+                });
+                logInfo("webhook/email", "KI-Abgleich: Abweichung erkannt", { bestellungId, anzahl: abgleichErgebnis.abweichungen.length });
+              } else {
+                logInfo("webhook/email", "KI-Abgleich: OK", { bestellungId });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        logError("webhook/email", "KI-Abgleich fehlgeschlagen", e);
+      }
+    }
+
+    // =====================================================================
+    // PREISANOMALIE-CHECK: Bei neuen Rechnungen Preissprünge vom Händler prüfen
+    // Nur wenn >= 3 historische Rechnungen vom gleichen Händler existieren
+    // =====================================================================
+    if (haendlerName) {
+      const neueRechnung = analyseErgebnisse.find((e) => e.analyse.typ === "rechnung");
+      const neueArtikel = neueRechnung?.analyse.artikel || [];
+      if (neueArtikel.length > 0) {
+        try {
+          const { data: historieRechnungen } = await supabase
+            .from("dokumente")
+            .select("artikel")
+            .eq("typ", "rechnung")
+            .neq("bestellung_id", bestellungId)
+            .not("artikel", "is", null)
+            .limit(20);
+
+          if (historieRechnungen && historieRechnungen.length >= 3) {
+            // Historische Preise pro Artikel sammeln
+            const preisHistorie: Record<string, number[]> = {};
+            for (const rechnung of historieRechnungen) {
+              const artikel = rechnung.artikel as { name: string; einzelpreis: number }[] | null;
+              if (!Array.isArray(artikel)) continue;
+              for (const a of artikel) {
+                if (a.name && typeof a.einzelpreis === "number" && a.einzelpreis > 0) {
+                  if (!preisHistorie[a.name]) preisHistorie[a.name] = [];
+                  preisHistorie[a.name].push(a.einzelpreis);
+                }
+              }
+            }
+
+            const historischeArr = Object.entries(preisHistorie)
+              .filter(([, preise]) => preise.length >= 2)
+              .map(([name, preise]) => ({ name, preise }));
+
+            if (historischeArr.length > 0) {
+              const aktuelleArtikel = neueArtikel
+                .filter((a) => a.name && typeof a.einzelpreis === "number" && a.einzelpreis > 0)
+                .map((a) => ({ name: a.name, einzelpreis: a.einzelpreis, menge: typeof a.menge === "number" ? a.menge : 1 }));
+
+              if (aktuelleArtikel.length > 0) {
+                const anomalien = await pruefePreisanomalien(aktuelleArtikel, historischeArr);
+                if (anomalien.hat_anomalie && anomalien.warnungen.length > 0) {
+                  await supabase.from("kommentare").insert({
+                    bestellung_id: bestellungId,
+                    autor_kuerzel: "SYSTEM",
+                    autor_name: "KI-Preisanomalie",
+                    text: `Preisanomalien erkannt: ${anomalien.warnungen.map((w) => `${w.artikel}: ${w.aktueller_preis.toFixed(2)}€ vs. Ø ${w.historischer_durchschnitt.toFixed(2)}€ (${w.abweichung_prozent > 0 ? "+" : ""}${w.abweichung_prozent.toFixed(1)}%, ${w.bewertung})`).join("; ")}`,
+                  });
+                  logInfo("webhook/email", "Preisanomalie erkannt", { bestellungId, count: anomalien.warnungen.length });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          logError("webhook/email", "Preisanomalie-Check fehlgeschlagen", e);
+        }
+      }
+    }
 
     // =====================================================================
     // ABO-LOGIK: Betragsabweichung prüfen + nächste Rechnung weiterschalten

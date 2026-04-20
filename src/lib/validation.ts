@@ -51,3 +51,18 @@ const KUERZEL_REGEX = /^[A-Z]{2,5}$/;
 export function isValidKuerzel(kuerzel: string): boolean {
   return KUERZEL_REGEX.test(kuerzel);
 }
+
+/**
+ * Gibt eine gültige Bestellnummer zurück oder null wenn:
+ * - leer / nicht String
+ * - zu lang (> 60 Zeichen, GPT-Halluzination)
+ * - nur Whitespace/Sonderzeichen
+ */
+export function safeBestellnummer(value: unknown, maxLen = 60): string | null {
+  if (!value || typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > maxLen) return null;
+  // Muss mindestens ein alphanumerisches Zeichen enthalten
+  if (!/[A-Za-z0-9]/.test(trimmed)) return null;
+  return trimmed;
+}

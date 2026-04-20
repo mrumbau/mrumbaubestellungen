@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { analysiereDokument, fuehreAbgleichDurch } from "@/lib/openai";
-import { isValidUUID, isAllowedMimeType, isFileSizeOk, sanitizeFilename } from "@/lib/validation";
+import { isValidUUID, isAllowedMimeType, isFileSizeOk, sanitizeFilename, safeBestellnummer } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
@@ -163,9 +163,9 @@ export async function POST(request: NextRequest) {
         quelle: mime_type.startsWith("image/") ? "scan_foto" : "scan_upload",
         storage_pfad: uploadError ? null : storagePfad,
         ki_roh_daten: analyse,
-        bestellnummer_erkannt: analyse.bestellnummer || null,
-        auftragsnummer: analyse.auftragsnummer || null,
-        lieferscheinnummer: analyse.lieferscheinnummer || null,
+        bestellnummer_erkannt: safeBestellnummer(analyse.bestellnummer),
+        auftragsnummer: safeBestellnummer(analyse.auftragsnummer),
+        lieferscheinnummer: safeBestellnummer(analyse.lieferscheinnummer),
         artikel: analyse.artikel || null,
         gesamtbetrag: safeNum(analyse.gesamtbetrag),
         netto: safeNum(analyse.netto),
@@ -213,10 +213,13 @@ export async function POST(request: NextRequest) {
       updateFields.hat_leistungsnachweis = true;
     }
 
-    // Nummern setzen
-    if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
-    if (analyse.auftragsnummer) updateFields.auftragsnummer = analyse.auftragsnummer;
-    if (analyse.lieferscheinnummer) updateFields.lieferscheinnummer = analyse.lieferscheinnummer;
+    // Nummern setzen (validiert Länge + filtert Unsinn)
+    const safeBNr = safeBestellnummer(analyse.bestellnummer);
+    const safeANr = safeBestellnummer(analyse.auftragsnummer);
+    const safeLNr = safeBestellnummer(analyse.lieferscheinnummer);
+    if (safeBNr) updateFields.bestellnummer = safeBNr;
+    if (safeANr) updateFields.auftragsnummer = safeANr;
+    if (safeLNr) updateFields.lieferscheinnummer = safeLNr;
 
     // Betrag setzen (für alle Nicht-Versand-Typen)
     if (erkannterTyp !== "versandbestaetigung") {

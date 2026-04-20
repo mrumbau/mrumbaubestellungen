@@ -42,6 +42,15 @@ export async function POST(request: NextRequest) {
     let versandGeloescht = 0;
     if (versandOnly && versandOnly.length > 0) {
       const ids = versandOnly.map((b) => b.id);
+
+      // Audit-Log VOR dem Delete: Welche Bestellungen wurden wann und warum gelöscht?
+      const auditDetails = versandOnly.map((b) => `${b.bestellnummer || "ohne-nr"} (${b.haendler_name || "unbekannt"})`).join(", ");
+      await supabase.from("webhook_logs").insert({
+        typ: "cron_cleanup",
+        status: "info",
+        fehler_text: `Versand-only cleanup nach ${stunden}h: ${ids.length} Bestellungen → ${auditDetails}`,
+      });
+
       await supabase.from("webhook_logs").delete().in("bestellung_id", ids);
       await supabase.from("kommentare").delete().in("bestellung_id", ids);
       await supabase.from("dokumente").delete().in("bestellung_id", ids);

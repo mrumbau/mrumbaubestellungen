@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logError } from "./logger";
 
 // =====================================================================
 // Bestellungsart: Material vs. Subunternehmer
@@ -76,6 +77,7 @@ export async function updateBestellungStatus(
     .maybeSingle();
 
   if (!bestellung) {
+    logError("updateBestellungStatus", "Bestellung nicht gefunden", { bestellungId });
     return "offen";
   }
 

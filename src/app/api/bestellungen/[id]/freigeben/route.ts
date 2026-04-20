@@ -70,32 +70,26 @@ export async function POST(
       return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
     }
 
-    // Status ZUERST atomar setzen (Doppelklick-Schutz), DANN Freigabe-Eintrag erstellen
-    // So gibt es keine orphaned Freigaben bei fehlgeschlagenem Status-Update
-    const { error: updateError } = await supabase
-      .from("bestellungen")
-      .update({ status: "freigegeben", updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .neq("status", "freigegeben");
+    // Atomare Freigabe via RPC: Status-Update + Freigabe-Insert in einer Transaktion.
+    // Unique Constraint auf freigaben(bestellung_id) verhindert Duplikate bei Doppelklick.
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("freigeben_bestellung", {
+      p_bestellung_id: id,
+      p_kuerzel: profil.kuerzel,
+      p_name: profil.name,
+      p_kommentar: body.kommentar || null,
+    });
 
-    if (updateError) {
-      logError("/api/bestellungen/[id]/freigeben", "Status-Update fehlgeschlagen", updateError);
-      return NextResponse.json({ error: "Status konnte nicht aktualisiert werden" }, { status: 500 });
+    if (rpcError) {
+      logError("/api/bestellungen/[id]/freigeben", "Freigabe-RPC fehlgeschlagen", rpcError);
+      return NextResponse.json({ error: "Freigabe konnte nicht durchgeführt werden" }, { status: 500 });
     }
 
-    // Freigabe-Eintrag erstellen (Status ist bereits gesetzt)
-    const { error: freigabeError } = await supabase
-      .from("freigaben")
-      .insert({
-        bestellung_id: id,
-        freigegeben_von_kuerzel: profil.kuerzel,
-        freigegeben_von_name: profil.name,
-        kommentar: body.kommentar || null,
-      });
-
-    if (freigabeError) {
-      logError("/api/bestellungen/[id]/freigeben", "Freigabe-Eintrag fehlgeschlagen (Status bereits gesetzt)", freigabeError);
-      // Status ist bereits korrekt gesetzt — Freigabe-Log fehlt aber ist nicht kritisch
+    if (rpcResult?.success === false) {
+      if (rpcResult.error === "bereits_freigegeben") {
+        return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
+      }
+      logError("/api/bestellungen/[id]/freigeben", "Freigabe-RPC Fehler", rpcResult);
+      return NextResponse.json({ error: "Freigabe fehlgeschlagen" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
