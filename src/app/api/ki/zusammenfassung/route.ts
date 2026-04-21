@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { generiereWochenzusammenfassung } from "@/lib/openai";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { parseTimeRange, computeRangeBounds } from "@/lib/time-range";
 
-// GET /api/ki/zusammenfassung – KI-Dashboard-Zusammenfassung
-export async function GET() {
+// GET /api/ki/zusammenfassung?range=30d – KI-Dashboard-Zusammenfassung für Zeitraum
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
 
@@ -16,12 +17,19 @@ export async function GET() {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
-    // Neueste 50 Bestellungen laden (RLS filtert automatisch nach Rolle)
+    // Zeitraum aus Query-Param; default 30d
+    const range = parseTimeRange(request.nextUrl.searchParams.get("range"));
+    const bounds = computeRangeBounds(range);
+
+    // Bestellungen im gewählten Zeitraum laden (RLS filtert automatisch nach Rolle).
+    // Limit 100 — bei längeren Zeiträumen nicht alle, aber repräsentativ für Zusammenfassung.
     const { data: bestellungen } = await supabase
       .from("bestellungen")
       .select("*")
+      .gte("created_at", bounds.start.toISOString())
+      .lte("created_at", bounds.end.toISOString())
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     const alle = bestellungen || [];
 
@@ -99,20 +107,22 @@ export async function GET() {
 
     // Write-through in Dashboard-Cache — beim nächsten Page-Load wird er direkt geladen
     // statt den OpenAI-Call zu wiederholen. Upsert über UNIQUE(user_id, typ).
+    // `range` im Inhalt gespeichert, damit Client Cache für Range-Mismatch erkennen kann.
     const generatedAt = new Date().toISOString();
+    const zusammenfassungMitRange = { ...zusammenfassung, range, rangeLabel: bounds.label };
     await supabase
       .from("dashboard_ki_cache")
       .upsert(
         {
           user_id: user.id,
           typ: "zusammenfassung",
-          inhalt: zusammenfassung,
+          inhalt: zusammenfassungMitRange,
           generated_at: generatedAt,
         },
         { onConflict: "user_id,typ" },
       );
 
-    return NextResponse.json({ ...zusammenfassung, generated_at: generatedAt });
+    return NextResponse.json({ ...zusammenfassungMitRange, generated_at: generatedAt });
   } catch (err) {
     logError("/api/ki/zusammenfassung", "Unerwarteter Fehler", err);
     return NextResponse.json(

@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/cn";
+import type { TimeRange } from "@/components/ui/time-range-picker";
 
 interface KIZusammenfassung {
   zusammenfassung: string;
   dringend: string[];
   highlights: string[];
+  /** Für welchen Range wurde diese Zusammenfassung generiert? Wichtig damit Client
+      einen Range-Mismatch erkennen kann (Cache war für anderen Zeitraum). */
+  range?: TimeRange;
+  rangeLabel?: string;
 }
 
 function relativeZeit(iso: string): string {
@@ -32,20 +37,34 @@ function istStale(iso: string): boolean {
 export function DashboardKIZusammenfassung({
   initial = null,
   initialGeneratedAt = null,
+  currentRange = "30d",
 }: {
   initial?: KIZusammenfassung | null;
   initialGeneratedAt?: string | null;
+  /** Aktuell gewählter Zeitraum — Cache wird nur angezeigt, wenn er dazu passt */
+  currentRange?: TimeRange;
 }) {
-  const [data, setData] = useState<KIZusammenfassung | null>(initial);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(initialGeneratedAt);
+  // Cache nur verwenden wenn er für den aktuell gewählten Range generiert wurde.
+  // Sonst zeigt der User Daten, die nicht zum Picker passen — verwirrend.
+  const cacheFitsRange = initial?.range === currentRange;
+  const [data, setData] = useState<KIZusammenfassung | null>(cacheFitsRange ? initial : null);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(cacheFitsRange ? initialGeneratedAt : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Wenn der Range wechselt (URL-Navigation), State anhand des neuen Caches neu setzen.
+  useEffect(() => {
+    const fits = initial?.range === currentRange;
+    setData(fits ? initial : null);
+    setGeneratedAt(fits ? initialGeneratedAt : null);
+    setError(null);
+  }, [currentRange, initial, initialGeneratedAt]);
 
   async function laden() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/ki/zusammenfassung");
+      const res = await fetch(`/api/ki/zusammenfassung?range=${currentRange}`);
       if (!res.ok) throw new Error("Fehler beim Laden");
       const json = await res.json();
       setData(json);

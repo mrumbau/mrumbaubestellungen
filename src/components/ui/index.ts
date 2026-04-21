@@ -52,6 +52,9 @@ export type { ActionMenuItem } from "./action-menu";
 export { Sparkline } from "./sparkline";
 export type { SparklineProps } from "./sparkline";
 
+export { TimeRangePicker, TIME_RANGE_OPTIONS } from "./time-range-picker";
+export type { TimeRange } from "./time-range-picker";
+
 export { SavedViewsMenu, useSavedViews } from "./saved-views";
 export type { SavedView, UseSavedViewsResult } from "./saved-views";
 

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { TimeRangePicker, type TimeRange } from "@/components/ui/time-range-picker";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
@@ -129,13 +130,17 @@ export interface DashboardWidgetsProps {
   mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[];
   kiZusammenfassungCache?: KiCacheEintrag | null;
   kiPriorisierungCache?: KiCacheEintrag | null;
-  /** Trend-Daten für Volumen-Widget (14-Tage Sparkline + MoM-Delta) */
+  /** Trend-Daten für Volumen-Widget (Sparkline + Delta vs. Vergleichs-Range) */
   volumenTrend?: {
     freigegebenSparkline: number[];
     gesamtSparkline: number[];
     freigegebenMoM: number | null;
     gesamtMoM: number | null;
+    /** Menschenlesbares Label des aktuellen Zeitraums ("Letzte 30 Tage", "März 2026") */
+    rangeLabel: string;
   };
+  /** Aktuell ausgewählter Zeitraum (aus URL-Param gesteuert) */
+  range?: TimeRange;
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -415,6 +420,17 @@ function StatCard({
   );
 }
 
+// Vergleichs-Label für MoM-Delta, abhängig vom Range
+function comparisonLabelFor(range: TimeRange): string {
+  switch (range) {
+    case "7d": return "vs. 7 T davor";
+    case "30d": return "vs. 30 T davor";
+    case "90d": return "vs. 90 T davor";
+    case "month": return "vs. Vormonat";
+    case "prev-month": return "vs. Vor-Vormonat";
+  }
+}
+
 // ─── Volumen Card ────────────────────────────────────────
 
 function VolumenCard({
@@ -423,6 +439,7 @@ function VolumenCard({
   color,
   sparkline,
   momProzent,
+  comparisonLabel,
   density,
 }: {
   label: string;
@@ -430,6 +447,8 @@ function VolumenCard({
   color: string;
   sparkline?: number[];
   momProzent: number | null;
+  /** "vs. Vormonat", "vs. 30T davor" etc — range-abhängig vom Caller */
+  comparisonLabel: string;
   density: Density;
 }) {
   const padding = density === "compact" ? "p-3" : "p-5";
@@ -478,7 +497,7 @@ function VolumenCard({
           {hasDelta && (
             <span className="text-[11px] font-mono-amount text-foreground-muted whitespace-nowrap">
               <span aria-hidden="true">{pfeil}</span> {prozentText}
-              <span className="text-foreground-subtle ml-1">vs. Vormonat</span>
+              <span className="text-foreground-subtle ml-1">{comparisonLabel}</span>
             </span>
           )}
         </div>
@@ -620,9 +639,12 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     kiZusammenfassungCache,
     kiPriorisierungCache,
     volumenTrend,
+    range = "30d",
   } = props;
 
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [statsVisible, setStatsVisible] = useState<Record<string, boolean>>(savedConfig.stats || {});
   const [widgetsVisible, setWidgetsVisible] = useState<Record<string, boolean>>(savedConfig.widgets || {});
   const statsRef = useRef(statsVisible);
@@ -646,6 +668,20 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
       }
       return next;
     });
+  }
+
+  // Range ändern: URL-Param aktualisieren → Server-Page rendert neu mit anderem Range.
+  // router.push (statt replace), damit Browser-Back funktioniert.
+  function changeRange(next: TimeRange) {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (next === "30d") {
+      // Default nicht persistieren — cleaner URL
+      params.delete("range");
+    } else {
+      params.set("range", next);
+    }
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
   }
 
   // Live-Refresh: auto-reload every 5 minutes
@@ -720,10 +756,11 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
 
   return (
     <div>
-      {/* Settings + Live Refresh + Density-Toggle */}
-      <div className="flex items-center justify-between mb-4 gap-2">
+      {/* Settings-Row: Refresh links, rechts Range-Picker + Density + Widget-Settings */}
+      <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <RefreshIndicator lastRefresh={lastRefresh} onRefresh={manualRefresh} />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <TimeRangePicker value={range} onChange={changeRange} />
           <DensityToggle density={density} onToggle={toggleDensity} />
           <WidgetSettings
             statsVisible={statsVisible}
@@ -953,35 +990,45 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Volumen-Übersicht — jetzt mit 14-Tage-Sparkline + MoM-Delta.
+      {/* Volumen-Übersicht — Range-scoped: Werte, Sparkline, Delta beziehen sich auf aktuellen Zeitraum.
           Farbigkeit disziplinär: Freigegeben = Status-Grün, Gesamt = Brand-Rot. */}
       {isWidgetVisible("volumen") && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <VolumenCard
-            label="Freigegebenes Volumen"
-            amount={freigegebenBetrag}
-            color="var(--status-freigegeben)"
-            sparkline={volumenTrend?.freigegebenSparkline}
-            momProzent={volumenTrend?.freigegebenMoM ?? null}
-            density={density}
-          />
-          <VolumenCard
-            label="Gesamt-Volumen"
-            amount={gesamtVolumen}
-            color="var(--mr-red)"
-            sparkline={volumenTrend?.gesamtSparkline}
-            momProzent={volumenTrend?.gesamtMoM ?? null}
-            density={density}
-          />
+        <div className="mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <VolumenCard
+              label="Freigegebenes Volumen"
+              amount={freigegebenBetrag}
+              color="var(--status-freigegeben)"
+              sparkline={volumenTrend?.freigegebenSparkline}
+              momProzent={volumenTrend?.freigegebenMoM ?? null}
+              comparisonLabel={comparisonLabelFor(range)}
+              density={density}
+            />
+            <VolumenCard
+              label="Gesamt-Volumen"
+              amount={gesamtVolumen}
+              color="var(--mr-red)"
+              sparkline={volumenTrend?.gesamtSparkline}
+              momProzent={volumenTrend?.gesamtMoM ?? null}
+              comparisonLabel={comparisonLabelFor(range)}
+              density={density}
+            />
+          </div>
+          {volumenTrend?.rangeLabel && (
+            <p className="text-[10px] text-foreground-subtle mt-2 font-mono-amount">
+              Zeitraum: {volumenTrend.rangeLabel}
+            </p>
+          )}
         </div>
       )}
 
       {/* KI-Zusammenfassung — narrativ, fasst die Zahlen oben zusammen.
-          Cache-initialisiert, auto-rendered wenn cached, sonst "Generieren"-Button. */}
+          Cache-initialisiert + range-aware: Cache wird nur verwendet wenn er zum aktuellen Range passt. */}
       {isWidgetVisible("ki_zusammenfassung") && (
         <DashboardKIZusammenfassung
           initial={kiZusammenfassungCache?.inhalt as Parameters<typeof DashboardKIZusammenfassung>[0]["initial"] ?? null}
           initialGeneratedAt={kiZusammenfassungCache?.generated_at ?? null}
+          currentRange={range}
         />
       )}
 
