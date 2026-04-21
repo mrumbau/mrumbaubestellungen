@@ -1,11 +1,13 @@
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceClient } from "@/lib/supabase";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PasswortAendern } from "@/components/passwort-aendern";
+import { TeamStats } from "@/components/team-stats";
 import {
   IconBuilding,
   IconTool,
@@ -33,10 +35,15 @@ export default async function EinstellungenIndexPage() {
 
   // Counts für fachliche Stammdaten: Admin + Besteller brauchen sie.
   // Benutzer-Count ist System-Info und bleibt Admin-exklusiv.
+  // Team-Stats (bestellungen pro besteller) nutzt Service-Role für firmenweite Aggregation,
+  // unabhängig von der RLS-Scope des betrachtenden Users — gewollt für Team-Transparenz.
   let counts: Record<string, number> = {};
+  let teamStatsCounts: Record<string, number> = {};
+  let teamNameMap: Record<string, string> = {};
   if (!istBuchhaltung) {
     const supabase = await createServerSupabaseClient();
-    const [h, su, p, a, bl, u] = await Promise.all([
+    const service = createServiceClient();
+    const [h, su, p, a, bl, u, bestellerAlle, bestellerNames] = await Promise.all([
       supabase.from("haendler").select("id", { count: "exact", head: true }),
       supabase.from("subunternehmer").select("id", { count: "exact", head: true }),
       supabase.from("projekte").select("id", { count: "exact", head: true }),
@@ -45,6 +52,8 @@ export default async function EinstellungenIndexPage() {
       istAdmin
         ? supabase.from("benutzer_rollen").select("id", { count: "exact", head: true })
         : Promise.resolve({ count: 0 }),
+      service.from("bestellungen").select("besteller_kuerzel"),
+      service.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller"),
     ]);
     counts = {
       haendler: h.count ?? 0,
@@ -54,6 +63,12 @@ export default async function EinstellungenIndexPage() {
       blacklist: bl.count ?? 0,
       benutzer: u.count ?? 0,
     };
+    for (const b of (bestellerAlle.data || []) as { besteller_kuerzel: string }[]) {
+      teamStatsCounts[b.besteller_kuerzel] = (teamStatsCounts[b.besteller_kuerzel] || 0) + 1;
+    }
+    teamNameMap = Object.fromEntries(
+      ((bestellerNames.data || []) as { kuerzel: string; name: string }[]).map((b) => [b.kuerzel, b.name]),
+    );
   }
 
   return (
@@ -134,6 +149,18 @@ export default async function EinstellungenIndexPage() {
               />
             )}
           </div>
+        </section>
+      )}
+
+      {!istBuchhaltung && Object.keys(teamStatsCounts).filter((k) => k !== "UNBEKANNT").length > 0 && (
+        <section aria-labelledby="team-heading" className="flex flex-col gap-3">
+          <h2
+            id="team-heading"
+            className="font-headline text-[13px] uppercase tracking-[0.14em] text-foreground-subtle"
+          >
+            Team
+          </h2>
+          <TeamStats counts={teamStatsCounts} nameMap={teamNameMap} />
         </section>
       )}
 

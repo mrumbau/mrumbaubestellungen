@@ -10,6 +10,7 @@ import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
 import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
 import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
 import { DashboardNeueSubunternehmer } from "@/components/dashboard-neue-subunternehmer";
+import { Sparkline } from "@/components/ui/sparkline";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 
@@ -121,12 +122,20 @@ export interface DashboardWidgetsProps {
   neueSubunternehmer: NeuerSubunternehmer[];
   aktionenNoetig: BestellungItem[];
   letzte: BestellungItem[];
-  bestellerStats: Record<string, number>;
+  /** @deprecated Peer-Stats wurden nach /einstellungen verschoben. Prop bleibt für API-Kompatibilität, wird nicht mehr gerendert. */
+  bestellerStats?: Record<string, number>;
   aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
   aboJaehrlicheKosten?: number;
   mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[];
   kiZusammenfassungCache?: KiCacheEintrag | null;
   kiPriorisierungCache?: KiCacheEintrag | null;
+  /** Trend-Daten für Volumen-Widget (14-Tage Sparkline + MoM-Delta) */
+  volumenTrend?: {
+    freigegebenSparkline: number[];
+    gesamtSparkline: number[];
+    freigegebenMoM: number | null;
+    gesamtMoM: number | null;
+  };
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -167,15 +176,47 @@ const WIDGET_DEFS: WidgetDef[] = [
   // System-Operation (Bestellung einem Besteller zuweisen): nur Admin
   { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
   { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true },
-  { id: "aktionen", label: "Aktion erforderlich", defaultVisible: true },
+  { id: "aktionen", label: "Offene Bestellungen", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },
-  { id: "besteller_stats", label: "Bestellungen pro Besteller", defaultVisible: true },
+  // besteller_stats wurde nach /einstellungen verschoben — Dashboard bleibt Workflow-fokussiert
 ];
 
 // ─── Auto-Refresh Interval ──────────────────────────────
 
 const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+// ─── Density-Persistence ─────────────────────────────────
+const DENSITY_STORAGE_KEY = "dashboard-density";
+function loadDensity(): Density {
+  if (typeof window === "undefined") return "comfortable";
+  const v = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+  return v === "compact" ? "compact" : "comfortable";
+}
+
+// ─── Density-Toggle-Button ───────────────────────────────
+function DensityToggle({ density, onToggle }: { density: Density; onToggle: () => void }) {
+  const isCompact = density === "compact";
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={isCompact ? "Komfortable Ansicht" : "Kompakte Ansicht"}
+      title={isCompact ? "Komfortable Ansicht" : "Kompakte Ansicht"}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg transition-colors text-foreground-subtle bg-input border border-line hover:bg-line-subtle hover:text-foreground-muted"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        {isCompact ? (
+          // Komfortabel-Icon (große Boxen)
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+        ) : (
+          // Kompakt-Icon (drei Zeilen)
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+        )}
+      </svg>
+      {isCompact ? "Komfortabel" : "Kompakt"}
+    </button>
+  );
+}
 
 // ─── Collapsible Card ────────────────────────────────────
 
@@ -340,17 +381,108 @@ function ToggleRow({ label, active, onToggle, badge }: { label: string; active: 
   );
 }
 
+// ─── Density ─────────────────────────────────────────────
+type Density = "comfortable" | "compact";
+
 // ─── Stat Card ───────────────────────────────────────────
 
-function StatCard({ label, value, color, alert }: { label: string; value: number; color: string; alert?: boolean }) {
+function StatCard({
+  label,
+  value,
+  color,
+  alert,
+  density,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  alert?: boolean;
+  density: Density;
+}) {
+  const padding = density === "compact" ? "p-3" : "p-5";
+  const gradientHeight = density === "compact" ? "h-6" : "h-8";
+  const valueSize = density === "compact" ? "text-xl" : "text-3xl";
+  const valueSpacing = density === "compact" ? "mt-1" : "mt-2";
   return (
-    <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: `3px solid ${color}` }}>
-      <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
+    <div className={`card card-hover ${padding} relative overflow-hidden`} style={{ borderTop: `3px solid ${color}` }}>
+      <div className={`absolute top-0 left-0 right-0 ${gradientHeight} opacity-[0.07]`} style={{ background: `linear-gradient(180deg, ${color}, transparent)` }} />
       <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">{label}</p>
-      <div className="flex items-end justify-between mt-2 relative">
-        <p className={`font-mono-amount text-3xl font-bold text-foreground ${alert ? "text-error" : ""}`}>{value}</p>
+      <div className={`flex items-end justify-between ${valueSpacing} relative`}>
+        <p className={`font-mono-amount ${valueSize} font-bold text-foreground ${alert ? "text-error" : ""}`}>{value}</p>
         {alert && value > 0 && <span className="pulse-urgent w-2 h-2 rounded-full bg-error mb-2" />}
       </div>
+    </div>
+  );
+}
+
+// ─── Volumen Card ────────────────────────────────────────
+
+function VolumenCard({
+  label,
+  amount,
+  color,
+  sparkline,
+  momProzent,
+  density,
+}: {
+  label: string;
+  amount: number;
+  color: string;
+  sparkline?: number[];
+  momProzent: number | null;
+  density: Density;
+}) {
+  const padding = density === "compact" ? "p-3" : "p-5";
+  const gradientHeight = density === "compact" ? "h-6" : "h-8";
+  const amountSize = density === "compact" ? "text-lg" : "text-2xl";
+  const amountSpacing = density === "compact" ? "mt-1" : "mt-2";
+  const sparklineHeight = density === "compact" ? 18 : 24;
+
+  // MoM-Richtung: Pfeil als Icon, Farbe bewusst neutral (foreground-muted) —
+  // ein fallendes Volumen ist nicht automatisch "rot" (Jahreszeiten, Urlaubszeiten).
+  // Nur das Vorzeichen zeigt Richtung, nicht das Ausmaß eines Problems.
+  const hasDelta = momProzent !== null && Number.isFinite(momProzent);
+  const pfeil =
+    !hasDelta ? null : momProzent > 0.5 ? "↑" : momProzent < -0.5 ? "↓" : "→";
+  const prozentText = hasDelta ? `${Math.abs(momProzent as number).toFixed(0)}%` : null;
+
+  return (
+    <div
+      className={`card card-hover ${padding} relative overflow-hidden`}
+      style={{ borderTop: `3px solid ${color}` }}
+    >
+      <div
+        className={`absolute top-0 left-0 right-0 ${gradientHeight} opacity-[0.07]`}
+        style={{ background: `linear-gradient(180deg, ${color}, transparent)` }}
+        aria-hidden="true"
+      />
+      <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
+        {label}
+      </p>
+      <p className={`font-mono-amount ${amountSize} ${amountSpacing} font-bold text-foreground relative`}>
+        {formatBetrag(amount)}
+      </p>
+      {(sparkline && sparkline.length > 1) || hasDelta ? (
+        <div className="flex items-center justify-between gap-3 mt-2 relative">
+          {sparkline && sparkline.length > 1 ? (
+            <Sparkline
+              data={sparkline}
+              color={color}
+              height={sparklineHeight}
+              width={80}
+              ariaLabel={`${label} Trend der letzten 14 Tage`}
+            />
+          ) : (
+            <span />
+          )}
+          {hasDelta && (
+            <span className="text-[11px] font-mono-amount text-foreground-muted whitespace-nowrap">
+              <span aria-hidden="true">{pfeil}</span> {prozentText}
+              <span className="text-foreground-subtle ml-1">vs. Vormonat</span>
+            </span>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -482,12 +614,12 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     neueSubunternehmer,
     aktionenNoetig,
     letzte,
-    bestellerStats,
     aboHinweise,
     aboJaehrlicheKosten,
     mahnungen,
     kiZusammenfassungCache,
     kiPriorisierungCache,
+    volumenTrend,
   } = props;
 
   const router = useRouter();
@@ -499,6 +631,22 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   widgetsRef.current = widgetsVisible;
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [density, setDensity] = useState<Density>("comfortable");
+
+  // Density aus localStorage beim Mount laden (nicht SSR — daher useEffect)
+  useEffect(() => {
+    setDensity(loadDensity());
+  }, []);
+
+  function toggleDensity() {
+    setDensity((prev) => {
+      const next = prev === "comfortable" ? "compact" : "comfortable";
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(DENSITY_STORAGE_KEY, next);
+      }
+      return next;
+    });
+  }
 
   // Live-Refresh: auto-reload every 5 minutes
   useEffect(() => {
@@ -558,11 +706,6 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
 
   const row1Stats = statCards.filter((s) => s.row === 1 && isStatVisible(s.id));
   const row2Stats = statCards.filter((s) => s.row === 2 && isStatVisible(s.id));
-  // UNBEKANNT rausfiltern (wird im Unzugeordnet-Widget angezeigt)
-  const bestellerEntries = Object.entries(bestellerStats).filter(([k]) => k !== "UNBEKANNT");
-
-  // Map kuerzel → name
-  const bestellerNameMap = new Map(bestellerListe.map((b) => [b.kuerzel, b.name]));
 
   // "Zu prüfen"-Section: aggregierter Count über alle gerenderten Confirm-Widgets.
   // Role-dependent: Admin sieht Unzugeordnet (System-Op), Besteller nicht. Das ergibt
@@ -577,17 +720,20 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
 
   return (
     <div>
-      {/* Settings + Live Refresh */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Settings + Live Refresh + Density-Toggle */}
+      <div className="flex items-center justify-between mb-4 gap-2">
         <RefreshIndicator lastRefresh={lastRefresh} onRefresh={manualRefresh} />
-        <WidgetSettings
-          statsVisible={statsVisible}
-          widgetsVisible={widgetsVisible}
-          onToggleStat={toggleStat}
-          onToggleWidget={toggleWidget}
-          onReset={resetConfig}
-          isAdmin={isAdmin}
-        />
+        <div className="flex items-center gap-2">
+          <DensityToggle density={density} onToggle={toggleDensity} />
+          <WidgetSettings
+            statsVisible={statsVisible}
+            widgetsVisible={widgetsVisible}
+            onToggleStat={toggleStat}
+            onToggleWidget={toggleWidget}
+            onReset={resetConfig}
+            isAdmin={isAdmin}
+          />
+        </div>
       </div>
 
       {/* Mahnungen — prominente Warnung (Error-Semantik) */}
@@ -657,169 +803,15 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </section>
       )}
 
-      {/* Stat Cards Row 1 — responsive grid */}
-      {row1Stats.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          {row1Stats.map((s) => (
-            <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} />
-          ))}
-        </div>
-      )}
-
-      {/* Industrial line — only if both rows have cards */}
-      {row1Stats.length > 0 && row2Stats.length > 0 && (
-        <div className="industrial-line mb-4" />
-      )}
-
-      {/* Stat Cards Row 2 — responsive grid */}
-      {row2Stats.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {row2Stats.map((s) => (
-            <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} />
-          ))}
-        </div>
-      )}
-
-      {/* KI-Zusammenfassung — Cache-initialisiert, auto-rendered wenn cached,
-          sonst "Generieren"-Button (First-Time-UX) */}
-      {isWidgetVisible("ki_zusammenfassung") && (
-        <DashboardKIZusammenfassung
-          initial={kiZusammenfassungCache?.inhalt as Parameters<typeof DashboardKIZusammenfassung>[0]["initial"] ?? null}
-          initialGeneratedAt={kiZusammenfassungCache?.generated_at ?? null}
-        />
-      )}
-
-      {/* Volumen-Übersicht — Freigegeben = Status-Farbe, Gesamt = Brand-Identität */}
-      {isWidgetVisible("volumen") && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid var(--status-freigegeben)" }}>
-            <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, var(--status-freigegeben), transparent)" }} />
-            <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Freigegebenes Volumen</p>
-            <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">{formatBetrag(freigegebenBetrag)}</p>
-          </div>
-          <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid var(--mr-red)" }}>
-            <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.07]" style={{ background: "linear-gradient(180deg, var(--mr-red), transparent)" }} />
-            <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Gesamt-Volumen</p>
-            <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">{formatBetrag(gesamtVolumen)}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Aktive Projekte */}
-      {isWidgetVisible("projekte") && topProjekte.length > 0 && (
-        <div className="mb-6">
-          <CollapsibleCard
-            title="Aktive Projekte"
-            icon={
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-              </svg>
-            }
-            badge={
-              <Link href="/projekte" className="text-xs text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
-                Alle anzeigen
-              </Link>
-            }
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {topProjekte.map((p) => {
-                const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
-                const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
-                return (
-                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-all group">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
-                      <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-[11px] text-foreground-subtle">
-                      <span><span className="font-mono-amount font-bold text-foreground">{p.stats.gesamt}</span> Best.</span>
-                      {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-warning">{p.stats.offen}</span> offen</span>}
-                      <span className="font-mono-amount font-bold text-foreground">{formatBetrag(p.stats.volumen)}</span>
-                    </div>
-                    {p.budget && (
-                      <div className="mt-2">
-                        <div className="w-full h-1.5 bg-line-subtle rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
-                        </div>
-                        <p className="text-[10px] text-foreground-subtle mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </CollapsibleCard>
-        </div>
-      )}
-
-      {/* Confirm-Queue wurde nach oben verschoben in die "Zu prüfen"-Section (siehe dort).
-          Die Widgets rendern direkt unter Mahnungs-Banner, nicht mehr hier nach Aktive Projekte. */}
-
-      {/* Abo-Übersicht — Kosten neutral (informativ), Hinweise semantic (Status-Farben bei echter Dringlichkeit) */}
-      {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboJaehrlicheKosten && aboJaehrlicheKosten > 0)) && (
-        <div className="mb-6">
-          <CollapsibleCard
-            title="Abo-Übersicht"
-            icon={
-              <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
-              </svg>
-            }
-            badge={aboHinweise && aboHinweise.some(h => h.dringend) ? (
-              <span className="font-mono-amount text-[10px] font-bold text-error bg-error-bg px-2 py-0.5 rounded">
-                {aboHinweise.filter(h => h.dringend).length}
-              </span>
-            ) : undefined}
-          >
-            {aboJaehrlicheKosten && aboJaehrlicheKosten > 0 ? (
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
-                  <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Monat</p>
-                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
-                    {(aboJaehrlicheKosten / 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-                  </p>
-                </div>
-                <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
-                  <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Jahr</p>
-                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
-                    {aboJaehrlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
-                  </p>
-                </div>
-              </div>
-            ) : null}
-            {aboHinweise && aboHinweise.length > 0 ? (
-              <div className="space-y-1.5">
-                {aboHinweise.map((h, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border ${h.dringend ? "bg-error-bg border-error-border" : "bg-warning-bg border-warning-border"}`}>
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-error" : "bg-warning"}`} />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-foreground">{h.name}</span>
-                      <span className={`text-[11px] ml-2 ${h.dringend ? "text-error" : "text-warning"}`}>{h.detail}</span>
-                    </div>
-                    <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      h.typ === "ueberfaellig" ? "bg-error-bg text-error" :
-                      h.typ === "kuendigung" ? "bg-warning-bg text-warning" :
-                      "bg-canvas text-foreground-muted"
-                    }`}>
-                      {{ ueberfaellig: "Überfällig", kuendigung: "Kündigung", vertragsende: "Vertragsende" }[h.typ]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-foreground-faint text-center py-2">Keine Abo-Hinweise.</p>
-            )}
-          </CollapsibleCard>
-        </div>
-      )}
-
-      {/* Aktion erforderlich + Letzte Bestellungen */}
+      {/* --- HANDLUNG-Cluster: was muss ich konkret tun? ---
+          Offene Bestellungen + Letzte Bestellungen als Kontext-Paar,
+          gefolgt von KI-Priorisierung (empfiehlt die Reihenfolge). */}
       {(isWidgetVisible("aktionen") || isWidgetVisible("letzte")) && (
         <div className={`grid grid-cols-1 ${isWidgetVisible("aktionen") && isWidgetVisible("letzte") ? "lg:grid-cols-2" : ""} gap-6 mb-6`}>
           {isWidgetVisible("aktionen") && (
             <CollapsibleCard
-              title="Aktion erforderlich"
-              borderColor="#dc2626"
+              title="Offene Bestellungen"
+              borderColor="var(--status-abweichung)"
               icon={
                 <svg className="w-4 h-4 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -836,7 +828,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm text-foreground-faint">Keine offenen Aktionen.</p>
+                  <p className="text-sm text-foreground-faint">Keine offenen Bestellungen.</p>
                 </div>
               ) : (
                 <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -926,7 +918,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* KI-Priorisierung — gleich wie Zusammenfassung: cache-first, Button nur bei leerem Cache */}
+      {/* KI-Priorisierung — schließt den Handlung-Cluster ab: "in welcher Reihenfolge?" */}
       {isWidgetVisible("priorisierung") && (
         <div className="mb-6">
           <DashboardPriorisierung
@@ -936,50 +928,170 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Bestellungen pro Besteller — Team-Transparenz (Firmeninhaber wollen sehen, wer wieviel bestellt) */}
-      {isWidgetVisible("besteller_stats") && bestellerEntries.length > 0 && (
+      {/* --- ÜBERSICHT-Cluster: wie steht's? --- */}
+
+      {/* Stat Cards Row 1 — responsive grid */}
+      {row1Stats.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          {row1Stats.map((s) => (
+            <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} density={density} />
+          ))}
+        </div>
+      )}
+
+      {/* Industrial line — only if both rows have cards */}
+      {row1Stats.length > 0 && row2Stats.length > 0 && (
+        <div className="industrial-line mb-4" />
+      )}
+
+      {/* Stat Cards Row 2 — responsive grid */}
+      {row2Stats.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {row2Stats.map((s) => (
+            <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} density={density} />
+          ))}
+        </div>
+      )}
+
+      {/* Volumen-Übersicht — jetzt mit 14-Tage-Sparkline + MoM-Delta.
+          Farbigkeit disziplinär: Freigegeben = Status-Grün, Gesamt = Brand-Rot. */}
+      {isWidgetVisible("volumen") && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <VolumenCard
+            label="Freigegebenes Volumen"
+            amount={freigegebenBetrag}
+            color="var(--status-freigegeben)"
+            sparkline={volumenTrend?.freigegebenSparkline}
+            momProzent={volumenTrend?.freigegebenMoM ?? null}
+            density={density}
+          />
+          <VolumenCard
+            label="Gesamt-Volumen"
+            amount={gesamtVolumen}
+            color="var(--mr-red)"
+            sparkline={volumenTrend?.gesamtSparkline}
+            momProzent={volumenTrend?.gesamtMoM ?? null}
+            density={density}
+          />
+        </div>
+      )}
+
+      {/* KI-Zusammenfassung — narrativ, fasst die Zahlen oben zusammen.
+          Cache-initialisiert, auto-rendered wenn cached, sonst "Generieren"-Button. */}
+      {isWidgetVisible("ki_zusammenfassung") && (
+        <DashboardKIZusammenfassung
+          initial={kiZusammenfassungCache?.inhalt as Parameters<typeof DashboardKIZusammenfassung>[0]["initial"] ?? null}
+          initialGeneratedAt={kiZusammenfassungCache?.generated_at ?? null}
+        />
+      )}
+
+      {/* Aktive Projekte */}
+      {isWidgetVisible("projekte") && topProjekte.length > 0 && (
         <div className="mb-6">
           <CollapsibleCard
-            title="Bestellungen pro Besteller"
+            title="Aktive Projekte"
             icon={
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
               </svg>
             }
+            badge={
+              <Link href="/projekte" className="text-xs text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+                Alle anzeigen
+              </Link>
+            }
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {bestellerEntries
-                .sort((a, b) => b[1] - a[1])
-                .map(([kuerzel, count]) => {
-                  const name = bestellerNameMap.get(kuerzel);
-                  const maxCount = Math.max(...bestellerEntries.map(([, c]) => c));
-                  const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
-                  return (
-                    <div key={kuerzel} className="p-4 rounded-lg bg-input border border-line-subtle relative overflow-hidden">
-                      {/* Background bar */}
-                      <div
-                        className="absolute bottom-0 left-0 h-1 bg-brand/10 rounded-full"
-                        style={{ width: `${barWidth}%` }}
-                      />
-                      <div className="flex items-center gap-3 relative">
-                        <div className="w-10 h-10 rounded-lg bg-brand text-white flex items-center justify-center text-xs font-bold shrink-0">
-                          {kuerzel}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{name || kuerzel}</p>
-                          <div className="flex items-baseline gap-1">
-                            <p className="font-mono-amount text-xl font-bold text-foreground">{count}</p>
-                            <p className="text-[10px] text-foreground-subtle uppercase tracking-wide">Bestellungen</p>
-                          </div>
-                        </div>
-                      </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {topProjekte.map((p) => {
+                const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
+                const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
+                return (
+                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-all group">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
+                      <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-3 text-[11px] text-foreground-subtle">
+                      <span><span className="font-mono-amount font-bold text-foreground">{p.stats.gesamt}</span> Best.</span>
+                      {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-warning">{p.stats.offen}</span> offen</span>}
+                      <span className="font-mono-amount font-bold text-foreground">{formatBetrag(p.stats.volumen)}</span>
+                    </div>
+                    {p.budget && (
+                      <div className="mt-2">
+                        <div className="w-full h-1.5 bg-line-subtle rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
+                        </div>
+                        <p className="text-[10px] text-foreground-subtle mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           </CollapsibleCard>
         </div>
       )}
+
+      {/* --- KONTEXT-Cluster: was passiert drumherum? --- */}
+
+      {/* Abo-Übersicht — Kosten neutral (informativ), Hinweise semantic (Status-Farben bei echter Dringlichkeit) */}
+      {isWidgetVisible("abo_status") && ((aboHinweise && aboHinweise.length > 0) || (aboJaehrlicheKosten && aboJaehrlicheKosten > 0)) && (
+        <div className="mb-6">
+          <CollapsibleCard
+            title="Abo-Übersicht"
+            icon={
+              <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3" />
+              </svg>
+            }
+            badge={aboHinweise && aboHinweise.some(h => h.dringend) ? (
+              <span className="font-mono-amount text-[10px] font-bold text-error bg-error-bg px-2 py-0.5 rounded">
+                {aboHinweise.filter(h => h.dringend).length}
+              </span>
+            ) : undefined}
+          >
+            {aboJaehrlicheKosten && aboJaehrlicheKosten > 0 ? (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
+                  <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Monat</p>
+                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
+                    {(aboJaehrlicheKosten / 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                  </p>
+                </div>
+                <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
+                  <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Jahr</p>
+                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
+                    {aboJaehrlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
+                  </p>
+                </div>
+              </div>
+            ) : null}
+            {aboHinweise && aboHinweise.length > 0 ? (
+              <div className="space-y-1.5">
+                {aboHinweise.map((h, i) => (
+                  <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border ${h.dringend ? "bg-error-bg border-error-border" : "bg-warning-bg border-warning-border"}`}>
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-error" : "bg-warning"}`} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-foreground">{h.name}</span>
+                      <span className={`text-[11px] ml-2 ${h.dringend ? "text-error" : "text-warning"}`}>{h.detail}</span>
+                    </div>
+                    <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      h.typ === "ueberfaellig" ? "bg-error-bg text-error" :
+                      h.typ === "kuendigung" ? "bg-warning-bg text-warning" :
+                      "bg-canvas text-foreground-muted"
+                    }`}>
+                      {{ ueberfaellig: "Überfällig", kuendigung: "Kündigung", vertragsende: "Vertragsende" }[h.typ]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground-faint text-center py-2">Keine Abo-Hinweise.</p>
+            )}
+          </CollapsibleCard>
+        </div>
+      )}
+
     </div>
   );
 }

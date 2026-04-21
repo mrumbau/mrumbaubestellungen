@@ -49,6 +49,9 @@ export { BulkToolbar } from "./bulk-toolbar";
 export { ActionMenu } from "./action-menu";
 export type { ActionMenuItem } from "./action-menu";
 
+export { Sparkline } from "./sparkline";
+export type { SparklineProps } from "./sparkline";
+
 export { SavedViewsMenu, useSavedViews } from "./saved-views";
 export type { SavedView, UseSavedViewsResult } from "./saved-views";
 

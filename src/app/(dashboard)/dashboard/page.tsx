@@ -1,5 +1,4 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { createServiceClient } from "@/lib/supabase";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { DashboardWidgets } from "@/components/dashboard-widgets";
@@ -17,6 +16,7 @@ export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
 
   const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sechzigTageZurueck = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
 
   // Besteller: nur eigene Bestellungen im Dashboard (RLS erlaubt auch freigegebene anderer)
   const istBesteller = profil!.rolle === "besteller";
@@ -35,7 +35,6 @@ export default async function DashboardPage() {
     { data: freigegebenBetraege },
     { data: letzteRaw },
     { data: aktionenNoetigRaw },
-    { data: bestellerKuerzelListe },
     { data: unzugeordnetRaw },
     { data: aktiveProjekte },
     { data: projektBestellungen },
@@ -47,6 +46,7 @@ export default async function DashboardPage() {
     { data: aboAnbieterRoh },
     { data: mahnungenRoh },
     { data: kiCacheRoh },
+    { data: trendDataRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     // 1 Query statt 6: alle Status-Werte holen und clientseitig zählen
@@ -54,7 +54,6 @@ export default async function DashboardPage() {
     eigene(supabase.from("bestellungen").select("betrag").eq("status", "freigegeben").not("betrag", "is", null)),
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").order("created_at", { ascending: false }).limit(5)),
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
-    createServiceClient().from("bestellungen").select("besteller_kuerzel"),
     supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("besteller_kuerzel", "UNBEKANNT").not("bestellungsart", "in", "(abo,subunternehmer)").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
@@ -84,6 +83,10 @@ export default async function DashboardPage() {
     // KI-Cache — beim Page-Load mit-laden, damit Zusammenfassung + Priorisierung
     // sofort sichtbar sind statt hinter Button versteckt. Upsert pro User+Typ.
     supabase.from("dashboard_ki_cache").select("typ, inhalt, generated_at").eq("user_id", profil.user_id),
+    // Trend-Daten für Volumen-Sparkline + MoM-Delta (letzte 60 Tage, role-scoped via eigene).
+    // Clientseitig in Tages-Buckets aggregiert — bei ~hundert Bestellungen performant genug,
+    // keine zusätzliche DB-Aggregat-Funktion nötig.
+    eigene(supabase.from("bestellungen").select("created_at, updated_at, betrag, status").gte("created_at", sechzigTageZurueck)),
   ]);
 
   // Dashboard-Config aus DB
@@ -108,10 +111,57 @@ export default async function DashboardPage() {
   const freigegebenBetrag = (freigegebenBetraege || []).reduce((sum: number, b: { betrag: number | null }) => sum + Number(b.betrag), 0);
   const gesamtVolumen = (projektBestellungen || []).reduce((s: number, b: { betrag: number | null }) => s + (Number(b.betrag) || 0), 0);
 
-  const bestellerStatsMap: Record<string, number> = {};
-  for (const b of bestellerKuerzelListe || []) {
-    bestellerStatsMap[b.besteller_kuerzel] = (bestellerStatsMap[b.besteller_kuerzel] || 0) + 1;
+  // ── Trend-Aggregation für Volumen-Widget ──
+  // Letzte 14 Tage als Sparkline (Tages-Buckets), plus MoM-Delta.
+  // Zwei Trends: Gesamt (nach created_at) + Freigegeben (nach updated_at + status-Filter).
+  type TrendRow = { created_at: string; updated_at: string | null; betrag: number | null; status: string };
+  const trendRows = (trendDataRoh || []) as TrendRow[];
+
+  const nowDate = new Date();
+  const heuteStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+  const vierzehnTageStart = new Date(heuteStart.getTime() - 13 * 24 * 60 * 60 * 1000);
+
+  // 14-Tage-Sparkline: ein Bucket pro Tag
+  function tagesIndex(iso: string, start: Date): number {
+    const d = new Date(iso);
+    return Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
   }
+
+  const gesamtSparkline = new Array(14).fill(0);
+  const freigegebenSparkline = new Array(14).fill(0);
+  for (const r of trendRows) {
+    const betrag = Number(r.betrag) || 0;
+    // Gesamt: created_at
+    const idxG = tagesIndex(r.created_at, vierzehnTageStart);
+    if (idxG >= 0 && idxG < 14) gesamtSparkline[idxG] += betrag;
+    // Freigegeben: updated_at (Proxy für Freigabezeit) + status-Filter
+    if (r.status === "freigegeben" && r.updated_at) {
+      const idxF = tagesIndex(r.updated_at, vierzehnTageStart);
+      if (idxF >= 0 && idxF < 14) freigegebenSparkline[idxF] += betrag;
+    }
+  }
+
+  // MoM-Delta: aktueller Monat vs. Vormonat
+  const aktMonatStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
+  const vorMonatStart = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1);
+  let gesamtAkt = 0, gesamtVor = 0, freigegebenAkt = 0, freigegebenVor = 0;
+  for (const r of trendRows) {
+    const betrag = Number(r.betrag) || 0;
+    const created = new Date(r.created_at);
+    if (created >= aktMonatStart) gesamtAkt += betrag;
+    else if (created >= vorMonatStart) gesamtVor += betrag;
+    if (r.status === "freigegeben" && r.updated_at) {
+      const upd = new Date(r.updated_at);
+      if (upd >= aktMonatStart) freigegebenAkt += betrag;
+      else if (upd >= vorMonatStart) freigegebenVor += betrag;
+    }
+  }
+  function momProzent(akt: number, vor: number): number | null {
+    if (vor <= 0) return null; // Division-by-zero + erster Monat: kein sinnvoller Vergleich
+    return ((akt - vor) / vor) * 100;
+  }
+  const gesamtMoM = momProzent(gesamtAkt, gesamtVor);
+  const freigegebenMoM = momProzent(freigegebenAkt, freigegebenVor);
 
   const bestellerListe = bestellerRollen || [];
   const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
@@ -235,12 +285,17 @@ export default async function DashboardPage() {
         neueSubunternehmer={neueSubunternehmer}
         aktionenNoetig={aktionenNoetig}
         letzte={letzte}
-        bestellerStats={bestellerStatsMap}
         aboHinweise={aboHinweise}
         aboJaehrlicheKosten={aboJaehrlicheKosten}
         mahnungen={(mahnungenRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[]}
         kiZusammenfassungCache={kiZusammenfassungCache}
         kiPriorisierungCache={kiPriorisierungCache}
+        volumenTrend={{
+          freigegebenSparkline,
+          gesamtSparkline,
+          freigegebenMoM,
+          gesamtMoM,
+        }}
       />
     </div>
   );
