@@ -97,7 +97,22 @@ export async function GET() {
       abweichende_bestellungen: abweichendeMitDetails,
     });
 
-    return NextResponse.json(zusammenfassung);
+    // Write-through in Dashboard-Cache — beim nächsten Page-Load wird er direkt geladen
+    // statt den OpenAI-Call zu wiederholen. Upsert über UNIQUE(user_id, typ).
+    const generatedAt = new Date().toISOString();
+    await supabase
+      .from("dashboard_ki_cache")
+      .upsert(
+        {
+          user_id: user.id,
+          typ: "zusammenfassung",
+          inhalt: zusammenfassung,
+          generated_at: generatedAt,
+        },
+        { onConflict: "user_id,typ" },
+      );
+
+    return NextResponse.json({ ...zusammenfassung, generated_at: generatedAt });
   } catch (err) {
     logError("/api/ki/zusammenfassung", "Unerwarteter Fehler", err);
     return NextResponse.json(

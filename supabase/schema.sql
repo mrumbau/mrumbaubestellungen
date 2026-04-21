@@ -478,3 +478,28 @@ CREATE POLICY "cardscan_images_delete" ON storage.objects
     bucket_id = 'cardscan-images'
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ============================================================
+-- Dashboard KI-Cache: pro User + typ ein Eintrag, upsert-fähig.
+-- Ziel: Auto-Load der KI-Zusammenfassung + KI-Priorisierung beim
+-- Page-Load ohne jedesmal OpenAI neu zu fragen. Regeneration
+-- on-demand via "Neu generieren"-Button.
+-- ============================================================
+CREATE TABLE dashboard_ki_cache (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  typ TEXT NOT NULL CHECK (typ IN ('zusammenfassung', 'priorisierung')),
+  inhalt JSONB NOT NULL,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, typ)
+);
+
+CREATE INDEX dashboard_ki_cache_user_typ_idx
+  ON dashboard_ki_cache(user_id, typ);
+
+ALTER TABLE dashboard_ki_cache ENABLE ROW LEVEL SECURITY;
+
+-- Jeder User sieht und verwaltet nur eigenen Cache
+CREATE POLICY dashboard_ki_cache_own ON dashboard_ki_cache
+  FOR ALL USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);

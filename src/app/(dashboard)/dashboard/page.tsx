@@ -46,6 +46,7 @@ export default async function DashboardPage() {
     { data: neueSubunternehmerRoh },
     { data: aboAnbieterRoh },
     { data: mahnungenRoh },
+    { data: kiCacheRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     // 1 Query statt 6: alle Status-Werte holen und clientseitig zählen
@@ -80,6 +81,9 @@ export default async function DashboardPage() {
     supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),
     // Mahnungen: Bestellungen mit mahnung_am die noch nicht bezahlt sind
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, mahnung_am, mahnung_count").not("mahnung_am", "is", null).is("bezahlt_am", null).order("mahnung_am", { ascending: false })),
+    // KI-Cache — beim Page-Load mit-laden, damit Zusammenfassung + Priorisierung
+    // sofort sichtbar sind statt hinter Button versteckt. Upsert pro User+Typ.
+    supabase.from("dashboard_ki_cache").select("typ, inhalt, generated_at").eq("user_id", profil.user_id),
   ]);
 
   // Dashboard-Config aus DB
@@ -180,6 +184,11 @@ export default async function DashboardPage() {
     }
   }
 
+  // KI-Cache-Einträge nach typ aufteilen, damit Widgets direkt mit Initial-Daten rendern
+  const kiCache = (kiCacheRoh || []) as { typ: string; inhalt: unknown; generated_at: string }[];
+  const kiZusammenfassungCache = kiCache.find((e) => e.typ === "zusammenfassung") || null;
+  const kiPriorisierungCache = kiCache.find((e) => e.typ === "priorisierung") || null;
+
   // Stat-Daten als Array für den Client.
   // Farben referenzieren Status-Tokens (globals.css) — Status-Pills sind die einzige Stelle
   // wo Farbe semantische Workflow-Bedeutung trägt. Gesamt + Aktive Projekte sind keine Status,
@@ -230,6 +239,8 @@ export default async function DashboardPage() {
         aboHinweise={aboHinweise}
         aboJaehrlicheKosten={aboJaehrlicheKosten}
         mahnungen={(mahnungenRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[]}
+        kiZusammenfassungCache={kiZusammenfassungCache}
+        kiPriorisierungCache={kiPriorisierungCache}
       />
     </div>
   );

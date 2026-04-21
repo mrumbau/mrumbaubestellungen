@@ -29,10 +29,23 @@ export async function POST(request: NextRequest) {
       .limit(30);
 
     if (!bestellungen || bestellungen.length === 0) {
-      return NextResponse.json({
+      const leer = {
         bestellungen: [],
         zusammenfassung: "Keine offenen Bestellungen vorhanden.",
-      });
+      };
+      const generatedAt = new Date().toISOString();
+      await supabase
+        .from("dashboard_ki_cache")
+        .upsert(
+          {
+            user_id: profil.user_id,
+            typ: "priorisierung",
+            inhalt: leer,
+            generated_at: generatedAt,
+          },
+          { onConflict: "user_id,typ" },
+        );
+      return NextResponse.json({ ...leer, generated_at: generatedAt });
     }
 
     // Fälligkeitsdaten aus Rechnungen laden (Batch)
@@ -61,7 +74,22 @@ export async function POST(request: NextRequest) {
     }));
 
     const ergebnis = await priorisiereBestellungen(prioInput);
-    return NextResponse.json(ergebnis);
+
+    // Write-through in Dashboard-Cache — beim nächsten Page-Load wird direkt geladen
+    const generatedAt = new Date().toISOString();
+    await supabase
+      .from("dashboard_ki_cache")
+      .upsert(
+        {
+          user_id: profil.user_id,
+          typ: "priorisierung",
+          inhalt: ergebnis,
+          generated_at: generatedAt,
+        },
+        { onConflict: "user_id,typ" },
+      );
+
+    return NextResponse.json({ ...ergebnis, generated_at: generatedAt });
   } catch (err) {
     logError("/api/ki/priorisierung", "Priorisierung Fehler", err);
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });

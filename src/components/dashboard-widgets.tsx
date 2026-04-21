@@ -100,6 +100,12 @@ interface DashboardConfig {
   widgets?: Record<string, boolean>;
 }
 
+export interface KiCacheEintrag {
+  typ: string;
+  inhalt: unknown;
+  generated_at: string;
+}
+
 export interface DashboardWidgetsProps {
   savedConfig: DashboardConfig;
   statCards: StatCardData[];
@@ -119,6 +125,8 @@ export interface DashboardWidgetsProps {
   aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
   aboJaehrlicheKosten?: number;
   mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[];
+  kiZusammenfassungCache?: KiCacheEintrag | null;
+  kiPriorisierungCache?: KiCacheEintrag | null;
 }
 
 // ─── Stat Card Definitions ───────────────────────────────
@@ -478,6 +486,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     aboHinweise,
     aboJaehrlicheKosten,
     mahnungen,
+    kiZusammenfassungCache,
+    kiPriorisierungCache,
   } = props;
 
   const router = useRouter();
@@ -670,9 +680,13 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* KI-Zusammenfassung */}
+      {/* KI-Zusammenfassung — Cache-initialisiert, auto-rendered wenn cached,
+          sonst "Generieren"-Button (First-Time-UX) */}
       {isWidgetVisible("ki_zusammenfassung") && (
-        <DashboardKIZusammenfassung />
+        <DashboardKIZusammenfassung
+          initial={kiZusammenfassungCache?.inhalt as Parameters<typeof DashboardKIZusammenfassung>[0]["initial"] ?? null}
+          initialGeneratedAt={kiZusammenfassungCache?.generated_at ?? null}
+        />
       )}
 
       {/* Volumen-Übersicht — Freigegeben = Status-Farbe, Gesamt = Brand-Identität */}
@@ -912,10 +926,13 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* KI-Priorisierung */}
+      {/* KI-Priorisierung — gleich wie Zusammenfassung: cache-first, Button nur bei leerem Cache */}
       {isWidgetVisible("priorisierung") && (
         <div className="mb-6">
-          <DashboardPriorisierung />
+          <DashboardPriorisierung
+            initial={kiPriorisierungCache?.inhalt as Parameters<typeof DashboardPriorisierung>[0]["initial"] ?? null}
+            initialGeneratedAt={kiPriorisierungCache?.generated_at ?? null}
+          />
         </div>
       )}
 

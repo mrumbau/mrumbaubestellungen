@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/cn";
 
 interface KIZusammenfassung {
   zusammenfassung: string;
@@ -8,8 +9,35 @@ interface KIZusammenfassung {
   highlights: string[];
 }
 
-export function DashboardKIZusammenfassung() {
-  const [data, setData] = useState<KIZusammenfassung | null>(null);
+function relativeZeit(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diffMs / 60000);
+  if (min < 1) return "gerade eben";
+  if (min < 60) return `vor ${min} Min.`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `vor ${h} Std.`;
+  const t = Math.floor(h / 24);
+  if (t === 1) return "gestern";
+  if (t < 7) return `vor ${t} Tagen`;
+  const w = Math.floor(t / 7);
+  if (w === 1) return "vor 1 Woche";
+  return `vor ${w} Wochen`;
+}
+
+function istStale(iso: string): boolean {
+  // Älter als 1 Stunde → subtile Farb-Akzentuierung, um den User an Refresh zu erinnern
+  return Date.now() - new Date(iso).getTime() > 60 * 60 * 1000;
+}
+
+export function DashboardKIZusammenfassung({
+  initial = null,
+  initialGeneratedAt = null,
+}: {
+  initial?: KIZusammenfassung | null;
+  initialGeneratedAt?: string | null;
+}) {
+  const [data, setData] = useState<KIZusammenfassung | null>(initial);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(initialGeneratedAt);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +49,7 @@ export function DashboardKIZusammenfassung() {
       if (!res.ok) throw new Error("Fehler beim Laden");
       const json = await res.json();
       setData(json);
+      if (json.generated_at) setGeneratedAt(json.generated_at);
     } catch {
       setError("KI-Zusammenfassung konnte nicht geladen werden.");
     } finally {
@@ -28,6 +57,7 @@ export function DashboardKIZusammenfassung() {
     }
   }
 
+  // First-time state: kein Cache, nie generiert — "Generieren"-Button als Entry-Point
   if (!data && !loading && !error) {
     return (
       <div className="mb-6">
@@ -44,18 +74,20 @@ export function DashboardKIZusammenfassung() {
     );
   }
 
-  if (loading) {
+  // Initial-Load ohne vorhandene Cache-Daten
+  if (loading && !data) {
     return (
       <div className="mb-6 card p-5">
         <div className="flex items-center gap-3">
           <div className="spinner w-5 h-5" />
-          <span className="text-sm text-foreground-subtle">KI analysiert aktuelle Daten...</span>
+          <span className="text-sm text-foreground-subtle">KI analysiert aktuelle Daten…</span>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  // Hard-Error ohne vorhandene Cache-Daten (weich bei bereits gecachten Daten — siehe unten)
+  if (error && !data) {
     return (
       <div className="mb-6 bg-error-bg rounded-xl border border-error-border p-4">
         <p className="text-sm text-error">{error}</p>
@@ -68,22 +100,40 @@ export function DashboardKIZusammenfassung() {
 
   if (!data) return null;
 
+  const stale = generatedAt ? istStale(generatedAt) : false;
+
   return (
     <div className="mb-6 card p-5 border-l-[3px] border-l-brand">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="flex items-start justify-between mb-3 gap-3">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
           </svg>
-          <h3 className="font-headline text-sm text-foreground tracking-tight">KI-Zusammenfassung</h3>
+          <h2 className="font-headline text-sm text-foreground tracking-tight">KI-Zusammenfassung</h2>
+          {generatedAt && (
+            <time
+              dateTime={generatedAt}
+              className={cn(
+                "text-[11px] font-mono-amount",
+                stale ? "text-warning" : "text-foreground-subtle",
+              )}
+            >
+              Aktualisiert {relativeZeit(generatedAt)}
+            </time>
+          )}
         </div>
         <button
           onClick={laden}
-          className="text-xs text-brand hover:text-brand-light font-medium transition-colors"
+          disabled={loading}
+          className="text-xs text-brand hover:text-brand-light font-medium transition-colors disabled:opacity-50 shrink-0"
         >
-          Aktualisieren
+          {loading ? "Lädt…" : "Neu generieren"}
         </button>
       </div>
+
+      {error && (
+        <p className="text-[11px] text-error mb-2">{error}</p>
+      )}
 
       <p className="text-sm text-foreground-muted leading-relaxed mb-3">{data.zusammenfassung}</p>
 
