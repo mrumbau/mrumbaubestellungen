@@ -90,8 +90,12 @@ export async function POST(request: NextRequest) {
     return handleTextExtract(request, user.id);
   } catch (err) {
     logError(ROUTE, "Unerwarteter Fehler", err);
+    const detail =
+      err instanceof Error
+        ? `${err.name}: ${err.message}`
+        : String(err);
     return NextResponse.json(
-      { error: ERRORS.INTERNER_FEHLER },
+      { error: `${ERRORS.INTERNER_FEHLER} – ${detail}` },
       { status: 500 }
     );
   }

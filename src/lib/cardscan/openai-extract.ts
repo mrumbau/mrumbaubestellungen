@@ -7,7 +7,16 @@ import { logError, logInfo } from "@/lib/logger";
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_JSON_SCHEMA } from "@/lib/cardscan/prompts";
 import type { ExtractedContactData, ConfidenceScores } from "@/lib/cardscan/types";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (_openai) return _openai;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY ist nicht gesetzt");
+  }
+  _openai = new OpenAI({ apiKey });
+  return _openai;
+}
 
 const ROUTE_TAG = "/lib/cardscan/openai-extract";
 
@@ -48,7 +57,7 @@ export async function extractContactFromText(
   const start = Date.now();
 
   const response = await withRetry(() =>
-    openai.chat.completions.create({
+    getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
@@ -143,7 +152,7 @@ export async function extractContactFromImage(
   }
 
   const response = await withRetry(() =>
-    openai.chat.completions.create({
+    getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
