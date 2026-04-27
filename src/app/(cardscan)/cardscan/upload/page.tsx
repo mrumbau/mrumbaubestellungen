@@ -202,10 +202,21 @@ export default function CardScanUploadPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { error?: string; capture_id?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        // Antwort ist kein JSON (z.B. HTML-Fehlerseite vom Hosting)
+      }
 
       if (!res.ok) {
-        setError(data.error || "Extraktion fehlgeschlagen.");
+        setError(data.error || `Server-Fehler (${res.status}). Bitte erneut versuchen.`);
+        return;
+      }
+
+      if (!data.capture_id) {
+        setError("Unerwartete Antwort vom Server.");
         return;
       }
 

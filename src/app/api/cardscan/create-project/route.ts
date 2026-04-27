@@ -9,6 +9,7 @@ import { logError, logInfo } from "@/lib/logger";
 import { createProjectInCrm } from "@/lib/cardscan/das-programm-client";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ROUTE = "/api/cardscan/create-project";
 

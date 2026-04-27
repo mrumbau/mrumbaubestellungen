@@ -149,9 +149,25 @@ export default function CardScanCapturePage() {
       formData.append("source_type", "image");
 
       const res = await fetch("/api/cardscan/extract", { method: "POST", body: formData });
-      const data = await res.json();
 
-      if (!res.ok) { setError(data.error || "Analyse fehlgeschlagen."); return; }
+      const raw = await res.text();
+      let data: { error?: string; capture_id?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        // Antwort ist kein JSON (z.B. HTML-Fehlerseite vom Hosting)
+      }
+
+      if (!res.ok) {
+        setError(data.error || `Server-Fehler (${res.status}).`);
+        return;
+      }
+
+      if (!data.capture_id) {
+        setError("Unerwartete Antwort vom Server.");
+        return;
+      }
+
       router.push(`/cardscan/review/${data.capture_id}`);
     } catch {
       setError("Verbindungsfehler.");

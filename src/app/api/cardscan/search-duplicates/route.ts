@@ -10,6 +10,7 @@ import { findDuplicates } from "@/lib/cardscan/duplicate-matcher";
 import type { ExtractedContactData } from "@/lib/cardscan/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ROUTE = "/api/cardscan/search-duplicates";
 

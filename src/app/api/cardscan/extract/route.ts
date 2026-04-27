@@ -30,6 +30,7 @@ import {
 import type { CardScanSourceType } from "@/lib/cardscan/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ROUTE = "/api/cardscan/extract";
 

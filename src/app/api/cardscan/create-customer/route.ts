@@ -15,6 +15,7 @@ import type { ExtractedContactData } from "@/lib/cardscan/types";
 import { isValidUUID } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ROUTE = "/api/cardscan/create-customer";
 

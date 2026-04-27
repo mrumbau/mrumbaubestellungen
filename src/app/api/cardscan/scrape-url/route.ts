@@ -14,6 +14,7 @@ import { extractContactFromText } from "@/lib/cardscan/openai-extract";
 import { CARDSCAN_RATE_LIMIT } from "@/lib/cardscan/constants";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const ROUTE = "/api/cardscan/scrape-url";
 
