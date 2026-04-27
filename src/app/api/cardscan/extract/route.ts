@@ -84,10 +84,10 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get("content-type") || "";
 
     if (contentType.includes("multipart/form-data")) {
-      return handleFileExtract(request, user.id);
+      return await handleFileExtract(request, user.id);
     }
 
-    return handleTextExtract(request, user.id);
+    return await handleTextExtract(request, user.id);
   } catch (err) {
     logError(ROUTE, "Unerwarteter Fehler", err);
     const detail =
