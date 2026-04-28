@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("email_processing_log")
     .select(
-      "internet_message_id, graph_message_id, folder_id, folder_hint, ki_classified_as, ki_confidence, folder_mismatch, status, received_at, processed_at, openai_input_tokens, openai_output_tokens, openai_cost_eur, error_msg, bestellung_id, sender, subject, has_attachments, created_at, mail_sync_folders!inner(folder_name, folder_path)",
+      "internet_message_id, graph_message_id, folder_id, folder_hint, ki_classified_as, ki_confidence, folder_mismatch, status, received_at, processed_at, openai_input_tokens, openai_output_tokens, openai_cost_eur, error_msg, bestellung_id, sender, subject, has_attachments, created_at, parser_source, parser_name, mail_sync_folders!inner(folder_name, folder_path)",
       { count: "exact" },
     )
     .order("created_at", { ascending: false })

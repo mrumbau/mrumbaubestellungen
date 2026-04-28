@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { analysiereDokument, erkenneHaendlerAusEmail, fuehreAbgleichDurch, erkenneBestellerIntelligent, pruefePreisanomalien, type DokumentAnalyse } from "@/lib/openai";
+import { tryParseVendor } from "@/lib/email-pipeline/vendor-parsers";
 import { isFileSizeOk, safeBestellnummer } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
@@ -141,6 +142,10 @@ export async function POST(request: NextRequest) {
         : null;
     const vorfilterBestellnummer = body.bestellnummer_betreff || null;
     const hatVorfilter = vorfilter === "ja";
+    // Phase 2 Telemetrie: Parser-Quelle für die Response. Wird in der Body-Analyse
+    // gesetzt wenn ein Vendor-Parser greift, sonst bleibt's beim Default 'ki'.
+    let parserSource: "vendor" | "ki" = "ki";
+    let parserName: string | null = null;
 
     if (vorfilter === "nein") {
       logInfo("webhook/email", "Vorfilter: irrelevant", { email_betreff, email_absender });
@@ -1288,11 +1293,56 @@ export async function POST(request: NextRequest) {
         if (Date.now() - startTime < 45_000) {
           // Betreff als Kontext mitgeben — GPT braucht den Betreff um den Dokumenttyp korrekt zu erkennen
           // z.B. "Ihre Bestellung bei Strauss" = Bestellbestätigung, nicht Versandbestätigung
-          const bodyMitBetreff = email_betreff
-            ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
-            : emailText.slice(0, 15000);
-          const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
-          const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint });
+          // Phase 2: Vendor-spezifischer Pre-Parser (Amazon, ggf. weitere).
+          // Wenn ein Parser hohe Konfidenz liefert, ersetzt das den KI-Aufruf
+          // vollständig — schneller, billiger, deterministischer.
+          // Bei niedriger Konfidenz fällt der Code transparent auf KI zurück.
+          const vendorResult = await tryParseVendor({
+            email_absender: email_absender || "",
+            email_betreff: email_betreff || "",
+            email_text: emailText,
+            anhaenge: [],
+          });
+
+          let bodyAnalyse: DokumentAnalyse;
+
+          if (vendorResult && vendorResult.acceptWithoutKI && vendorResult.result.documents.length > 0) {
+            // Vendor-Parser hat sicheren Treffer — KI-Aufruf überspringen
+            bodyAnalyse = vendorResult.result.documents[0];
+            parserSource = "vendor";
+            parserName = vendorResult.result.vendor;
+            logInfo("webhook/email", "Vendor-Parser-Treffer (KI übersprungen)", {
+              vendor: parserName,
+              parser_version: vendorResult.result.parser_version,
+              konfidenz: vendorResult.result.konfidenz,
+              bestellnummer: bodyAnalyse.bestellnummer,
+              typ: bodyAnalyse.typ,
+            });
+          } else {
+            // Kein Vendor-Match oder zu unsichere Konfidenz → KI-Pipeline wie gehabt
+            const bodyMitBetreff = email_betreff
+              ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
+              : emailText.slice(0, 15000);
+            const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
+            bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint });
+
+            // Wenn ein Vendor-Parser ZU UNSICHER war: seine Daten als Hint mergen
+            if (vendorResult && vendorResult.result.documents.length > 0) {
+              const vendorDoc = vendorResult.result.documents[0];
+              if (!bodyAnalyse.bestellnummer && vendorDoc.bestellnummer) {
+                bodyAnalyse.bestellnummer = vendorDoc.bestellnummer;
+              }
+              if (!bodyAnalyse.haendler && vendorDoc.haendler) {
+                bodyAnalyse.haendler = vendorDoc.haendler;
+              }
+              parserName = vendorResult.result.vendor;
+              logInfo("webhook/email", "Vendor-Parser Low-Konfidenz: KI-Hauptanalyse + Vendor-Hint", {
+                vendor: parserName,
+                vendor_konfidenz: vendorResult.result.konfidenz,
+                ki_typ: bodyAnalyse.typ,
+              });
+            }
+          }
 
           // Betreff-basierte Korrektur: Wenn der Betreff klar einen Typ signalisiert, GPT aber etwas anderes sagt
           if (email_betreff) {
@@ -1829,6 +1879,8 @@ export async function POST(request: NextRequest) {
       zuordnung: { methode: zuordnungsMethode, kuerzel: bestellerKuerzel },
       dokumente_gespeichert: dokumenteGespeichert,
       dauer_ms: dauer,
+      parser_source: parserSource,
+      parser_name: parserName,
       debug_anhaenge: {
         raw_empfangen: Array.isArray(rawAnhaenge) ? rawAnhaenge.length : 0,
         nach_filter: anhaenge.length,

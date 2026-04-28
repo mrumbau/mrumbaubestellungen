@@ -58,6 +58,8 @@ interface LogEntry {
   subject: string | null;
   has_attachments: boolean | null;
   created_at: string;
+  parser_source: "vendor" | "ki" | null;
+  parser_name: string | null;
   mail_sync_folders: { folder_name: string; folder_path: string };
 }
 
@@ -84,6 +86,14 @@ interface Telemetry {
     last_error: string | null;
     mails_24h: number;
   }[];
+  parser: {
+    vendor_count: number;
+    ki_count: number;
+    vendor_rate: number;
+    avg_ki_cost_eur: number;
+    estimated_savings_eur: number;
+    by_vendor: Record<string, number>;
+  };
 }
 
 const HINT_LABELS: Record<string, string> = {
@@ -692,6 +702,7 @@ function MonitorTab({
                 <th className="text-left px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Sender</th>
                 <th className="text-left px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Betreff</th>
                 <th className="text-left px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Status</th>
+                <th className="text-left px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Parser</th>
                 <th className="text-right px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Kosten</th>
                 <th className="text-right px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Aktion</th>
               </tr>
@@ -721,6 +732,19 @@ function MonitorTab({
                       <Badge tone="warning" size="sm" className="ml-1">
                         Mismatch
                       </Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {e.parser_source === "vendor" && e.parser_name ? (
+                      <Badge tone="success" size="sm" title={`Deterministischer ${e.parser_name}-Parser`}>
+                        {e.parser_name}
+                      </Badge>
+                    ) : e.parser_source === "ki" ? (
+                      <Badge tone="info" size="sm">
+                        KI
+                      </Badge>
+                    ) : (
+                      <span className="text-foreground-subtle">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-right font-mono-amount">
@@ -788,6 +812,20 @@ function TraceModal({ entry, onClose }: { entry: LogEntry; onClose: () => void }
 
         <dt className="text-foreground-subtle">Folder-Mismatch</dt>
         <dd>{entry.folder_mismatch ? "Ja — KI wich vom Folder-Hint ab" : "Nein"}</dd>
+
+        <dt className="text-foreground-subtle">Parser-Quelle</dt>
+        <dd>
+          {entry.parser_source === "vendor" && entry.parser_name ? (
+            <>
+              <Badge tone="success" size="sm">{entry.parser_name}</Badge>
+              <span className="ml-1 text-foreground-subtle">deterministisch (kein KI-Aufruf)</span>
+            </>
+          ) : entry.parser_source === "ki" ? (
+            <Badge tone="info" size="sm">OpenAI gpt-4o</Badge>
+          ) : (
+            "—"
+          )}
+        </dd>
 
         <dt className="text-foreground-subtle">Tokens (in/out)</dt>
         <dd className="font-mono-amount">
@@ -883,6 +921,61 @@ function TelemetryTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }
           value={`${data.status_counts.processed} / ${data.status_counts.failed} / ${data.status_counts.irrelevant}`}
         />
       </div>
+
+      {/* Vendor-Parser-Quote */}
+      {data.parser && (data.parser.vendor_count + data.parser.ki_count > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Stat
+            label="Vendor-Parser-Quote"
+            value={`${(data.parser.vendor_rate * 100).toFixed(0)} %`}
+            tone={data.parser.vendor_rate > 0.3 ? "success" : undefined}
+          />
+          <Stat
+            label="Mails: Vendor / KI"
+            value={`${data.parser.vendor_count} / ${data.parser.ki_count}`}
+          />
+          <Stat
+            label="Geschätzte Ersparnis (30d)"
+            value={`${data.parser.estimated_savings_eur.toFixed(2)} €`}
+            tone="success"
+          />
+        </div>
+      )}
+
+      {/* Vendor-Breakdown */}
+      {data.parser && Object.keys(data.parser.by_vendor).length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3">Vendor-Parser-Treffer (30 Tage)</h3>
+          <div className="rounded-lg border border-line-subtle overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-canvas border-b border-line-subtle">
+                <tr>
+                  <th className="text-left px-3 py-2 uppercase tracking-wider text-foreground-subtle">Parser</th>
+                  <th className="text-right px-3 py-2 uppercase tracking-wider text-foreground-subtle">Treffer</th>
+                  <th className="text-right px-3 py-2 uppercase tracking-wider text-foreground-subtle">Anteil</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(data.parser.by_vendor)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([name, count]) => (
+                    <tr key={name} className="border-b border-line-subtle last:border-0">
+                      <td className="px-3 py-2">
+                        <Badge tone="success" size="sm">{name}</Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono-amount">{count}</td>
+                      <td className="px-3 py-2 text-right font-mono-amount text-foreground-muted">
+                        {data.parser.vendor_count > 0
+                          ? `${((count / data.parser.vendor_count) * 100).toFixed(0)} %`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Folder-Health */}
       <div>

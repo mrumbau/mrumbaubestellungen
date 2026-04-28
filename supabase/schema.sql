@@ -586,3 +586,12 @@ CREATE TRIGGER trg_mail_sync_folders_updated_at
   BEFORE UPDATE ON mail_sync_folders
   FOR EACH ROW
   EXECUTE FUNCTION update_mail_sync_folders_updated_at();
+
+-- Vendor-Parser-Telemetrie (Phase 2)
+ALTER TABLE email_processing_log
+  ADD COLUMN parser_source TEXT CHECK (parser_source IN ('vendor', 'ki') OR parser_source IS NULL),
+  ADD COLUMN parser_name   TEXT;
+
+CREATE INDEX idx_epl_parser_source
+  ON email_processing_log(parser_source)
+  WHERE parser_source IS NOT NULL;

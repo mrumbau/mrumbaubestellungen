@@ -147,6 +147,8 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       bestellung_id: ingestResult.bestellung_id,
       ki_classified_as: ingestResult.dokument_typ,
       ki_confidence: ingestResult.ki_confidence,
+      parser_source: ingestResult.parser_source,
+      parser_name: ingestResult.parser_name,
     });
 
     return NextResponse.json({

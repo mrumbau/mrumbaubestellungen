@@ -34,7 +34,7 @@ export async function GET() {
       supabase
         .from("email_processing_log")
         .select(
-          "openai_cost_eur, status, folder_mismatch, sender, subject, created_at, internet_message_id",
+          "openai_cost_eur, status, folder_mismatch, sender, subject, created_at, internet_message_id, parser_source, parser_name",
         )
         .gte("created_at", since30d)
         .order("created_at", { ascending: false }),
@@ -125,6 +125,33 @@ export async function GET() {
       mails_24h: folder24hCount.get(f.id) ?? 0,
     }));
 
+    // Parser-Quelle Aggregat (Phase 2 Vendor-Parser-Telemetrie)
+    let parserVendorCount = 0;
+    let parserKiCount = 0;
+    const parserByVendor: Record<string, number> = {};
+    let kiCostSum = 0;
+    let kiCostN = 0;
+    for (const log of logs) {
+      const src = (log as { parser_source?: string | null }).parser_source;
+      const name = (log as { parser_name?: string | null }).parser_name;
+      if (src === "vendor") {
+        parserVendorCount++;
+        if (name) parserByVendor[name] = (parserByVendor[name] ?? 0) + 1;
+      } else if (src === "ki") {
+        parserKiCount++;
+        if (log.openai_cost_eur && Number(log.openai_cost_eur) > 0) {
+          kiCostSum += Number(log.openai_cost_eur);
+          kiCostN++;
+        }
+      }
+    }
+    const avgKiCostEur = kiCostN > 0 ? kiCostSum / kiCostN : 0;
+    const estimatedSavingsEur = avgKiCostEur * parserVendorCount;
+    const parserVendorRate =
+      parserVendorCount + parserKiCount > 0
+        ? parserVendorCount / (parserVendorCount + parserKiCount)
+        : 0;
+
     return NextResponse.json({
       daily_spend,
       status_counts,
@@ -133,6 +160,14 @@ export async function GET() {
       total_mails_30d: logs.length,
       top_costly,
       folder_health,
+      parser: {
+        vendor_count: parserVendorCount,
+        ki_count: parserKiCount,
+        vendor_rate: parserVendorRate,
+        avg_ki_cost_eur: Math.round(avgKiCostEur * 10000) / 10000,
+        estimated_savings_eur: Math.round(estimatedSavingsEur * 100) / 100,
+        by_vendor: parserByVendor,
+      },
     });
   } catch (err) {
     logError("email-sync/telemetry", "Aggregate-Fehler", err);

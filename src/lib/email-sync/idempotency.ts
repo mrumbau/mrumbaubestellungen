@@ -107,6 +107,10 @@ export interface ProcessedUpdate {
   bestellung_id?: string;
   ki_classified_as?: string;
   ki_confidence?: number;
+  /** Phase 2: 'vendor' wenn deterministischer Parser ausreichte, sonst 'ki'. */
+  parser_source?: "vendor" | "ki";
+  /** Phase 2: Vendor-Parser-Name oder null. */
+  parser_name?: string | null;
 }
 
 /** Markiert eine Mail als erfolgreich verarbeitet. */
@@ -124,6 +128,8 @@ export async function markProcessed(
       bestellung_id: update.bestellung_id ?? null,
       ki_classified_as: update.ki_classified_as ?? null,
       ki_confidence: update.ki_confidence ?? null,
+      parser_source: update.parser_source ?? null,
+      parser_name: update.parser_name ?? null,
     })
     .eq("internet_message_id", internetMessageId);
 

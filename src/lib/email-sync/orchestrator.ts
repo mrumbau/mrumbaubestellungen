@@ -329,6 +329,8 @@ async function processMessage(
       bestellung_id: ingestResult.bestellung_id,
       ki_classified_as: ingestResult.dokument_typ,
       ki_confidence: ingestResult.ki_confidence,
+      parser_source: ingestResult.parser_source,
+      parser_name: ingestResult.parser_name,
     });
     return "processed";
   } catch (err) {

@@ -47,12 +47,18 @@ export async function ingestEmail(input: IngestEmailInput): Promise<IngestEmailR
     }
 
     const json = (await res.json()) as Record<string, unknown>;
+    const parserSource =
+      json.parser_source === "vendor" || json.parser_source === "ki"
+        ? (json.parser_source as "vendor" | "ki")
+        : undefined;
     return {
       success: !!json.success || res.ok,
       bestellung_id: typeof json.bestellung_id === "string" ? json.bestellung_id : undefined,
       dokument_typ: typeof json.dokument_typ === "string" ? json.dokument_typ : undefined,
       ki_confidence:
         typeof json.ki_confidence === "number" ? json.ki_confidence : undefined,
+      parser_source: parserSource,
+      parser_name: typeof json.parser_name === "string" ? json.parser_name : null,
       fehler: typeof json.error === "string" ? json.error : undefined,
     };
   } catch (err) {

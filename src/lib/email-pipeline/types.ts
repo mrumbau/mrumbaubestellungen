@@ -54,5 +54,9 @@ export interface IngestEmailResult {
   dokument_typ?: string;
   /** Wenn klassifiziert mit confidence (z.B. via OpenAI). */
   ki_confidence?: number;
+  /** Phase 2: 'vendor' wenn ein Vendor-Parser ohne KI-Fallback ausreichte, sonst 'ki'. */
+  parser_source?: "vendor" | "ki";
+  /** Phase 2: Name des Vendor-Parsers (z.B. 'amazon'). null bei reiner KI. */
+  parser_name?: string | null;
   fehler?: string;
 }
