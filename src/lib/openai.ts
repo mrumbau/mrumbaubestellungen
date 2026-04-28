@@ -180,10 +180,30 @@ Extrahiere auch:
 
 Falls ein Feld nicht erkennbar ist, setze null.`;
 
+/** Document-Hint-Map: vom Outlook-Folder gelieferter weicher Hinweis auf den Dokumenttyp. */
+const HINT_LABELS: Record<string, string> = {
+  rechnung: "Rechnung",
+  lieferschein: "Lieferschein",
+  bestellbestaetigung: "Bestellbestätigung / Auftragsbestätigung",
+  versand: "Versandbestätigung",
+};
+
+/** Generiert einen System-Prompt-Zusatz wenn ein Folder-Hint vorhanden ist.
+ *  Bewusst SOFT formuliert — Outlook-Rule ist unzuverlässig, Inhalt schlägt Hint. */
+function folderHintPromptAddition(hint: string | null | undefined): string {
+  if (!hint) return "";
+  const label = HINT_LABELS[hint] ?? hint;
+  return `
+
+ZUSATZHINWEIS — Folder-Hint vom Mail-Server:
+Diese Mail wurde von einer Outlook-Regel in einen Folder einsortiert, der typischerweise "${label}"-Dokumente enthält. Das ist ein SCHWACHES Signal — die Outlook-Regel arbeitet mit einfachen Subject/Sender-Pattern und ist NICHT immer korrekt. Wenn der Dokumentinhalt eindeutig einen anderen Typ zeigt (z.B. eindeutige Rechnungsnummer + MwSt + IBAN trotz Folder-Hint "${label}"), VERTRAUE DEM INHALT und überschreibe den Hint. Bei mehrdeutigen Dokumenten (z.B. Lieferschein mit Preisen ohne klare MwSt) tendiere zu "${label}".`;
+}
+
 // PDF/Bild analysieren mit GPT-4o
 export async function analysiereDokument(
   base64: string,
-  mimeType: string
+  mimeType: string,
+  options?: { folderHint?: string | null }
 ): Promise<DokumentAnalyse> {
   // PDFs werden als file-Content gesendet, Bilder als image_url, Text als text
   const isPdf = mimeType === "application/pdf";
@@ -213,11 +233,13 @@ export async function analysiereDokument(
           },
         ];
 
+  const systemPrompt = ANALYSE_PROMPT + folderHintPromptAddition(options?.folderHint);
+
   const response = await withRetry(() =>
     openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: ANALYSE_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
       max_tokens: 2000,

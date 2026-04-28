@@ -132,6 +132,13 @@ export async function POST(request: NextRequest) {
     const vorfilterHaendlerId = body.haendler_id || null;
     const vorfilterHaendlerName = body.haendler_name || null;
     const vorfilterSuId = body.su_id || null;
+    // Folder-Hint vom Cron-Orchestrator (Phase 2a). Outlook-Folder-Sortierung als
+    // SCHWACHES Signal an den OpenAI-Klassifikations-Prompt durchreichen.
+    // Make.com sendet das Feld nicht — daher null als Default.
+    const documentHint: string | null =
+      typeof body.document_hint === "string" && body.document_hint.length > 0
+        ? body.document_hint
+        : null;
     const vorfilterBestellnummer = body.bestellnummer_betreff || null;
     const hatVorfilter = vorfilter === "ja";
 
@@ -565,7 +572,7 @@ export async function POST(request: NextRequest) {
       const batch = anhaenge.slice(0, 3);
       const analysePromises = batch.map(async (anhang) => {
         try {
-          const analyse = await analysiereDokument(anhang.base64, anhang.mime_type);
+          const analyse = await analysiereDokument(anhang.base64, anhang.mime_type, { folderHint: documentHint });
           return { analyse, dateiName: anhang.name, base64: anhang.base64, mime_type: anhang.mime_type };
         } catch (err) {
           logError("webhook/email", `Analyse fehlgeschlagen: ${anhang.name}`, err);
@@ -1285,7 +1292,7 @@ export async function POST(request: NextRequest) {
             ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
             : emailText.slice(0, 15000);
           const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
-          const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain");
+          const bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint });
 
           // Betreff-basierte Korrektur: Wenn der Betreff klar einen Typ signalisiert, GPT aber etwas anderes sagt
           if (email_betreff) {
