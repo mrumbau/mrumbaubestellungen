@@ -503,3 +503,86 @@ ALTER TABLE dashboard_ki_cache ENABLE ROW LEVEL SECURITY;
 CREATE POLICY dashboard_ki_cache_own ON dashboard_ki_cache
   FOR ALL USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
+
+-- ============================================================
+-- E-Mail-Sync (Make.com-Replacement, in-App via Microsoft Graph)
+--
+-- mail_sync_folders    = konfigurierte Outlook-Folder + Delta-Cursor
+-- email_processing_log = Idempotenz-PK + Telemetrie pro Mail
+--
+-- Cron-Endpoint /api/cron/check-emails iteriert alle aktiven Folder,
+-- holt Delta-Updates und ruft email-Pipeline intern auf.
+-- ============================================================
+
+CREATE TABLE mail_sync_folders (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  graph_folder_id TEXT NOT NULL UNIQUE,
+  folder_name     TEXT NOT NULL,
+  folder_path     TEXT NOT NULL,
+  document_hint   TEXT CHECK (document_hint IN
+                    ('rechnung','lieferschein','bestellbestaetigung','versand') OR document_hint IS NULL),
+  delta_token     TEXT,
+  enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+  last_sync_at    TIMESTAMPTZ,
+  last_sync_count INT DEFAULT 0,
+  last_error      TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_msf_enabled ON mail_sync_folders(enabled) WHERE enabled = TRUE;
+
+CREATE TYPE email_processing_status AS ENUM
+  ('pending','irrelevant','processed','failed');
+
+CREATE TABLE email_processing_log (
+  internet_message_id   TEXT PRIMARY KEY,
+  graph_message_id      TEXT NOT NULL,
+  folder_id             UUID NOT NULL REFERENCES mail_sync_folders(id) ON DELETE CASCADE,
+  folder_hint           TEXT,
+  ki_classified_as      TEXT,
+  ki_confidence         NUMERIC(3,2),
+  folder_mismatch       BOOLEAN GENERATED ALWAYS AS
+                          (folder_hint IS NOT NULL AND ki_classified_as IS NOT NULL
+                           AND folder_hint <> ki_classified_as) STORED,
+  status                email_processing_status NOT NULL DEFAULT 'pending',
+  received_at           TIMESTAMPTZ,
+  check_at              TIMESTAMPTZ,
+  processed_at          TIMESTAMPTZ,
+  openai_input_tokens   INT,
+  openai_output_tokens  INT,
+  openai_cost_eur       NUMERIC(8,4),
+  error_msg             TEXT,
+  bestellung_id         UUID REFERENCES bestellungen(id) ON DELETE SET NULL,
+  sender                TEXT,
+  subject               TEXT,
+  has_attachments       BOOLEAN,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_epl_folder_processed ON email_processing_log(folder_id, processed_at DESC);
+CREATE INDEX idx_epl_status_created   ON email_processing_log(status, created_at DESC);
+CREATE INDEX idx_epl_processed_at     ON email_processing_log(processed_at DESC) WHERE processed_at IS NOT NULL;
+CREATE INDEX idx_epl_mismatch         ON email_processing_log(folder_mismatch) WHERE folder_mismatch = TRUE;
+CREATE INDEX idx_epl_bestellung       ON email_processing_log(bestellung_id) WHERE bestellung_id IS NOT NULL;
+
+ALTER TABLE mail_sync_folders     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_processing_log  ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY admin_msf ON mail_sync_folders FOR ALL
+  USING ((SELECT rolle FROM benutzer_rollen WHERE user_id = auth.uid()) = 'admin');
+
+CREATE POLICY admin_epl ON email_processing_log FOR ALL
+  USING ((SELECT rolle FROM benutzer_rollen WHERE user_id = auth.uid()) = 'admin');
+
+CREATE OR REPLACE FUNCTION update_mail_sync_folders_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_mail_sync_folders_updated_at
+  BEFORE UPDATE ON mail_sync_folders
+  FOR EACH ROW
+  EXECUTE FUNCTION update_mail_sync_folders_updated_at();

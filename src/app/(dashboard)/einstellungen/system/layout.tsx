@@ -6,6 +6,7 @@ import {
   IconActivity,
   IconUsers,
   IconTool,
+  IconMail,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,11 @@ export default async function SystemLayout({
       href: "/einstellungen/system",
       match: "exact",
       icon: <IconSettings />,
+    },
+    {
+      label: "E-Mail-Sync",
+      href: "/einstellungen/system/email-sync",
+      icon: <IconMail />,
     },
     {
       label: "Webhook-Logs",

@@ -217,3 +217,28 @@ export function IconDownload(props: IconProps) {
     </svg>
   );
 }
+
+export function IconMail(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <rect x="2" y="3.5" width="12" height="9" rx="1" />
+      <path d="M2.5 4.5l5.5 4 5.5-4" />
+    </svg>
+  );
+}
+
+export function IconRefresh(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3.5h-3.5" />
+    </svg>
+  );
+}
+
+export function IconPlay(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <path d="M4 3.5l8 4.5-8 4.5z" />
+    </svg>
+  );
+}
