@@ -595,3 +595,12 @@ ALTER TABLE email_processing_log
 CREATE INDEX idx_epl_parser_source
   ON email_processing_log(parser_source)
   WHERE parser_source IS NOT NULL;
+
+-- Retry-Mechanik für 'failed' Mails (Phase 2 Reliability)
+ALTER TABLE email_processing_log
+  ADD COLUMN retry_count   INT NOT NULL DEFAULT 0,
+  ADD COLUMN last_retry_at TIMESTAMPTZ;
+
+CREATE INDEX idx_epl_retry_candidates
+  ON email_processing_log(status, retry_count, created_at DESC)
+  WHERE status = 'failed';

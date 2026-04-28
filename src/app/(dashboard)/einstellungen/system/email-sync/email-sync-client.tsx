@@ -210,6 +210,102 @@ function TabButton({
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   Health-Card — aggregierter Subsystem-Status aus /api/health
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface HealthData {
+  email_sync: {
+    status: "ok" | "warning" | "error" | "inactive";
+    active_folders: number;
+    folders_with_error: number;
+    bootstrap_pending: number;
+    last_processed_at: string | null;
+    failed_last_24h: number;
+    permanent_failures_24h: number;
+    mismatch_rate_7d: number;
+    warnings: string[];
+  };
+  microsoft_graph: string;
+  openai: string;
+}
+
+function HealthCard() {
+  const [data, setData] = useState<HealthData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <div className="rounded-lg border border-line-subtle bg-canvas p-3 text-xs text-foreground-subtle">
+        Health wird geladen…
+      </div>
+    );
+  }
+
+  const es = data.email_sync;
+  const tone =
+    es.status === "ok"
+      ? "success"
+      : es.status === "warning"
+        ? "warning"
+        : es.status === "error"
+          ? "error"
+          : "neutral";
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-3 flex flex-col gap-2",
+        tone === "success" && "border-success-border bg-success-bg",
+        tone === "warning" && "border-warning-border bg-warning-bg",
+        tone === "error" && "border-error-border bg-error-bg",
+        tone === "neutral" && "border-line-subtle bg-canvas",
+      )}
+    >
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Badge tone={tone} size="md">
+            Sync-Status: {es.status === "inactive" ? "inaktiv" : es.status}
+          </Badge>
+          <span className="text-xs text-foreground-muted">
+            {es.active_folders} aktive Folder
+            {es.bootstrap_pending > 0 && ` · ${es.bootstrap_pending} Bootstrap-pending`}
+            {es.failed_last_24h > 0 && ` · ${es.failed_last_24h} failed/24h`}
+            {es.permanent_failures_24h > 0 && ` (${es.permanent_failures_24h} permanent)`}
+          </span>
+        </div>
+        {es.last_processed_at && (
+          <span className="text-[11px] text-foreground-subtle font-mono-amount">
+            zuletzt {relativeTime(es.last_processed_at)}
+          </span>
+        )}
+      </div>
+      {es.warnings.length > 0 && (
+        <ul className="text-xs space-y-0.5">
+          {es.warnings.map((w, i) => (
+            <li key={i} className="text-foreground-muted">
+              · {w}
+            </li>
+          ))}
+        </ul>
+      )}
+      {es.mismatch_rate_7d > 0 && (
+        <div className="text-[11px] text-foreground-subtle">
+          Folder-Mismatch-Rate (7d): {(es.mismatch_rate_7d * 100).toFixed(1)} %
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    TAB 1: Folder-Verwaltung
    ════════════════════════════════════════════════════════════════════════ */
 
@@ -302,6 +398,7 @@ function FoldersTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <HealthCard />
       <div className="flex items-center justify-between">
         <p className="text-sm text-foreground-muted">
           Konfigurierte Outlook-Folder. Cron iteriert nur aktive Folder. Der Folder-Hint hilft der KI bei

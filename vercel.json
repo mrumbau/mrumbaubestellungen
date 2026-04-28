@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/check-emails",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/retry-failed-emails",
+      "schedule": "0 * * * *"
     }
   ]
 }
