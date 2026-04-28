@@ -15,6 +15,8 @@
 
 import { logInfo } from "@/lib/logger";
 import { amazonParser } from "./amazon";
+import { raabKarcherParser } from "./raab-karcher";
+import { plancraftParser } from "./plancraft";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -31,10 +33,12 @@ export { VENDOR_CONFIDENCE_THRESHOLD } from "./types";
 
 /**
  * Registry. Reihenfolge = Priorität. Erster Match gewinnt.
- * Neue Parser hier hinzufügen.
+ * Spezifische Domain-Matcher zuerst, generische Pattern-Matcher danach.
  */
 const PARSERS: VendorParser[] = [
-  amazonParser,
+  amazonParser,       // amazon.de etc. — eindeutige Domain
+  raabKarcherParser,  // raab-karcher.de / stark-deutschland.de — eindeutige Domain
+  plancraftParser,    // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
 export interface VendorDispatchResult {

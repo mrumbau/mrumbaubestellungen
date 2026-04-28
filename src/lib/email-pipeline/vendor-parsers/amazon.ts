@@ -20,6 +20,7 @@
 
 import type { DokumentAnalyse } from "@/lib/openai";
 import type { VendorParser, VendorParseResult, VendorParserInput } from "./types";
+import { parseGermanDate, parseEuroAmount } from "./utils";
 
 const AMAZON_DOMAINS = [
   "amazon.de",
@@ -30,48 +31,6 @@ const AMAZON_DOMAINS = [
 
 const ORDER_NUMBER_REGEX = /(\d{3}-\d{7}-\d{7})/;
 const TRACKING_REGEX_DHL = /\b(\d{12,20})\b/;
-
-const MONTH_MAP_DE: Record<string, string> = {
-  januar: "01", jan: "01",
-  februar: "02", feb: "02",
-  märz: "03", marz: "03", mar: "03",
-  april: "04", apr: "04",
-  mai: "05",
-  juni: "06", jun: "06",
-  juli: "07", jul: "07",
-  august: "08", aug: "08",
-  september: "09", sep: "09",
-  oktober: "10", okt: "10",
-  november: "11", nov: "11",
-  dezember: "12", dez: "12",
-};
-
-function parseGermanDate(raw: string | null): string | null {
-  if (!raw) return null;
-  // Format: "16. April 2026" oder "16.04.2026"
-  const dotted = raw.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-  if (dotted) {
-    return `${dotted[3]}-${dotted[2].padStart(2, "0")}-${dotted[1].padStart(2, "0")}`;
-  }
-  const longForm = raw.match(/(\d{1,2})\.\s+(\w+)\s+(\d{4})/);
-  if (longForm) {
-    const month = MONTH_MAP_DE[longForm[2].toLowerCase()];
-    if (month) {
-      return `${longForm[3]}-${month}-${longForm[1].padStart(2, "0")}`;
-    }
-  }
-  return null;
-}
-
-function parseEuroAmount(raw: string | null): number | null {
-  if (!raw) return null;
-  // "EUR 1.234,56" oder "1234,56 EUR" oder "234,99"
-  const cleaned = raw.replace(/[€EUR\s]/gi, "").trim();
-  // Deutsches Format: 1.234,56 → 1234.56
-  const normalized = cleaned.replace(/\./g, "").replace(",", ".");
-  const num = parseFloat(normalized);
-  return Number.isFinite(num) ? num : null;
-}
 
 function classifyDocumentType(
   subject: string,
