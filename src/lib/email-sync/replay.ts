@@ -17,8 +17,9 @@ import { graphFetch, GraphError } from "@/lib/microsoft-graph/client";
 import { fetchAllFileAttachments } from "@/lib/microsoft-graph/attachments";
 import { classifyEmail } from "@/lib/email-pipeline/classify";
 import { ingestEmail } from "@/lib/email-pipeline/ingest";
+import { withCostTracking } from "@/lib/openai";
 import { markIrrelevant, markProcessed, markFailed } from "./idempotency";
-import { logError } from "@/lib/logger";
+import { logError, logInfo } from "@/lib/logger";
 
 export type ReplayOutcome = "processed" | "irrelevant" | "failed" | "gone";
 
@@ -108,38 +109,64 @@ export async function replayOneMessage(
     return { outcome: "failed", fehler: msg };
   }
 
+  // R5c: Komplette Pipeline (classify + ingest) in withCostTracking-Bucket
+  // → AsyncLocalStorage-Bucket fließt durch alle OpenAI-Calls und wird in
+  // markProcessed in email_processing_log.openai_* persistiert.
   try {
-    const classifyResult = await classifyEmail({
-      email_absender: message.from?.emailAddress.address ?? "",
-      email_betreff: message.subject ?? "",
-      email_vorschau: message.bodyPreview ?? "",
-      hat_anhaenge: message.hasAttachments,
+    const { result, cost } = await withCostTracking(async () => {
+      const classifyResult = await classifyEmail({
+        email_absender: message.from?.emailAddress.address ?? "",
+        email_betreff: message.subject ?? "",
+        email_vorschau: message.bodyPreview ?? "",
+        hat_anhaenge: message.hasAttachments,
+      });
+
+      if (!classifyResult.relevant) {
+        return {
+          outcome: "irrelevant" as const,
+          grund: classifyResult.grund,
+        };
+      }
+
+      const attachments = message.hasAttachments
+        ? await fetchAllFileAttachments(message.id)
+        : [];
+
+      const ingestResult = await ingestEmail({
+        email_absender: message.from?.emailAddress.address ?? "",
+        email_betreff: message.subject ?? "",
+        email_datum: message.receivedDateTime,
+        email_text: message.body?.content ?? "",
+        email_vorschau: message.bodyPreview ?? "",
+        vorfilter: "ja",
+        haendler_id: classifyResult.haendler_id,
+        haendler_name: classifyResult.haendler_name,
+        su_id: classifyResult.su_id,
+        bestellnummer_betreff: classifyResult.bestellnummer_betreff,
+        anhaenge: attachments,
+        document_hint: folderHint,
+      });
+
+      return { outcome: "ingested" as const, ingestResult };
     });
 
-    if (!classifyResult.relevant) {
-      await markIrrelevant(supabase, internetMessageId, classifyResult.grund);
+    if (cost.calls > 0) {
+      logInfo("email-sync/replay", "Cost-Bucket aggregiert", {
+        internet_message_id: internetMessageId,
+        calls: cost.calls,
+        input_tokens: cost.input_tokens,
+        output_tokens: cost.output_tokens,
+        cost_eur: Number(cost.cost_eur.toFixed(6)),
+        models: Object.keys(cost.model_breakdown),
+      });
+    }
+
+    if (result.outcome === "irrelevant") {
+      await markIrrelevant(supabase, internetMessageId, result.grund);
       return { outcome: "irrelevant" };
     }
 
-    const attachments = message.hasAttachments
-      ? await fetchAllFileAttachments(message.id)
-      : [];
-
-    const ingestResult = await ingestEmail({
-      email_absender: message.from?.emailAddress.address ?? "",
-      email_betreff: message.subject ?? "",
-      email_datum: message.receivedDateTime,
-      email_text: message.body?.content ?? "",
-      email_vorschau: message.bodyPreview ?? "",
-      vorfilter: "ja",
-      haendler_id: classifyResult.haendler_id,
-      haendler_name: classifyResult.haendler_name,
-      su_id: classifyResult.su_id,
-      bestellnummer_betreff: classifyResult.bestellnummer_betreff,
-      anhaenge: attachments,
-      document_hint: folderHint,
-    });
-
+    const ingestResult = result.ingestResult;
     if (!ingestResult.success) {
       await markFailed(
         supabase,
@@ -155,6 +182,9 @@ export async function replayOneMessage(
       ki_confidence: ingestResult.ki_confidence,
       parser_source: ingestResult.parser_source,
       parser_name: ingestResult.parser_name,
+      openai_input_tokens: cost.input_tokens || undefined,
+      openai_output_tokens: cost.output_tokens || undefined,
+      openai_cost_eur: cost.cost_eur || undefined,
     });
 
     return { outcome: "processed", bestellung_id: ingestResult.bestellung_id };

@@ -111,6 +111,10 @@ export interface ProcessedUpdate {
   parser_source?: "vendor" | "ki";
   /** Phase 2: Vendor-Parser-Name oder null. */
   parser_name?: string | null;
+  /** R5c: Cost-Tracking pro Mail (von withCostTracking aggregiert). */
+  openai_input_tokens?: number;
+  openai_output_tokens?: number;
+  openai_cost_eur?: number;
 }
 
 /** Markiert eine Mail als erfolgreich verarbeitet. */
@@ -130,6 +134,9 @@ export async function markProcessed(
       ki_confidence: update.ki_confidence ?? null,
       parser_source: update.parser_source ?? null,
       parser_name: update.parser_name ?? null,
+      openai_input_tokens: update.openai_input_tokens ?? null,
+      openai_output_tokens: update.openai_output_tokens ?? null,
+      openai_cost_eur: update.openai_cost_eur ?? null,
     })
     .eq("internet_message_id", internetMessageId);
 
