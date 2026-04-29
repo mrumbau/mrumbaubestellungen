@@ -3,6 +3,37 @@ import { logError } from "./logger";
 import { checkTransition, type BestellStatus } from "./status-machine";
 
 // =====================================================================
+// F4.18: Confidence-Aggregation
+//
+// End-to-End-Confidence einer Pipeline-Run basierend auf Zuordnungs-Methode
+// und (optional) KI-Konfidenz. Liefert einen Score [0..1] für Diagnose und
+// ggf. UI-Filter ("low-confidence Bestellungen reviewen").
+// =====================================================================
+
+/** Aggregiert Pipeline-Confidence. Methode dominiert, KI-Konfidenz justiert. */
+export function aggregatePipelineConfidence(
+  zuordnungsMethode: string,
+  kiKonfidenz?: number | null,
+): number {
+  const methodeBase: Record<string, number> = {
+    bestellnummer_match: 1.0,
+    bestellnummer_match_gpt: 0.95,
+    signal_4h: 0.92,
+    besteller_im_dokument: 0.85,
+    name_im_text: 0.78,
+    ki_historisch: 0.72,
+    haendler_affinitaet: 0.65,
+    unbekannt: 0.0,
+  };
+  const base = methodeBase[zuordnungsMethode] ?? 0.5;
+  // KI-Konfidenz dämpft (geometrisches Mittel) wenn Methode KI-basiert ist
+  if (zuordnungsMethode === "ki_historisch" && typeof kiKonfidenz === "number") {
+    return Math.sqrt(base * Math.max(0, Math.min(1, kiKonfidenz)));
+  }
+  return base;
+}
+
+// =====================================================================
 // Bestellungsart: Material vs. Subunternehmer
 // =====================================================================
 

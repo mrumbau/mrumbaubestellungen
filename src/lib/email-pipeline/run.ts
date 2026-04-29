@@ -24,7 +24,7 @@ import {
 } from "@/lib/openai";
 import { tryParseVendor, mergeVendorIntoKi } from "@/lib/email-pipeline/vendor-parsers";
 import { safeBestellnummer } from "@/lib/validation";
-import { updateBestellungStatus } from "@/lib/bestellung-utils";
+import { updateBestellungStatus, aggregatePipelineConfidence } from "@/lib/bestellung-utils";
 import { buildTrackingUrl } from "@/lib/tracking-urls";
 import { logError, logInfo } from "@/lib/logger";
 
@@ -576,7 +576,16 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     const { analyse, dateiName, base64, mime_type } = ergebnis;
 
     if (!BEKANNTE_TYPEN.includes(analyse.typ) || analyse.parse_fehler) {
-      logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", parse_fehler=${!!analyse.parse_fehler}, datei="${dateiName}"`);
+      // F4.15 Fix: parse_fehler explizit als Error loggen (Diagnose-Indikator
+      // für systematische Modell-Drift). Unbekannter Typ bleibt info.
+      if (analyse.parse_fehler) {
+        logError("webhook/email", `OpenAI parse_fehler — Dokument wird übersprungen`, {
+          datei: dateiName,
+          typ: analyse.typ,
+        });
+      } else {
+        logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
+      }
       continue;
     }
 
@@ -833,12 +842,16 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   });
 
   const dauer = Date.now() - startTime;
+  // F4.18: End-to-End Confidence aus Methode + ggf. KI-Konfidenz aggregieren
+  const kiKonfidenz = analyseErgebnisse.find((e) => e.analyse.konfidenz)?.analyse.konfidenz ?? null;
+  const pipelineConfidence = aggregatePipelineConfidence(zuordnungsMethodeMutable, kiKonfidenz);
   logInfo("webhook/email", `Fertig in ${dauer}ms`, {
     bestellungId,
     dokumente: dokumenteGespeichert,
     besteller: bestellerKuerzelMutable,
     methode: zuordnungsMethodeMutable,
     haendler: haendlerName,
+    pipeline_confidence: Math.round(pipelineConfidence * 100) / 100,
   });
 
   return {

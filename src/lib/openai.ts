@@ -1,9 +1,18 @@
 import OpenAI from "openai";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { z } from "zod";
+import { zodResponseFormat } from "openai/helpers/zod";
 import { logError, logInfo } from "@/lib/logger";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// F4.13 Fix: 60s Default-Timeout. PDF-Vision braucht oft 20-30s, knapp am SDK-
+// Default 30s — bei großen PDFs hilft das. Maximal-Werte werden bei Bedarf
+// pro Call überschrieben.
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 60_000,
+  maxRetries: 0, // wir machen Retries selbst via withRetry()
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // R2/F4.1: Cost-Tracking-Layer
@@ -95,14 +104,16 @@ export async function withCostTracking<T>(fn: () => Promise<T>): Promise<{ resul
 }
 
 /** Retry-Wrapper mit exponential backoff für OpenAI-Calls. Auto-trackt Costs
- *  bei ChatCompletion-Responses (model + usage erkannt am Result-Shape). */
+ *  bei ChatCompletion-Responses (model + usage erkannt am Result-Shape).
+ *
+ *  F4.7 Fix: Retry-Detection via APIError.status statt String-Match auf der
+ *  Error-Message. 4xx (außer 429) sind non-retryable — der Client-Fehler wird
+ *  durch wiederholte Aufrufe nicht besser. */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const result = await fn();
-      // R2/F4.1: Auto-Cost-Tracking. ChatCompletion hat `model` + `usage`,
-      // andere Result-Shapes (z.B. Stream-Iteratoren) haben das nicht — kein
-      // Tracking dann.
+      // R2/F4.1: Auto-Cost-Tracking
       if (result && typeof result === "object" && "model" in result && "usage" in result) {
         const r = result as {
           model?: string;
@@ -112,32 +123,93 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
       }
       return result;
     } catch (err: unknown) {
-      const isRetryable =
-        err instanceof Error &&
-        (err.message.includes("429") ||
-          err.message.includes("timeout") ||
-          err.message.includes("ECONNRESET") ||
-          err.message.includes("500") ||
-          err.message.includes("503"));
+      let isRetryable = false;
+
+      if (err instanceof OpenAI.APIError) {
+        // Retryable: 429 (rate-limited), 5xx (server-side), explicit 408 (request timeout)
+        const status = err.status ?? 0;
+        isRetryable = status === 429 || status === 408 || (status >= 500 && status < 600);
+      } else if (err instanceof Error) {
+        // Network-Errors haben keinen .status — fallback auf String-Match
+        const msg = err.message.toLowerCase();
+        isRetryable =
+          msg.includes("timeout")
+          || msg.includes("econnreset")
+          || msg.includes("etimedout")
+          || msg.includes("network");
+      }
 
       if (!isRetryable || attempt === maxRetries - 1) throw err;
-      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+      // Jitter zur Vermeidung von Thundering-Herd
+      const backoff = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 250);
+      await new Promise((r) => setTimeout(r, backoff));
     }
   }
   throw new Error("Max retries reached");
 }
 
-/** Sicherer JSON-Parser für GPT-Responses — gibt Fallback statt Crash */
-function safeParseGptJson<T>(text: string, fallback: T): T {
-  // Markdown-Backticks entfernen (GPT verpackt manchmal in ```json...```)
+/** Sicherer JSON-Parser für GPT-Responses — gibt Fallback statt Crash.
+ *  F4.14 Fix: Parse-Fehler werden geloggt (vorher silent fallback → systematische
+ *  Modell-Drift blieb unentdeckt). */
+function safeParseGptJson<T>(text: string, fallback: T, context = "openai/safeParseGptJson"): T {
   const clean = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
   try {
     return JSON.parse(jsonMatch ? jsonMatch[0] : clean);
-  } catch {
+  } catch (err) {
+    logError(context, "JSON-Parse fehlgeschlagen — Fallback wird zurückgegeben", {
+      error: err instanceof Error ? err.message : String(err),
+      raw_preview: text.slice(0, 500),
+    });
     return fallback;
   }
 }
+
+// =====================================================================
+// F4.3: Structured Outputs Schema
+//
+// Zod-Schema für analysiereDokument-Response. Wird via zodResponseFormat
+// als JSON-Schema mit strict-Mode an die OpenAI-API geschickt → garantiert
+// gültige Struktur, kein JSON-Parse-Fehler mehr möglich.
+//
+// Wichtig: Strict-Mode erfordert dass ALLE Felder required sind (kein
+// .optional()). Felder die "fehlen können" werden via .nullable() expliziert.
+// =====================================================================
+const DokumentAnalyseSchema = z.object({
+  typ: z.enum([
+    "bestellbestaetigung", "lieferschein", "rechnung",
+    "aufmass", "leistungsnachweis", "versandbestaetigung", "unbekannt",
+  ]),
+  vermutete_bestellungsart: z.enum(["material", "subunternehmer"]).nullable(),
+  bestellnummer: z.string().nullable(),
+  auftragsnummer: z.string().nullable(),
+  lieferscheinnummer: z.string().nullable(),
+  haendler: z.string().nullable(),
+  datum: z.string().nullable(),
+  artikel: z.array(z.object({
+    name: z.string(),
+    menge: z.number(),
+    einzelpreis: z.number(),
+    gesamtpreis: z.number(),
+  })),
+  gesamtbetrag: z.number().nullable(),
+  netto: z.number().nullable(),
+  mwst: z.number().nullable(),
+  faelligkeitsdatum: z.string().nullable(),
+  lieferdatum: z.string().nullable(),
+  iban: z.string().nullable(),
+  konfidenz: z.number(),
+  lieferadressen: z.array(z.string()),
+  volltext: z.string(),
+  tracking_nummer: z.string().nullable(),
+  versanddienstleister: z.string().nullable(),
+  tracking_url: z.string().nullable(),
+  voraussichtliche_lieferung: z.string().nullable(),
+  kundennummer: z.string().nullable(),
+  besteller_im_dokument: z.string().nullable(),
+  projekt_referenz: z.string().nullable(),
+  bestelldatum: z.string().nullable(),
+});
 
 export interface DokumentAnalyse {
   typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "versandbestaetigung" | "unbekannt";
@@ -337,34 +409,84 @@ export async function analysiereDokument(
 
   const systemPrompt = ANALYSE_PROMPT + folderHintPromptAddition(options?.folderHint);
 
-  const response = await withRetry(() =>
-    openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      max_tokens: 2000,
-      temperature: 0.1,
-    })
-  );
+  // F4.17 Fix: Adaptive max_tokens.
+  let maxTokens = 2000;
+  if (isText) {
+    const inputBytes = Buffer.byteLength(base64, "base64");
+    maxTokens = Math.min(2000, Math.max(500, Math.ceil(inputBytes / 5)));
+  }
 
-  const rawText = response.choices[0]?.message?.content || "{}";
-  // Markdown-Backticks entfernen (GPT verpackt manchmal in ```json...```)
-  const text = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  // F4.3 Fix: Structured Outputs via zodResponseFormat. Kein safeParseGptJson
+  // mehr nötig — die OpenAI-API garantiert valid-JSON conforming zum Schema
+  // (oder wirft beim Refusal).
   try {
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-    return {
-      ...parsed,
-      lieferadressen: parsed.lieferadressen || [],
-      volltext: parsed.volltext || "",
-    };
-  } catch {
-    logError("openai/analysiereDokument", "JSON-Parse fehlgeschlagen", { text: text.slice(0, 500) });
-    return { typ: "unbekannt", bestellnummer: null, auftragsnummer: null, lieferscheinnummer: null, haendler: null, datum: null, artikel: [], gesamtbetrag: null, netto: null, mwst: null, faelligkeitsdatum: null, lieferdatum: null, iban: null, konfidenz: 0, lieferadressen: [], volltext: rawText, parse_fehler: true };
+    const completion = await withRetry(() =>
+      openai.chat.completions.parse({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.1,
+        response_format: zodResponseFormat(DokumentAnalyseSchema, "DokumentAnalyse"),
+      }),
+    );
+
+    const parsed = completion.choices[0]?.message?.parsed;
+    if (!parsed) {
+      const refusal = completion.choices[0]?.message?.refusal;
+      logError("openai/analysiereDokument", "Structured-Outputs lieferte kein parsed-Objekt", {
+        refusal: refusal ?? null,
+      });
+      return makeUnknownDokumentAnalyse(true);
+    }
+
+    // Strikte Schema-Garantie — Cast ist safe weil zodResponseFormat parsed validiert.
+    return parsed as DokumentAnalyse;
+  } catch (err) {
+    logError("openai/analysiereDokument", "Structured-Outputs-Aufruf fehlgeschlagen", err);
+    return makeUnknownDokumentAnalyse(true);
   }
 }
+
+/** F4.3 Helper: Default-Fallback wenn analysiereDokument keinen valid-Output liefert. */
+function makeUnknownDokumentAnalyse(parseError: boolean): DokumentAnalyse {
+  return {
+    typ: "unbekannt",
+    bestellnummer: null,
+    auftragsnummer: null,
+    lieferscheinnummer: null,
+    haendler: null,
+    datum: null,
+    artikel: [],
+    gesamtbetrag: null,
+    netto: null,
+    mwst: null,
+    faelligkeitsdatum: null,
+    lieferdatum: null,
+    iban: null,
+    konfidenz: 0,
+    lieferadressen: [],
+    volltext: "",
+    parse_fehler: parseError,
+  };
+}
+
+// F4.3: AbgleichErgebnis-Schema für Structured Outputs.
+// strict-Mode: erwartet/gefunden müssen einheitlich typed sein → string (KI muss Zahlen als Strings ausgeben).
+const AbgleichErgebnisSchema = z.object({
+  status: z.enum(["ok", "abweichung"]),
+  abweichungen: z.array(z.object({
+    feld: z.string(),
+    artikel: z.string().nullable(),
+    erwartet: z.string(),
+    gefunden: z.string(),
+    dokument: z.string(),
+    schwere: z.enum(["niedrig", "mittel", "hoch"]),
+  })),
+  zusammenfassung: z.string(),
+});
 
 // KI-Abgleich zwischen den 3 Dokumenten
 export async function fuehreAbgleichDurch(
@@ -372,45 +494,50 @@ export async function fuehreAbgleichDurch(
   lieferschein: DokumentAnalyse | null,
   rechnung: DokumentAnalyse | null
 ): Promise<AbgleichErgebnis> {
-  const response = await withRetry(() =>
-    openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: `Du bist ein Prüfassistent für eine deutsche Baufirma.
+  try {
+    const completion = await withRetry(() =>
+      openai.chat.completions.parse({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `Du bist ein Prüfassistent für eine deutsche Baufirma.
 Vergleiche die folgenden Dokumente einer Bestellung und prüfe ob alles übereinstimmt.
 
-Gib NUR ein JSON-Objekt zurück:
-{
-  "status": "ok" | "abweichung",
-  "abweichungen": [
-    {
-      "feld": "menge",
-      "artikel": "Bosch Bohrmaschine",
-      "erwartet": 2,
-      "gefunden": 1,
-      "dokument": "lieferschein",
-      "schwere": "hoch"
-    }
-  ],
-  "zusammenfassung": "Alles stimmt überein." | "Abweichung gefunden: ..."
-}`,
-        },
-        {
-          role: "user",
-          content: `Bestellbestätigung: ${JSON.stringify(bestellbestaetigung)}
+Gib das Ergebnis als JSON-Objekt zurück:
+- status: "ok" wenn keine Abweichungen, sonst "abweichung"
+- abweichungen: Liste der erkannten Diskrepanzen
+- zusammenfassung: kurze Beschreibung in Deutsch
+
+In abweichungen[].erwartet und abweichungen[].gefunden gib Werte IMMER als String (auch Zahlen).`,
+          },
+          {
+            role: "user",
+            content: `Bestellbestätigung: ${JSON.stringify(bestellbestaetigung)}
 Lieferschein: ${JSON.stringify(lieferschein)}
 Rechnung: ${JSON.stringify(rechnung)}`,
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.1,
-    })
-  );
+          },
+        ],
+        max_tokens: 2000,
+        temperature: 0.1,
+        response_format: zodResponseFormat(AbgleichErgebnisSchema, "AbgleichErgebnis"),
+      }),
+    );
 
-  const text = response.choices[0]?.message?.content || "{}";
-  return safeParseGptJson<AbgleichErgebnis>(text, { status: "ok", abweichungen: [], zusammenfassung: "Abgleich konnte nicht durchgeführt werden." });
+    const parsed = completion.choices[0]?.message?.parsed;
+    if (!parsed) {
+      logError("openai/fuehreAbgleichDurch", "kein parsed-Result", {
+        refusal: completion.choices[0]?.message?.refusal ?? null,
+      });
+      return { status: "ok", abweichungen: [], zusammenfassung: "Abgleich konnte nicht durchgeführt werden." };
+    }
+    // Cast: z.string() für erwartet/gefunden aus dem Schema → AbgleichErgebnis-Type
+    // erlaubt string | number, also widening-Cast safe.
+    return parsed as AbgleichErgebnis;
+  } catch (err) {
+    logError("openai/fuehreAbgleichDurch", "Strict-Outputs fehlgeschlagen", err);
+    return { status: "ok", abweichungen: [], zusammenfassung: "Abgleich konnte nicht durchgeführt werden." };
+  }
 }
 
 // ========== NEUE KI-FUNKTIONEN ==========
@@ -441,11 +568,14 @@ Falls du dir sehr unsicher bist (konfidenz < 0.4), setze kuerzel auf "UNBEKANNT"
       },
       {
         role: "user",
+        // F4.11 Fix: Pre-Trim der Artikel- und Händler-Listen pro Besteller.
+        // Top-5 Artikel + Top-5 Händler reichen für Profil-Erkennung; volle
+        // Liste hätte Token-Verbrauch unnötig getrieben.
         content: `Neue Bestellung bei ${haendlerName}:
-Artikel: ${JSON.stringify(artikelAusEmail)}
+Artikel: ${JSON.stringify(artikelAusEmail.slice(0, 10))}
 
 Bestellhistorie der Mitarbeiter:
-${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.artikel_namen.slice(0, 15).join(", ")} | Händler: ${b.haendler.join(", ")}`).join("\n")}`,
+${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.artikel_namen.slice(0, 5).join(", ")} | Händler: ${b.haendler.slice(0, 5).join(", ")}`).join("\n")}`,
       },
     ],
     max_tokens: 500,
@@ -560,9 +690,12 @@ Falls du den Händler nicht erkennen kannst, gib null zurück.`,
       },
       {
         role: "user",
-        content: `E-Mail-Absender: ${emailAbsender}
-Betreff: ${emailBetreff}
-Erkannter Händlername aus Dokument: ${erkannterHaendlerName || "nicht erkannt"}`,
+        // F4.9 Fix: User-Input via JSON-Encoding gegen Prompt-Injection
+        content: `Analysiere folgenden Input (JSON):\n\`\`\`json\n${JSON.stringify({
+          email_absender: emailAbsender,
+          email_betreff: emailBetreff,
+          erkannter_haendler_name: erkannterHaendlerName ?? null,
+        })}\n\`\`\``,
       },
     ],
     max_tokens: 300,
@@ -616,10 +749,13 @@ Falls du den Subunternehmer nicht erkennen kannst, gib null zurück.`,
       },
       {
         role: "user",
-        content: `E-Mail-Absender: ${emailAbsender}
-Betreff: ${emailBetreff}
-Erkannter Firmenname aus Dokument: ${erkannterName || "nicht erkannt"}
-${dokumentText ? `\nDokument-Text (Auszug):\n${dokumentText.slice(0, 2000)}` : ""}`,
+        // F4.9 Fix: User-Input via JSON-Encoding gegen Prompt-Injection
+        content: `Analysiere folgenden Input (JSON):\n\`\`\`json\n${JSON.stringify({
+          email_absender: emailAbsender,
+          email_betreff: emailBetreff,
+          erkannter_firmenname: erkannterName ?? null,
+          dokument_text_auszug: dokumentText ? dokumentText.slice(0, 2000) : null,
+        })}\n\`\`\``,
       },
     ],
     max_tokens: 400,
@@ -829,6 +965,23 @@ export async function priorisiereBestellungen(
     faelligkeitsdatum: string | null;
   }[]
 ): Promise<PriorisierungErgebnis> {
+  // F4.10 Fix: Pre-Filter Top-15 nach Heuristik (überfällig + älteste + höchste Beträge),
+  // Rest als Statistik. Verhindert Token-Explosion bei vielen offenen Bestellungen.
+  const TOP_N = 15;
+  const heuteISO = new Date().toISOString().slice(0, 10);
+  const scored = bestellungen.map((b) => {
+    let score = 0;
+    if (b.faelligkeitsdatum && b.faelligkeitsdatum < heuteISO) score += 50; // überfällig
+    if (b.status === "abweichung") score += 30;
+    score += Math.min(b.tage_alt, 30);
+    if (b.betrag && b.betrag > 1000) score += 10;
+    if (!b.hat_rechnung) score += 5;
+    return { b, score };
+  });
+  const top = scored.sort((a, b) => b.score - a.score).slice(0, TOP_N).map((s) => s.b);
+  const restCount = Math.max(0, bestellungen.length - top.length);
+  const restSummary = restCount > 0 ? `\n\nWeitere ${restCount} offene Bestellungen (niedrigere Priorität, nicht im Detail).` : "";
+
   const response = await withRetry(() => openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -861,9 +1014,9 @@ Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
       },
       {
         role: "user",
-        content: `Offene Bestellungen:\n${bestellungen.map((b) =>
+        content: `Offene Bestellungen (Top ${top.length} nach Pre-Filter):\n${top.map((b) =>
           `- ${b.bestellnummer} bei ${b.haendler}: Status=${b.status}, Betrag=${b.betrag ?? "?"}€, ${b.tage_alt} Tage alt, Fällig=${b.faelligkeitsdatum || "unbekannt"}, Rechnung=${b.hat_rechnung ? "ja" : "nein"}, LS=${b.hat_lieferschein ? "ja" : "nein"}`
-        ).join("\n")}`,
+        ).join("\n")}${restSummary}`,
       },
     ],
     max_tokens: 1500,
