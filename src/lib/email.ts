@@ -98,6 +98,47 @@ export async function sendeRechnungAnDatev(options: RechnungAnDatevOptions): Pro
   }
 }
 
+interface MahnungEmailOptions {
+  empfaengerEmail: string;
+  empfaengerName: string;
+  betreff: string;
+  text: string;
+}
+
+/**
+ * F5.8 Fix: Versendet eine Mahnung-/Erinnerungs-Mail via SMTP.
+ * Vorher hat cron/erinnerungen die KI-generierten Mails NUR zurückgegeben
+ * ohne sie tatsächlich zu versenden — User-Visible halb-gebrochener Workflow.
+ */
+export async function sendeMahnungEmail(options: MahnungEmailOptions): Promise<{ success: boolean; error?: string }> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+    console.warn("[Mahnung-Mail] SMTP nicht konfiguriert — Versand übersprungen");
+    return { success: false, error: "SMTP nicht konfiguriert" };
+  }
+
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: { name: FIRMA, address: ABSENDER },
+      to: { name: options.empfaengerName, address: options.empfaengerEmail },
+      replyTo: ABSENDER,
+      subject: options.betreff,
+      headers: {
+        "X-Mailer": "MR-Umbau-Bestellsystem/1.0",
+        "X-Auto-Response-Suppress": "All",
+      },
+      text: options.text,
+    });
+
+    console.log(`[Mahnung-Mail] Erinnerung gesendet an ${options.empfaengerEmail}`);
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
+    console.error(`[Mahnung-Mail] Fehler: ${msg}`);
+    return { success: false, error: msg };
+  }
+}
+
 /**
  * Erstellt einen sauberen, lesbaren PDF-Dateinamen.
  * z.B. "Rechnung_Raab_Karcher_Nr_8778719837.pdf"

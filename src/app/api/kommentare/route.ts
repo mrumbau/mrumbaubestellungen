@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { isValidUUID, validateTextLength } from "@/lib/validation";
+import { isValidUUID, validateTextLength, sanitizePlainText } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
@@ -48,11 +48,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
+    // F5.4: Server-side Sanitization gegen XSS (Defense-in-Depth, UI rendert
+    // bereits als Plain-Text aber DB-Inhalt soll auch ohne UI-Trust clean sein).
+    const cleanedText = sanitizePlainText(text.trim(), 2000);
+    if (cleanedText.length === 0) {
+      return NextResponse.json({ error: "Kommentar leer nach Sanitization" }, { status: 400 });
+    }
+
     const { error } = await supabase.from("kommentare").insert({
       bestellung_id,
       autor_kuerzel: profil.kuerzel,
       autor_name: profil.name,
-      text: text.trim(),
+      text: cleanedText,
     });
 
     if (error) {

@@ -66,3 +66,33 @@ export function safeBestellnummer(value: unknown, maxLen = 60): string | null {
   if (!/[A-Za-z0-9]/.test(trimmed)) return null;
   return trimmed;
 }
+
+/**
+ * F5.4 Fix: Server-side User-Input-Sanitization für Plain-Text-Felder.
+ * Entfernt HTML-Tags, neutralisiert gefährliche URL-Protokolle, escapet
+ * residuale HTML-Entities, strippt Control-Characters außer \n\t.
+ *
+ * Defense-in-Depth: UI rendert kommentare.text als Plain-Text via React,
+ * aber wenn jemand jemals dangerouslySetInnerHTML drauf macht oder Text via
+ * neuen UI-Helper rendert, ist der DB-Inhalt schon clean.
+ */
+export function sanitizePlainText(text: string, maxLen = 2000): string {
+  if (!text || typeof text !== "string") return "";
+  return text
+    // Tags entfernen
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    // Gefährliche URL-Protokolle neutralisieren
+    .replace(/\b(javascript|vbscript|data|file|jar):/gi, "[blocked-protocol]:")
+    // Control-Characters strippen (außer \n, \t, \r)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    // HTML-Entities escapen
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .trim()
+    .slice(0, maxLen);
+}

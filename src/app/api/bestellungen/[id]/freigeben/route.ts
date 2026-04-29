@@ -79,6 +79,19 @@ export async function POST(
       return NextResponse.json({ error: "Freigabe fehlgeschlagen" }, { status: 500 });
     }
 
+    // F5.3: Audit-Kommentar in kommentare-Stream (zusätzlich zur freigaben-Tabelle).
+    // Dadurch sehen User in der Bestelldetail-Ansicht WER WANN freigegeben hat,
+    // ohne den freigaben-Tab öffnen zu müssen.
+    const auditText = body.kommentar
+      ? `Bestellung freigegeben — Kommentar: ${String(body.kommentar).replace(/[<>"&']/g, "").slice(0, 500)}`
+      : `Bestellung freigegeben`;
+    await supabase.from("kommentare").insert({
+      bestellung_id: id,
+      autor_kuerzel: profil.kuerzel,
+      autor_name: profil.name,
+      text: auditText,
+    });
+
     return NextResponse.json({ success: true });
   } catch (err) {
     logError("/api/bestellungen/[id]/freigeben", "Unerwarteter Fehler", err);

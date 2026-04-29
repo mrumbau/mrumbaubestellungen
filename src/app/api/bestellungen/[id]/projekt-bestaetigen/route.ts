@@ -29,7 +29,7 @@ export async function POST(
 
     const { data: profil } = await supabase
       .from("benutzer_rollen")
-      .select("rolle, kuerzel")
+      .select("rolle, kuerzel, name")
       .eq("user_id", user.id)
       .single();
 
@@ -111,6 +111,14 @@ export async function POST(
       // Besteller-Affinität aktualisieren
       await aktualisiereBestellerAffinitaet(supabase, projekt.id);
 
+      // F5.3: Audit-Kommentar
+      await supabase.from("kommentare").insert({
+        bestellung_id: id,
+        autor_kuerzel: profil!.kuerzel,
+        autor_name: profil!.name ?? profil!.kuerzel,
+        text: `Projekt-Vorschlag bestätigt: ${String(projekt.name).replace(/[<>"&']/g, "").slice(0, 200)}`,
+      });
+
       return NextResponse.json({ success: true, projekt_id: projekt.id, projekt_name: projekt.name });
     }
 
@@ -159,6 +167,14 @@ export async function POST(
 
       await aktualisiereBestellerAffinitaet(supabase, korrProjekt.id);
 
+      // F5.3: Audit-Kommentar bei Korrektur
+      await supabase.from("kommentare").insert({
+        bestellung_id: id,
+        autor_kuerzel: profil!.kuerzel,
+        autor_name: profil!.name ?? profil!.kuerzel,
+        text: `Projekt-Vorschlag korrigiert auf: ${String(korrProjekt.name).replace(/[<>"&']/g, "").slice(0, 200)}`,
+      });
+
       return NextResponse.json({ success: true, projekt_id: korrProjekt.id, projekt_name: korrProjekt.name });
     }
 
@@ -173,6 +189,14 @@ export async function POST(
         projekt_bestaetigt: false,
       })
       .eq("id", id);
+
+    // F5.3: Audit-Kommentar bei Ablehnung ohne Korrektur
+    await supabase.from("kommentare").insert({
+      bestellung_id: id,
+      autor_kuerzel: profil!.kuerzel,
+      autor_name: profil!.name ?? profil!.kuerzel,
+      text: `Projekt-Vorschlag abgelehnt (keine Alternative angegeben)`,
+    });
 
     return NextResponse.json({ success: true });
   } catch {

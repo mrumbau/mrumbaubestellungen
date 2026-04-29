@@ -74,12 +74,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Typ muss 'domain' oder 'adresse' sein" }, { status: 400 });
     }
 
+    // F5.16 Fix: Pattern-Whitelist gegen Wildcard-Missbrauch (`.*` würde alles
+    // blacklisten). Akzeptiert: Domains (`example.com`) oder vollständige
+    // E-Mail-Adressen (`noreply@example.com`). Keine Regex-Metazeichen erlaubt.
+    const trimmed = muster.trim().toLowerCase();
+    if (trimmed.length > 253) {
+      return NextResponse.json({ error: "Muster zu lang (max 253 Zeichen)" }, { status: 400 });
+    }
+    const declaredTyp = typ || "domain";
+    const DOMAIN_PAT = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+    const ADRESSE_PAT = /^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+    const isValid = declaredTyp === "domain" ? DOMAIN_PAT.test(trimmed) : ADRESSE_PAT.test(trimmed);
+    if (!isValid) {
+      return NextResponse.json({
+        error: declaredTyp === "domain"
+          ? "Domain-Muster ungültig (z.B. example.com — keine Wildcards/Regex)"
+          : "Adress-Muster ungültig (z.B. noreply@example.com)",
+      }, { status: 400 });
+    }
+
     const supabase = createServiceClient();
 
     const { error } = await supabase
       .from("email_blacklist")
       .upsert(
-        { muster: muster.trim().toLowerCase(), typ: typ || "domain", grund: grund || null },
+        { muster: trimmed, typ: declaredTyp, grund: grund || null },
         { onConflict: "muster" }
       );
 

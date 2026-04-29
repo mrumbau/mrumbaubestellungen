@@ -15,6 +15,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { safeUpdateStatus } from "@/lib/bestellung-utils";
 import { logInfo } from "@/lib/logger";
 
 const INTERVAL_MONATE: Record<string, number> = {
@@ -56,7 +57,7 @@ export async function handleAboLogik(
     const abweichung =
       Math.abs(aktuellerBetrag - Number(abo.erwarteter_betrag)) / Number(abo.erwarteter_betrag);
     if (abweichung > toleranz) {
-      await supabase.from("bestellungen").update({ status: "abweichung" }).eq("id", bestellungId);
+      await safeUpdateStatus(supabase, bestellungId, "abweichung", "abo/abweichung");
       await supabase.from("kommentare").insert({
         bestellung_id: bestellungId,
         autor_kuerzel: "SYSTEM",
@@ -73,11 +74,11 @@ export async function handleAboLogik(
       });
     } else {
       // Betrag passt → vollständig (löst auch alte 'abweichung' auf)
-      await supabase.from("bestellungen").update({ status: "vollstaendig" }).eq("id", bestellungId);
+      await safeUpdateStatus(supabase, bestellungId, "vollstaendig", "abo/vollstaendig");
     }
   } else {
     // Kein erwarteter Betrag → Abo-Rechnung sofort vollständig
-    await supabase.from("bestellungen").update({ status: "vollstaendig" }).eq("id", bestellungId);
+    await safeUpdateStatus(supabase, bestellungId, "vollstaendig", "abo/vollstaendig");
   }
 
   // 2. Nächste Rechnung weiterschalten (vom geplanten Datum, kein Drift)

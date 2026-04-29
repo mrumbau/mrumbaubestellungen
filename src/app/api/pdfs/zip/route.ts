@@ -38,11 +38,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
     }
 
-    // Dokumente laden (RLS filtert)
+    // F5.5 Fix: Dokumente-Limit gegen Memory-Overflow im Lambda. Bei einer
+    // Bestellung mit >100 Dokumenten würden parallele Downloads die Lambda
+    // sprengen. Aktuell typ. 3-10 Doks/Bestellung — 100 ist sehr großzügig.
     const { data: dokumente } = await supabaseAuth
       .from("dokumente")
       .select("id, typ, storage_pfad")
-      .eq("bestellung_id", bestellungId);
+      .eq("bestellung_id", bestellungId)
+      .limit(100);
 
     const mitPfad = (dokumente || []).filter((d) => d.storage_pfad);
 

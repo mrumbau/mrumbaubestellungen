@@ -13,6 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fuehreAbgleichDurch, type DokumentAnalyse } from "@/lib/openai";
+import { safeUpdateStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
 
 export async function tryAbgleich(
@@ -63,9 +64,7 @@ export async function tryAbgleich(
     });
 
     if (ergebnis.status === "abweichung") {
-      await supabase.from("bestellungen")
-        .update({ status: "abweichung", updated_at: new Date().toISOString() })
-        .eq("id", bestellungId);
+      await safeUpdateStatus(supabase, bestellungId, "abweichung", "abgleich/result");
       await supabase.from("kommentare").insert({
         bestellung_id: bestellungId,
         autor_kuerzel: "SYSTEM",

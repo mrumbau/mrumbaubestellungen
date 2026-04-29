@@ -59,7 +59,7 @@ export async function POST(
     // Bestellung prüfen
     const { data: bestellung } = await serviceClient
       .from("bestellungen")
-      .select("id, status, bestellnummer, haendler_name, betrag")
+      .select("id, status, bestellnummer, haendler_name, betrag, bezahlt_am")
       .eq("id", id)
       .single();
 
@@ -72,7 +72,20 @@ export async function POST(
       return NextResponse.json({ error: "Nur freigegebene Rechnungen können als bezahlt markiert werden" }, { status: 400 });
     }
 
-    const { error: updateError } = await serviceClient
+    // F5.12 Fix: Idempotenz — wenn bereits bezahlt UND wir setzen bezahlt=true,
+    // kein erneuter Update + kein DATEV-Doppel-Versand.
+    if (bezahlt && bestellung.bezahlt_am) {
+      return NextResponse.json({
+        success: true,
+        bezahlt: true,
+        bezahlt_von: profil.name,
+        already: true,
+      });
+    }
+
+    // F5.12: Atomic Update — nur wenn bezahlt_am dem erwarteten Wert entspricht.
+    // Bei bezahlt=true: nur setzen wenn bezahlt_am IS NULL. Bei false: immer.
+    let query = serviceClient
       .from("bestellungen")
       .update({
         bezahlt_am: bezahlt ? new Date().toISOString() : null,
@@ -80,6 +93,9 @@ export async function POST(
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
+    if (bezahlt) query = query.is("bezahlt_am", null);
+
+    const { error: updateError } = await query;
 
     if (updateError) {
       logError("/api/bestellungen/[id]/bezahlt", "Update fehlgeschlagen", updateError);
@@ -133,9 +149,28 @@ export async function POST(
           });
 
           console.log(`[DATEV] Ergebnis: ${result.success ? "GESENDET" : "FEHLER: " + result.error}`);
+          // F5.13 Fix: SMTP-Ergebnis in webhook_logs persistieren — nicht nur console.
+          await svc.from("webhook_logs").insert({
+            typ: "email",
+            status: result.success ? "success" : "error",
+            bestellung_id: id,
+            fehler_text: result.success
+              ? `DATEV-Versand erfolgreich: ${bestellung.haendler_name} ${bestellung.bestellnummer || ""}`
+              : `DATEV-Versand fehlgeschlagen: ${result.error}`,
+          });
         } catch (datevErr) {
           console.error(`[DATEV] Exception:`, datevErr instanceof Error ? datevErr.message : datevErr);
           logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen", datevErr);
+          // F5.13: Exception ebenfalls persistieren
+          try {
+            const svc = createServiceClient();
+            await svc.from("webhook_logs").insert({
+              typ: "email",
+              status: "error",
+              bestellung_id: id,
+              fehler_text: `DATEV-Versand Exception: ${datevErr instanceof Error ? datevErr.message : String(datevErr)}`,
+            });
+          } catch { /* swallow nested */ }
         }
       });
     }

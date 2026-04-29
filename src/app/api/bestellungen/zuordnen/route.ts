@@ -81,12 +81,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Zuordnung fehlgeschlagen" }, { status: 500 });
     }
 
-    // Kommentar für Nachvollziehbarkeit
+    // Kommentar für Nachvollziehbarkeit (F5.4: User-Input wird sanitized
+    // bevor er ins kommentare.text Template fließt — verhindert XSS via
+    // bösartige benutzer.name)
+    const safeKuerzel = String(benutzer.kuerzel).replace(/[^A-Za-z0-9]/g, "");
+    const safeName = String(benutzer.name).replace(/[<>"&']/g, "").slice(0, 100);
+    const safeVorher = String(vorher).replace(/[<>"&']/g, "").slice(0, 100);
     await supabase.from("kommentare").insert({
       bestellung_id,
       autor_kuerzel: "ADMIN",
       autor_name: "Admin",
-      text: `Besteller manuell zugeordnet: ${vorher} → ${benutzer.kuerzel} (${benutzer.name})`,
+      text: `Besteller manuell zugeordnet: ${safeVorher} → ${safeKuerzel} (${safeName})`,
     });
 
     return NextResponse.json({ success: true });

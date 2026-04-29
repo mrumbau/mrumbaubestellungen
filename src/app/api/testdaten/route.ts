@@ -318,7 +318,14 @@ const TEST_KUNDEN = [
 // =====================================================================
 
 export async function POST(request: NextRequest) {
+  // F5.6 Fix: Doppel-Gate — NODE_ENV-Check bleibt, plus explizites
+  // ALLOW_TESTDATEN-ENV. Verhindert dass der Endpoint auf Vercel-Preview
+  // (NODE_ENV=development) versehentlich offen ist. Auf Production muss
+  // ALLOW_TESTDATEN=true gesetzt sein UND NODE_ENV != production.
   if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (process.env.ALLOW_TESTDATEN !== "true") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

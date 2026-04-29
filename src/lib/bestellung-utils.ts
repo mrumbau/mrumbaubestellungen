@@ -94,6 +94,48 @@ export type Gewerk = (typeof GEWERKE)[number];
 // =====================================================================
 
 /**
+ * F5.1 Fix: Sicherer Status-Update für `bestellungen.status`.
+ * Lädt aktuellen Status, validiert Übergang via `checkTransition`, und
+ * UPDATEs nur wenn erlaubt. Bei freigegeben-Bestellungen passiert NICHTS
+ * (kein Rollback). Loggt Verstöße via logError.
+ *
+ * Nutzen: an Stellen die bestellungen.status setzen, statt direkt
+ * `update({status: X})` aufzurufen.
+ */
+export async function safeUpdateStatus(
+  supabase: SupabaseClient,
+  bestellungId: string,
+  neuerStatus: BestellStatus,
+  context?: string,
+): Promise<{ updated: boolean; from?: string; reason?: string }> {
+  const { data: row } = await supabase
+    .from("bestellungen")
+    .select("status")
+    .eq("id", bestellungId)
+    .maybeSingle();
+
+  if (!row) {
+    return { updated: false, reason: "bestellung_nicht_gefunden" };
+  }
+
+  if (row.status === neuerStatus) {
+    return { updated: true, from: row.status }; // idempotent
+  }
+
+  const result = checkTransition(row.status as BestellStatus, neuerStatus, context);
+  if (!result.valid) {
+    return { updated: false, from: row.status, reason: result.reason };
+  }
+
+  await supabase
+    .from("bestellungen")
+    .update({ status: neuerStatus, updated_at: new Date().toISOString() })
+    .eq("id", bestellungId);
+
+  return { updated: true, from: row.status };
+}
+
+/**
  * Berechnet und aktualisiert den Status einer Bestellung
  * basierend auf vorhandenen Dokumenten und der Bestellungsart.
  * Wird in webhook/email und scan verwendet.

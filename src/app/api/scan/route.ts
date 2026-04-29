@@ -179,6 +179,14 @@ export async function POST(request: NextRequest) {
 
     if (dokError) {
       logError("/api/scan", "Dokument DB-Fehler", dokError);
+      // F5.7 Fix: Storage-Cleanup bei DB-Insert-Fehler — verhindert verwaiste Files
+      if (!uploadError) {
+        try {
+          await supabase.storage.from("dokumente").remove([storagePfad]);
+        } catch (rmErr) {
+          logError("/api/scan", "Storage-Cleanup nach DB-Insert-Fehler fehlgeschlagen", rmErr);
+        }
+      }
       return NextResponse.json({ error: "Dokument konnte nicht gespeichert werden" }, { status: 500 });
     }
 
