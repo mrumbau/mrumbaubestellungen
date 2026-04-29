@@ -17,6 +17,18 @@
  */
 
 import { graphFetch, GraphError } from "./client";
+import { logError } from "@/lib/logger";
+
+/**
+ * F3.A4: Eigener Error-Type statt GraphError(200) das semantisch falsch ist
+ * (200 ist ein Erfolgs-Status, nicht ein Anhang-leer-Fehler).
+ */
+export class AttachmentError extends Error {
+  constructor(message: string, public readonly attachmentName?: string) {
+    super(message);
+    this.name = "AttachmentError";
+  }
+}
 
 export interface AttachmentMeta {
   id: string;
@@ -51,6 +63,8 @@ interface GraphAttachmentList {
   value: GraphAttachment[];
 }
 
+// F3.A6: Mailbox-Accessor in client.ts konsolidiert (getMailboxSegment).
+// Lokale Wrapper bleibt für bestehende Aufrufer.
 function getMailbox(): string {
   const m = process.env.MS_MAILBOX;
   if (!m) throw new Error("MS_MAILBOX nicht gesetzt");
@@ -63,23 +77,38 @@ function mapAttachmentType(odataType: string): AttachmentMeta["attachmentType"] 
   return "referenceAttachment";
 }
 
+interface GraphAttachmentListPaged extends GraphAttachmentList {
+  "@odata.nextLink"?: string;
+}
+
 /**
- * Listet Attachment-Metadaten OHNE contentBytes (ist beim List-Call leer für >0 Größe).
- * Limit 25 — bei mehr nehmen wir die ersten 25 (Make hatte limit=10).
+ * F3.A3 Fix: Listet ALLE Attachment-Metadaten via Pagination (war 25-Hard-Cap).
+ * In der Praxis erwarten wir <100, deswegen Soft-Cap auf 100 zur Sicherheit.
  */
 export async function listAttachments(messageId: string): Promise<AttachmentMeta[]> {
   const mailbox = encodeURIComponent(getMailbox());
-  const result = await graphFetch<GraphAttachmentList>(
-    `/users/${mailbox}/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline&$top=25`,
-  );
-  return result.value.map((a) => ({
-    id: a.id,
-    name: a.name ?? "anhang",
-    contentType: a.contentType ?? "application/octet-stream",
-    size: a.size ?? 0,
-    isInline: a.isInline ?? false,
-    attachmentType: mapAttachmentType(a["@odata.type"] ?? ""),
-  }));
+  const SOFT_CAP = 100;
+  const out: AttachmentMeta[] = [];
+  let url:
+    | string
+    | undefined = `/users/${mailbox}/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline&$top=25`;
+
+  while (url && out.length < SOFT_CAP) {
+    const result: GraphAttachmentListPaged = await graphFetch<GraphAttachmentListPaged>(url);
+    for (const a of result.value) {
+      out.push({
+        id: a.id,
+        name: a.name ?? "anhang",
+        contentType: a.contentType ?? "application/octet-stream",
+        size: a.size ?? 0,
+        isInline: a.isInline ?? false,
+        attachmentType: mapAttachmentType(a["@odata.type"] ?? ""),
+      });
+      if (out.length >= SOFT_CAP) break;
+    }
+    url = result["@odata.nextLink"];
+  }
+  return out;
 }
 
 /**
@@ -109,7 +138,7 @@ export async function getAttachmentBytes(
       `/users/${mailbox}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachment.id)}`,
     );
     if (!full.contentBytes) {
-      throw new GraphError(`Attachment ohne contentBytes: ${attachment.name}`, 200);
+      throw new AttachmentError(`Attachment ohne contentBytes: ${attachment.name}`, attachment.name);
     }
     return {
       name: attachment.name,
@@ -148,8 +177,10 @@ export async function fetchAllFileAttachments(
   for (const att of fileOnly) {
     try {
       result.push(await getAttachmentBytes(messageId, att));
-    } catch {
-      // Anhang-Fehler nicht fatal — Mail-Verarbeitung soll fortfahren.
+    } catch (err) {
+      // F3.A2 Fix: Anhang-Fehler loggen statt schlucken.
+      // Mail-Verarbeitung läuft trotzdem mit den erfolgreichen Anhängen weiter.
+      logError("microsoft-graph/attachments", `getAttachmentBytes ${att.name}`, err);
       continue;
     }
   }

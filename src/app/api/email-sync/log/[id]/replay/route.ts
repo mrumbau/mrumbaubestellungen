@@ -31,6 +31,21 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   }
 
   const { id: internetMessageId } = await context.params;
+
+  // F3.E10: Format-Check für RFC822 internet_message_id (`<...@...>`).
+  // Verhindert dass arbiträre Strings den Replay-Pfad triggern oder logs spammen.
+  if (
+    typeof internetMessageId !== "string"
+    || internetMessageId.length < 3
+    || internetMessageId.length > 998
+    || !/^<.+@.+>$|^[A-Za-z0-9_.@+\-=]+$/.test(internetMessageId)
+  ) {
+    return NextResponse.json(
+      { error: "Invalid internet_message_id format" },
+      { status: 400 },
+    );
+  }
+
   const supabase = createServiceClient();
 
   const result = await replayOneMessage(supabase, internetMessageId, {

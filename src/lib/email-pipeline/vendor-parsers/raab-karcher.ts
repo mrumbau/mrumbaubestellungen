@@ -109,10 +109,23 @@ function extractKundennummer(text: string): string | null {
   return m?.[1] ?? null;
 }
 
+/**
+ * F3.D3 Fix + Memory `feedback_marlon_name`: "Marlon Tschon" / "Tschon, Marlon"
+ * ist KEIN Besteller-Signal — es ist der Firmeninhaber, dessen Name in jeder
+ * Lieferadresse steht. Match-Pipeline würde das fälschlich als Besteller-Hinweis
+ * interpretieren. Wenn der erkannte Wert die Tschon-Heuristik trifft, lieber
+ * null zurück als falsches Match-Signal zu liefern.
+ */
 function extractBestellerHinweis(text: string): string | null {
-  // STARK schreibt "Besteller: Tschon,Marlon" oder ähnlich
   const m = text.match(/Besteller:?\s*([A-ZÄÖÜ][\w,. -]{3,60})/);
-  return m?.[1]?.trim() ?? null;
+  const raw = m?.[1]?.trim() ?? null;
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower.includes("tschon") || lower.includes("marlon")) {
+    // Tschon = Firmeninhaber, ist nirgends Besteller-Signal
+    return null;
+  }
+  return raw;
 }
 
 function extractGesamtbetrag(text: string): { betrag: number | null; mwst: number | null; netto: number | null } {

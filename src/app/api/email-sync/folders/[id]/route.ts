@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil, requireRoles } from "@/lib/auth";
 import { ERRORS } from "@/lib/errors";
@@ -14,6 +15,14 @@ import { logError } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VALID_HINTS = ["rechnung", "lieferschein", "bestellbestaetigung", "versand"] as const;
+
+// F3.E12 Fix: Zod-Schema mit strict-Mode — verbietet unbekannte Felder.
+// Verhindert dass z.B. ein Bug der `delta_token` direkt erlaubt durchschlüpft.
+const PatchSchema = z.object({
+  enabled: z.boolean().optional(),
+  document_hint: z.union([z.enum(VALID_HINTS), z.null()]).optional(),
+  reset_delta_token: z.boolean().optional(),
+}).strict();
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -26,26 +35,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== "object") {
+  const rawBody = await request.json().catch(() => null);
+  if (!rawBody || typeof rawBody !== "object") {
     return NextResponse.json({ error: ERRORS.UNGUELTIGE_AKTION }, { status: 400 });
   }
+  const parsed = PatchSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json({
+      error: "Body invalid (whitelist: enabled, document_hint, reset_delta_token)",
+      issues: parsed.error.issues,
+    }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const update: Record<string, unknown> = {};
   if (typeof body.enabled === "boolean") update.enabled = body.enabled;
-  if (body.document_hint !== undefined) {
-    if (
-      body.document_hint !== null &&
-      !VALID_HINTS.includes(body.document_hint as (typeof VALID_HINTS)[number])
-    ) {
-      return NextResponse.json(
-        { error: `document_hint muss einer von: ${VALID_HINTS.join(", ")} sein, oder null` },
-        { status: 400 },
-      );
-    }
-    update.document_hint = body.document_hint;
-  }
-  // Reset des delta_token erlaubt — erzwingt Bootstrap beim nächsten Sync
+  if (body.document_hint !== undefined) update.document_hint = body.document_hint;
   if (body.reset_delta_token === true) {
     update.delta_token = null;
     update.last_error = null;

@@ -13,7 +13,8 @@
  * Plancraft etc.), generische Parser am Ende (Würth-Style PDF-Pattern).
  */
 
-import { logInfo } from "@/lib/logger";
+import { logError, logInfo } from "@/lib/logger";
+import { z } from "zod";
 import { amazonParser } from "./amazon";
 import { raabKarcherParser } from "./raab-karcher";
 import { plancraftParser } from "./plancraft";
@@ -23,6 +24,39 @@ import {
   type VendorParseResult,
   type VendorParserInput,
 } from "./types";
+
+/**
+ * F3.D5 Fix: Runtime-Validation des DokumentAnalyse-Schemas. Wenn ein Parser
+ * eine kaputte Struktur liefert (z.B. nach Refactor), wird das hier gefangen
+ * statt im Pipeline-Inneren als undefined-Property zu crashen.
+ *
+ * Permissiv: Optional-Felder werden nicht strict geprüft, nur Pflicht-Felder
+ * (typ, bestellnummer, konfidenz, artikel-Array, etc.).
+ */
+const DokumentAnalyseSchema = z.object({
+  typ: z.enum([
+    "bestellbestaetigung", "lieferschein", "rechnung", "aufmass",
+    "leistungsnachweis", "versandbestaetigung", "unbekannt",
+  ]),
+  bestellnummer: z.string().nullable(),
+  auftragsnummer: z.string().nullable(),
+  lieferscheinnummer: z.string().nullable(),
+  haendler: z.string().nullable(),
+  datum: z.string().nullable(),
+  artikel: z.array(z.object({
+    name: z.string(),
+    menge: z.number(),
+    einzelpreis: z.number(),
+    gesamtpreis: z.number(),
+  })),
+  gesamtbetrag: z.number().nullable(),
+  netto: z.number().nullable(),
+  mwst: z.number().nullable(),
+  faelligkeitsdatum: z.string().nullable(),
+  lieferdatum: z.string().nullable(),
+  iban: z.string().nullable(),
+  konfidenz: z.number().min(0).max(1),
+}).passthrough();
 
 export type {
   VendorParser,
@@ -71,6 +105,17 @@ export async function tryParseVendor(
     try {
       const result = await parser.parse(enrichedInput);
       if (!result) continue;
+
+      // F3.D5: Schema-Validation jedes documents Eintrags
+      const invalid = result.documents.filter((doc) => !DokumentAnalyseSchema.safeParse(doc).success);
+      if (invalid.length > 0) {
+        logError("vendor-parsers/dispatch", `${parser.name} liefert kaputtes DokumentAnalyse-Schema`, {
+          vendor: parser.name,
+          invalid_count: invalid.length,
+        });
+        // Fallthrough → KI-Pipeline statt korrupte Vendor-Daten zu nutzen
+        continue;
+      }
 
       const acceptWithoutKI = result.konfidenz >= VENDOR_CONFIDENCE_THRESHOLD;
 

@@ -66,6 +66,11 @@ export async function claimMessage(
  * Markiert einen Log-Eintrag als bootstrap_skip — wird nur beim ersten Sync
  * eines Folders verwendet (delta_token war null), damit existierende Mails
  * nicht reprocessiert werden.
+ *
+ * F3.B1 Fix: processed_at wird NICHT gesetzt — die Mail wurde nicht durch die
+ * Pipeline verarbeitet, sondern beim Bootstrap übergangen. Health-Endpoint
+ * `last_processed_at` wäre sonst falsch (würde wirken als hätte die Pipeline
+ * frisch gelaufen).
  */
 export async function markBootstrapSkip(
   supabase: SupabaseClient,
@@ -77,7 +82,7 @@ export async function markBootstrapSkip(
       status: "irrelevant",
       error_msg: "bootstrap_skip",
       check_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
+      // processed_at bewusst NICHT gesetzt (siehe F3.B1)
     })
     .eq("internet_message_id", internetMessageId);
 

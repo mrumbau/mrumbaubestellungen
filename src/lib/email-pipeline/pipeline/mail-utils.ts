@@ -73,8 +73,41 @@ export function isVersandDomain(domain: string): boolean {
 }
 
 // =====================================================================
-// HTML-Stripping
+// F3.F7: Defensive base64-Decoding
 // =====================================================================
+
+/**
+ * Decodiert base64 zu Buffer mit defensiver Validation.
+ * `Buffer.from(x, "base64")` wirft NICHT bei kaputten Inputs, sondern
+ * liefert leeren oder verstümmelten Buffer. Diese Helper-Function fängt:
+ *   - Leeren String
+ *   - Decoded-Buffer kürzer als 50 Bytes (zu klein für PDF/Bild)
+ *   - Decoded-Buffer ≥4× kürzer als Input (Indikator für Garbage)
+ *
+ * Liefert null wenn ungültig — Caller muss skippen oder Fehler signalisieren.
+ */
+export function safeBase64ToBuffer(base64: string): Buffer | null {
+  if (!base64 || typeof base64 !== "string" || base64.length < 64) return null;
+  try {
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length < 50) return null;
+    // Sanity: base64 codiert ~4/3 der Bytes. Wenn Buffer <25% der Input-
+    // Länge, war Input weitgehend Garbage.
+    if (buffer.length < base64.length * 0.25) return null;
+    return buffer;
+  } catch {
+    return null;
+  }
+}
+
+// =====================================================================
+// HTML-Stripping
+// F3.F8 Fix: gefährliche URL-Protokolle (javascript:, data:, vbscript:) werden
+// neutralisiert — verhindert dass nach Stripping noch ausführbare Inhalte als
+// Plain-Text in KI-Prompts oder UI-Renderings landen.
+// =====================================================================
+const DANGEROUS_PROTOCOLS = /\b(javascript|vbscript|data|file|jar):/gi;
+
 export function stripHtml(html: string): string {
   if (!html || typeof html !== "string") return "";
   return html
@@ -87,6 +120,7 @@ export function stripHtml(html: string): string {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#\d+;/g, "")
+    .replace(DANGEROUS_PROTOCOLS, "[blocked-protocol]:")
     .replace(/\s+/g, " ")
     .trim();
 }

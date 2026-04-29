@@ -78,8 +78,12 @@ function extractArtikel(text: string): DokumentAnalyse["artikel"] {
   while ((m = blockRegex.exec(text)) !== null) {
     const menge = parseInt(m[1], 10) || 1;
     const einzelpreis = parseEuroAmount(m[2]) ?? 0;
+    // F3.D2: Generischer Platzhalter — Amazon-Mails haben keinen extrahierbaren
+    // Artikel-Namen im Body (ASIN nur in Webshop sichtbar). Match-Logic darf
+    // sich auf Artikel-Namen nicht stützen für Amazon — daher leerer String
+    // statt verwirrendem "Amazon-Artikel".
     artikel.push({
-      name: "Amazon-Artikel",
+      name: "",
       menge,
       einzelpreis,
       gesamtpreis: einzelpreis * menge,

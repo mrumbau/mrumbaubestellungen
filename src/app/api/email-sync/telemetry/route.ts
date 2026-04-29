@@ -30,6 +30,8 @@ export async function GET() {
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   try {
+    // F3.E11: Limit als OOM-Safety-Net (~50k = 50d × 1000 Mails). Bei Skalierung
+    // > 50k/30d wäre DB-side Aggregation via SQL-View / RPC nötig.
     const [logsRes, foldersRes] = await Promise.all([
       supabase
         .from("email_processing_log")
@@ -37,7 +39,8 @@ export async function GET() {
           "openai_cost_eur, status, folder_mismatch, sender, subject, created_at, internet_message_id, parser_source, parser_name",
         )
         .gte("created_at", since30d)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(50_000),
       supabase
         .from("mail_sync_folders")
         .select("id, folder_name, folder_path, enabled, last_sync_at, last_sync_count, last_error"),

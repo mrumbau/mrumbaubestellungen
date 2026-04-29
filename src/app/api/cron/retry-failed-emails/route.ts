@@ -48,15 +48,29 @@ async function runCron(request: NextRequest) {
     logInfo("cron/retry-failed-emails", "Retry-Run abgeschlossen", { ...result });
 
     // Alert: wenn alles failed (mehr als 3 Mails attempted, alle still_failed/gone)
-    // → das deutet auf systematisches Problem hin
+    // → das deutet auf systematisches Problem hin.
+    // F3.E13 Fix: 6h-Dedup gegen Alert-Storm bei 24h-Outage (sonst 24× selber Alert).
     if (result.attempted >= 3 && result.succeeded === 0 && result.still_failed >= 3) {
       try {
         const sb = createServiceClient();
-        await sb.from("webhook_logs").insert({
-          typ: "cron",
-          status: "error",
-          fehler_text: `Auto-Retry: ${result.attempted} Versuche, 0 Erfolge, ${result.still_failed} weiter failed. Möglicher systematischer Fehler (OpenAI-Outage, Graph-Down, Bug). Im Email-Sync-Monitor checken.`,
-        });
+        const sechsStundenZurueck = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+        const { data: recentAlert } = await sb
+          .from("webhook_logs")
+          .select("id")
+          .eq("typ", "cron")
+          .eq("status", "error")
+          .ilike("fehler_text", "Auto-Retry%")
+          .gte("created_at", sechsStundenZurueck)
+          .limit(1)
+          .maybeSingle();
+
+        if (!recentAlert) {
+          await sb.from("webhook_logs").insert({
+            typ: "cron",
+            status: "error",
+            fehler_text: `Auto-Retry: ${result.attempted} Versuche, 0 Erfolge, ${result.still_failed} weiter failed. Möglicher systematischer Fehler (OpenAI-Outage, Graph-Down, Bug). Im Email-Sync-Monitor checken.`,
+          });
+        }
       } catch { /* Alert-Fehler nicht eskalieren */ }
     }
 

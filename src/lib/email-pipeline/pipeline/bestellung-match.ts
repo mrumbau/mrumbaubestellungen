@@ -294,11 +294,15 @@ export async function findByBetragMatch(
   const flag = TYP_FLAG[hauptTyp];
   if (!flag) return null;
 
+  // F3.F6 Fix: Betrag-Range statt exact-eq (Brutto/Netto-Rundung kann ±0.01 €
+  // Drift verursachen — eq() würde 100.00 vs 100.01 nicht matchen).
+  const BETRAG_TOLERANZ = 0.05;
   const vierzehnTageZurueck = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   let q = supabase
     .from("bestellungen")
     .select("id, bestellnummer, auftragsnummer, betrag")
-    .eq("betrag", betrag)
+    .gte("betrag", betrag - BETRAG_TOLERANZ)
+    .lte("betrag", betrag + BETRAG_TOLERANZ)
     .gte("created_at", vierzehnTageZurueck)
     .in("status", ["offen", "vollstaendig"])
     .limit(1);

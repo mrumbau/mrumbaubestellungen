@@ -14,6 +14,17 @@ import { getGraphToken, refreshGraphToken } from "./auth";
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 const MAX_RETRIES = 3;
 
+/**
+ * F3.A6: Gemeinsamer Mailbox-Accessor. Liefert die konfigurierte Shared-Mailbox
+ * (`info@mrumbau.de`) URL-encoded als Pfad-Segment. Wirft wenn ENV fehlt —
+ * Boot-Validation in `src/lib/env.ts` (R3a) sollte das ohnehin abfangen.
+ */
+export function getMailboxSegment(): string {
+  const m = process.env.MS_MAILBOX;
+  if (!m) throw new Error("MS_MAILBOX nicht gesetzt");
+  return encodeURIComponent(m);
+}
+
 export class GraphError extends Error {
   constructor(
     message: string,

@@ -44,15 +44,30 @@ async function runCron(request: NextRequest) {
 
   try {
     const result = await runDiscover();
-    logInfo("cron/check-emails", "Legacy-Endpoint → Discover delegiert", {
+    logInfo("cron/check-emails", "Legacy-Endpoint → Discover delegiert (DEPRECATED)", {
       claimed: result.total_messages_claimed,
       bootstrap_skipped: result.total_bootstrap_skipped,
       duration_ms: result.total_duration_ms,
     });
-    return NextResponse.json({
-      ...result,
-      note: "Legacy-Endpoint. Pipeline läuft jetzt via /api/cron/process-one (per-Mail-Fan-out via pg_cron).",
-    });
+    // F3.E6: Deprecation- + Sunset-Header (RFC 8594/9745). Caller die diesen
+    // Endpoint noch nutzen sehen das in den Response-Headern und können auf
+    // /api/cron/discover-emails migrieren. Sunset 2026-12-31 (Make-Cutover-Puffer).
+    return NextResponse.json(
+      {
+        ...result,
+        deprecated: true,
+        replacement: "/api/cron/discover-emails",
+        sunset: "2026-12-31",
+        note: "DEPRECATED: Endpoint wird zum 2026-12-31 entfernt. Bitte auf /api/cron/discover-emails umstellen.",
+      },
+      {
+        headers: {
+          Deprecation: "true",
+          Sunset: "Thu, 31 Dec 2026 23:59:59 GMT",
+          Link: "</api/cron/discover-emails>; rel=\"successor-version\"",
+        },
+      },
+    );
   } catch (err) {
     logError("cron/check-emails", "Discover-Fehler", err);
     return NextResponse.json(

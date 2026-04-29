@@ -32,7 +32,10 @@ export interface MailMessage {
   receivedDateTime: string;
   subject: string;
   bodyPreview: string;
-  body: { contentType: "text" | "html"; content: string };
+  // F3.A5 Fix: Microsoft Graph kann auch andere ContentTypes liefern (z.B.
+  // multipart). Prefer-Header zwingt zwar Text, aber bei Ignorieren wäre
+  // strict union zu eng — string ist defensiver.
+  body: { contentType: string; content: string };
   from: { emailAddress: { name?: string; address: string } } | null;
   hasAttachments: boolean;
   parentFolderId: string;

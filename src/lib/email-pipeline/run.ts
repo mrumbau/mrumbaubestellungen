@@ -36,6 +36,7 @@ import {
   isVersandBetreff,
   isBestellBetreff,
   stripHtml,
+  safeBase64ToBuffer,
 } from "./pipeline/mail-utils";
 import { checkAndClaimIdempotency } from "./pipeline/idempotency-check";
 import { normalizeAnhaenge } from "./pipeline/anhang-handling";
@@ -53,6 +54,30 @@ import { handleVersandEmail } from "./pipeline/versand-handler";
 import { tryAbgleich } from "./pipeline/abgleich";
 import { tryPreisanomalieCheck } from "./pipeline/preisanomalie";
 import { handleAboLogik } from "./pipeline/abo-handling";
+
+// =====================================================================
+// INTERNAL TYPES (F3.F10: typed statt any)
+// =====================================================================
+
+interface HaendlerRow {
+  id: string | null;
+  name: string | null;
+  domain?: string | null;
+  email_absender?: string[] | null;
+  url_muster?: string[] | null;
+  [key: string]: unknown;
+}
+
+interface SignalRow {
+  id: string;
+  kuerzel: string;
+  haendler_domain?: string | null;
+  order_nummer?: string | null;
+  zeitstempel?: string | null;
+  status?: string | null;
+  matched_bestellung_id?: string | null;
+  [key: string]: unknown;
+}
 
 // =====================================================================
 // PUBLIC API
@@ -180,34 +205,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     throw new Error("Betreff zu lang");
   }
 
-  // 5. Auto-Bereinigung (10% chance)
-  if (Math.random() < 0.1) {
-    const achtundvierzigStundenZurueck = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const { data: versandOnly } = await supabase
-      .from("bestellungen")
-      .select("id")
-      .eq("hat_versandbestaetigung", true)
-      .eq("hat_bestellbestaetigung", false)
-      .eq("hat_rechnung", false)
-      .eq("hat_lieferschein", false)
-      .in("status", ["offen"])
-      .lt("created_at", achtundvierzigStundenZurueck)
-      .limit(20);
-
-    if (versandOnly && versandOnly.length > 0) {
-      const vIds = versandOnly.map((b) => b.id);
-      await supabase.from("webhook_logs").delete().in("bestellung_id", vIds);
-      await supabase.from("kommentare").delete().in("bestellung_id", vIds);
-      await supabase.from("dokumente").delete().in("bestellung_id", vIds);
-      await supabase.from("bestellungen").delete().in("id", vIds);
-      logInfo("webhook/email", `Auto-Bereinigung: ${vIds.length} versand-only Einträge gelöscht`);
-    }
-
-    await supabase.from("bestellung_signale")
-      .update({ status: "expired" })
-      .eq("status", "pending")
-      .lt("zeitstempel", achtundvierzigStundenZurueck);
-  }
+  // F3.F15 Fix: Inline-Cleanup entfernt. Hot-Path-Webhook macht keine
+  // heimlichen Side-Effects mehr — pg_cron `cleanup-stale-pending`,
+  // `cleanup-pgnet-responses`, `cleanup-bestellung-signale` und
+  // `cleanup-webhook-logs` (R4) übernehmen diese Cleanups deterministisch.
+  // Versand-Only-Cleanup läuft via /api/cron/cleanup (Make-getriggert oder
+  // pg_cron, atomar via delete_versand_only_bestellungen).
 
   // 6. Anhänge normalisieren
   const anhaenge = normalizeAnhaenge(input.anhaenge, email_betreff, email_absender);
@@ -235,9 +238,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     });
   }
 
-  // 9. Händler/SU erkennen
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let haendler: any = null;
+  // 9. Händler/SU erkennen (F3.F10: typed statt any)
+  let haendler: HaendlerRow | null = null;
   let erkannterSubunternehmer: { id: string; firma: string } | null = null;
   let bestellungsart: "material" | "subunternehmer" | "abo" = "material";
 
@@ -245,12 +247,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     const { data: vfHaendler } = await supabase
       .from("haendler").select("*").eq("id", vorfilterHaendlerId).maybeSingle();
     if (vfHaendler) {
-      haendler = vfHaendler;
-      const bestehendeAdressen: string[] = haendler.email_absender || [];
-      if (absenderAdresse && !bestehendeAdressen.some((a) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
+      haendler = vfHaendler as HaendlerRow;
+      const bestehendeAdressen: string[] = vfHaendler.email_absender || [];
+      if (absenderAdresse && !bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
         await supabase.from("haendler")
           .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
-          .eq("id", haendler.id);
+          .eq("id", vfHaendler.id);
       }
     }
   } else if (vorfilterSuId) {
@@ -263,7 +265,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   }
 
   if (!haendler && !erkannterSubunternehmer) {
-    const { data: haendlerListe } = await supabase.from("haendler").select("*");
+    // F3.F13: Limit als Safety-Net (heute 74 Händler, bei >2000 muss Architektur überdacht werden)
+    const { data: haendlerListe } = await supabase.from("haendler").select("*").limit(2000);
 
     haendler = haendlerListe?.find((h) =>
       h.email_absender?.some((addr: string) => {
@@ -291,7 +294,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     }
 
     if (!haendler) {
-      const { data: suListe } = await supabase.from("subunternehmer").select("*");
+      // F3.F13: Limit als Safety-Net
+      const { data: suListe } = await supabase.from("subunternehmer").select("*").limit(2000);
       if (suListe && suListe.length > 0) {
         const suMatch = suListe.find((su) =>
           su.email_absender?.some((addr: string) => {
@@ -332,7 +336,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
   // Abo-Anbieter
   if (bestellungsart === "material") {
-    const { data: aboListe } = await supabase.from("abo_anbieter").select("*");
+    // F3.F13: Limit als Safety-Net (kleine Tabelle, aber bounded)
+    const { data: aboListe } = await supabase.from("abo_anbieter").select("*").limit(500);
     if (aboListe && aboListe.length > 0) {
       const aboMatch = aboListe.find((ab) => {
         if (ab.email_absender?.some((addr: string) => addr.toLowerCase().trim() === absenderAdresse)) return true;
@@ -576,7 +581,11 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     }
 
     const storagePfad = `${bestellungId}/${analyse.typ}_${Date.now()}_${dateiName}`;
-    const buffer = Buffer.from(base64, "base64");
+    const buffer = safeBase64ToBuffer(base64);
+    if (!buffer) {
+      logError("webhook/email", `Ungültiger base64-Inhalt: ${dateiName}`, { base64_len: base64?.length ?? 0 });
+      continue;
+    }
     const { error: uploadError } = await supabase.storage
       .from("dokumente")
       .upload(storagePfad, buffer, { contentType: mime_type, upsert: true });
@@ -864,12 +873,11 @@ async function assignBesteller(
     email_betreff: string;
     email_datum: string;
   },
-): Promise<{ bestellerKuerzel: string; zuordnungsMethode: string; signal: Record<string, unknown> | null }> {
+): Promise<{ bestellerKuerzel: string; zuordnungsMethode: string; signal: SignalRow | null }> {
   const { haendlerDomain, haendlerName, absenderDomain, vorfilterBestellnummer, analyseErgebnisse, emailText, email_betreff, email_datum } = ctx;
   let bestellerKuerzel = "";
   let zuordnungsMethode = "";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let signal: any = null;
+  let signal: SignalRow | null = null;
 
   const parsedDate = email_datum ? new Date(email_datum) : new Date();
   const emailZeit = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
@@ -894,10 +902,11 @@ async function assignBesteller(
         .update({ status: "matched", verarbeitet: true })
         .eq("id", signalByNr[0].id).eq("status", "pending").select("id");
       if (claimed && claimed.length > 0) {
-        signal = signalByNr[0];
-        bestellerKuerzel = signal.kuerzel;
+        const claimedSignal = signalByNr[0] as SignalRow;
+        signal = claimedSignal;
+        bestellerKuerzel = claimedSignal.kuerzel;
         zuordnungsMethode = "bestellnummer_match";
-        logInfo("webhook/email", `Besteller per Bestellnummer zugeordnet: ${signal.kuerzel}`, { bestellnummer: schnellBestellnummer });
+        logInfo("webhook/email", `Besteller per Bestellnummer zugeordnet: ${claimedSignal.kuerzel}`, { bestellnummer: schnellBestellnummer });
       }
     }
   }
@@ -920,8 +929,9 @@ async function assignBesteller(
         .update({ status: "matched", verarbeitet: true })
         .eq("id", signale[0].id).eq("status", "pending").select("id");
       if (claimed && claimed.length > 0) {
-        signal = signale[0];
-        bestellerKuerzel = signal.kuerzel;
+        const claimedSignal = signale[0] as SignalRow;
+        signal = claimedSignal;
+        bestellerKuerzel = claimedSignal.kuerzel;
         zuordnungsMethode = "signal_4h";
       }
     }

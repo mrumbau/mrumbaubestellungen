@@ -75,9 +75,8 @@ function parseSubject(subject: string): SubjectMatch | null {
   return null;
 }
 
-function classifyArt(_typ: DokumentAnalyse["typ"]): DokumentAnalyse["vermutete_bestellungsart"] {
-  return "subunternehmer";
-}
+// F3.D4: Konstante statt Function — typ-Parameter wurde nie genutzt.
+const PLANCRAFT_BESTELLUNGSART: DokumentAnalyse["vermutete_bestellungsart"] = "subunternehmer";
 
 export const plancraftParser: VendorParser = {
   name: "plancraft",
@@ -96,7 +95,7 @@ export const plancraftParser: VendorParser = {
 
     const document: DokumentAnalyse = {
       typ: subjectMatch.typ,
-      vermutete_bestellungsart: classifyArt(subjectMatch.typ),
+      vermutete_bestellungsart: PLANCRAFT_BESTELLUNGSART,
       bestellnummer: subjectMatch.nummer || null,
       auftragsnummer: null,
       lieferscheinnummer: null,

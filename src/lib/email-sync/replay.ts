@@ -70,22 +70,25 @@ export async function replayOneMessage(
       .mail_sync_folders?.document_hint ?? null;
   const graphMessageId = logEntry.graph_message_id;
 
-  // Retry-Counter optimistisch erhöhen vor Pipeline-Call,
-  // damit selbst bei Crash der Counter steigt und endlose Retries vermieden werden
+  // F3.B2 Fix: SQL-side Atomic-Inkrement statt Read-Modify-Write Race.
+  // Bei zwei parallelen Retries (manuell + Cron) wird der Counter nun korrekt
+  // hochgezählt statt potentiell zurückgesetzt.
   if (options.incrementRetryCount) {
-    await supabase
-      .from("email_processing_log")
-      .update({
-        retry_count: ((logEntry as { retry_count?: number }).retry_count ?? 0) + 1,
-        last_retry_at: new Date().toISOString(),
-      })
-      .eq("internet_message_id", internetMessageId);
+    await supabase.rpc("increment_email_retry_count", {
+      p_internet_message_id: internetMessageId,
+    });
   }
 
-  const mailbox = encodeURIComponent(process.env.MS_MAILBOX ?? "");
-  if (!mailbox) {
-    await markFailed(supabase, internetMessageId, "MS_MAILBOX nicht gesetzt");
-    return { outcome: "failed", fehler: "MS_MAILBOX nicht gesetzt" };
+  // F3.B4 Fix: einheitlicher Pfad — mailbox wird hart angefordert, fail-fast
+  // bei Env-Lücke (R3a env.ts validiert schon beim Boot, hier Defense-in-Depth).
+  let mailbox: string;
+  try {
+    mailbox = encodeURIComponent(process.env.MS_MAILBOX ?? "");
+    if (!mailbox) throw new Error("MS_MAILBOX nicht gesetzt");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "MS_MAILBOX nicht gesetzt";
+    await markFailed(supabase, internetMessageId, msg);
+    return { outcome: "failed", fehler: msg };
   }
 
   let message: FullMessage;

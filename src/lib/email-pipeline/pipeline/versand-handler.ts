@@ -16,6 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logError, logInfo } from "@/lib/logger";
 import { buildTrackingUrl } from "@/lib/tracking-urls";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
+import { safeBase64ToBuffer } from "./mail-utils";
 import type { NormalizedAnhang } from "./anhang-handling";
 
 export interface VersandHandlerInput {
@@ -164,7 +165,11 @@ export async function handleVersandEmail(
   // Anhänge (Versandlabels) hochladen
   for (const anhang of anhaenge.slice(0, 1)) {
     const storagePfad = `${bestellungId}/versand_${Date.now()}_${anhang.name}`;
-    const buffer = Buffer.from(anhang.base64, "base64");
+    const buffer = safeBase64ToBuffer(anhang.base64);
+    if (!buffer) {
+      logError("webhook/email/versand", `Ungültiger base64 für ${anhang.name}`, { len: anhang.base64?.length ?? 0 });
+      continue;
+    }
     const { error: uploadErr } = await supabase.storage
       .from("dokumente")
       .upload(storagePfad, buffer, { contentType: anhang.mime_type, upsert: true });

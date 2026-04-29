@@ -14,6 +14,40 @@ import { logInfo } from "@/lib/logger";
 import { isFileSizeOk } from "@/lib/validation";
 import { ALLOWED_MIME_TYPES, effectiveMimeType } from "./mail-utils";
 
+/**
+ * F3.F1 Fix: Magic-Byte-Validation für `application/octet-stream`-Anhänge.
+ * Make.com/M365 senden PDFs gelegentlich mit generischem MIME — ohne Magic-Byte-
+ * Check könnte ein Angreifer beliebige Binärdateien (.exe, .zip) durchschmuggeln.
+ *
+ * Erkennt PDF (%PDF-), JPEG (FF D8 FF), PNG (89 50 4E 47), GIF, BMP, TIFF, WebP.
+ * Liefert null wenn unbekannt → Anhang wird verworfen.
+ */
+function detectMimeFromMagicBytes(base64: string): string | null {
+  const head = base64.slice(0, 16);
+  // PDF: "%PDF-" → base64 Prefix "JVBERi0"
+  if (head.startsWith("JVBERi0")) return "application/pdf";
+  // JPEG: FF D8 FF → base64 Prefix "/9j/"
+  if (head.startsWith("/9j/")) return "image/jpeg";
+  // PNG: 89 50 4E 47 → base64 Prefix "iVBORw0KGgo"
+  if (head.startsWith("iVBORw0KGgo")) return "image/png";
+  // GIF: "GIF87a" oder "GIF89a" → base64 Prefix "R0lGOD"
+  if (head.startsWith("R0lGOD")) return "image/gif";
+  // BMP: 42 4D → base64 Prefix "Qk"
+  if (head.startsWith("Qk")) return "image/bmp";
+  // WebP: starts with "RIFF" → "UklGR" + later "WEBP"
+  if (head.startsWith("UklGR")) {
+    // Check for WEBP-Marker zwischen Position 8-12 (RIFF+size+WEBP)
+    const webpProbe = base64.slice(8, 24);
+    try {
+      const decoded = Buffer.from(webpProbe, "base64").toString("ascii");
+      if (decoded.includes("WEBP")) return "image/webp";
+    } catch { /* ignore */ }
+  }
+  // TIFF: 49 49 2A 00 (little-endian) → "SUkqAA" oder 4D 4D 00 2A → "TU0AKg"
+  if (head.startsWith("SUkqAA") || head.startsWith("TU0AKg")) return "image/tiff";
+  return null;
+}
+
 export interface NormalizedAnhang {
   name: string;
   base64: string;
@@ -94,6 +128,18 @@ export function normalizeAnhaenge(rawAnhaenge: unknown, email_betreff?: string, 
       continue;
     }
 
+    // F3.F1: Magic-Byte-Validation. Bei octet-stream (M365/Make-Quirk) den
+    // tatsächlichen Typ aus den ersten Bytes ableiten — verhindert dass
+    // .exe/.zip/.dll als PDF durchschmuggeln.
+    if (mimeType === "application/octet-stream") {
+      const magicMime = detectMimeFromMagicBytes(base64);
+      if (!magicMime) {
+        logInfo("webhook/email", `Anhang übersprungen (octet-stream ohne erkannte Magic-Bytes): ${name}`);
+        continue;
+      }
+      mimeType = magicMime;
+    }
+
     // Inline-Bilder/Logos filtern (Bilder <5KB sind keine echten Dokumente)
     const istBild = mimeType.startsWith("image/");
     const geschaetzteGroesse = Math.ceil((base64.length * 3) / 4);
@@ -108,6 +154,21 @@ export function normalizeAnhaenge(rawAnhaenge: unknown, email_betreff?: string, 
     if (mimeType === "image/svg+xml") {
       logInfo("webhook/email", `Anhang übersprungen (SVG/XSS-Risiko): ${name}`);
       continue;
+    }
+
+    // F3.F1 Defense-in-Depth: Cross-Check Magic-Bytes auch wenn MIME nicht octet-stream
+    // (Schutz gegen falsch deklariertes MIME). Nur wenn Magic-Byte-Detection
+    // einen anderen Typ liefert UND die Detection eindeutig ist (nicht null).
+    const claimedIsPdfOrImage = mimeType === "application/pdf" || mimeType.startsWith("image/");
+    if (claimedIsPdfOrImage) {
+      const detected = detectMimeFromMagicBytes(base64);
+      if (detected && detected !== mimeType) {
+        logInfo("webhook/email", `Anhang[${idx}] MIME korrigiert via Magic-Byte: ${mimeType} → ${detected}`, { name });
+        mimeType = detected;
+      } else if (!detected) {
+        logInfo("webhook/email", `Anhang übersprungen (deklariert ${mimeType}, keine erkennbare Magic-Bytes): ${name}`);
+        continue;
+      }
     }
 
     // MIME-Whitelist oder Bilder durchlassen

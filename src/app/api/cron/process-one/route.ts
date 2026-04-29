@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { replayOneMessage } from "@/lib/email-sync/replay";
-import { logError, logInfo } from "@/lib/logger";
+import { logError, logInfo, withRequestId } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
 import { ERRORS } from "@/lib/errors";
 
@@ -57,11 +57,14 @@ export async function POST(request: NextRequest) {
   try {
     const startTime = Date.now();
     // Manueller Replay-Modus: incrementRetryCount=false damit normale Discover→Process
-    // nicht den Retry-Counter hochzählt (das macht nur der retry-failed-emails-Cron)
+    // nicht den Retry-Counter hochzählt (das macht nur der retry-failed-emails-Cron).
+    // F3.F16: Request-ID-Kontext für korrelierbare Logs durch die ganze Pipeline.
     const supabase = createServiceClient();
-    const result = await replayOneMessage(supabase, internet_message_id, {
-      incrementRetryCount: false,
-    });
+    const result = await withRequestId(() =>
+      replayOneMessage(supabase, internet_message_id, {
+        incrementRetryCount: false,
+      }),
+    );
     logInfo("cron/process-one", "Mail verarbeitet", {
       internet_message_id,
       outcome: result.outcome,
