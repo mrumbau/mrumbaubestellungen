@@ -101,3 +101,60 @@ export async function tryParseVendor(
 export function listRegisteredVendors(): { name: string; version: string }[] {
   return PARSERS.map((p) => ({ name: p.name, version: p.version }));
 }
+
+import type { DokumentAnalyse } from "@/lib/openai";
+
+/**
+ * R5b/F3.F5: Merge-Helper für Vendor-Hint + KI-Hauptanalyse.
+ *
+ * Wenn der Vendor-Parser unterhalb des Konfidenz-Schwellwerts liefert, läuft
+ * die KI als Hauptanalyse — aber die Vendor-Daten sind trotzdem oft präziser
+ * als die KI-Halluzination (z.B. Plancraft liefert sicher die SU-Firma aus
+ * dem Subject, KI rät teilweise daneben).
+ *
+ * Vorher (audit): nur `bestellnummer` und `haendler` wurden gemergt — andere
+ * Felder wie `auftragsnummer`, `lieferscheinnummer`, `vermutete_bestellungsart`,
+ * `kundennummer` gingen verloren.
+ *
+ * Jetzt: Generic-Merge — für JEDES Feld gilt "wenn KI null/leer, übernimm
+ * Vendor". Ausnahmen:
+ *   - `typ`: nur überschreiben wenn KI "unbekannt" ist
+ *   - `konfidenz`, `volltext`, `parse_fehler`: NIE überschreiben (KI-Hoheit)
+ */
+export function mergeVendorIntoKi(
+  ki: DokumentAnalyse,
+  vendor: DokumentAnalyse,
+): DokumentAnalyse {
+  const merged: DokumentAnalyse = { ...ki };
+  const NEVER_MERGE = new Set(["konfidenz", "volltext", "parse_fehler"]);
+
+  for (const [key, vendorVal] of Object.entries(vendor)) {
+    if (NEVER_MERGE.has(key)) continue;
+    if (vendorVal === null || vendorVal === undefined) continue;
+
+    const kiVal = (merged as unknown as Record<string, unknown>)[key];
+
+    // Arrays: ki leer → übernimm
+    if (Array.isArray(vendorVal)) {
+      if (Array.isArray(kiVal) && kiVal.length === 0 && vendorVal.length > 0) {
+        (merged as unknown as Record<string, unknown>)[key] = vendorVal;
+      }
+      continue;
+    }
+
+    // typ: spezialfall — nur wenn ki "unbekannt"
+    if (key === "typ") {
+      if (kiVal === "unbekannt" && vendorVal !== "unbekannt") {
+        merged.typ = vendorVal as DokumentAnalyse["typ"];
+      }
+      continue;
+    }
+
+    // Skalare: ki null/undefined/leer → übernimm Vendor-Wert
+    if (kiVal === null || kiVal === undefined || kiVal === "") {
+      (merged as unknown as Record<string, unknown>)[key] = vendorVal;
+    }
+  }
+
+  return merged;
+}

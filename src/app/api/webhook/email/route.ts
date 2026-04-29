@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { analysiereDokument, erkenneHaendlerAusEmail, fuehreAbgleichDurch, erkenneBestellerIntelligent, pruefePreisanomalien, type DokumentAnalyse } from "@/lib/openai";
-import { tryParseVendor } from "@/lib/email-pipeline/vendor-parsers";
+import { tryParseVendor, mergeVendorIntoKi } from "@/lib/email-pipeline/vendor-parsers";
 import { isFileSizeOk, safeBestellnummer } from "@/lib/validation";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
@@ -1326,20 +1326,31 @@ export async function POST(request: NextRequest) {
             const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
             bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint });
 
-            // Wenn ein Vendor-Parser ZU UNSICHER war: seine Daten als Hint mergen
+            // R5b/F3.F5: Vendor-Hint + KI-Hauptanalyse generisch mergen.
+            // Vorher: nur bestellnummer + haendler. Jetzt: alle nicht-null Vendor-
+            // Felder, wo KI null/leer ist (siehe mergeVendorIntoKi).
             if (vendorResult && vendorResult.result.documents.length > 0) {
               const vendorDoc = vendorResult.result.documents[0];
-              if (!bodyAnalyse.bestellnummer && vendorDoc.bestellnummer) {
-                bodyAnalyse.bestellnummer = vendorDoc.bestellnummer;
-              }
-              if (!bodyAnalyse.haendler && vendorDoc.haendler) {
-                bodyAnalyse.haendler = vendorDoc.haendler;
-              }
+              const before = {
+                bestellnummer: bodyAnalyse.bestellnummer,
+                haendler: bodyAnalyse.haendler,
+                auftragsnummer: bodyAnalyse.auftragsnummer,
+                lieferscheinnummer: bodyAnalyse.lieferscheinnummer,
+                kundennummer: bodyAnalyse.kundennummer,
+              };
+              bodyAnalyse = mergeVendorIntoKi(bodyAnalyse, vendorDoc);
               parserName = vendorResult.result.vendor;
               logInfo("webhook/email", "Vendor-Parser Low-Konfidenz: KI-Hauptanalyse + Vendor-Hint", {
                 vendor: parserName,
                 vendor_konfidenz: vendorResult.result.konfidenz,
                 ki_typ: bodyAnalyse.typ,
+                merged_fields: {
+                  bestellnummer: before.bestellnummer !== bodyAnalyse.bestellnummer,
+                  haendler: before.haendler !== bodyAnalyse.haendler,
+                  auftragsnummer: before.auftragsnummer !== bodyAnalyse.auftragsnummer,
+                  lieferscheinnummer: before.lieferscheinnummer !== bodyAnalyse.lieferscheinnummer,
+                  kundennummer: before.kundennummer !== bodyAnalyse.kundennummer,
+                },
               });
             }
           }
