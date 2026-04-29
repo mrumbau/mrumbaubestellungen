@@ -61,6 +61,10 @@ interface EmailSyncHealth {
   permanent_failures_24h: number;
   /** Mismatch-Rate letzte 7 Tage */
   mismatch_rate_7d: number;
+  /** Mails aktuell in pending (= claimed aber noch nicht von process-one verarbeitet) */
+  pending_in_queue: number;
+  /** Pending-Mails älter als 10 min (sollten von cleanup-stale-pending behandelt werden) */
+  stale_pending: number;
   warnings: string[];
 }
 
@@ -74,6 +78,8 @@ async function checkEmailSyncHealth(): Promise<EmailSyncHealth> {
     failed_last_24h: 0,
     permanent_failures_24h: 0,
     mismatch_rate_7d: 0,
+    pending_in_queue: 0,
+    stale_pending: 0,
     warnings: [],
   };
 
@@ -82,27 +88,39 @@ async function checkEmailSyncHealth(): Promise<EmailSyncHealth> {
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const [foldersRes, lastProcessedRes, failed24hRes, mismatch7dRes] = await Promise.all([
-      sb
-        .from("mail_sync_folders")
-        .select("id, enabled, last_error, delta_token"),
-      sb
-        .from("email_processing_log")
-        .select("processed_at")
-        .eq("status", "processed")
-        .order("processed_at", { ascending: false })
-        .limit(1),
-      sb
-        .from("email_processing_log")
-        .select("retry_count")
-        .eq("status", "failed")
-        .gte("created_at", since24h),
-      sb
-        .from("email_processing_log")
-        .select("folder_mismatch")
-        .gte("created_at", since7d)
-        .not("folder_mismatch", "is", null),
-    ]);
+    const staleSince = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    const [foldersRes, lastProcessedRes, failed24hRes, mismatch7dRes, pendingRes, stalePendingRes] =
+      await Promise.all([
+        sb
+          .from("mail_sync_folders")
+          .select("id, enabled, last_error, delta_token"),
+        sb
+          .from("email_processing_log")
+          .select("processed_at")
+          .eq("status", "processed")
+          .order("processed_at", { ascending: false })
+          .limit(1),
+        sb
+          .from("email_processing_log")
+          .select("retry_count")
+          .eq("status", "failed")
+          .gte("created_at", since24h),
+        sb
+          .from("email_processing_log")
+          .select("folder_mismatch")
+          .gte("created_at", since7d)
+          .not("folder_mismatch", "is", null),
+        sb
+          .from("email_processing_log")
+          .select("internet_message_id", { count: "exact", head: true })
+          .eq("status", "pending"),
+        sb
+          .from("email_processing_log")
+          .select("internet_message_id", { count: "exact", head: true })
+          .eq("status", "pending")
+          .lt("created_at", staleSince),
+      ]);
 
     const folders = foldersRes.data ?? [];
     result.active_folders = folders.filter((f) => f.enabled).length;
@@ -124,6 +142,9 @@ async function checkEmailSyncHealth(): Promise<EmailSyncHealth> {
       const mismatches = mismatchRows.filter((r) => r.folder_mismatch === true).length;
       result.mismatch_rate_7d = Math.round((mismatches / mismatchRows.length) * 1000) / 1000;
     }
+
+    result.pending_in_queue = pendingRes.count ?? 0;
+    result.stale_pending = stalePendingRes.count ?? 0;
 
     // Status-Bewertung
     if (result.active_folders === 0) {
@@ -163,6 +184,22 @@ async function checkEmailSyncHealth(): Promise<EmailSyncHealth> {
       result.warnings.push(
         `Folder-Mismatch-Rate ${(result.mismatch_rate_7d * 100).toFixed(1)}% — Outlook-Sortierregel evtl. zu schwach`,
       );
+    }
+
+    if (result.stale_pending > 0) {
+      // stale-cleanup-Cron sollte das alle 5 min aufräumen — wenn das hier
+      // wächst, läuft cleanup-stale-pending nicht (oder gar nicht eingerichtet)
+      result.warnings.push(
+        `${result.stale_pending} Mails >10 min in pending — pg_cron cleanup-stale-pending läuft nicht?`,
+      );
+      if (result.status === "ok") result.status = "warning";
+    }
+    if (result.pending_in_queue > 50) {
+      // Discover läuft schneller als process-one — Backlog wächst
+      result.warnings.push(
+        `${result.pending_in_queue} Mails in Queue — process-pending-emails Cron Backlog-Throughput zu klein?`,
+      );
+      if (result.status === "ok") result.status = "warning";
     }
   } catch (err) {
     result.status = "error";

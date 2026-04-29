@@ -1,13 +1,12 @@
 /**
- * Legacy-Endpoint — bleibt aus Backward-Compat-Gründen erhalten.
+ * Cron-Endpoint: Phase 1 der Fan-out-Architektur.
  *
- * Heute redirected er auf den neuen `discover-emails`-Pfad. Die eigentliche
- * Pipeline-Verarbeitung (classify + ingest) läuft seit der Fan-out-Migration
- * in `/api/cron/process-one`, getriggert von pg_cron.
+ * Wird von pg_cron alle 2 Min getriggert. Liest neue Mails per
+ * Microsoft Graph Delta und schreibt sie als 'pending' in die DB.
+ * KEINE Pipeline-Verarbeitung — die läuft isoliert in /api/cron/process-one.
  *
- * Wer das hier aufruft, bekommt nur die Discovery-Ergebnisse zurück. Damit
- * verarbeitete Mails sehen → process-one separat aufrufen lassen oder
- * pg_cron im Supabase-Dashboard checken.
+ * Auth: Bearer-Header CRON_SECRET (auch von Vercel-Cron als Backup
+ * akzeptiert) ODER MAKE_WEBHOOK_SECRET für lokale Tests.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -44,17 +43,16 @@ async function runCron(request: NextRequest) {
 
   try {
     const result = await runDiscover();
-    logInfo("cron/check-emails", "Legacy-Endpoint → Discover delegiert", {
+    logInfo("cron/discover-emails", "Discover abgeschlossen", {
+      folders: result.total_folders,
       claimed: result.total_messages_claimed,
       bootstrap_skipped: result.total_bootstrap_skipped,
       duration_ms: result.total_duration_ms,
+      truncated: result.truncated,
     });
-    return NextResponse.json({
-      ...result,
-      note: "Legacy-Endpoint. Pipeline läuft jetzt via /api/cron/process-one (per-Mail-Fan-out via pg_cron).",
-    });
+    return NextResponse.json(result);
   } catch (err) {
-    logError("cron/check-emails", "Discover-Fehler", err);
+    logError("cron/discover-emails", "Discover-Fehler", err);
     return NextResponse.json(
       { error: ERRORS.INTERNER_FEHLER, details: err instanceof Error ? err.message : null },
       { status: 500 },

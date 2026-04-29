@@ -223,6 +223,8 @@ interface HealthData {
     failed_last_24h: number;
     permanent_failures_24h: number;
     mismatch_rate_7d: number;
+    pending_in_queue: number;
+    stale_pending: number;
     warnings: string[];
   };
   microsoft_graph: string;
@@ -276,6 +278,8 @@ function HealthCard() {
           </Badge>
           <span className="text-xs text-foreground-muted">
             {es.active_folders} aktive Folder
+            {es.pending_in_queue > 0 && ` · ${es.pending_in_queue} in Queue`}
+            {es.stale_pending > 0 && ` (${es.stale_pending} stale)`}
             {es.bootstrap_pending > 0 && ` · ${es.bootstrap_pending} Bootstrap-pending`}
             {es.failed_last_24h > 0 && ` · ${es.failed_last_24h} failed/24h`}
             {es.permanent_failures_24h > 0 && ` (${es.permanent_failures_24h} permanent)`}

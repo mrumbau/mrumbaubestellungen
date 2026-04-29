@@ -604,3 +604,123 @@ ALTER TABLE email_processing_log
 CREATE INDEX idx_epl_retry_candidates
   ON email_processing_log(status, retry_count, created_at DESC)
   WHERE status = 'failed';
+
+-- ============================================================
+-- pg_cron + pg_net für Fan-out-Architektur (Phase 2 Option D)
+-- Ersetzt Vercel-Cron komplett — Postgres-native Trigger.
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- Fan-out: pro pending-Mail einen async POST an /api/cron/process-one.
+-- Wird von pg_cron jede Minute aufgerufen. Concurrency-Cap 30/Tick.
+CREATE OR REPLACE FUNCTION fan_out_pending_mails()
+RETURNS TABLE(triggered_count INT, base_url TEXT) AS $$
+DECLARE
+  rec RECORD;
+  cron_secret TEXT;
+  base_url TEXT;
+  count INT := 0;
+BEGIN
+  SELECT decrypted_secret INTO cron_secret
+  FROM vault.decrypted_secrets WHERE name = 'cron_secret' LIMIT 1;
+  IF cron_secret IS NULL THEN
+    RAISE EXCEPTION 'Vault-Secret cron_secret nicht gefunden. Setup unvollständig.';
+  END IF;
+
+  SELECT decrypted_secret INTO base_url
+  FROM vault.decrypted_secrets WHERE name = 'app_base_url' LIMIT 1;
+  IF base_url IS NULL THEN
+    base_url := 'https://cloud.mrumbau.de';
+  END IF;
+
+  FOR rec IN
+    SELECT internet_message_id FROM email_processing_log
+    WHERE status = 'pending' ORDER BY created_at ASC LIMIT 30
+  LOOP
+    PERFORM net.http_post(
+      url := base_url || '/api/cron/process-one',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer ' || cron_secret,
+        'Content-Type', 'application/json'
+      ),
+      body := jsonb_build_object('internet_message_id', rec.internet_message_id),
+      timeout_milliseconds := 60000
+    );
+    count := count + 1;
+  END LOOP;
+
+  RETURN QUERY SELECT count, base_url;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger-Helper für discover-emails Cron
+CREATE OR REPLACE FUNCTION trigger_discover_emails()
+RETURNS BIGINT AS $$
+DECLARE
+  cron_secret TEXT;
+  base_url TEXT;
+  request_id BIGINT;
+BEGIN
+  SELECT decrypted_secret INTO cron_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret' LIMIT 1;
+  IF cron_secret IS NULL THEN RAISE EXCEPTION 'Vault-Secret cron_secret nicht gefunden'; END IF;
+
+  SELECT decrypted_secret INTO base_url FROM vault.decrypted_secrets WHERE name = 'app_base_url' LIMIT 1;
+  IF base_url IS NULL THEN base_url := 'https://cloud.mrumbau.de'; END IF;
+
+  SELECT net.http_post(
+    url := base_url || '/api/cron/discover-emails',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || cron_secret, 'Content-Type', 'application/json'),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  ) INTO request_id;
+
+  RETURN request_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger-Helper für retry-failed-emails Cron
+CREATE OR REPLACE FUNCTION trigger_retry_failed_emails()
+RETURNS BIGINT AS $$
+DECLARE
+  cron_secret TEXT;
+  base_url TEXT;
+  request_id BIGINT;
+BEGIN
+  SELECT decrypted_secret INTO cron_secret FROM vault.decrypted_secrets WHERE name = 'cron_secret' LIMIT 1;
+  IF cron_secret IS NULL THEN RAISE EXCEPTION 'Vault-Secret cron_secret nicht gefunden'; END IF;
+
+  SELECT decrypted_secret INTO base_url FROM vault.decrypted_secrets WHERE name = 'app_base_url' LIMIT 1;
+  IF base_url IS NULL THEN base_url := 'https://cloud.mrumbau.de'; END IF;
+
+  SELECT net.http_post(
+    url := base_url || '/api/cron/retry-failed-emails',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || cron_secret, 'Content-Type', 'application/json'),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  ) INTO request_id;
+
+  RETURN request_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Stale-Pending-Cleanup: pure SQL, läuft direkt in pg_cron ohne Lambda.
+-- Mails die >10 min in 'pending' hängen → 'failed' damit auto-retry sie holt.
+CREATE OR REPLACE FUNCTION cleanup_stale_pending_mails()
+RETURNS INT AS $$
+DECLARE
+  affected INT;
+BEGIN
+  UPDATE email_processing_log
+  SET status = 'failed',
+      error_msg = COALESCE(error_msg, '') || ' [stale_pending]',
+      processed_at = NOW()
+  WHERE status = 'pending' AND created_at < NOW() - INTERVAL '10 minutes';
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  RETURN affected;
+END;
+$$ LANGUAGE plpgsql;
+
+-- HINWEIS: Vault-Secrets + Cron-Schedules werden NICHT hier deployed,
+-- sondern manuell via supabase/email-sync-pgcron-setup.sql nach jedem
+-- frischen Setup. Grund: CRON_SECRET-Wert muss vom Operator kommen.
