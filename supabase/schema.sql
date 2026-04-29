@@ -1,6 +1,36 @@
--- MR Umbau GmbH – Bestellmanagement Schema
+-- ════════════════════════════════════════════════════════════════════════
+-- ⚠️  DIESE DATEI IST EIN VERALTETER SNAPSHOT — NICHT SOURCE-OF-TRUTH ⚠️
+-- ════════════════════════════════════════════════════════════════════════
+--
+-- Stand dieses Snapshots: 2026-03-17
+-- Tatsächliche DB hat seitdem 15+ Migrationen erhalten (siehe Liste unten).
+-- Source-of-Truth: Supabase Migrations-History (`supabase/migrations/` oder
+-- via `mcp__supabase__list_migrations`).
+--
+-- Was hier FEHLT (Stand letzter Audit 2026-04-29):
+--   Tabellen: subunternehmer, abo_anbieter, email_blacklist, verworfene_emails,
+--             dashboard_ki_cache, mail_sync_folders, email_processing_log,
+--             cardscan_captures, cardscan_sync_errors
+--   Spalten in bestellungen: bezahlt_am/von, bestellungsart, hat_aufmass,
+--             hat_leistungsnachweis, subunternehmer_id, archiviert_am/von,
+--             hat_versandbestaetigung, tracking_*, betrag_ist_netto,
+--             auftragsnummer, lieferscheinnummer, mahnung_*
+--   Functions: freigeben_bestellung, increment_mahnung, fan_out_pending_mails,
+--             trigger_discover_emails, trigger_retry_failed_emails,
+--             cleanup_stale_pending_mails, update_mail_sync_folders_updated_at
+--   Plus erweiterte RLS-Policies (Multiple Permissive über mehrere Tabellen)
+--
+-- Für ein aktuelles Schema-Dump:
+--   supabase db dump --schema public > supabase/snapshot.sql
+-- (Erfordert installierte Supabase-CLI + Login.)
+--
+-- Diese Datei bleibt als Referenz für die initialen Schema-Konzepte erhalten;
+-- ist aber NICHT für Setup-Zwecke geeignet.
+-- ════════════════════════════════════════════════════════════════════════
+
+-- MR Umbau GmbH – Bestellmanagement Schema (Initial-Snapshot)
 -- Exportiert aus Supabase Projekt: fxeobohsgzvymgbnxbdc
--- Stand: 2026-03-17
+-- Stand: 2026-03-17 (VERALTET, siehe Header-Warnung)
 
 -- ============================================================
 -- Helper Functions (für RLS Policies)

@@ -4,6 +4,7 @@ import { isValidUUID, validateTextLength } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { requireAuth } from "@/lib/require-auth";
 
 // POST /api/kommentare – Kommentar zu einer Bestellung hinzufügen
 export async function POST(request: NextRequest) {
@@ -12,26 +13,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
+    const auth = await requireAuth();
+    if (auth.response) return auth.response;
+    const { profil } = auth;
+
     const supabase = await createServerSupabaseClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
-    }
-
-    const { data: profil } = await supabase
-      .from("benutzer_rollen")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!profil) {
-      return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 403 });
-    }
-
     const body = await request.json();
     const { bestellung_id, text } = body;
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logError } from "./logger";
+import { checkTransition, type BestellStatus } from "./status-machine";
 
 // =====================================================================
 // Bestellungsart: Material vs. Subunternehmer
@@ -95,6 +96,11 @@ export async function updateBestellungStatus(
     .every((a) => bestellung[a.flag as keyof typeof bestellung] === true);
 
   const neuerStatus = alleErfuellt ? "vollstaendig" : "offen";
+
+  // R3c/F5.1: Status-Übergang validieren + bei Verstoß loggen.
+  // Wirft NICHT — Pipeline-Backward-Compat. DB-Trigger blockt dafür den
+  // einzigen wirklich kritischen Übergang (freigegeben rückwärts).
+  checkTransition(bestellung.status as BestellStatus, neuerStatus, "updateBestellungStatus");
 
   await supabase
     .from("bestellungen")

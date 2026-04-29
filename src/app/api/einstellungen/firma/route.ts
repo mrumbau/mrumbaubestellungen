@@ -2,27 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
-import { requireRoles } from "@/lib/auth";
+import { requireAuth } from "@/lib/require-auth";
 
 // GET /api/einstellungen/firma – Alle Firma-Einstellungen laden
 export async function GET() {
   try {
+    const auth = await requireAuth(["admin"]);
+    if (auth.response) return auth.response;
+
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
-    }
-
-    const { data: profil } = await supabase
-      .from("benutzer_rollen")
-      .select("rolle")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!requireRoles(profil, "admin")) {
-      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
-    }
-
     const { data, error } = await supabase
       .from("firma_einstellungen")
       .select("schluessel, wert");
@@ -31,7 +19,6 @@ export async function GET() {
       return NextResponse.json({ error: "Laden fehlgeschlagen" }, { status: 500 });
     }
 
-    // Als Key-Value-Objekt zurückgeben
     const einstellungen: Record<string, string> = {};
     for (const row of data || []) {
       einstellungen[row.schluessel] = row.wert;
@@ -50,22 +37,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
     }
 
+    const auth = await requireAuth(["admin"]);
+    if (auth.response) return auth.response;
+
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
-    }
-
-    const { data: profil } = await supabase
-      .from("benutzer_rollen")
-      .select("rolle")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!requireRoles(profil, "admin")) {
-      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
-    }
-
     const body = await request.json();
     const { schluessel, wert } = body;
 

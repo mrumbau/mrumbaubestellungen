@@ -4,7 +4,7 @@ import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
-import { requireRoles } from "@/lib/auth";
+import { requireAuth } from "@/lib/require-auth";
 
 // POST /api/bestellungen/[id]/freigeben – Rechnung freigeben
 export async function POST(
@@ -22,32 +22,13 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.UNGUELTIGE_ID }, { status: 400 });
     }
 
+    // R3b: Defense-in-Depth — Buchhaltung explizit ausschließen.
+    const auth = await requireAuth(["admin", "besteller"]);
+    if (auth.response) return auth.response;
+    const { profil } = auth;
+
     const body = await request.json().catch(() => ({}));
     const supabase = await createServerSupabaseClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
-    }
-
-    // Benutzerprofil holen
-    const { data: profil } = await supabase
-      .from("benutzer_rollen")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!profil) {
-      return NextResponse.json({ error: ERRORS.KEIN_PROFIL }, { status: 403 });
-    }
-
-    // Defense-in-Depth: Buchhaltung explizit ausschließen (Freigabe ist Besteller-/Admin-Aufgabe)
-    if (!requireRoles(profil, "admin", "besteller")) {
-      return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
-    }
 
     // Bestellung prüfen
     const { data: bestellung } = await supabase
