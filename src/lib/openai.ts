@@ -1,14 +1,116 @@
 import OpenAI from "openai";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { logError } from "@/lib/logger";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { logError, logInfo } from "@/lib/logger";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-/** Retry-Wrapper mit exponential backoff für OpenAI-Calls */
+// ═══════════════════════════════════════════════════════════════════════════
+// R2/F4.1: Cost-Tracking-Layer
+//
+// Jeder OpenAI-Call schreibt sein Cost-Profil entweder in einen request-scoped
+// AsyncLocalStorage-Bucket (wenn der Caller `withCostTracking()` nutzt) ODER
+// als logInfo-Eintrag (Per-Call-Visibility in Vercel-Function-Logs).
+//
+// Per-Mail-Aggregation in `email_processing_log.openai_*` setzt voraus, dass
+// classify.ts/ingest.ts direkten Lib-Call statt HTTP-Loopback machen
+// (Phase-2b-Backlog). Bis dahin: Per-Call-Logs sind unsere Cost-Diagnose.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CostBucket {
+  input_tokens: number;
+  output_tokens: number;
+  cost_eur: number;
+  calls: number;
+  model_breakdown: Record<string, { input_tokens: number; output_tokens: number; cost_eur: number; calls: number }>;
+}
+
+/** USD pro 1M Tokens. Stand 2026-04. Anpassen wenn OpenAI-Preise ändern. */
+export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> = {
+  "gpt-4o": { input: 2.50, output: 10.00 },
+  "gpt-4o-mini": { input: 0.15, output: 0.60 },
+  "text-embedding-3-small": { input: 0.02, output: 0 },
+  "text-embedding-3-large": { input: 0.13, output: 0 },
+};
+
+/** Grobe USD→EUR-Konversion. Bei Bedarf pro Quartal aktualisieren. */
+export const USD_TO_EUR = 0.93;
+
+const costStore = new AsyncLocalStorage<CostBucket>();
+
+function calcCostEur(model: string, prompt_tokens: number, completion_tokens: number): number {
+  const rates = MODEL_COSTS_USD[model] ?? { input: 0, output: 0 };
+  const usd = (prompt_tokens * rates.input + completion_tokens * rates.output) / 1_000_000;
+  return usd * USD_TO_EUR;
+}
+
+function trackCost(model: string, usage: { prompt_tokens?: number; completion_tokens?: number } | null | undefined) {
+  if (!usage) return;
+  const inputT = usage.prompt_tokens ?? 0;
+  const outputT = usage.completion_tokens ?? 0;
+  if (inputT === 0 && outputT === 0) return;
+  const costEur = calcCostEur(model, inputT, outputT);
+
+  const bucket = costStore.getStore();
+  if (bucket) {
+    bucket.input_tokens += inputT;
+    bucket.output_tokens += outputT;
+    bucket.cost_eur += costEur;
+    bucket.calls += 1;
+    const mb = (bucket.model_breakdown[model] ??= { input_tokens: 0, output_tokens: 0, cost_eur: 0, calls: 0 });
+    mb.input_tokens += inputT;
+    mb.output_tokens += outputT;
+    mb.cost_eur += costEur;
+    mb.calls += 1;
+  } else {
+    // Per-Call-Log für Cost-Diagnose ohne explizites tracking-context
+    logInfo("openai/cost", "OpenAI-Call", {
+      model,
+      input_tokens: inputT,
+      output_tokens: outputT,
+      cost_eur: Number(costEur.toFixed(6)),
+    });
+  }
+}
+
+/**
+ * Wrappt einen Block aus mehreren OpenAI-Calls + akkumuliert die Costs.
+ * Liefert Result + aggregierten Cost-Bucket. Caller schreibt z.B. in
+ * `email_processing_log` oder ein Cost-Audit-Log.
+ *
+ * Funktioniert nur In-Process — HTTP-Loopback (siehe classify.ts/ingest.ts)
+ * durchquert die Async-Local-Storage-Grenze. Für die Email-Pipeline daher
+ * heute keine Per-Mail-Aggregation; siehe Phase-2b-Refactor.
+ */
+export async function withCostTracking<T>(fn: () => Promise<T>): Promise<{ result: T; cost: CostBucket }> {
+  const bucket: CostBucket = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cost_eur: 0,
+    calls: 0,
+    model_breakdown: {},
+  };
+  const result = await costStore.run(bucket, fn);
+  return { result, cost: bucket };
+}
+
+/** Retry-Wrapper mit exponential backoff für OpenAI-Calls. Auto-trackt Costs
+ *  bei ChatCompletion-Responses (model + usage erkannt am Result-Shape). */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await fn();
+      const result = await fn();
+      // R2/F4.1: Auto-Cost-Tracking. ChatCompletion hat `model` + `usage`,
+      // andere Result-Shapes (z.B. Stream-Iteratoren) haben das nicht — kein
+      // Tracking dann.
+      if (result && typeof result === "object" && "model" in result && "usage" in result) {
+        const r = result as {
+          model?: string;
+          usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+        };
+        if (r.model && r.usage) trackCost(r.model, r.usage);
+      }
+      return result;
     } catch (err: unknown) {
       const isRetryable =
         err instanceof Error &&
@@ -360,7 +462,8 @@ export async function generiereErinnerungsmail(
   bestellungen: { bestellnummer: string; haendler: string; besteller: string; tage_alt: number; betrag: number }[]
 ): Promise<string> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    // R2/F4.2: gpt-4o-mini ausreichend für simple Text-Generation; ~5x günstiger
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -388,7 +491,8 @@ export async function pruefePreisanomalien(
   historischePreise: { name: string; preise: number[] }[]
 ): Promise<PreisAnomalieErgebnis> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    // R2/F4.2: numerischer Vergleich, kein Reasoning nötig — gpt-4o-mini reicht
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -437,7 +541,8 @@ export async function erkenneHaendlerAusEmail(
   erkannterHaendlerName: string | null
 ): Promise<{ name: string; domain: string; email_muster: string } | null> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    // R2/F4.2: einfache Domain-/Namens-Extraktion — gpt-4o-mini ausreichend
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -483,7 +588,8 @@ export async function erkenneSubunternehmerAusEmail(
   dokumentText: string | null
 ): Promise<{ firma: string; gewerk: string | null; email_muster: string; steuer_nr: string | null; iban: string | null } | null> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    // R2/F4.2: Text-Matching für SU-Firmen-Erkennung — gpt-4o-mini ausreichend
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -660,7 +766,8 @@ export async function kategorisiereArtikel(
   artikel: { name: string; menge: number; einzelpreis: number }[]
 ): Promise<KategorisierungErgebnis> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    // R2/F4.2: Whitelist-Kategorien-Zuordnung — gpt-4o-mini ausreichend
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",

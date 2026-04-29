@@ -2,7 +2,7 @@
  * Vercel-Cron Endpoint: stündlich. Holt 'failed' Mails der letzten 24h
  * und versucht sie erneut durch die Pipeline zu schicken.
  *
- * Auth: Bearer-Header CRON_SECRET (Vercel-Cron) ODER MAKE_WEBHOOK_SECRET (manuell).
+ * Auth: Bearer CRON_SECRET (R1: Make-Fallback entfernt — Privilege-Escalation-Risiko).
  *
  * Verhalten:
  * - Pro Tick max 10 Mails (Vercel-60s-Schutz)
@@ -24,12 +24,10 @@ export const dynamic = "force-dynamic";
 
 function isAuthorized(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  const makeSecret = process.env.MAKE_WEBHOOK_SECRET;
+  if (!cronSecret) return false;
   const authHeader = request.headers.get("authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
-  if (cronSecret && safeCompare(bearer, cronSecret)) return true;
-  if (makeSecret && safeCompare(bearer, makeSecret)) return true;
-  return false;
+  return safeCompare(bearer, cronSecret);
 }
 
 export async function GET(request: NextRequest) {

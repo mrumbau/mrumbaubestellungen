@@ -16,6 +16,7 @@ import {
   extractContactFromImage,
 } from "@/lib/cardscan/openai-extract";
 import { ocrWithVision } from "@/lib/cardscan/google-vision";
+import { checkVisionDailyQuota } from "@/lib/cardscan/vision-quota";
 import {
   parseBase64Image,
   validateImageSize,
@@ -465,6 +466,17 @@ async function handleImageExtract(
 
   const { base64: processedBase64, mimeType: processedMime } =
     prepareImageForOcr(base64, mimeType);
+
+  // R2/F7.2: Daily-Vision-Cap pro User vor dem teuren OCR-Call prüfen.
+  const quota = await checkVisionDailyQuota(userId);
+  if (!quota.allowed) {
+    return NextResponse.json(
+      {
+        error: `Tageslimit für Visiten­karten-Scans erreicht (${quota.used}/${quota.cap}). Bitte morgen erneut versuchen oder Admin kontaktieren.`,
+      },
+      { status: 429 }
+    );
+  }
 
   // Google Vision OCR
   let ocrText: string;

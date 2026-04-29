@@ -38,26 +38,34 @@ export async function classifyEmail(
 
   const url = `${getInternalBaseUrl()}/api/webhook/email-check`;
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret, ...input }),
-    });
+  // R2/F3.C1: KEIN fail-open mehr. Bei Service-Errors throw → replay.ts
+  // catched → markFailed → retry-cron holt's später erneut. Verhindert
+  // Cost-Bomb bei DB-Outage (vorher: alle Mails wurden via fallback durch
+  // die ingest-Pipeline gejagt + OpenAI-Calls verbraucht).
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ secret, ...input }),
+  }).catch((err) => {
+    logError("email-pipeline/classify", "Network-Fehler bei email-check", err);
+    throw new Error(`classify_network_error: ${err instanceof Error ? err.message : "unknown"}`);
+  });
 
-    if (!res.ok) {
-      throw new Error(`email-check antwortete ${res.status}`);
-    }
-
-    const json = (await res.json()) as ClassifyEmailResult & { error?: string };
-    if (json.error) {
-      throw new Error(`email-check Fehler: ${json.error}`);
-    }
-    return json;
-  } catch (err) {
-    logError("email-pipeline/classify", "Fehler beim Aufruf von /api/webhook/email-check", err);
-    // Sicherheits-Fallback: bei Fehler durchlassen — wie der bestehende Endpoint
-    // selbst es bei internen Fehlern macht (Zeile 467 in route.ts).
-    return { relevant: true, grund: "classify_fehler_fallback" };
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    logError("email-pipeline/classify", `email-check antwortete ${res.status}`, body.slice(0, 500));
+    throw new Error(`classify_http_${res.status}`);
   }
+
+  const json = (await res.json().catch((err) => {
+    logError("email-pipeline/classify", "Invalid JSON von email-check", err);
+    throw new Error("classify_invalid_response");
+  })) as ClassifyEmailResult & { error?: string };
+
+  if (json.error) {
+    logError("email-pipeline/classify", "email-check meldete Fehler", json.error);
+    throw new Error(`classify_error: ${json.error}`);
+  }
+
+  return json;
 }

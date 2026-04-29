@@ -19,14 +19,14 @@ import { ERRORS } from "@/lib/errors";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
+// R1 Security-Hotfix: Make.com-Fallback entfernt. Diese Route ist ohnehin
+// Legacy — pg_cron triggert jetzt /api/cron/discover-emails direkt.
 function isAuthorized(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  const makeSecret = process.env.MAKE_WEBHOOK_SECRET;
+  if (!cronSecret) return false;
   const authHeader = request.headers.get("authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
-  if (cronSecret && safeCompare(bearer, cronSecret)) return true;
-  if (makeSecret && safeCompare(bearer, makeSecret)) return true;
-  return false;
+  return safeCompare(bearer, cronSecret);
 }
 
 export async function GET(request: NextRequest) {

@@ -3,10 +3,17 @@
 // Language-Hints: ["de", "en"] für deutsche und englische Texte.
 
 import { logError, logInfo } from "@/lib/logger";
+import { CARDSCAN_VISION_MAX_IMAGE_BYTES } from "./constants";
 
 const ROUTE_TAG = "/lib/cardscan/google-vision";
 
 const VISION_API_URL = "https://vision.googleapis.com/v1/images:annotate";
+
+// R2/F7.2: Cost-Diagnose. Vision DOCUMENT_TEXT_DETECTION ~$1.50/1000 Calls.
+// Loggen wir pro Call zur Sichtbarkeit. Für aggregierte Caps siehe
+// die separate Daily-Cap-Logik (R2.6).
+const VISION_COST_USD_PER_CALL = 0.0015;
+const USD_TO_EUR = 0.93;
 
 interface VisionOcrResult {
   text: string;
@@ -16,6 +23,9 @@ interface VisionOcrResult {
 /**
  * Sendet ein Base64-Bild an Google Cloud Vision DOCUMENT_TEXT_DETECTION.
  * Gibt den erkannten Volltext zurück.
+ *
+ * R2/F7.16: Pre-Call Size-Check. Bilder über CARDSCAN_VISION_MAX_IMAGE_BYTES
+ * werden abgelehnt — verhindert kostspielige OCR auf unkomprimierten XL-Fotos.
  */
 export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResult> {
   const apiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
@@ -26,12 +36,24 @@ export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResul
     );
   }
 
-  const start = Date.now();
-
   // Base64-Prefix entfernen falls vorhanden (data:image/jpeg;base64,...)
   const cleanBase64 = imageBase64.includes(",")
     ? imageBase64.split(",")[1]
     : imageBase64;
+
+  // Size-Check: Base64-Länge × 0.75 ≈ Originalbytes
+  const estimatedBytes = Math.ceil((cleanBase64.length * 3) / 4);
+  if (estimatedBytes > CARDSCAN_VISION_MAX_IMAGE_BYTES) {
+    logError(ROUTE_TAG, "Bild zu groß für Vision-OCR", {
+      estimatedKb: Math.round(estimatedBytes / 1024),
+      maxKb: Math.round(CARDSCAN_VISION_MAX_IMAGE_BYTES / 1024),
+    });
+    throw new Error(
+      `Bild zu groß für OCR (${Math.round(estimatedBytes / 1024)} KB). Maximum: ${Math.round(CARDSCAN_VISION_MAX_IMAGE_BYTES / 1024 / 1024 * 10) / 10} MB. Bitte vor dem Upload komprimieren.`
+    );
+  }
+
+  const start = Date.now();
 
   const requestBody = {
     requests: [
@@ -90,6 +112,8 @@ export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResul
   logInfo(ROUTE_TAG, "OCR erfolgreich", {
     textLength: fullText.length,
     durationMs,
+    image_kb: Math.round(estimatedBytes / 1024),
+    cost_eur: Number((VISION_COST_USD_PER_CALL * USD_TO_EUR).toFixed(6)),
   });
 
   return { text: fullText, durationMs };

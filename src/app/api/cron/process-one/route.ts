@@ -7,7 +7,7 @@
  *
  * Body: { internet_message_id: string }
  *
- * Auth: Bearer CRON_SECRET (oder MAKE_WEBHOOK_SECRET für Tests).
+ * Auth: Bearer CRON_SECRET (R1: Make-Fallback entfernt — Privilege-Escalation-Risiko).
  *
  * Vorteile gegenüber Monolith-Orchestrator:
  * - Eigenes 60s-Lambda-Budget pro Mail (keine Cross-Contamination)
@@ -28,12 +28,10 @@ export const dynamic = "force-dynamic";
 
 function isAuthorized(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  const makeSecret = process.env.MAKE_WEBHOOK_SECRET;
+  if (!cronSecret) return false;
   const authHeader = request.headers.get("authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
-  if (cronSecret && safeCompare(bearer, cronSecret)) return true;
-  if (makeSecret && safeCompare(bearer, makeSecret)) return true;
-  return false;
+  return safeCompare(bearer, cronSecret);
 }
 
 export async function POST(request: NextRequest) {
