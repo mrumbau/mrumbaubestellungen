@@ -101,6 +101,10 @@ export default function HistoryDetailPage() {
       : [data.firstName, data.lastName].filter(Boolean).join(" ")
     : "Unbekannt";
 
+  // Aktionen je nach Status (F5.7)
+  const canContinueReview = capture.status === "review";
+  const isFailed = capture.status === "failed" || capture.status === "partial_success";
+
   return (
     <div className="max-w-lg md:max-w-xl mx-auto pb-8 animate-fade-in">
       <BackLink href="/cardscan/history" label="Historie" />
@@ -117,6 +121,40 @@ export default function HistoryDetailPage() {
             {formatDate(capture.created_at)}
           </span>
         </div>
+
+        {/* Aktions-Bar */}
+        {(canContinueReview || isFailed) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {canContinueReview && (
+              <button
+                type="button"
+                onClick={() => router.push(`/cardscan/review/${capture.id}`)}
+                className="btn-primary px-4 py-2 rounded-md text-[13px] font-medium min-h-[44px] inline-flex items-center gap-1.5"
+              >
+                Bearbeitung fortsetzen
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M6 4l4 4-4 4" />
+                </svg>
+              </button>
+            )}
+            {isFailed && capture.raw_image_path && (
+              <button
+                type="button"
+                onClick={() => router.push(`/cardscan/review/${capture.id}`)}
+                className="px-4 py-2 rounded-md border border-line text-foreground hover:bg-surface-hover text-[13px] font-medium min-h-[44px] inline-flex items-center gap-1.5"
+              >
+                Erneut prüfen
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Hinweis: 30-Tage-Retention für Bilder */}
+        {(canContinueReview || isFailed) && (
+          <p className="mt-2 text-[11px] text-foreground-subtle leading-relaxed">
+            Bilder werden nach 30 Tagen automatisch gelöscht — danach ist eine Re-Analyse nicht mehr möglich.
+          </p>
+        )}
       </div>
 
       {/* CRM-Status */}

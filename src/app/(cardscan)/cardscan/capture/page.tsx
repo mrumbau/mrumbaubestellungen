@@ -212,21 +212,91 @@ export default function CardScanCapturePage() {
   }
 
   if (cameraState === "denied") {
+    // F5.8 — Plattform-spezifische Step-by-Step-Anleitung statt generischer Text.
+    // Plus: Galerie-Upload als sofort-verfügbarer Fallback prominenter platziert.
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    const isAndroid = /Android/i.test(ua);
+
+    const steps = isIOS
+      ? [
+          'iPhone-Einstellungen öffnen',
+          '"Safari" antippen',
+          '"Kamera" → "Erlauben"',
+          'Hier "Erneut versuchen" tippen',
+        ]
+      : isAndroid
+        ? [
+            'Browser-Adressleiste antippen (Schloss-Symbol)',
+            '"Berechtigungen" oder "Site-Einstellungen"',
+            '"Kamera" auf "Erlauben" stellen',
+            'Hier "Erneut versuchen" tippen',
+          ]
+        : [
+            'Browser-Adressleiste links: Schloss-Symbol klicken',
+            '"Kamera" auf "Erlauben" stellen',
+            'Seite neu laden',
+            'Hier "Erneut versuchen" klicken',
+          ];
+
     return (
-      <div className="max-w-xl mx-auto py-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-error-bg flex items-center justify-center">
-          <svg className="w-8 h-8 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-          </svg>
+      <div className="max-w-xl mx-auto py-8 px-4">
+        {/* Galerie-Fallback — primärer Ausweg */}
+        <div className="card p-5 mb-6 border-cs-accent/30 bg-cs-accent-tint/30">
+          <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-cs-accent-text mb-2 font-mono-amount">
+            Alternative
+          </p>
+          <h2 className="font-headline text-lg text-foreground mb-2">Foto aus Galerie hochladen</h2>
+          <p className="text-sm text-foreground-muted mb-4">
+            Du brauchst keinen Kamera-Zugriff — wähle einfach ein vorhandenes Foto aus der Galerie.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push("/cardscan/upload")}
+            className="btn-primary w-full py-3.5 px-6 rounded-md text-sm font-semibold min-h-[48px]"
+          >
+            Aus Galerie wählen
+          </button>
         </div>
-        <h2 className="font-headline text-xl text-foreground mb-2">Kamera-Zugriff verweigert</h2>
-        <p className="text-sm text-foreground-muted mb-6">Bitte erlaube den Kamera-Zugriff in deinen Browser-Einstellungen und lade die Seite neu.</p>
-        <button onClick={() => startCamera()} className="py-3.5 px-6 rounded-md bg-sidebar text-white text-sm font-medium min-h-[44px]">
-          Erneut versuchen
-        </button>
-        <button onClick={() => router.push("/cardscan/upload")} className="block mx-auto mt-4 text-sm text-foreground-subtle hover:text-foreground-muted min-h-[44px]">
-          Zum Datei-Upload →
-        </button>
+
+        {/* Kamera-Permission Anleitung */}
+        <div className="card p-5">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-10 h-10 shrink-0 rounded-lg bg-error-bg flex items-center justify-center">
+              <svg className="w-5 h-5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-base text-foreground">Kamera-Zugriff verweigert</h2>
+              <p className="text-[11.5px] text-foreground-subtle mt-0.5">
+                {isIOS ? "iPhone/iPad" : isAndroid ? "Android" : "Desktop-Browser"}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground-subtle mb-2.5 font-mono-amount">
+            So gibst du den Zugriff frei
+          </p>
+          <ol className="space-y-2.5 mb-5">
+            {steps.map((step, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-foreground-muted">
+                <span aria-hidden="true" className="w-5 h-5 shrink-0 rounded-full bg-input border border-line text-[10px] font-mono-amount font-semibold text-foreground-subtle flex items-center justify-center">
+                  {i + 1}
+                </span>
+                <span className="leading-relaxed">{step}</span>
+              </li>
+            ))}
+          </ol>
+
+          <button
+            type="button"
+            onClick={() => startCamera()}
+            className="w-full py-3 px-6 rounded-md bg-sidebar text-white text-sm font-medium min-h-[44px] hover:bg-sidebar-hover transition-colors"
+          >
+            Erneut versuchen
+          </button>
+        </div>
       </div>
     );
   }
@@ -235,6 +305,7 @@ export default function CardScanCapturePage() {
 
   return (
     <div className="fixed inset-0 bg-black z-40 flex flex-col">
+      <h1 className="sr-only">Visitenkarte fotografieren</h1>
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Video-Feed – IMMER im DOM, nur visuell versteckt wenn captured */}

@@ -239,7 +239,7 @@ function LoginForm() {
           </div>
 
           <div>
-            <h2 className="font-headline text-2xl text-foreground tracking-tight">Anmelden</h2>
+            <h1 className="font-headline text-2xl text-foreground tracking-tight">Anmelden</h1>
             <p className="text-sm text-foreground-subtle mt-2">
               {isCardScan
                 ? "Melde dich an um CardScan zu nutzen."
