@@ -576,6 +576,7 @@ function CheckboxCell({
   ariaLabel: string;
 }) {
   const ref = React.useRef<HTMLInputElement>(null);
+  const shiftKeyRef = React.useRef(false);
   React.useEffect(() => {
     if (ref.current) ref.current.indeterminate = indeterminate;
   }, [indeterminate]);
@@ -585,13 +586,21 @@ function CheckboxCell({
       type="checkbox"
       aria-label={ariaLabel}
       checked={checked}
-      onChange={() => onChange?.()}
-      onClick={(e) => {
+      onChange={() => {
         if (onToggle) {
-          e.preventDefault();
-          e.stopPropagation();
-          onToggle(e.shiftKey);
+          onToggle(shiftKeyRef.current);
+          shiftKeyRef.current = false;
+        } else {
+          onChange?.();
         }
+      }}
+      // Capture shift-state for the change-event that follows. Don't
+      // preventDefault here — that would prevent the native DOM toggle and
+      // confuse React's controlled-input reconciliation (state updated but
+      // DOM stayed unchecked, was the symptom we hit).
+      onClick={(e) => {
+        shiftKeyRef.current = e.shiftKey;
+        e.stopPropagation();
       }}
       disabled={disabled}
       className={cn(
