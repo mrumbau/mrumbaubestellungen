@@ -75,6 +75,22 @@ export function logError(route: string, message: string, error?: unknown) {
         : {}),
   };
   console.error(JSON.stringify(entry));
+
+  // Sentry-Forwarding (No-Op wenn SENTRY_DSN nicht gesetzt). Async-Import damit
+  // Client-Bundles nicht @sentry/nextjs in der Tree haben wenn sie es nicht brauchen.
+  if (isServer && process.env.SENTRY_DSN) {
+    void (async () => {
+      try {
+        const Sentry = await import("@sentry/nextjs");
+        Sentry.captureException(error instanceof Error ? error : new Error(message), {
+          tags: { route, ...(requestId ? { request_id: requestId } : {}) },
+          extra: { message },
+        });
+      } catch {
+        // Sentry-Forward darf logger nicht crashen
+      }
+    })();
+  }
 }
 
 export function logInfo(route: string, message: string, data?: Record<string, unknown>) {

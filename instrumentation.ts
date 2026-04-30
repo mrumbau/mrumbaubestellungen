@@ -11,6 +11,9 @@
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Sentry vor Env-Check laden — wenn Env-Boot crasht, willst du den Stack in Sentry sehen.
+    await import("./sentry.server.config");
+
     const { validateEnvAtBoot } = await import("@/lib/env");
     try {
       validateEnvAtBoot();
@@ -31,4 +34,14 @@ export async function register() {
       throw err;
     }
   }
+
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config");
+  }
+}
+
+// Sentry: Server-side Errors aus Server-Components / Route-Handlers
+export async function onRequestError(...args: Parameters<typeof import("@sentry/nextjs").captureRequestError>) {
+  const Sentry = await import("@sentry/nextjs");
+  return Sentry.captureRequestError(...args);
 }

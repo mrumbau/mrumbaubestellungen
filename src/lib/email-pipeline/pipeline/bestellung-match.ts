@@ -167,13 +167,14 @@ export function bestellnummernFuzzyMatch(a: string | null | undefined, b: string
 }
 
 /**
- * R5c-Bugfix: Findet Bestellungen wo eine der erkannten Nummern als
- * Substring in DB-Nummer steht (oder vice versa) UND der Händler-Token-
- * Match passt.
+ * R5c-Bugfix + pg_trgm-Upgrade: Findet Bestellungen via DB-side
+ * Trigram-Similarity-Match (pg_trgm-Extension + GIN-Indizes).
  *
- * Lädt Kandidaten der letzten 30 Tage des erkannten Händlers, dann
- * JS-side Substring-Check (PostgREST kann column-side LIKE nicht direkt).
- * Bei mehreren Kandidaten: nimmt den jüngsten.
+ * Strategie:
+ * 1. Primary: SQL-RPC `fuzzy_match_bestellung` mit trgm-Score-Sortierung
+ *    — schneller als JS-side, nutzt GIN-Indizes, liefert Top-5 Kandidaten.
+ * 2. Fallback: JS-side Substring/Token-Match wenn RPC keine Treffer
+ *    (z.B. bei sehr kurzen Nummern wo trgm-Threshold nicht greift).
  */
 export async function findByFuzzyNumber(
   supabase: SupabaseClient,
@@ -183,6 +184,54 @@ export async function findByFuzzyNumber(
   if (suchNummern.length === 0) return null;
   if (!ctx.haendler?.id && !ctx.haendlerName && !ctx.subunternehmer) return null;
 
+  // PRIMARY: pg_trgm SQL-side fuzzy-match
+  for (const suchNr of suchNummern) {
+    if (!suchNr || suchNr.length < 4) continue;
+    try {
+      const { data: rpcMatches } = await supabase.rpc("fuzzy_match_bestellung", {
+        p_search_nummer: suchNr,
+        p_haendler_id: ctx.haendler?.id ?? null,
+        p_haendler_name: ctx.haendlerName ?? null,
+        p_subunternehmer_id: ctx.subunternehmer?.id ?? null,
+        p_days: 30,
+        p_threshold: 0.4,
+      });
+
+      if (rpcMatches && rpcMatches.length > 0) {
+        // Bei Name-Only-Filter (kein haendler.id, keine SU): Token-Cross-Check
+        // gegen den ersten Treffer für extra Sicherheit.
+        const top = rpcMatches[0] as Record<string, unknown>;
+        if (!ctx.haendler?.id && !ctx.subunternehmer) {
+          if (!haendlerNamesMatch(ctx.haendlerName, String(top.haendler_name ?? ""))) {
+            continue; // nächster suchNr
+          }
+        }
+        logInfo("webhook/email/match", "pg_trgm Fuzzy-Match gefunden", {
+          bestellungId: top.id,
+          db_nummer_field: top.match_field,
+          erkannte_nummer: suchNr,
+          similarity: top.similarity_score,
+          haendler_kandidat: top.haendler_name,
+        });
+
+        // Lade vollständige Row für Caller (BestellungRow-Shape)
+        const { data: full } = await supabase
+          .from("bestellungen")
+          .select(STUFE1_SELECT)
+          .eq("id", top.id as string)
+          .maybeSingle();
+        if (full) return full as BestellungRow;
+      }
+    } catch (err) {
+      logInfo("webhook/email/match", "pg_trgm RPC Fehler — Fallback auf JS-Match", {
+        error: err instanceof Error ? err.message : String(err),
+        suchNr,
+      });
+    }
+  }
+
+  // FALLBACK: JS-side Substring/Token-Match (für kurze Nummern <4 chars
+  // oder wenn pg_trgm-Threshold zu strikt war)
   const dreissigTageZurueck = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   let q = supabase
     .from("bestellungen")
@@ -196,15 +245,11 @@ export async function findByFuzzyNumber(
   } else if (ctx.subunternehmer) {
     q = q.eq("subunternehmer_id", ctx.subunternehmer.id);
   } else if (ctx.haendlerName) {
-    // Name-Filter: ilike mit Wildcards für Token-Match
-    // (z.B. extracted="CHECK24 Vergleichsportal..." sucht "%CHECK24%")
     const tokens = [...tokenizeHaendler(ctx.haendlerName)];
     if (tokens.length > 0) {
-      // Längster Token als ilike-Filter (reduziert Kandidaten-Set)
       const longest = tokens.sort((a, b) => b.length - a.length)[0];
       q = q.ilike("haendler_name", `%${longest}%`);
     } else {
-      // Keine sinnvollen Tokens → fall through, full scan zu teuer
       return null;
     }
   }
@@ -213,24 +258,21 @@ export async function findByFuzzyNumber(
   if (!kandidaten || kandidaten.length === 0) return null;
 
   for (const kandidat of kandidaten) {
-    // Händler-Token-Match prüfen wenn nur via Name gefiltert wurde
     if (!ctx.haendler?.id && !ctx.subunternehmer) {
       if (!haendlerNamesMatch(ctx.haendlerName, kandidat.haendler_name)) continue;
     }
 
-    // Nummern-Fuzzy-Match
     const dbNummern = [kandidat.bestellnummer, kandidat.auftragsnummer, kandidat.lieferscheinnummer].filter(
       (n): n is string => !!n,
     );
     for (const suchNr of suchNummern) {
       for (const dbNr of dbNummern) {
         if (bestellnummernFuzzyMatch(suchNr, dbNr)) {
-          logInfo("webhook/email/match", "Fuzzy-Number-Match gefunden (R5c)", {
+          logInfo("webhook/email/match", "Fuzzy-Number-Match (JS-Fallback)", {
             bestellungId: kandidat.id,
             db_nummer: dbNr,
             erkannte_nummer: suchNr,
             haendler_kandidat: kandidat.haendler_name,
-            haendler_email: ctx.haendlerName,
           });
           return kandidat as BestellungRow;
         }

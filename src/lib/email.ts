@@ -1,7 +1,85 @@
 import nodemailer from "nodemailer";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { logError, logInfo } from "@/lib/logger";
 
 const ROUTE = "/lib/email";
+
+/**
+ * F5.9 + DATEV-Polish: Stempelt eine PDF-Rechnung mit Bestellnr + Bezahlt-Info.
+ * Nada bekommt damit eine "Annotated"-Version statt der rohen Händler-PDF.
+ *
+ * Stempel landet auf Seite 1 oben rechts (kollidiert nicht mit Logo/Header).
+ * Bei Fehler (kaputte PDF, etc.): liefert Original zurück, niemand kann
+ * den Bezahlt-Workflow blockieren.
+ */
+export async function stempelPdfMitDatev(
+  pdfBuffer: Buffer,
+  metadata: {
+    bestellnummer: string | null;
+    haendlerName: string | null;
+    bezahltAm: Date;
+    bezahltVon: string;
+    betrag: number | null;
+  },
+): Promise<Buffer> {
+  try {
+    const pdfDoc = await PDFDocument.load(new Uint8Array(pdfBuffer), {
+      ignoreEncryption: true,
+      throwOnInvalidObject: false,
+    });
+    const pages = pdfDoc.getPages();
+    if (pages.length === 0) return pdfBuffer;
+
+    const page = pages[0];
+    const { width, height } = page.getSize();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    // Stempel-Box: oben rechts, ~50pt breit, 6 Zeilen
+    const lines = [
+      "BEZAHLT",
+      `Datum: ${metadata.bezahltAm.toLocaleDateString("de-DE")}`,
+      `Von: ${(metadata.bezahltVon || "—").slice(0, 30)}`,
+      metadata.bestellnummer ? `Best.-Nr: ${metadata.bestellnummer.slice(0, 30)}` : null,
+      metadata.haendlerName ? `Lieferant: ${metadata.haendlerName.slice(0, 35)}` : null,
+      metadata.betrag != null ? `Betrag: ${metadata.betrag.toFixed(2)} €` : null,
+    ].filter((l): l is string => !!l);
+
+    const lineHeight = 11;
+    const padding = 6;
+    const boxHeight = lines.length * lineHeight + padding * 2;
+    const boxWidth = 220;
+    const boxX = width - boxWidth - 20;
+    const boxY = height - boxHeight - 20;
+
+    page.drawRectangle({
+      x: boxX, y: boxY, width: boxWidth, height: boxHeight,
+      borderColor: rgb(0.1, 0.3, 0.55), // Mr-Umbau-Blue
+      borderWidth: 1.5,
+      color: rgb(0.97, 0.99, 1.0),
+      opacity: 0.9,
+    });
+
+    let cursorY = boxY + boxHeight - padding - lineHeight + 2;
+    for (let i = 0; i < lines.length; i++) {
+      const isHeader = i === 0;
+      page.drawText(lines[i], {
+        x: boxX + padding,
+        y: cursorY,
+        size: isHeader ? 11 : 9,
+        font: isHeader ? fontBold : font,
+        color: isHeader ? rgb(0.1, 0.3, 0.55) : rgb(0.15, 0.15, 0.15),
+      });
+      cursorY -= lineHeight;
+    }
+
+    const stamped = await pdfDoc.save();
+    return Buffer.from(stamped);
+  } catch (err) {
+    logError(ROUTE, "PDF-Stempelung fehlgeschlagen — Original wird verwendet", err);
+    return pdfBuffer;
+  }
+}
 
 // Microsoft 365 SMTP Transporter (bu@mrumbau.de)
 function createTransporter() {

@@ -6,7 +6,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
-import { sendeRechnungAnDatev } from "@/lib/email";
+import { sendeRechnungAnDatev, stempelPdfMitDatev } from "@/lib/email";
 
 // POST /api/bestellungen/[id]/bezahlt – Rechnung als bezahlt markieren/entmarkieren
 export async function POST(
@@ -137,8 +137,18 @@ export async function POST(
           }
 
           logInfo("/api/bestellungen/[id]/bezahlt", "DATEV: PDF geladen", { size_bytes: pdfData.size });
-          const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
+          const rawBuffer = Buffer.from(await pdfData.arrayBuffer());
           const filename = rechnungDok.storage_pfad.split("/").pop() || "rechnung.pdf";
+
+          // PDF mit Bezahlt-Stempel annotieren (Defense-in-Depth: bei Fehler liefert
+          // stempelPdfMitDatev das Original zurück, kein Workflow-Block)
+          const pdfBuffer = await stempelPdfMitDatev(rawBuffer, {
+            bestellnummer: bestellung.bestellnummer,
+            haendlerName: bestellung.haendler_name || null,
+            bezahltAm: new Date(),
+            bezahltVon: profil.name,
+            betrag: bestellung.betrag,
+          });
 
           const result = await sendeRechnungAnDatev({
             bestellnummer: bestellung.bestellnummer,

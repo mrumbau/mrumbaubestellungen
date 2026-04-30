@@ -111,17 +111,18 @@ export async function GET(request: NextRequest) {
       gegenKonto,
     });
 
-    // UTF-8 mit BOM Encoding
-    const encoder = new TextEncoder();
-    const utf8Bytes = encoder.encode(csv);
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-    const withBom = new Uint8Array(bom.length + utf8Bytes.length);
-    withBom.set(bom);
-    withBom.set(utf8Bytes, bom.length);
+    // F5.9: DATEV-Format-Spec verlangt CP1252 (Windows-Latin-1).
+    // UTF-8 mit BOM funktioniert in modernen DATEV-Versionen, ältere Buchhaltungs-
+    // Tools (mancher Steuerkanzleien-Software) interpretieren UTF-8-Umlaute falsch.
+    // CP1252 ist die offizielle Erwartung im "EXTF Version 700"-Standard.
+    const iconv = await import("iconv-lite");
+    const cp1252Buf = iconv.encode(csv, "win1252");
+    // Buffer → Blob für NextResponse-Body (Buffer ist nicht direkt BodyInit-kompatibel)
+    const blob = new Blob([new Uint8Array(cp1252Buf)], { type: "text/csv" });
 
-    return new NextResponse(withBom, {
+    return new NextResponse(blob, {
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Type": "text/csv; charset=windows-1252",
         "Content-Disposition": `attachment; filename="${dateiname}"`,
       },
     });
