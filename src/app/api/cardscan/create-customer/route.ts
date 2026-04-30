@@ -75,8 +75,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Capture auf 'writing' setzen – nur wenn Status noch 'review' ist (verhindert doppelte Verarbeitung)
+    // F7.3: Bestehende CRM-Customer-IDs laden — bei Retry nach partial_success
+    // werden CRMs mit existierender ID übersprungen (kein Duplikat).
     const serviceClient = createServiceClient();
+    const { data: existing } = await serviceClient
+      .from("cardscan_captures")
+      .select("crm1_customer_id, crm2_customer_id, status")
+      .eq("id", capture_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // Capture auf 'writing' setzen – nur wenn Status noch 'review' ist (verhindert doppelte Verarbeitung)
     const { data: updatedCapture, error: updateError } = await serviceClient
       .from("cardscan_captures")
       .update({
@@ -106,8 +115,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Dual-Write in beide CRMs
-    const result = await createInBothCRMs(final_data);
+    // Dual-Write in beide CRMs (F7.3: mit Idempotenz-Skip bei vorhandenen IDs)
+    const result = await createInBothCRMs(final_data, {
+      existingCrm1CustomerId: existing?.crm1_customer_id ?? null,
+      existingCrm2CustomerId: existing?.crm2_customer_id ?? null,
+      captureId: capture_id,
+    });
 
     // CRM-Status in cardscan_captures speichern
     const crmStatus = (s: string) => {

@@ -334,16 +334,53 @@ async function createCustomerInCrm(
 
 // ─── Dual-Write in beide CRMs (parallel) ───────────────────────────
 
+export interface DualWriteOptions {
+  /** F7.3: Wenn ein CRM bereits eine customer_id hat, wird dieser Write übersprungen.
+   *  Verhindert Duplikate bei Retry nach partial_success. */
+  existingCrm1CustomerId?: string | null;
+  existingCrm2CustomerId?: string | null;
+  /** F7.3: Optional capture_id als externe Referenz (Idempotenz-Marker im Log). */
+  captureId?: string;
+}
+
 export async function createInBothCRMs(
-  data: ExtractedContactData
+  data: ExtractedContactData,
+  options: DualWriteOptions = {},
 ): Promise<DualWriteResult> {
   const token1 = process.env.DAS_PROGRAMM_TOKEN_CRM1;
   const token2 = process.env.DAS_PROGRAMM_TOKEN_CRM2;
 
+  // F7.3 Idempotenz-Skip: bei bekannter customer_id keinen erneuten Create
+  const skipCrm1 = !!options.existingCrm1CustomerId;
+  const skipCrm2 = !!options.existingCrm2CustomerId;
+
+  if (skipCrm1 || skipCrm2) {
+    logInfo(ROUTE_TAG, "Dual-Write Idempotenz-Skip", {
+      capture_id: options.captureId,
+      skip_crm1: skipCrm1,
+      skip_crm2: skipCrm2,
+      existing_crm1: options.existingCrm1CustomerId,
+      existing_crm2: options.existingCrm2CustomerId,
+    });
+  }
+
+  const skippedResult = (existingId: string): CrmWriteResult => ({
+    status: "success",
+    customerId: existingId,
+    referenceNumber: null,
+    error: null,
+    warnings: ["idempotenz_skip_already_exists"],
+    durationMs: 0,
+  });
+
   // Parallel über beide CRMs, innerhalb sequentiell
   const [crm1Result, crm2Result] = await Promise.allSettled([
-    createCustomerInCrm(token1 || "", data, "CRM1"),
-    createCustomerInCrm(token2 || "", data, "CRM2"),
+    skipCrm1
+      ? Promise.resolve(skippedResult(options.existingCrm1CustomerId!))
+      : createCustomerInCrm(token1 || "", data, "CRM1"),
+    skipCrm2
+      ? Promise.resolve(skippedResult(options.existingCrm2CustomerId!))
+      : createCustomerInCrm(token2 || "", data, "CRM2"),
   ]);
 
   const crm1: CrmWriteResult =

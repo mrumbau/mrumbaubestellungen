@@ -25,6 +25,7 @@ import {
 import { parseVcard } from "@/lib/cardscan/vcard-parser";
 import {
   CARDSCAN_RATE_LIMIT,
+  CARDSCAN_RATE_LIMITS_BY_TYPE,
   CARDSCAN_MAX_FILE_SIZE_BYTES,
   CARDSCAN_STORAGE_BUCKET,
 } from "@/lib/cardscan/constants";
@@ -35,7 +36,8 @@ export const maxDuration = 60;
 
 const ROUTE = "/api/cardscan/extract";
 
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+// F7.13: Server-Image-Whitelist aus Constants importieren (Single Source of Truth)
+const IMAGE_TYPES: readonly string[] = ["image/jpeg", "image/png", "image/webp"]; // matches CARDSCAN_SERVER_IMAGE_TYPES
 const PDF_TYPE = "application/pdf";
 const DOCX_TYPE =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -127,7 +129,7 @@ async function handleTextExtract(request: NextRequest, userId: string) {
 
   const effectiveSourceType: CardScanSourceType = source_type || "text";
 
-  const { data: extractedData, confidence, durationMs } =
+  const { data: extractedData, confidence, durationMs, inputTokens, outputTokens, costEur } =
     await extractContactFromText(text.trim());
 
   const serviceClient = createServiceClient();
@@ -141,6 +143,10 @@ async function handleTextExtract(request: NextRequest, userId: string) {
       confidence_scores: confidence,
       status: "review",
       llm_duration_ms: durationMs,
+      // F7.2: Cost-Tracking persistieren
+      openai_input_tokens: inputTokens,
+      openai_output_tokens: outputTokens,
+      openai_cost_eur: costEur,
     })
     .select("id, status, extracted_data, confidence_scores")
     .single();
@@ -328,7 +334,7 @@ async function handlePdfExtract(
 
   const trimmedText = pdfText.trim().slice(0, 10_000);
 
-  const { data: extractedData, confidence, durationMs } =
+  const { data: extractedData, confidence, durationMs, inputTokens, outputTokens, costEur } =
     await extractContactFromText(trimmedText);
 
   const serviceClient = createServiceClient();
@@ -343,6 +349,10 @@ async function handlePdfExtract(
       confidence_scores: confidence,
       status: "review",
       llm_duration_ms: durationMs,
+      // F7.2
+      openai_input_tokens: inputTokens,
+      openai_output_tokens: outputTokens,
+      openai_cost_eur: costEur,
     })
     .select("id, status, extracted_data, confidence_scores")
     .single();
@@ -402,7 +412,7 @@ async function handleDocxExtract(
 
   const trimmedText = docxText.trim().slice(0, 10_000);
 
-  const { data: extractedData, confidence, durationMs } =
+  const { data: extractedData, confidence, durationMs, inputTokens, outputTokens, costEur } =
     await extractContactFromText(trimmedText);
 
   const serviceClient = createServiceClient();
@@ -417,6 +427,10 @@ async function handleDocxExtract(
       confidence_scores: confidence,
       status: "review",
       llm_duration_ms: durationMs,
+      // F7.2
+      openai_input_tokens: inputTokens,
+      openai_output_tokens: outputTokens,
+      openai_cost_eur: costEur,
     })
     .select("id, status, extracted_data, confidence_scores")
     .single();
@@ -452,6 +466,19 @@ async function handleImageExtract(
   userId: string,
   sourceType: string
 ) {
+  // F7.5: Strengeres Rate-Limit für teure Image-Pipeline (Vision + GPT-4o)
+  const imageRateCheck = checkRateLimit(
+    `cardscan:image:${userId}`,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.image.MAX_REQUESTS,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.image.WINDOW_MS,
+  );
+  if (!imageRateCheck.allowed) {
+    return NextResponse.json(
+      { error: `Zu viele Bild-Scans pro Minute (max ${CARDSCAN_RATE_LIMITS_BY_TYPE.image.MAX_REQUESTS}). Bitte kurz warten.` },
+      { status: 429 },
+    );
+  }
+
   const arrayBuffer = await file.arrayBuffer();
   const base64Raw = Buffer.from(arrayBuffer).toString("base64");
 
@@ -481,10 +508,12 @@ async function handleImageExtract(
   // Google Vision OCR
   let ocrText: string;
   let ocrDurationMs: number;
+  let visionCostEur = 0;
   try {
     const ocrResult = await ocrWithVision(processedBase64);
     ocrText = ocrResult.text;
     ocrDurationMs = ocrResult.durationMs;
+    visionCostEur = ocrResult.costEur;
   } catch (err) {
     logError(ROUTE, "OCR fehlgeschlagen", err);
     return NextResponse.json(
@@ -513,6 +542,9 @@ async function handleImageExtract(
     data: extractedData,
     confidence,
     durationMs: llmDurationMs,
+    inputTokens: llmInputTokens,
+    outputTokens: llmOutputTokens,
+    costEur: llmCostEur,
   } = await extractContactFromImage(ocrText, processedBase64, processedMime);
 
   // Supabase Storage Upload
@@ -546,6 +578,11 @@ async function handleImageExtract(
       status: "review",
       ocr_duration_ms: ocrDurationMs,
       llm_duration_ms: llmDurationMs,
+      // F7.2: Cost-Tracking persistieren
+      vision_cost_eur: visionCostEur,
+      openai_input_tokens: llmInputTokens,
+      openai_output_tokens: llmOutputTokens,
+      openai_cost_eur: llmCostEur,
     })
     .select("id, status, extracted_data, confidence_scores")
     .single();

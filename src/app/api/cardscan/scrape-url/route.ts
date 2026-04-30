@@ -11,7 +11,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { scrapeUrl } from "@/lib/cardscan/url-scraper";
 import { extractContactFromText } from "@/lib/cardscan/openai-extract";
-import { CARDSCAN_RATE_LIMIT } from "@/lib/cardscan/constants";
+import { CARDSCAN_RATE_LIMIT, CARDSCAN_RATE_LIMITS_BY_TYPE } from "@/lib/cardscan/constants";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -39,16 +39,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate-Limit
+    // F7.5: Strengeres Rate-Limit für URL-Scrape (externe Netzwerk-Calls + KI)
     const rateLimitKey = `cardscan-url:${user.id}`;
     const rateCheck = checkRateLimit(
       rateLimitKey,
-      CARDSCAN_RATE_LIMIT.MAX_REQUESTS,
-      CARDSCAN_RATE_LIMIT.WINDOW_MS
+      CARDSCAN_RATE_LIMITS_BY_TYPE.url.MAX_REQUESTS,
+      CARDSCAN_RATE_LIMITS_BY_TYPE.url.WINDOW_MS
     );
     if (!rateCheck.allowed) {
       return NextResponse.json(
-        { error: ERRORS.ZU_VIELE_ANFRAGEN },
+        { error: `Zu viele URL-Scans pro Minute (max ${CARDSCAN_RATE_LIMITS_BY_TYPE.url.MAX_REQUESTS}). Bitte kurz warten.` },
         { status: 429 }
       );
     }

@@ -18,6 +18,8 @@ const USD_TO_EUR = 0.93;
 interface VisionOcrResult {
   text: string;
   durationMs: number;
+  /** F7.2: Costs in EUR pro Call zum Persistieren in cardscan_captures.vision_cost_eur. */
+  costEur: number;
 }
 
 /**
@@ -89,6 +91,7 @@ export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResul
 
   const json = await res.json();
   const durationMs = Date.now() - start;
+  const costEur = VISION_COST_USD_PER_CALL * USD_TO_EUR;
 
   // Fehler in der Response prüfen
   const responseItem = json.responses?.[0];
@@ -105,16 +108,16 @@ export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResul
     "";
 
   if (!fullText) {
-    logInfo(ROUTE_TAG, "Kein Text im Bild erkannt", { durationMs });
-    return { text: "", durationMs };
+    logInfo(ROUTE_TAG, "Kein Text im Bild erkannt", { durationMs, cost_eur: Number(costEur.toFixed(6)) });
+    return { text: "", durationMs, costEur };
   }
 
   logInfo(ROUTE_TAG, "OCR erfolgreich", {
     textLength: fullText.length,
     durationMs,
     image_kb: Math.round(estimatedBytes / 1024),
-    cost_eur: Number((VISION_COST_USD_PER_CALL * USD_TO_EUR).toFixed(6)),
+    cost_eur: Number(costEur.toFixed(6)),
   });
 
-  return { text: fullText, durationMs };
+  return { text: fullText, durationMs, costEur };
 }

@@ -12,6 +12,35 @@ interface VcardParseResult {
 }
 
 /**
+ * F7.14: Splittet einen vCard-Wert an unescaped semicolons.
+ * Akzeptiert `\;` als Escape (RFC 6350 §3.4) und löst es nach dem Split auf.
+ * Beispiel: `Maler\\; Kunst` → `["Maler; Kunst"]`, nicht `["Maler\\", "Kunst"]`.
+ */
+function splitVcardField(value: string): string[] {
+  const out: string[] = [];
+  let current = "";
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === "\\" && i + 1 < value.length) {
+      const next = value[i + 1];
+      if (next === ";" || next === "," || next === "\\" || next === "n" || next === "N") {
+        current += next === "n" || next === "N" ? "\n" : next;
+        i++;
+        continue;
+      }
+    }
+    if (ch === ";") {
+      out.push(current);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  out.push(current);
+  return out;
+}
+
+/**
  * Parst einen vCard-String (.vcf) direkt in ExtractedContactData.
  * Kein GPT-Call nötig – vCard hat ein festes Schema.
  */
@@ -38,14 +67,14 @@ export function parseVcard(vcfContent: string): VcardParseResult {
         break;
       case "N": {
         // N:Nachname;Vorname;Weitere;Prefix;Suffix
-        const parts = value.split(";");
+        const parts = splitVcardField(value);
         if (parts[0]) fields.lastName = parts[0];
         if (parts[1]) fields.firstName = parts[1];
         if (parts[3]) fields.title = parts[3]; // Prefix = Titel
         break;
       }
       case "ORG":
-        fields.org = value.split(";")[0];
+        fields.org = splitVcardField(value)[0];
         break;
       case "TITLE":
       case "ROLE":
@@ -71,7 +100,7 @@ export function parseVcard(vcfContent: string): VcardParseResult {
       }
       case "ADR": {
         // ADR:;;Straße;Stadt;Region;PLZ;Land
-        const adrParts = value.split(";");
+        const adrParts = splitVcardField(value);
         const streetFull = adrParts[2] || "";
         // Hausnummer aus Straße extrahieren (letztes Wort wenn es eine Zahl enthält)
         const streetMatch = streetFull.match(/^(.+?)\s+(\d[\w/-]*)$/);
