@@ -26,8 +26,8 @@ function CrmBadge({ status, label }: { status: string | null; label: string }) {
   const s = config[status || "pending"] || config.pending;
   return (
     <div className="flex items-center justify-between text-sm py-1.5">
-      <span className="text-[var(--text-secondary)]">{label}</span>
-      <span className={`text-xs px-2 py-0.5 rounded-[var(--radius-sm)] font-medium ${s.bg} ${s.text}`}>
+      <span className="text-foreground-muted">{label}</span>
+      <span className={`text-xs px-2 py-0.5 rounded-sm font-medium ${s.bg} ${s.text}`}>
         {s.label}
       </span>
     </div>
@@ -38,8 +38,8 @@ function FieldRow({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
     <div className="py-2 flex justify-between gap-4">
-      <span className="text-xs text-[var(--text-tertiary)] shrink-0">{label}</span>
-      <span className="text-sm text-[var(--text-primary)] text-right">{value}</span>
+      <span className="text-xs text-foreground-subtle shrink-0">{label}</span>
+      <span className="text-sm text-foreground text-right">{value}</span>
     </div>
   );
 }
@@ -83,7 +83,7 @@ export default function HistoryDetailPage() {
         <p className="text-sm text-red-600">Eintrag nicht gefunden.</p>
         <button
           onClick={() => router.push("/cardscan/history")}
-          className="mt-4 text-sm text-[var(--text-secondary)] underline"
+          className="mt-4 text-sm text-foreground-muted underline"
         >
           Zurück zur Historie
         </button>
@@ -106,14 +106,14 @@ export default function HistoryDetailPage() {
       <BackLink href="/cardscan/history" label="Historie" />
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight">
+        <h1 className="font-headline text-xl text-foreground tracking-tight">
           {displayName || "Kontaktdetails"}
         </h1>
         <div className="flex items-center gap-3 mt-2">
           <span className={`text-sm font-medium ${statusInfo.color}`}>
             {statusInfo.label}
           </span>
-          <span className="text-xs text-[var(--text-tertiary)]">
+          <span className="text-xs text-foreground-subtle">
             {formatDate(capture.created_at)}
           </span>
         </div>
@@ -122,19 +122,19 @@ export default function HistoryDetailPage() {
       {/* CRM-Status */}
       {(capture.crm1_status || capture.crm2_status) && (
         <div className="card p-4 mb-4">
-          <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+          <h2 className="text-xs font-medium text-foreground-muted uppercase tracking-wider mb-2">
             CRM-Status
           </h2>
           <CrmBadge status={capture.crm1_status} label="CRM 1" />
           {capture.crm1_reference_number && (
-            <p className="text-xs text-[var(--text-tertiary)] mb-1">
+            <p className="text-xs text-foreground-subtle mb-1">
               Kundennr.: {capture.crm1_reference_number}
             </p>
           )}
-          <div className="border-t border-[var(--border-subtle)] my-1.5" />
+          <div className="border-t border-line-subtle my-1.5" />
           <CrmBadge status={capture.crm2_status} label="CRM 2" />
           {capture.crm2_reference_number && (
-            <p className="text-xs text-[var(--text-tertiary)]">
+            <p className="text-xs text-foreground-subtle">
               Kundennr.: {capture.crm2_reference_number}
             </p>
           )}
@@ -145,7 +145,7 @@ export default function HistoryDetailPage() {
       {data && (
         <>
           <div className="card p-4 mb-4">
-            <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+            <h2 className="text-xs font-medium text-foreground-muted uppercase tracking-wider mb-2">
               Kontaktdaten
             </h2>
             <div className="divide-y divide-[var(--border-subtle)]">
@@ -175,7 +175,7 @@ export default function HistoryDetailPage() {
 
           {data.address && (data.address.street || data.address.city) && (
             <div className="card p-4 mb-4">
-              <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+              <h2 className="text-xs font-medium text-foreground-muted uppercase tracking-wider mb-2">
                 Adresse
               </h2>
               <div className="divide-y divide-[var(--border-subtle)]">
@@ -191,7 +191,7 @@ export default function HistoryDetailPage() {
           {data.contactPerson &&
             (data.contactPerson.firstName || data.contactPerson.lastName) && (
               <div className="card p-4 mb-4">
-                <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                <h2 className="text-xs font-medium text-foreground-muted uppercase tracking-wider mb-2">
                   Ansprechpartner
                 </h2>
                 <div className="divide-y divide-[var(--border-subtle)]">

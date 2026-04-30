@@ -736,7 +736,7 @@ export function KundenClient({
                 disabled={saving}
                 className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Speichert..." : editId ? "Speichern" : "Anlegen"}
+                {saving ? "Speichert..." : editId ? "Änderungen speichern" : "Kunde anlegen"}
               </button>
             </div>
           </div>

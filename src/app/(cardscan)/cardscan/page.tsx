@@ -13,10 +13,10 @@ export default async function CardScanPage() {
     <div className="max-w-lg md:max-w-xl mx-auto flex flex-col animate-fade-in min-h-[calc(100dvh-120px)]">
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <div className="pt-4 pb-6">
-        <h1 className="font-headline text-[22px] text-[var(--text-primary)] tracking-tight">
+        <h1 className="font-headline text-[22px] text-foreground tracking-tight">
           Hi {firstName}
         </h1>
-        <p className="text-sm text-[var(--text-tertiary)] mt-1">
+        <p className="text-sm text-foreground-subtle mt-1">
           Neuen Kontakt erfassen
         </p>
       </div>
@@ -26,7 +26,7 @@ export default async function CardScanPage() {
         href="/cardscan/capture"
         className="group block rounded-2xl overflow-hidden active:scale-[0.98] transition-transform duration-150"
       >
-        <div className="bg-[var(--bg-sidebar)] px-5 py-5 flex items-center gap-4 relative">
+        <div className="bg-sidebar px-5 py-5 flex items-center gap-4 relative">
           <div className="w-14 h-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
             <svg className="w-7 h-7 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
@@ -45,7 +45,7 @@ export default async function CardScanPage() {
       </Link>
 
       {/* ─── Sekundäre Methoden ───────────────────────────────────── */}
-      <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-[0.12em] font-medium mt-6 mb-2.5 px-0.5">
+      <p className="text-[10px] text-foreground-subtle uppercase tracking-[0.12em] font-medium mt-6 mb-2.5 px-0.5">
         Weitere Methoden
       </p>
 
@@ -75,16 +75,16 @@ export default async function CardScanPage() {
             href={item.href}
             className="group card flex items-center gap-3.5 px-4 py-3.5 active:scale-[0.98] transition-transform duration-150 min-h-[56px]"
           >
-            <div className="w-9 h-9 rounded-lg bg-[var(--bg-input)] flex items-center justify-center shrink-0 group-hover:bg-emerald-50 transition-colors">
-              <svg className="w-[18px] h-[18px] text-[var(--text-tertiary)] group-hover:text-emerald-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="w-9 h-9 rounded-lg bg-input flex items-center justify-center shrink-0 group-hover:bg-emerald-50 transition-colors">
+              <svg className="w-[18px] h-[18px] text-foreground-subtle group-hover:text-emerald-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 {item.icon}
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--text-primary)]">{item.label}</p>
-              <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">{item.sub}</p>
+              <p className="text-sm font-medium text-foreground">{item.label}</p>
+              <p className="text-[11px] text-foreground-subtle mt-0.5">{item.sub}</p>
             </div>
-            <svg className="w-4 h-4 text-[var(--text-tertiary)] opacity-30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-foreground-subtle opacity-30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
           </Link>

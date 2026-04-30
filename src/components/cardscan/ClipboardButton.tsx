@@ -107,27 +107,27 @@ export function ClipboardButton() {
       >
         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         <div className="flex items-center gap-4 px-5 py-4">
-          <span className="font-mono-amount text-[11px] text-[var(--text-tertiary)] w-6 shrink-0">05</span>
+          <span className="font-mono-amount text-[11px] text-foreground-subtle w-6 shrink-0">05</span>
           <div className="w-px h-8 bg-[var(--border-subtle)]" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-emerald-700 transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-emerald-700 transition-colors">
               {state === "reading" ? "Lese Zwischenablage…" : state === "processing" ? "Analysiere…" : "Aus Zwischenablage"}
             </p>
-            <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+            <p className="text-[11px] text-foreground-subtle mt-0.5">
               Text · Bild · URL automatisch erkennen
             </p>
           </div>
           {(state === "reading" || state === "processing") ? (
             <span className="spinner w-4 h-4 shrink-0" />
           ) : (
-            <svg className="w-4 h-4 text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-4 h-4 text-foreground-subtle opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
             </svg>
           )}
         </div>
       </button>
       {error && (
-        <div className="p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-xs">
+        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs">
           {error}
         </div>
       )}

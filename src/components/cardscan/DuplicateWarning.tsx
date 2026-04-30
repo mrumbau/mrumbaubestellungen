@@ -52,7 +52,7 @@ export function DuplicateWarning({
             <div className="mt-3 flex gap-3">
               <button
                 onClick={() => onUpdate(bestMatch)}
-                className="text-xs font-medium px-4 py-2.5 rounded-[var(--radius-md)] bg-amber-600 text-white hover:bg-amber-700 transition-colors min-h-[44px]"
+                className="text-xs font-medium px-4 py-2.5 rounded-md bg-amber-600 text-white hover:bg-amber-700 transition-colors min-h-[44px]"
               >
                 Daten ergänzen
               </button>

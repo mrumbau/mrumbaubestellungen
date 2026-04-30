@@ -198,13 +198,13 @@ export default function CardScanCapturePage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
         </div>
-        <h2 className="font-headline text-xl text-[var(--text-primary)] mb-2">Kamera nicht verfügbar</h2>
-        <p className="text-sm text-[var(--text-secondary)] mb-6">Dein Browser unterstützt keinen Kamera-Zugriff oder die Seite wird nicht über HTTPS aufgerufen.</p>
-        <label className="inline-block py-3.5 px-6 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium cursor-pointer min-h-[44px]">
+        <h2 className="font-headline text-xl text-foreground mb-2">Kamera nicht verfügbar</h2>
+        <p className="text-sm text-foreground-muted mb-6">Dein Browser unterstützt keinen Kamera-Zugriff oder die Seite wird nicht über HTTPS aufgerufen.</p>
+        <label className="inline-block py-3.5 px-6 rounded-md bg-sidebar text-white text-sm font-medium cursor-pointer min-h-[44px]">
           Foto aus Galerie wählen
           <input type="file" accept="image/*" capture="environment" onChange={handleFallbackCapture} className="hidden" />
         </label>
-        <button onClick={() => router.push("/cardscan/upload")} className="block mx-auto mt-4 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] min-h-[44px]">
+        <button onClick={() => router.push("/cardscan/upload")} className="block mx-auto mt-4 text-sm text-foreground-subtle hover:text-foreground-muted min-h-[44px]">
           Oder zum Datei-Upload →
         </button>
       </div>
@@ -219,12 +219,12 @@ export default function CardScanCapturePage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
           </svg>
         </div>
-        <h2 className="font-headline text-xl text-[var(--text-primary)] mb-2">Kamera-Zugriff verweigert</h2>
-        <p className="text-sm text-[var(--text-secondary)] mb-6">Bitte erlaube den Kamera-Zugriff in deinen Browser-Einstellungen und lade die Seite neu.</p>
-        <button onClick={() => startCamera()} className="py-3.5 px-6 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium min-h-[44px]">
+        <h2 className="font-headline text-xl text-foreground mb-2">Kamera-Zugriff verweigert</h2>
+        <p className="text-sm text-foreground-muted mb-6">Bitte erlaube den Kamera-Zugriff in deinen Browser-Einstellungen und lade die Seite neu.</p>
+        <button onClick={() => startCamera()} className="py-3.5 px-6 rounded-md bg-sidebar text-white text-sm font-medium min-h-[44px]">
           Erneut versuchen
         </button>
-        <button onClick={() => router.push("/cardscan/upload")} className="block mx-auto mt-4 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] min-h-[44px]">
+        <button onClick={() => router.push("/cardscan/upload")} className="block mx-auto mt-4 text-sm text-foreground-subtle hover:text-foreground-muted min-h-[44px]">
           Zum Datei-Upload →
         </button>
       </div>

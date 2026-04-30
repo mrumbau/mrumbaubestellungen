@@ -86,10 +86,10 @@ export default function CardScanUrlPage() {
   return (
     <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
-      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
+      <h1 className="font-headline text-xl text-foreground tracking-tight mb-1">
         URL analysieren
       </h1>
-      <p className="text-sm text-[var(--text-tertiary)] mb-5">
+      <p className="text-sm text-foreground-subtle mb-5">
         Impressum und Kontaktseite werden automatisch mitdurchsucht.
       </p>
 
@@ -104,7 +104,7 @@ export default function CardScanUrlPage() {
             value={url}
             onChange={(e) => handleUrlChange(e.target.value)}
             placeholder="musterfirma.de"
-            className="w-full py-3.5 px-4 bg-[var(--bg-card)] text-[var(--text-primary)] text-base placeholder:text-[var(--text-tertiary)]/50 focus:outline-none rounded-[var(--radius-md)] border-0"
+            className="w-full py-3.5 px-4 bg-surface text-foreground text-base placeholder:text-foreground-subtle/50 focus:outline-none rounded-md border-0"
             autoFocus
             disabled={loading}
           />
@@ -128,7 +128,7 @@ export default function CardScanUrlPage() {
         )}
 
         {error && (
-          <div className="mt-4 p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-sm">
+          <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
             {error}
           </div>
         )}
@@ -142,10 +142,10 @@ export default function CardScanUrlPage() {
               "GPT-4o extrahiert Firma, Ansprechpartner, Adresse",
             ].map((step, i) => (
               <div key={step} className="flex items-start gap-2.5">
-                <span className="font-mono-amount text-[9px] text-[var(--text-tertiary)] mt-0.5 shrink-0 w-4">
+                <span className="font-mono-amount text-[9px] text-foreground-subtle mt-0.5 shrink-0 w-4">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <span className="text-[11px] text-[var(--text-tertiary)]">{step}</span>
+                <span className="text-[11px] text-foreground-subtle">{step}</span>
               </div>
             ))}
           </div>
@@ -154,7 +154,7 @@ export default function CardScanUrlPage() {
         <button
           type="submit"
           disabled={loading || !url.trim().includes(".")}
-          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
+          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-sidebar text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-sidebar-hover transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
         >
           {loading ? (
             <>

@@ -22,7 +22,7 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
 
   return (
     <div className="card p-4 mb-4">
-      <h2 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-4 flex items-center">
+      <h2 className="text-sm font-medium text-foreground-muted uppercase tracking-wider mb-4 flex items-center">
         Adresse
         <ConfidenceBadge score={confidence?.address} />
       </h2>
@@ -32,14 +32,14 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
             (addr as Record<string, string | null>)[field.key] ?? "";
           return (
             <label key={field.key} className="block">
-              <span className="text-xs text-[var(--text-secondary)]">
+              <span className="text-xs text-foreground-muted">
                 {field.label}
               </span>
               <input
                 type="text"
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
-                className="mt-1 w-full py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]"
+                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand"
                 placeholder={`${field.label}…`}
               />
             </label>

@@ -82,7 +82,7 @@ export default function CardScanErrorsPage() {
     <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight">
+        <h1 className="font-headline text-xl text-foreground tracking-tight">
           Sync-Fehler
         </h1>
         {openErrors.length > 0 && (
@@ -99,7 +99,7 @@ export default function CardScanErrorsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </div>
-          <p className="text-sm text-[var(--text-tertiary)]">
+          <p className="text-sm text-foreground-subtle">
             Keine Sync-Fehler vorhanden.
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function CardScanErrorsPage() {
       {openErrors.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+            <h2 className="text-xs font-medium text-foreground-muted uppercase tracking-wider">
               Offene Fehler
             </h2>
             <button
@@ -130,21 +130,21 @@ export default function CardScanErrorsPage() {
                       <span className="text-[10px] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-600">
                         {err.crm === "crm1" ? "CRM 1" : "CRM 2"}
                       </span>
-                      <span className="text-xs text-[var(--text-tertiary)]">
+                      <span className="text-xs text-foreground-subtle">
                         {formatDate(err.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm text-[var(--text-primary)]">
+                    <p className="text-sm text-foreground">
                       {err.error_message}
                     </p>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    <p className="text-xs text-foreground-subtle mt-1">
                       Typ: {err.error_type}
                     </p>
                   </div>
                   <button
                     onClick={() => handleAcknowledge(err.id)}
                     disabled={acknowledging}
-                    className="text-xs px-3.5 py-2.5 rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-input)] transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="text-xs px-3.5 py-2.5 rounded-md border border-line text-foreground-muted hover:bg-input transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
                   >
                     OK
                   </button>
@@ -158,20 +158,20 @@ export default function CardScanErrorsPage() {
       {/* Bestätigte Fehler */}
       {closedErrors.length > 0 && (
         <div>
-          <h2 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-3">
+          <h2 className="text-xs font-medium text-foreground-subtle uppercase tracking-wider mb-3">
             Bestätigt ({closedErrors.length})
           </h2>
           <div className="space-y-2 opacity-60">
             {closedErrors.slice(0, 10).map((err) => (
               <div key={err.id} className="card p-3">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="uppercase tracking-wider font-medium text-[var(--text-tertiary)]">
+                  <span className="uppercase tracking-wider font-medium text-foreground-subtle">
                     {err.crm === "crm1" ? "CRM 1" : "CRM 2"}
                   </span>
-                  <span className="flex-1 truncate text-[var(--text-secondary)]">
+                  <span className="flex-1 truncate text-foreground-muted">
                     {err.error_message}
                   </span>
-                  <span className="text-[var(--text-tertiary)]">
+                  <span className="text-foreground-subtle">
                     {formatDate(err.created_at)}
                   </span>
                 </div>

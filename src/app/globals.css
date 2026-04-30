@@ -10,6 +10,7 @@
   --mr-red: #570006;
   --mr-red-light: #7a1a1f;
   --mr-red-glow: rgba(87, 0, 6, 0.8);
+  --mr-red-disabled: #8b6369; /* desaturated brand for primary disabled state */
   --mr-gray: #adadaf;
 
   /* Surfaces */
@@ -79,6 +80,7 @@
 
   /* Feedback (semantic — form errors, alerts, toasts) */
   --feedback-error: #dc2626;
+  --feedback-error-hover: #b91c1c; /* red-700 equivalent for destructive hover */
   --feedback-error-bg: #fef2f2;
   --feedback-error-border: #fecaca;
   --feedback-success: #16a34a;
@@ -106,6 +108,7 @@
   --color-brand: var(--mr-red);
   --color-brand-light: var(--mr-red-light);
   --color-brand-glow: var(--mr-red-glow);
+  --color-brand-disabled: var(--mr-red-disabled);
 
   /* Surfaces */
   --color-canvas: var(--bg-main);
@@ -157,6 +160,7 @@
 
   /* Feedback (semantic — forms, alerts, toasts) */
   --color-error: var(--feedback-error);
+  --color-error-hover: var(--feedback-error-hover);
   --color-error-bg: var(--feedback-error-bg);
   --color-error-border: var(--feedback-error-border);
   --color-success: var(--feedback-success);
@@ -179,7 +183,7 @@
   /* Fonts */
   --font-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
   --font-display: var(--font-barlow), system-ui, sans-serif;
-  --font-mono: var(--font-mono), "SF Mono", "Fira Code", monospace;
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", "Fira Code", monospace;
 }
 
 /* ============================================
@@ -288,14 +292,11 @@ body {
   overflow: hidden;
 }
 
-.status-tag::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-}
+/* Decorative left bar — color is set inline per status via JSX
+   (status.color resolves to var(--status-{name}) tokens).
+   Kept as ::before placeholder so the structure is documented; the actual
+   visual rendering happens via the manual <span> in the status-cell render
+   (see src/components/bestellungen-tabelle.tsx:660-674). */
 
 /* ============================================
    Table Row Hover – aggressive, auffällig

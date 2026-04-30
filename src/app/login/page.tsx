@@ -71,7 +71,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-dvh flex">
       {/* Left: Brand Panel – kontextabhängig */}
       <div className={`hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 ${
         isCardScan ? "bg-sidebar" : "bg-mr-gradient"
@@ -276,12 +276,12 @@ function LoginForm() {
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div role="alert" aria-live="polite" className="flex items-start gap-2 p-3 bg-error-bg border border-error-border rounded-lg">
+                <svg className="w-4 h-4 text-error mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01" />
                   <circle cx="12" cy="12" r="9" />
                 </svg>
-                <p className="text-sm text-red-700">{error}</p>
+                <p className="text-sm text-error">{error}</p>
               </div>
             )}
 
@@ -290,7 +290,7 @@ function LoginForm() {
               disabled={loading}
               className={`w-full py-4 rounded-xl text-[15px] font-semibold text-white disabled:opacity-50 active:scale-[0.98] transition-all min-h-[52px] ${
                 isCardScan
-                  ? "bg-[var(--bg-sidebar)] hover:bg-[var(--bg-sidebar-hover)]"
+                  ? "bg-sidebar hover:bg-sidebar-hover"
                   : "btn-primary"
               }`}
             >

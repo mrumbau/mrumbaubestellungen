@@ -787,7 +787,7 @@ export function ProjekteClient({
                 disabled={saving}
                 className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Speichert..." : editId ? "Speichern" : "Erstellen"}
+                {saving ? "Speichert..." : editId ? "Änderungen speichern" : "Projekt anlegen"}
               </button>
             </div>
           </div>

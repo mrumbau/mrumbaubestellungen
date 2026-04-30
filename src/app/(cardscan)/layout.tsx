@@ -22,7 +22,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
   themeColor: "#141414",
 };
@@ -39,12 +38,19 @@ export default async function CardScanLayout({
   }
 
   return (
-      <div className="min-h-screen bg-[var(--bg-main)] flex flex-col">
+      <div className="min-h-dvh bg-canvas flex flex-col">
         {/* Service Worker */}
         <script src="/cardscan-register-sw.js" defer />
 
+        <a
+          href="#cardscan-main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-3 focus:py-2 focus:bg-surface focus:text-foreground focus:shadow-[var(--shadow-elevated)] focus:rounded focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+        >
+          Zum Hauptinhalt springen
+        </a>
+
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-[var(--bg-sidebar)] border-b border-white/[0.06] safe-area-top">
+        <header className="sticky top-0 z-30 bg-sidebar border-b border-white/[0.06] safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
             <a
               href="/"
@@ -68,13 +74,13 @@ export default async function CardScanLayout({
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-8">{children}</main>
+        <main id="cardscan-main" tabIndex={-1} className="flex-1 p-4 md:p-8 focus:outline-none">{children}</main>
 
         {/* Footer */}
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 safe-area-bottom">
           <div className="max-w-2xl mx-auto">
-            <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)] to-transparent" />
-            <p className="text-center text-[9px] text-[var(--text-tertiary)] tracking-[0.15em] uppercase font-mono-amount mt-3 opacity-50">
+            <div className="h-px bg-gradient-to-r from-transparent via-line-subtle to-transparent" />
+            <p className="text-center text-[9px] text-foreground-subtle tracking-[0.15em] uppercase font-mono-amount mt-3 opacity-50">
               cloud.mrumbau.de
             </p>
           </div>

@@ -16,7 +16,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 text-xs font-mono-amount text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs font-mono-amount text-foreground-subtle hover:text-foreground-muted transition-colors"
       title={`${label} kopieren`}
     >
       {text}
@@ -67,16 +67,16 @@ function ProjectCreateCard({
 
   return (
     <div className="card p-4 mb-5">
-      <p className="text-xs text-[var(--text-secondary)] mb-3 font-medium">Projekt anlegen?</p>
+      <p className="text-xs text-foreground-muted mb-3 font-medium">Projekt anlegen?</p>
       <div className="flex gap-2">
         <input
           type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
           placeholder="Projektname"
-          className="flex-1 py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)] min-h-[44px]"
+          className="flex-1 py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
         />
         <button
           onClick={handleCreate} disabled={creating || !projectName.trim()}
-          className="py-2.5 px-4 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 hover:bg-[var(--bg-sidebar-hover)] transition-colors min-h-[44px]"
+          className="py-2.5 px-4 rounded-md bg-sidebar text-white text-sm font-medium disabled:opacity-30 hover:bg-sidebar-hover transition-colors min-h-[44px]"
         >
           {creating ? <span className="spinner w-4 h-4 border-white/30 border-t-white" /> : "Erstellen"}
         </button>
@@ -100,13 +100,13 @@ function CrmRow({ label, status, refNum, error: err }: { label: string; status: 
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center gap-2.5">
         <span className={`w-2 h-2 rounded-full ${c.dot}`} />
-        <span className="text-sm text-[var(--text-primary)]">{label}</span>
+        <span className="text-sm text-foreground">{label}</span>
       </div>
       <div className="text-right">
         {refNum ? (
           <CopyButton text={refNum} label="Kundennummer" />
         ) : (
-          <span className="text-xs text-[var(--text-tertiary)]">{c.text}</span>
+          <span className="text-xs text-foreground-subtle">{c.text}</span>
         )}
         {err && <p className="text-[10px] text-red-500 mt-0.5 max-w-[200px] truncate">{err}</p>}
       </div>
@@ -170,10 +170,10 @@ export default function CardScanSuccessPage() {
           )}
         </div>
 
-        <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight">
+        <h1 className="font-headline text-xl text-foreground tracking-tight">
           {displayName}
         </h1>
-        <p className="text-sm text-[var(--text-secondary)] mt-1">
+        <p className="text-sm text-foreground-muted mt-1">
           {isFailed ? "Konnte nicht angelegt werden" : isPartial ? "Teilweise angelegt" : "Erfolgreich angelegt"}
         </p>
       </div>
@@ -181,7 +181,7 @@ export default function CardScanSuccessPage() {
       {/* ─── CRM-Status ───────────────────────────────────────────── */}
       <div className="card p-4 mb-5">
         <CrmRow label="CRM 1" status={capture?.crm1_status || null} refNum={capture?.crm1_reference_number || null} error={capture?.crm1_error || null} />
-        <div className="border-t border-[var(--border-subtle)] my-1" />
+        <div className="border-t border-line-subtle my-1" />
         <CrmRow label="CRM 2" status={capture?.crm2_status || null} refNum={capture?.crm2_reference_number || null} error={capture?.crm2_error || null} />
       </div>
 
@@ -198,13 +198,13 @@ export default function CardScanSuccessPage() {
       <div className="flex gap-3">
         <button
           onClick={() => router.push("/cardscan")}
-          className="flex-1 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium hover:bg-[var(--bg-sidebar-hover)] transition-colors min-h-[48px] active:scale-[0.98]"
+          className="flex-1 py-3.5 px-4 rounded-xl bg-sidebar text-white text-sm font-medium hover:bg-sidebar-hover transition-colors min-h-[48px] active:scale-[0.98]"
         >
           Neuer Scan
         </button>
         <button
           onClick={() => router.push("/cardscan/history")}
-          className="flex-1 py-3.5 px-4 rounded-xl border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[48px] active:scale-[0.98]"
+          className="flex-1 py-3.5 px-4 rounded-xl border border-line text-foreground-muted text-sm font-medium hover:bg-input transition-colors min-h-[48px] active:scale-[0.98]"
         >
           Historie
         </button>

@@ -151,7 +151,7 @@ export default function CardScanReviewPage() {
     return (
       <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
         <p className="text-red-600 text-sm">{error}</p>
-        <button onClick={() => router.push("/cardscan")} className="mt-4 text-sm text-[var(--text-secondary)] underline">Zurück</button>
+        <button onClick={() => router.push("/cardscan")} className="mt-4 text-sm text-foreground-muted underline">Zurück</button>
       </div>
     );
   }
@@ -173,20 +173,20 @@ export default function CardScanReviewPage() {
       <div className="card p-5 mb-4 corner-marks">
         <div className="flex items-start gap-4">
           {/* Avatar/Initial */}
-          <div className="w-12 h-12 rounded-xl bg-[var(--bg-sidebar)] flex items-center justify-center text-white text-sm font-bold shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-sidebar flex items-center justify-center text-white text-sm font-bold shrink-0">
             {(displayName || "?")[0]?.toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-headline text-lg text-[var(--text-primary)] tracking-tight truncate">
+            <p className="font-headline text-lg text-foreground tracking-tight truncate">
               {displayName || "Unbekannter Kontakt"}
             </p>
             {isCompany && formData.contactPerson?.firstName && (
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              <p className="text-xs text-foreground-muted mt-0.5">
                 {formData.contactPerson.firstName} {formData.contactPerson.lastName}
-                {formData.contactPerson.role && <span className="text-[var(--text-tertiary)]"> · {formData.contactPerson.role}</span>}
+                {formData.contactPerson.role && <span className="text-foreground-subtle"> · {formData.contactPerson.role}</span>}
               </p>
             )}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-[var(--text-tertiary)]">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-foreground-subtle">
               {formData.email && (
                 <span className="flex items-center gap-1">
                   <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
@@ -207,7 +207,7 @@ export default function CardScanReviewPage() {
               )}
             </div>
             {hasAddress && (
-              <p className="text-xs text-[var(--text-tertiary)] mt-1.5">
+              <p className="text-xs text-foreground-subtle mt-1.5">
                 {[formData.address?.street, formData.address?.houseNumber].filter(Boolean).join(" ")}
                 {formData.address?.city && `, ${formData.address.zip || ""} ${formData.address.city}`}
               </p>
@@ -221,7 +221,7 @@ export default function CardScanReviewPage() {
 
       {/* Duplikat-Warnung */}
       {dupChecking && (
-        <div className="card p-3 mb-4 flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+        <div className="card p-3 mb-4 flex items-center gap-3 text-sm text-foreground-muted">
           <span className="spinner w-4 h-4" aria-hidden="true" />
           Prüfe Duplikate in CRM…
         </div>
@@ -261,7 +261,7 @@ export default function CardScanReviewPage() {
         <div className="mb-4">
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="w-full flex items-center justify-between py-2.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+            className="w-full flex items-center justify-between py-2.5 text-xs text-foreground-subtle hover:text-foreground-muted transition-colors"
           >
             <span className="uppercase tracking-wider font-medium">
               Weitere Details
@@ -277,32 +277,32 @@ export default function CardScanReviewPage() {
             <div className="card p-4 space-y-3">
               {formData.letterSalutation !== undefined && (
                 <label className="block">
-                  <span className="text-xs text-[var(--text-secondary)]">Briefanrede</span>
-                  <input type="text" value={formData.letterSalutation || ""} onChange={(e) => updateField("letterSalutation", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]" />
+                  <span className="text-xs text-foreground-muted">Briefanrede</span>
+                  <input type="text" value={formData.letterSalutation || ""} onChange={(e) => updateField("letterSalutation", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
                 </label>
               )}
               {formData.fax !== undefined && (
                 <label className="block">
-                  <span className="text-xs text-[var(--text-secondary)]">Fax</span>
-                  <input type="text" value={formData.fax || ""} onChange={(e) => updateField("fax", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]" />
+                  <span className="text-xs text-foreground-muted">Fax</span>
+                  <input type="text" value={formData.fax || ""} onChange={(e) => updateField("fax", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
                 </label>
               )}
               {formData.website !== undefined && (
                 <label className="block">
-                  <span className="text-xs text-[var(--text-secondary)]">Webseite</span>
-                  <input type="text" value={formData.website || ""} onChange={(e) => updateField("website", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]" />
+                  <span className="text-xs text-foreground-muted">Webseite</span>
+                  <input type="text" value={formData.website || ""} onChange={(e) => updateField("website", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
                 </label>
               )}
               {formData.vatId !== undefined && (
                 <label className="block">
-                  <span className="text-xs text-[var(--text-secondary)]">USt-IdNr.</span>
-                  <input type="text" value={formData.vatId || ""} onChange={(e) => updateField("vatId", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]" />
+                  <span className="text-xs text-foreground-muted">USt-IdNr.</span>
+                  <input type="text" value={formData.vatId || ""} onChange={(e) => updateField("vatId", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
                 </label>
               )}
               {formData.notes !== undefined && (
                 <label className="block">
-                  <span className="text-xs text-[var(--text-secondary)]">Notizen</span>
-                  <input type="text" value={formData.notes || ""} onChange={(e) => updateField("notes", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-input)] text-[var(--text-primary)] text-base focus:outline-none focus:ring-2 focus:ring-[var(--mr-red)]" />
+                  <span className="text-xs text-foreground-muted">Notizen</span>
+                  <input type="text" value={formData.notes || ""} onChange={(e) => updateField("notes", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
                 </label>
               )}
             </div>
@@ -312,7 +312,7 @@ export default function CardScanReviewPage() {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-sm mb-4" role="alert">
+        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm mb-4" role="alert">
           {error}
         </div>
       )}
@@ -321,7 +321,7 @@ export default function CardScanReviewPage() {
       <div className="flex gap-3">
         <button
           onClick={handleDiscard}
-          className="flex-1 py-3.5 px-4 rounded-xl border border-[var(--border-default)] text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--bg-input)] transition-colors min-h-[48px] active:scale-[0.98]"
+          className="flex-1 py-3.5 px-4 rounded-xl border border-line text-foreground-muted text-sm font-medium hover:bg-input transition-colors min-h-[48px] active:scale-[0.98]"
           disabled={saving}
           aria-label="Kontakt verwerfen"
         >
@@ -330,7 +330,7 @@ export default function CardScanReviewPage() {
         <button
           onClick={handleConfirm}
           disabled={saving || !canSubmit}
-          className="flex-1 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
+          className="flex-1 py-3.5 px-4 rounded-xl bg-sidebar text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-sidebar-hover transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
           aria-label="Kontakt bestätigen und im CRM anlegen"
         >
           {saving ? (

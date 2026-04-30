@@ -136,7 +136,7 @@ function ShareHandler() {
     return (
       <div className="max-w-xl mx-auto py-20 text-center">
         <div className="spinner w-8 h-8 mx-auto" />
-        <p className="text-sm text-[var(--text-tertiary)] mt-4">
+        <p className="text-sm text-foreground-subtle mt-4">
           {status === "loading"
             ? "Geteilte Daten werden geladen…"
             : "Wird analysiert…"}
@@ -156,7 +156,7 @@ function ShareHandler() {
         <p className="text-sm text-red-600 mb-4">{error}</p>
         <button
           onClick={() => router.push("/cardscan")}
-          className="text-sm text-[var(--text-secondary)] underline"
+          className="text-sm text-foreground-muted underline"
         >
           Zurück zu CardScan
         </button>
@@ -167,12 +167,12 @@ function ShareHandler() {
   // empty
   return (
     <div className="max-w-xl mx-auto py-20 text-center">
-      <p className="text-sm text-[var(--text-tertiary)] mb-4">
+      <p className="text-sm text-foreground-subtle mb-4">
         Keine geteilten Daten gefunden.
       </p>
       <button
         onClick={() => router.push("/cardscan")}
-        className="py-3 px-6 rounded-[var(--radius-md)] btn-primary text-sm"
+        className="py-3 px-6 rounded-md btn-primary text-sm"
       >
         Zu CardScan
       </button>

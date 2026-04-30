@@ -240,10 +240,10 @@ export default function CardScanUploadPage() {
   return (
     <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
-      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-1">
+      <h1 className="font-headline text-xl text-foreground tracking-tight mb-1">
         Datei hochladen
       </h1>
-      <p className="text-sm text-[var(--text-tertiary)] mb-5">
+      <p className="text-sm text-foreground-subtle mb-5">
         Foto, PDF, DOCX oder vCard (.vcf) hochladen.
       </p>
 
@@ -259,8 +259,8 @@ export default function CardScanUploadPage() {
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">Foto aufnehmen</p>
-              <p className="text-xs text-[var(--text-tertiary)]">Öffnet die Kamera</p>
+              <p className="text-sm font-medium text-foreground">Foto aufnehmen</p>
+              <p className="text-xs text-foreground-subtle">Öffnet die Kamera</p>
             </div>
             <input
               ref={cameraInputRef}
@@ -274,16 +274,16 @@ export default function CardScanUploadPage() {
 
           {/* Datei aus Galerie/Dateien */}
           <label className="card card-hover p-6 flex flex-col items-center gap-3 cursor-pointer block text-center">
-            <div className="w-14 h-14 rounded-2xl bg-[var(--bg-input)] flex items-center justify-center">
-              <svg className="w-7 h-7 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="w-14 h-14 rounded-2xl bg-input flex items-center justify-center">
+              <svg className="w-7 h-7 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">
+              <p className="text-sm font-medium text-foreground">
                 Aus Galerie / Dateien
               </p>
-              <p className="text-xs text-[var(--text-tertiary)]">
+              <p className="text-xs text-foreground-subtle">
                 JPEG, PNG, WebP, HEIC, PDF, DOCX, vCard
               </p>
             </div>
@@ -300,7 +300,7 @@ export default function CardScanUploadPage() {
 
       {/* Verarbeitung */}
       {processing && (
-        <div className="card p-4 flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+        <div className="card p-4 flex items-center gap-3 text-sm text-foreground-muted">
           <span className="spinner w-5 h-5" />
           {processing}
         </div>
@@ -313,10 +313,10 @@ export default function CardScanUploadPage() {
             <img
               src={preview}
               alt="Vorschau"
-              className="w-full rounded-[var(--radius-md)] object-contain max-h-80"
+              className="w-full rounded-md object-contain max-h-80"
             />
           </div>
-          <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
+          <div className="flex items-center justify-between text-xs text-foreground-subtle">
             <span>
               {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)
             </span>
@@ -334,14 +334,14 @@ export default function CardScanUploadPage() {
       {fileLabel && selectedFile && !preview && (
         <div className="space-y-4">
           <div className="card p-6 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-[var(--radius-md)] bg-[var(--bg-input)] flex items-center justify-center text-[var(--text-secondary)] font-mono-amount text-sm font-bold">
+            <div className="w-14 h-14 rounded-md bg-input flex items-center justify-center text-foreground-muted font-mono-amount text-sm font-bold">
               {fileLabel}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {selectedFile.name}
               </p>
-              <p className="text-xs text-[var(--text-tertiary)]">
+              <p className="text-xs text-foreground-subtle">
                 {(selectedFile.size / 1024).toFixed(0)} KB
               </p>
             </div>
@@ -357,7 +357,7 @@ export default function CardScanUploadPage() {
 
       {/* Fehler */}
       {error && (
-        <div className="mt-4 p-3 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-700 text-sm">
+        <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
           {error}
         </div>
       )}
@@ -365,7 +365,7 @@ export default function CardScanUploadPage() {
       <button
         onClick={handleUpload}
         disabled={loading || !selectedFile}
-        className="w-full mt-5 py-3.5 px-4 rounded-xl bg-[var(--bg-sidebar)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[var(--bg-sidebar-hover)] transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
+        className="w-full mt-5 py-3.5 px-4 rounded-xl bg-sidebar text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:bg-sidebar-hover transition-colors flex items-center justify-center gap-2 min-h-[48px] active:scale-[0.98]"
       >
         {loading ? (
           <>

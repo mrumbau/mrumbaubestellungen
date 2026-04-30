@@ -77,7 +77,7 @@ export default function CardScanHistoryPage() {
   if (loading) {
     return (
       <div className="max-w-lg md:max-w-xl mx-auto">
-        <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-6">
+        <h1 className="font-headline text-xl text-foreground tracking-tight mb-6">
           Letzte Scans
         </h1>
         <div className="space-y-2">
@@ -111,16 +111,16 @@ export default function CardScanHistoryPage() {
   return (
     <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
-      <h1 className="font-headline text-xl text-[var(--text-primary)] tracking-tight mb-5">
+      <h1 className="font-headline text-xl text-foreground tracking-tight mb-5">
         Letzte Scans
       </h1>
 
       {captures.length === 0 && (
         <div className="card p-8 text-center">
-          <p className="text-sm text-[var(--text-tertiary)]">Noch keine Scans vorhanden.</p>
+          <p className="text-sm text-foreground-subtle">Noch keine Scans vorhanden.</p>
           <button
             onClick={() => router.push("/cardscan")}
-            className="mt-4 py-2.5 px-5 rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] text-white text-sm font-medium min-h-[44px]"
+            className="mt-4 py-2.5 px-5 rounded-md bg-sidebar text-white text-sm font-medium min-h-[44px]"
           >
             Ersten Scan starten
           </button>
@@ -130,7 +130,7 @@ export default function CardScanHistoryPage() {
       {groups.map((group) => (
         <div key={group.label} className="mb-5">
           {/* Zeitgruppen-Header */}
-          <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] font-mono-amount mb-2 px-1">
+          <p className="text-[10px] text-foreground-subtle uppercase tracking-[0.15em] font-mono-amount mb-2 px-1">
             {group.label}
           </p>
 
@@ -154,7 +154,7 @@ export default function CardScanHistoryPage() {
                 >
                   {/* Initial mit Quell-Badge */}
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--bg-input)] flex items-center justify-center text-sm font-bold text-[var(--text-secondary)]">
+                    <div className="w-10 h-10 rounded-xl bg-input flex items-center justify-center text-sm font-bold text-foreground-muted">
                       {(name || "?")[0]?.toUpperCase()}
                     </div>
                     <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full ${dot} border-2 border-[var(--bg-card)]`} />
@@ -162,14 +162,14 @@ export default function CardScanHistoryPage() {
 
                   {/* Name + Subtitle */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">{name}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{name}</p>
                     {subtitle && (
-                      <p className="text-[11px] text-[var(--text-tertiary)] truncate mt-0.5">{subtitle}</p>
+                      <p className="text-[11px] text-foreground-subtle truncate mt-0.5">{subtitle}</p>
                     )}
                   </div>
 
                   {/* Zeit */}
-                  <span className="text-[10px] text-[var(--text-tertiary)] font-mono-amount shrink-0">
+                  <span className="text-[10px] text-foreground-subtle font-mono-amount shrink-0">
                     {isToday ? formatTime(c.created_at) : formatDate(c.created_at)}
                   </span>
                 </button>

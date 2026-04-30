@@ -56,15 +56,15 @@ export function ConfidenceOverview({ overall }: ConfidenceOverviewProps) {
   return (
     <div className="card p-3 mb-6 flex items-center gap-3" role="status" aria-label={`Gesamt-Confidence: ${percent} Prozent`}>
       <div
-        className={`w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center text-white text-sm font-bold ${bgColor}`}
+        className={`w-10 h-10 rounded-md flex items-center justify-center text-white text-sm font-bold ${bgColor}`}
       >
         {percent}%
       </div>
       <div>
-        <p className="text-sm font-medium text-[var(--text-primary)]">
+        <p className="text-sm font-medium text-foreground">
           Gesamt-Confidence
         </p>
-        <p className="text-xs text-[var(--text-tertiary)]">{description}</p>
+        <p className="text-xs text-foreground-subtle">{description}</p>
       </div>
     </div>
   );

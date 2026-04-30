@@ -13,11 +13,11 @@ export default async function Home() {
   const cardscanHref = isLoggedIn ? "/cardscan" : "/login?redirect=/cardscan";
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
+    <div className="min-h-dvh flex flex-col lg:flex-row">
       {/* ─── Bestellmanagement Panel ─────────────────────────────────── */}
       <Link
         href={bestellwesenHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50vh] lg:min-h-screen"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh"
       >
         {/* Hover overlay – GPU-beschleunigt via opacity */}
         <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -111,7 +111,7 @@ export default async function Home() {
       {/* ─── CardScan Panel ──────────────────────────────────────────── */}
       <Link
         href={cardscanHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50vh] lg:min-h-screen"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh"
       >
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-emerald-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

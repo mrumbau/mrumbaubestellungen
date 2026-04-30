@@ -18,7 +18,7 @@ export function ErrorBadgeLink({ isAdmin = false }: { isAdmin?: boolean }) {
     <div className="flex items-center justify-between">
       <Link
         href="/cardscan/history"
-        className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors py-2"
+        className="text-xs text-foreground-subtle hover:text-foreground-muted transition-colors py-2"
       >
         Letzte Scans →
       </Link>

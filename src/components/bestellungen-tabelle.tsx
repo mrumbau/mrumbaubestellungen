@@ -659,10 +659,7 @@ export function BestellungenTabelle({
         render: (b) => {
           const status = getStatusConfig(b.status);
           return (
-            <span
-              className={`status-tag ${status.bg} ${status.text}`}
-              style={{ position: "relative" }}
-            >
+            <span className={`status-tag ${status.bg} ${status.text}`}>
               <span
                 aria-hidden="true"
                 className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
