@@ -19,6 +19,7 @@ import {
   IconCheck,
   IconTool,
 } from "@/components/ui/icons";
+import { useListManager } from "@/lib/use-list-manager";
 
 export type Subunternehmer = {
   id: string;
@@ -76,6 +77,18 @@ const emptyForm: FormState = {
   notizen: "",
 };
 
+type SubunternehmerPayload = {
+  firma: string;
+  ansprechpartner: string | null;
+  gewerk: string | null;
+  telefon: string | null;
+  email: string | null;
+  email_absender: string[];
+  steuer_nr: string | null;
+  iban: string | null;
+  notizen: string | null;
+};
+
 export function SubunternehmerClient({
   initialListe,
   canEdit,
@@ -84,19 +97,31 @@ export function SubunternehmerClient({
   canEdit: boolean;
 }) {
   const { toast } = useToast();
-  const [liste, setListe] = useState<Subunternehmer[]>(initialListe);
+
+  const list = useListManager<Subunternehmer, SubunternehmerPayload>({
+    initial: initialListe,
+    endpoint: "/api/subunternehmer",
+    responseKey: "subunternehmer",
+    toastLabels: {
+      create: "Subunternehmer angelegt",
+      update: "Subunternehmer aktualisiert",
+      delete: (su) => `Subunternehmer "${su.firma}" gelöscht`,
+    },
+    sortBy: (a, b) => a.firma.localeCompare(b.firma, "de"),
+  });
+
+  // Form-State bleibt lokal
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; firma: string } | null>(null);
+  // Bestaetigen ist eine zusätzliche Mutation außerhalb des Standard-CRUD
+  const [bestaetigenLoading, setBestaetigenLoading] = useState(false);
 
   function resetForm() {
     setForm(emptyForm);
     setEditId(null);
     setShowForm(false);
-    setError(null);
+    list.setError(null);
   }
 
   function startEdit(su: Subunternehmer) {
@@ -113,19 +138,17 @@ export function SubunternehmerClient({
     });
     setEditId(su.id);
     setShowForm(true);
-    setError(null);
+    list.setError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.firma.trim()) {
-      setError("Firma ist ein Pflichtfeld.");
+      list.setError("Firma ist ein Pflichtfeld.");
       return;
     }
-    setLoading(true);
-    setError(null);
 
-    const payload = {
+    const payload: SubunternehmerPayload = {
       firma: form.firma.trim(),
       ansprechpartner: form.ansprechpartner.trim() || null,
       gewerk: form.gewerk || null,
@@ -137,56 +160,12 @@ export function SubunternehmerClient({
       notizen: form.notizen.trim() || null,
     };
 
-    try {
-      const url = editId ? `/api/subunternehmer/${editId}` : "/api/subunternehmer";
-      const res = await fetch(url, {
-        method: editId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-
-      if (editId) {
-        setListe((prev) => prev.map((s) => (s.id === editId ? data.subunternehmer : s)));
-        toast.success("Subunternehmer aktualisiert");
-      } else {
-        setListe((prev) =>
-          [...prev, data.subunternehmer].sort((a, b) => a.firma.localeCompare(b.firma)),
-        );
-        toast.success("Subunternehmer angelegt");
-      }
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    const target = liste.find((s) => s.id === id);
-    setDeleteConfirm(null);
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/subunternehmer/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
-      setListe((prev) => prev.filter((s) => s.id !== id));
-      toast.success("Subunternehmer gelöscht", {
-        description: target ? target.firma : undefined,
-      });
-    } catch (err) {
-      toast.error("Löschen fehlgeschlagen", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
+    const saved = await list.submit({ id: editId, payload });
+    if (saved) resetForm();
   }
 
   async function handleBestaetigen(id: string) {
-    setLoading(true);
+    setBestaetigenLoading(true);
     try {
       const res = await fetch("/api/subunternehmer/bestaetigen", {
         method: "POST",
@@ -195,7 +174,7 @@ export function SubunternehmerClient({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Bestätigung fehlgeschlagen");
-      setListe((prev) =>
+      list.setItems((prev) =>
         prev.map((s) =>
           s.id === id ? { ...s, confirmed_at: new Date().toISOString() } : s,
         ),
@@ -206,10 +185,11 @@ export function SubunternehmerClient({
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
-      setLoading(false);
+      setBestaetigenLoading(false);
     }
   }
 
+  const liste = list.items;
   const unconfirmed = liste.filter((s) => !s.confirmed_at).length;
 
   // Unbestätigte zuerst, dann bestätigte alphabetisch (analog kunden-client.tsx)
@@ -262,9 +242,9 @@ export function SubunternehmerClient({
         }
       />
 
-      {error && (
-        <Alert tone="error" onDismiss={() => setError(null)}>
-          {error}
+      {list.error && (
+        <Alert tone="error" onDismiss={() => list.setError(null)}>
+          {list.error}
         </Alert>
       )}
 
@@ -342,10 +322,10 @@ export function SubunternehmerClient({
               wrapperClassName="md:col-span-2"
             />
             <div className="md:col-span-2 flex items-center gap-2 pt-1">
-              <Button type="submit" loading={loading}>
+              <Button type="submit" loading={list.loading}>
                 {editId ? "Änderungen speichern" : "Subunternehmer anlegen"}
               </Button>
-              <Button type="button" variant="secondary" onClick={resetForm} disabled={loading}>
+              <Button type="button" variant="secondary" onClick={resetForm} disabled={list.loading}>
                 Abbrechen
               </Button>
             </div>
@@ -385,7 +365,7 @@ export function SubunternehmerClient({
                 su={su}
                 canEdit={canEdit}
                 onEdit={() => startEdit(su)}
-                onDelete={() => setDeleteConfirm({ id: su.id, firma: su.firma })}
+                onDelete={() => list.openDeleteConfirm(su)}
                 onConfirm={() => handleBestaetigen(su.id)}
               />
             ))}
@@ -394,18 +374,18 @@ export function SubunternehmerClient({
       )}
 
       <ConfirmDialog
-        open={deleteConfirm !== null}
+        open={list.deleteConfirm !== null}
         title="Subunternehmer löschen?"
         message={
-          deleteConfirm
-            ? `"${deleteConfirm.firma}" wird endgültig gelöscht. Bereits zugeordnete Rechnungen bleiben erhalten.`
+          list.deleteConfirm
+            ? `"${list.deleteConfirm.item.firma}" wird endgültig gelöscht. Bereits zugeordnete Rechnungen bleiben erhalten.`
             : ""
         }
         confirmLabel="Löschen"
         variant="danger"
-        loading={loading}
-        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm.id)}
-        onCancel={() => setDeleteConfirm(null)}
+        loading={list.loading}
+        onConfirm={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
+        onCancel={list.closeDeleteConfirm}
       />
     </div>
   );

@@ -10,8 +10,8 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useToast } from "@/components/ui/toast";
 import { IconPlus, IconEdit, IconTrash, IconRepeat } from "@/components/ui/icons";
+import { useListManager } from "@/lib/use-list-manager";
 
 export type AboAnbieter = {
   id: string;
@@ -66,21 +66,43 @@ const emptyForm: FormState = {
   kuendigungsfrist: "",
 };
 
+type AboAnbieterPayload = {
+  name: string;
+  domain: string;
+  email_absender: string[];
+  notizen: string | null;
+  intervall: AboAnbieter["intervall"];
+  erwarteter_betrag: number | null;
+  toleranz_prozent: number;
+  naechste_rechnung: string | null;
+  vertragsbeginn: string | null;
+  vertragsende: string | null;
+  kuendigungsfrist_tage: number | null;
+};
+
 export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[] }) {
-  const { toast } = useToast();
-  const [liste, setListe] = useState<AboAnbieter[]>(initialListe);
+  const list = useListManager<AboAnbieter, AboAnbieterPayload>({
+    initial: initialListe,
+    endpoint: "/api/abo-anbieter",
+    responseKey: "abo_anbieter",
+    toastLabels: {
+      create: "Abo-Anbieter angelegt",
+      update: "Abo-Anbieter aktualisiert",
+      delete: (a) => `Abo-Anbieter "${a.name}" gelöscht`,
+    },
+    sortBy: (a, b) => a.name.localeCompare(b.name, "de"),
+  });
+  const liste = list.items;
+
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   function resetForm() {
     setForm(emptyForm);
     setEditId(null);
     setShowForm(false);
-    setError(null);
+    list.setError(null);
   }
 
   function startEdit(abo: AboAnbieter) {
@@ -99,19 +121,17 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
     });
     setEditId(abo.id);
     setShowForm(true);
-    setError(null);
+    list.setError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.domain.trim()) {
-      setError("Name und Domain sind Pflichtfelder.");
+      list.setError("Name und Domain sind Pflichtfelder.");
       return;
     }
-    setLoading(true);
-    setError(null);
 
-    const payload = {
+    const payload: AboAnbieterPayload = {
       name: form.name.trim(),
       domain: form.domain.trim().toLowerCase(),
       email_absender: form.emailAbsender
@@ -128,52 +148,8 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
       kuendigungsfrist_tage: form.kuendigungsfrist ? parseInt(form.kuendigungsfrist) : null,
     };
 
-    try {
-      const url = editId ? `/api/abo-anbieter/${editId}` : "/api/abo-anbieter";
-      const res = await fetch(url, {
-        method: editId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-
-      if (editId) {
-        setListe((prev) => prev.map((a) => (a.id === editId ? data.abo_anbieter : a)));
-        toast.success("Abo-Anbieter aktualisiert");
-      } else {
-        setListe((prev) =>
-          [...prev, data.abo_anbieter].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        toast.success("Abo-Anbieter angelegt");
-      }
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    const target = liste.find((a) => a.id === id);
-    setDeleteConfirm(null);
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/abo-anbieter/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
-      setListe((prev) => prev.filter((a) => a.id !== id));
-      toast.success("Abo-Anbieter gelöscht", {
-        description: target ? target.name : undefined,
-      });
-    } catch (err) {
-      toast.error("Löschen fehlgeschlagen", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
+    const saved = await list.submit({ id: editId, payload });
+    if (saved) resetForm();
   }
 
   return (
@@ -205,9 +181,9 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
         }
       />
 
-      {error && (
-        <Alert tone="error" onDismiss={() => setError(null)}>
-          {error}
+      {list.error && (
+        <Alert tone="error" onDismiss={() => list.setError(null)}>
+          {list.error}
         </Alert>
       )}
 
@@ -305,10 +281,10 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
               wrapperClassName="md:col-span-2"
             />
             <div className="md:col-span-2 flex items-center gap-2 pt-1">
-              <Button type="submit" loading={loading}>
+              <Button type="submit" loading={list.loading}>
                 {editId ? "Änderungen speichern" : "Abo-Anbieter anlegen"}
               </Button>
-              <Button type="button" variant="secondary" onClick={resetForm} disabled={loading}>
+              <Button type="button" variant="secondary" onClick={resetForm} disabled={list.loading}>
                 Abbrechen
               </Button>
             </div>
@@ -341,7 +317,7 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
                 key={abo.id}
                 abo={abo}
                 onEdit={() => startEdit(abo)}
-                onDelete={() => setDeleteConfirm({ id: abo.id, name: abo.name })}
+                onDelete={() => list.openDeleteConfirm(abo)}
               />
             ))}
           </ul>
@@ -349,18 +325,18 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
       )}
 
       <ConfirmDialog
-        open={deleteConfirm !== null}
+        open={list.deleteConfirm !== null}
         title="Abo-Anbieter löschen?"
         message={
-          deleteConfirm
-            ? `"${deleteConfirm.name}" wird endgültig gelöscht. Bereits zugeordnete Abo-Rechnungen bleiben erhalten.`
+          list.deleteConfirm
+            ? `"${list.deleteConfirm.item.name}" wird endgültig gelöscht. Bereits zugeordnete Abo-Rechnungen bleiben erhalten.`
             : ""
         }
         confirmLabel="Löschen"
         variant="danger"
-        loading={loading}
-        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm.id)}
-        onCancel={() => setDeleteConfirm(null)}
+        loading={list.loading}
+        onConfirm={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
+        onCancel={list.closeDeleteConfirm}
       />
     </div>
   );

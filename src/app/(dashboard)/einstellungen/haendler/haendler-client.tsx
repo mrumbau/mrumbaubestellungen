@@ -8,13 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useToast } from "@/components/ui/toast";
 import {
   IconPlus,
   IconEdit,
   IconTrash,
   IconBuilding,
 } from "@/components/ui/icons";
+import { useListManager } from "@/lib/use-list-manager";
 
 export type Haendler = {
   id: string;
@@ -37,6 +37,13 @@ type FormState = {
   emailAbsender: string;
 };
 
+type HaendlerPayload = {
+  name: string;
+  domain: string;
+  url_muster: string[];
+  email_absender: string[];
+};
+
 const emptyForm: FormState = { name: "", domain: "", urlMuster: "", emailAbsender: "" };
 
 export function HaendlerClient({
@@ -46,20 +53,29 @@ export function HaendlerClient({
   initialHaendler: Haendler[];
   stats: Record<string, HaendlerStat>;
 }) {
-  const { toast } = useToast();
-  const [haendler, setHaendler] = useState<Haendler[]>(initialHaendler);
+  // CRUD-State + async-Mutationen via Hook
+  const list = useListManager<Haendler, HaendlerPayload>({
+    initial: initialHaendler,
+    endpoint: "/api/haendler",
+    responseKey: "haendler",
+    toastLabels: {
+      create: "Händler angelegt",
+      update: "Händler aktualisiert",
+      delete: (h) => `Händler "${h.name}" gelöscht`,
+    },
+    sortBy: (a, b) => a.name.localeCompare(b.name, "de"),
+  });
+
+  // Form-State bleibt lokal (Page-spezifisch)
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   function resetForm() {
     setForm(emptyForm);
     setEditId(null);
     setShowForm(false);
-    setError(null);
+    list.setError(null);
   }
 
   function startEdit(h: Haendler) {
@@ -71,7 +87,7 @@ export function HaendlerClient({
     });
     setEditId(h.id);
     setShowForm(true);
-    setError(null);
+    list.setError(null);
   }
 
   function startNew() {
@@ -82,66 +98,19 @@ export function HaendlerClient({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.domain.trim()) {
-      setError("Name und Domain sind Pflichtfelder.");
+      list.setError("Name und Domain sind Pflichtfelder.");
       return;
     }
-    setLoading(true);
-    setError(null);
 
-    const payload = {
+    const payload: HaendlerPayload = {
       name: form.name.trim(),
       domain: form.domain.trim(),
       url_muster: form.urlMuster.split(",").map((s) => s.trim()).filter(Boolean),
       email_absender: form.emailAbsender.split(",").map((s) => s.trim()).filter(Boolean),
     };
 
-    try {
-      const url = editId ? `/api/haendler/${editId}` : "/api/haendler";
-      const method = editId ? "PUT" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-
-      if (editId) {
-        setHaendler((prev) => prev.map((h) => (h.id === editId ? data.haendler : h)));
-        toast.success("Händler aktualisiert");
-      } else {
-        setHaendler((prev) =>
-          [...prev, data.haendler].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        toast.success("Händler angelegt");
-      }
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    const target = haendler.find((h) => h.id === id);
-    setDeleteConfirm(null);
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/haendler/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Löschen fehlgeschlagen");
-      setHaendler((prev) => prev.filter((h) => h.id !== id));
-      toast.success("Händler gelöscht", {
-        description: target ? target.name : undefined,
-      });
-    } catch (err) {
-      toast.error("Löschen fehlgeschlagen", {
-        description: err instanceof Error ? err.message : undefined,
-      });
-    } finally {
-      setLoading(false);
-    }
+    const saved = await list.submit({ id: editId, payload });
+    if (saved) resetForm();
   }
 
   return (
@@ -155,7 +124,7 @@ export function HaendlerClient({
         description="Webshop-Erkennungsmuster (Domain, URL, E-Mail-Absender) und Bestell-Statistik pro Händler."
         meta={
           <span className="text-[12px] text-foreground-subtle font-mono-amount">
-            {haendler.length} Einträge
+            {list.items.length} Einträge
           </span>
         }
         actions={
@@ -167,9 +136,9 @@ export function HaendlerClient({
         }
       />
 
-      {error && (
-        <Alert tone="error" onDismiss={() => setError(null)}>
-          {error}
+      {list.error && (
+        <Alert tone="error" onDismiss={() => list.setError(null)}>
+          {list.error}
         </Alert>
       )}
 
@@ -211,10 +180,10 @@ export function HaendlerClient({
               wrapperClassName="md:col-span-2"
             />
             <div className="md:col-span-2 flex items-center gap-2 pt-1">
-              <Button type="submit" loading={loading}>
+              <Button type="submit" loading={list.loading}>
                 {editId ? "Änderungen speichern" : "Händler anlegen"}
               </Button>
-              <Button type="button" variant="secondary" onClick={resetForm} disabled={loading}>
+              <Button type="button" variant="secondary" onClick={resetForm} disabled={list.loading}>
                 Abbrechen
               </Button>
             </div>
@@ -222,7 +191,7 @@ export function HaendlerClient({
         </SectionCard>
       )}
 
-      {haendler.length === 0 && !showForm ? (
+      {list.items.length === 0 && !showForm ? (
         <EmptyState
           icon={<IconBuilding className="h-5 w-5" />}
           title="Noch keine Händler"
@@ -236,13 +205,13 @@ export function HaendlerClient({
       ) : (
         <SectionCard padding="none" headerBorder={false}>
           <ul className="divide-y divide-line-subtle">
-            {haendler.map((h) => (
+            {list.items.map((h) => (
               <HaendlerRow
                 key={h.id}
                 haendler={h}
                 stat={stats[h.name]}
                 onEdit={() => startEdit(h)}
-                onDelete={() => setDeleteConfirm({ id: h.id, name: h.name })}
+                onDelete={() => list.openDeleteConfirm(h)}
               />
             ))}
           </ul>
@@ -250,18 +219,18 @@ export function HaendlerClient({
       )}
 
       <ConfirmDialog
-        open={deleteConfirm !== null}
+        open={list.deleteConfirm !== null}
         title="Händler löschen?"
         message={
-          deleteConfirm
-            ? `Der Händler "${deleteConfirm.name}" wird endgültig gelöscht. Bereits zugeordnete Bestellungen bleiben erhalten, verlieren aber die Händler-Referenz.`
+          list.deleteConfirm
+            ? `Der Händler "${list.deleteConfirm.item.name}" wird endgültig gelöscht. Bereits zugeordnete Bestellungen bleiben erhalten, verlieren aber die Händler-Referenz.`
             : ""
         }
         confirmLabel="Löschen"
         variant="danger"
-        loading={loading}
-        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm.id)}
-        onCancel={() => setDeleteConfirm(null)}
+        loading={list.loading}
+        onConfirm={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
+        onCancel={list.closeDeleteConfirm}
       />
     </div>
   );
