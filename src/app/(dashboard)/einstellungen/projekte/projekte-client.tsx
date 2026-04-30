@@ -19,6 +19,7 @@ import {
   IconFolderOpen,
   IconChevronRight,
 } from "@/components/ui/icons";
+import { useListManager } from "@/lib/use-list-manager";
 
 export type Projekt = {
   id: string;
@@ -61,6 +62,17 @@ const emptyForm: FormState = {
   adresse: "",
 };
 
+type ProjektPayload = {
+  name: string;
+  beschreibung: string | null;
+  kunde: string | null;
+  farbe: string;
+  budget: number | null;
+  status: string;
+  adresse: string | null;
+  adresse_keywords: string[];
+};
+
 export function ProjekteClient({
   initialProjekte,
   canEdit,
@@ -69,12 +81,26 @@ export function ProjekteClient({
   canEdit: boolean;
 }) {
   const { toast } = useToast();
-  const [projekte, setProjekte] = useState<Projekt[]>(initialProjekte);
+
+  // submit (POST/PUT) via Hook; DELETE bleibt inline wegen dual-outcome (delete ODER archive)
+  const list = useListManager<Projekt, ProjektPayload>({
+    initial: initialProjekte,
+    endpoint: "/api/projekte",
+    responseKey: "projekt",
+    toastLabels: {
+      create: "Projekt angelegt",
+      update: "Projekt aktualisiert",
+      delete: (p) => `Projekt "${p.name}" gelöscht`,
+    },
+    sortBy: (a, b) => a.name.localeCompare(b.name, "de"),
+  });
+  const projekte = list.items;
+  const setProjekte = list.setItems;
+
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [archivLoading, setArchivLoading] = useState(false);
   const [archivConfirm, setArchivConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const aktiveProjekte = projekte.filter((p) => ["aktiv", "pausiert"].includes(p.status));
@@ -86,7 +112,7 @@ export function ProjekteClient({
     setForm(emptyForm);
     setEditId(null);
     setShowForm(false);
-    setError(null);
+    list.setError(null);
   }
 
   function startEdit(p: Projekt) {
@@ -101,19 +127,17 @@ export function ProjekteClient({
     });
     setEditId(p.id);
     setShowForm(true);
-    setError(null);
+    list.setError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) {
-      setError("Projektname ist ein Pflichtfeld.");
+      list.setError("Projektname ist ein Pflichtfeld.");
       return;
     }
-    setLoading(true);
-    setError(null);
 
-    const payload = {
+    const payload: ProjektPayload = {
       name: form.name.trim(),
       beschreibung: form.beschreibung.trim() || null,
       kunde: form.kunde.trim() || null,
@@ -126,37 +150,16 @@ export function ProjekteClient({
         : [],
     };
 
-    try {
-      const url = editId ? `/api/projekte/${editId}` : "/api/projekte";
-      const res = await fetch(url, {
-        method: editId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Speichern fehlgeschlagen");
-
-      if (editId) {
-        setProjekte((prev) => prev.map((p) => (p.id === editId ? data.projekt : p)));
-        toast.success("Projekt aktualisiert");
-      } else {
-        setProjekte((prev) =>
-          [...prev, data.projekt].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        toast.success("Projekt angelegt");
-      }
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler beim Speichern");
-    } finally {
-      setLoading(false);
-    }
+    const saved = await list.submit({ id: editId, payload });
+    if (saved) resetForm();
   }
 
+  // Custom DELETE-Flow: Backend entscheidet ob hard-delete oder archive
+  // (abhängig davon, ob das Projekt noch von Bestellungen referenziert wird).
   async function handleArchiv(id: string) {
     const target = projekte.find((p) => p.id === id);
     setArchivConfirm(null);
-    setLoading(true);
+    setArchivLoading(true);
     try {
       const res = await fetch(`/api/projekte/${id}`, { method: "DELETE" });
       const data = await res.json();
@@ -179,7 +182,7 @@ export function ProjekteClient({
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
-      setLoading(false);
+      setArchivLoading(false);
     }
   }
 
@@ -216,9 +219,9 @@ export function ProjekteClient({
         }
       />
 
-      {error && (
-        <Alert tone="error" onDismiss={() => setError(null)}>
-          {error}
+      {list.error && (
+        <Alert tone="error" onDismiss={() => list.setError(null)}>
+          {list.error}
         </Alert>
       )}
 
@@ -285,10 +288,10 @@ export function ProjekteClient({
               </Select>
             )}
             <div className="md:col-span-2 flex items-center gap-2 pt-1">
-              <Button type="submit" loading={loading}>
+              <Button type="submit" loading={list.loading}>
                 {editId ? "Änderungen speichern" : "Projekt anlegen"}
               </Button>
-              <Button type="button" variant="secondary" onClick={resetForm} disabled={loading}>
+              <Button type="button" variant="secondary" onClick={resetForm} disabled={list.loading}>
                 Abbrechen
               </Button>
             </div>
@@ -377,7 +380,7 @@ export function ProjekteClient({
         }
         confirmLabel="Archivieren"
         variant="danger"
-        loading={loading}
+        loading={archivLoading}
         onConfirm={() => archivConfirm && handleArchiv(archivConfirm.id)}
         onCancel={() => setArchivConfirm(null)}
       />
