@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/cn";
 
 interface PrioBestellung {
@@ -52,6 +52,16 @@ export function DashboardPriorisierung({
   const [generatedAt, setGeneratedAt] = useState<string | null>(initialGeneratedAt);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slowWarning, setSlowWarning] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setSlowWarning(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowWarning(true), 10_000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   async function laden() {
     setLoading(true);
@@ -105,6 +115,11 @@ export function DashboardPriorisierung({
           <div className="spinner w-5 h-5" />
           <span className="text-sm text-foreground-subtle">KI priorisiert Bestellungen…</span>
         </div>
+        {slowWarning && (
+          <p className="mt-3 text-[12px] text-warning leading-relaxed" role="status" aria-live="polite">
+            Die Anfrage dauert länger als üblich. OpenAI antwortet eventuell verzögert — bitte einen Moment Geduld.
+          </p>
+        )}
       </div>
     );
   }

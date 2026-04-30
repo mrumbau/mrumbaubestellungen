@@ -652,18 +652,22 @@ export function KundenClient({
                   <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">E-Mail</label>
                   <input
                     type="email"
+                    inputMode="email"
+                    autoComplete="email"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Telefon</label>
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={formTelefon}
                     onChange={(e) => setFormTelefon(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
                   />
                 </div>
               </div>

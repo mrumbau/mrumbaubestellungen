@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CollapsibleWidget } from "./collapsible-widget";
+import { timelineColor } from "@/lib/timeline-config";
 import type { Abgleich, Dokument, Freigabe, Kommentar } from "./types";
 
 /**
@@ -123,7 +124,7 @@ function buildTimeline(
       zeit: d.created_at,
       label: `${typLabels[d.typ] || d.typ} eingegangen`,
       typ: "dok",
-      farbe: "var(--text-secondary)",
+      farbe: timelineColor("dok"),
     });
   }
   if (abgleich) {
@@ -133,8 +134,8 @@ function buildTimeline(
       typ: "abgleich",
       farbe:
         abgleich.status === "ok"
-          ? "var(--status-vollstaendig)"
-          : "var(--status-abweichung)",
+          ? timelineColor("abgleich_ok")
+          : timelineColor("abgleich_abweichung"),
     });
   }
   if (freigabe) {
@@ -142,7 +143,7 @@ function buildTimeline(
       zeit: freigabe.freigegeben_am,
       label: `Freigegeben von ${freigabe.freigegeben_von_name}`,
       typ: "freigabe",
-      farbe: "var(--status-freigegeben)",
+      farbe: timelineColor("freigabe"),
     });
   }
   for (const k of kommentare) {
@@ -150,7 +151,7 @@ function buildTimeline(
       zeit: k.erstellt_am,
       label: `${k.autor_kuerzel}: "${k.text.slice(0, 60)}${k.text.length > 60 ? "…" : ""}"`,
       typ: "kommentar",
-      farbe: "var(--text-tertiary)",
+      farbe: timelineColor("kommentar"),
     });
   }
   return items.sort((a, b) => new Date(a.zeit).getTime() - new Date(b.zeit).getTime());

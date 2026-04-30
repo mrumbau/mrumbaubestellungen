@@ -51,6 +51,17 @@ export function DashboardKIZusammenfassung({
   const [generatedAt, setGeneratedAt] = useState<string | null>(cacheFitsRange ? initialGeneratedAt : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slowWarning, setSlowWarning] = useState(false);
+
+  // F4.2 — Wenn KI-Anfrage länger als 10s läuft, User-Hinweis statt Stille
+  useEffect(() => {
+    if (!loading) {
+      setSlowWarning(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowWarning(true), 10_000);
+    return () => clearTimeout(t);
+  }, [loading]);
 
   // Wenn der Range wechselt (URL-Navigation), State anhand des neuen Caches neu setzen.
   useEffect(() => {
@@ -101,6 +112,11 @@ export function DashboardKIZusammenfassung({
           <div className="spinner w-5 h-5" />
           <span className="text-sm text-foreground-subtle">KI analysiert aktuelle Daten…</span>
         </div>
+        {slowWarning && (
+          <p className="mt-3 text-[12px] text-warning leading-relaxed" role="status" aria-live="polite">
+            Die Anfrage dauert länger als üblich. OpenAI antwortet eventuell verzögert — bitte einen Moment Geduld.
+          </p>
+        )}
       </div>
     );
   }

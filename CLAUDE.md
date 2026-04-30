@@ -74,8 +74,10 @@ DNS:          All-Inkl (CNAME cloud → cname.vercel-dns.com)
   3. Bestelldetail (Split-View)
   4. Buchhaltungsansicht
   5. Dashboard
-- Primärfarbe: #1E4D8C (Dunkelblau), Akzent: #2E6BAD
-- Stil: Professionelles Business-Dashboard, deutsch, clean
+- Primärfarbe: #570006 (MR-Red, Brand-Anker), Light: #7a1a1f
+- CardScan-Sub-Brand: emerald-500 (#10b981) — separates Modul-Identity
+- Stil: "Linear meets Handwerk-Industrie", deutsch, clean, industrielle SVG-Texturen
+- Siehe globals.css für vollständiges Token-System (6 Status × 3-Part, 4 Feedback × 3-Part, CardScan 8 States, bestellungsart-Tokens)
 
 ```
 
@@ -417,11 +419,14 @@ Zusätzlich: Datei-Upload Button für PC (PDF oder JPG vom Scanner).
 ## 🎨 Frontend UI/UX Anforderungen
 
 ### Allgemein
-- Modernes, professionelles Design
-- Primärfarbe: #1E4D8C (Dunkelblau)
-- Akzentfarbe: #2E6BAD
-- Responsive – funktioniert auf Handy (für Scan-Funktion)
-- Deutsche Sprache durchgehend
+- Stil: "Linear meets Handwerk-Industrie" — industrielle SVG-Texturen, editorial Typografie
+- **Bestellwesen-Brand:** Primary `#570006` (MR-Red), Light `#7a1a1f`
+- **CardScan-Sub-Brand (Modul 02):** Accent `emerald-500` (#10b981) — bewusste Visual-Trennung neben MR-Red
+- Typografie: DM Sans (sans), Barlow Condensed (display, font-headline), JetBrains Mono (font-mono-amount für Beträge mit tabular-nums)
+- Token-System in `globals.css`: 6 Bestellungs-Status × 3-Part-Triplet, 4 Feedback × 3-Part, 3 Bestellungsart × 3-Part, CardScan 8-State + Sub-Brand
+- Responsive – funktioniert auf Handy (CardScan-Mobile-Hot-Path)
+- Deutsche Sprache durchgehend (Microcopy: "Erstellen"/"Anlegen"-Pattern, "Änderungen speichern" für Edit)
+- Industrielle SVG-Texturen: `bg-grid-pattern`, `bg-iso-grid`, `bg-dot-grid`, `corner-marks`, `industrial-line`
 
 ### Status-Farben
 ```

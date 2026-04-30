@@ -4,6 +4,10 @@ export type { ButtonProps, ButtonVariants } from "./button";
 export { Input, FieldShell, inputBase, inputSizeVariants } from "./input";
 export type { InputProps } from "./input";
 
+export { PasswordInput } from "./password-input";
+
+export { Skeleton } from "./skeleton";
+
 export { Textarea } from "./textarea";
 export type { TextareaProps } from "./textarea";
 

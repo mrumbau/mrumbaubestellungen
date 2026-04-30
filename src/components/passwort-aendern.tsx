@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
-import { Input, Button, Alert, useToast } from "@/components/ui";
+import { PasswordInput, Button, Alert, useToast } from "@/components/ui";
 
 export function PasswortAendern() {
   const { toast } = useToast();
@@ -64,9 +64,8 @@ export function PasswortAendern() {
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
-        <Input
+        <PasswordInput
           id="neues-passwort"
-          type="password"
           label="Neues Passwort"
           value={neuesPasswort}
           onChange={(e) => setNeuesPasswort(e.target.value)}
@@ -76,9 +75,8 @@ export function PasswortAendern() {
           error={lengthError}
         />
 
-        <Input
+        <PasswordInput
           id="bestaetigung"
-          type="password"
           label="Passwort bestätigen"
           value={bestaetigung}
           onChange={(e) => setBestaetigung(e.target.value)}

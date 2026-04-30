@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -212,6 +212,16 @@ export function SubunternehmerClient({
 
   const unconfirmed = liste.filter((s) => !s.confirmed_at).length;
 
+  // Unbestätigte zuerst, dann bestätigte alphabetisch (analog kunden-client.tsx)
+  const sortedListe = useMemo(() => {
+    return [...liste].sort((a, b) => {
+      const aUnconfirmed = !a.confirmed_at;
+      const bUnconfirmed = !b.confirmed_at;
+      if (aUnconfirmed !== bUnconfirmed) return aUnconfirmed ? -1 : 1;
+      return a.firma.localeCompare(b.firma, "de");
+    });
+  }, [liste]);
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -292,6 +302,7 @@ export function SubunternehmerClient({
             <Input
               label="Telefon"
               type="tel"
+              inputMode="tel"
               autoComplete="tel"
               value={form.telefon}
               onChange={(e) => setForm((f) => ({ ...f, telefon: e.target.value }))}
@@ -299,6 +310,7 @@ export function SubunternehmerClient({
             <Input
               label="E-Mail"
               type="email"
+              inputMode="email"
               autoComplete="email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -367,7 +379,7 @@ export function SubunternehmerClient({
       ) : (
         <SectionCard padding="none" headerBorder={false}>
           <ul className="divide-y divide-line-subtle">
-            {liste.map((su) => (
+            {sortedListe.map((su) => (
               <SuRow
                 key={su.id}
                 su={su}

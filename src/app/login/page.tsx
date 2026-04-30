@@ -16,6 +16,7 @@ export default function LoginPage() {
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -248,31 +249,60 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="mt-8 space-y-5">
             <div>
-              <label className="block text-[10px] font-semibold text-foreground-subtle mb-2 tracking-widest uppercase">
+              <label htmlFor="login-email" className="block text-[10px] font-semibold text-foreground-subtle mb-2 tracking-widest uppercase">
                 E-Mail
               </label>
               <input
+                id="login-email"
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 bg-white border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
+                className="w-full px-4 py-3.5 bg-surface border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
                 placeholder="name@mrumbau.de"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold text-foreground-subtle mb-2 tracking-widest uppercase">
+              <label htmlFor="login-password" className="block text-[10px] font-semibold text-foreground-subtle mb-2 tracking-widest uppercase">
                 Passwort
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3.5 bg-white border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
-                placeholder="Passwort eingeben"
-              />
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full pl-4 pr-12 py-3.5 bg-surface border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
+                  placeholder="Passwort eingeben"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
+                  aria-pressed={showPassword}
+                  tabIndex={-1}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md text-foreground-subtle hover:text-foreground hover:bg-surface-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                >
+                  {showPassword ? (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 3l18 18" />
+                      <path d="M10.5 10.5a2.5 2.5 0 003.4 3.4" />
+                      <path d="M5.5 6.5C3 8.3 2 12 2 12s3.5 7 10 7c2 0 3.7-.6 5.1-1.5" />
+                      <path d="M8 4.5c1.2-.3 2.5-.5 4-.5 6.5 0 10 7 10 7s-1 1.7-2.7 3.4" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {error && (
