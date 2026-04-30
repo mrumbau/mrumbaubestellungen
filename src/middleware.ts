@@ -3,6 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/cron", "/api/extension", "/api/health"];
 
+// F2.18: Defense-in-Depth — diese Prefix-public Routen MÜSSEN selbst
+// authentifizieren (Bearer/Body-Secret/EXTENSION_SECRET). Wenn eine Route
+// versehentlich ohne Auth-Check erstellt wird, fängt dieser Check sie ab:
+// `Authorization: Bearer ...` oder `secret`-Body-Field MUSS vorhanden sein.
+// Verhindert dass z.B. /api/webhook/debug versehentlich offen ist.
+const AUTH_HEADER_REQUIRED_PREFIXES = ["/api/webhook", "/api/cron", "/api/extension"];
+
 // Exakte Pfade die ohne Auth erreichbar sind (Tool-Auswahl)
 const PUBLIC_EXACT = ["/"];
 
@@ -12,6 +19,21 @@ const ROLLE_COOKIE_NAME = "mr_rolle_cache";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // F2.18 Defense-in-Depth: webhook/cron/extension benötigen IMMER ein Auth-Token
+  // (entweder Authorization-Header ODER secret-Field im Body — Body lesen wir
+  // hier nicht, also reicht Header-Check als Sanity-Filter).
+  if (AUTH_HEADER_REQUIRED_PREFIXES.some((p) => pathname.startsWith(p))) {
+    const authHeader = request.headers.get("authorization");
+    const contentType = request.headers.get("content-type") ?? "";
+    const looksLikeJson = contentType.includes("application/json");
+    // POST mit JSON-Body darf ohne Auth-Header durchgehen (Body kann `secret` haben).
+    // GET ohne Auth-Header → block.
+    if (!authHeader && !(request.method === "POST" && looksLikeJson)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
 
   // Öffentliche Pfade durchlassen
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || PUBLIC_EXACT.includes(pathname)) {

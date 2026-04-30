@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidKuerzel, isValidDomain, validateTextLength } from "@/lib/validation";
 import { checkRateLimit, checkGlobalRateLimit, getRateLimitKey } from "@/lib/rate-limit";
-import { logError } from "@/lib/logger";
+import { logError, logInfo } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
 
 // POST /api/webhook/bestellung – Empfängt Signal von Chrome Extension
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
                 .from("haendler")
                 .update({ url_muster: [...muster, pattern] })
                 .eq("id", haendler.id);
-              console.log(`[Webhook] Neues URL-Pattern gelernt: ${haendler_domain} → ${pattern}`);
+              logInfo("/api/webhook/bestellung", "URL-Pattern gelernt", { haendler_domain, pattern });
             }
           } else {
             // Neuen Händler mit URL-Pattern anlegen
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
                 email_absender: [],
                 url_muster: [pattern],
               });
-              console.log(`[Webhook] Neuer Händler via ${erkennung} angelegt: ${haendler_domain} (${pattern})`);
+              logInfo("/api/webhook/bestellung", "Neuer Händler angelegt", { erkennung, haendler_domain, pattern });
             } else {
               // Händler existiert, Pattern hinzufügen
               const muster: string[] = existingH[0].url_muster || [];
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
                   .from("haendler")
                   .update({ url_muster: [...muster, pattern] })
                   .eq("id", existingH[0].id);
-                console.log(`[Webhook] URL-Pattern gelernt: ${haendler_domain} → ${pattern}`);
+                logInfo("/api/webhook/bestellung", "URL-Pattern auf bestehenden Händler gelernt", { haendler_domain, pattern });
               }
             }
           }
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (erkennung && erkennung !== "bekannt") {
-      console.log(`[Webhook] Händler erkannt via ${erkennung}: ${haendler_domain} (${kuerzel})`);
+      logInfo("/api/webhook/bestellung", "Händler erkannt", { erkennung, haendler_domain, kuerzel });
     }
 
     // Webhook-Log: Erfolg

@@ -1,4 +1,7 @@
 import nodemailer from "nodemailer";
+import { logError, logInfo } from "@/lib/logger";
+
+const ROUTE = "/lib/email";
 
 // Microsoft 365 SMTP Transporter (bu@mrumbau.de)
 function createTransporter() {
@@ -37,7 +40,7 @@ export async function sendeRechnungAnDatev(options: RechnungAnDatevOptions): Pro
   const { bestellnummer, haendlerName, betrag, pdfBuffer } = options;
 
   if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    console.warn("[DATEV-Mail] SMTP nicht konfiguriert — Versand übersprungen");
+    logInfo(ROUTE, "DATEV-Mail SMTP nicht konfiguriert — Versand übersprungen");
     return { success: false, error: "SMTP nicht konfiguriert" };
   }
 
@@ -89,11 +92,11 @@ export async function sendeRechnungAnDatev(options: RechnungAnDatevOptions): Pro
       ],
     });
 
-    console.log(`[DATEV-Mail] Rechnung gesendet: ${haendlerName} ${bestellnummer || ""}`);
+    logInfo(ROUTE, `DATEV-Mail Rechnung gesendet`, { haendlerName, bestellnummer });
     return { success: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
-    console.error(`[DATEV-Mail] Fehler: ${msg}`);
+    logError(ROUTE, "DATEV-Mail Fehler", err);
     return { success: false, error: msg };
   }
 }
@@ -112,7 +115,7 @@ interface MahnungEmailOptions {
  */
 export async function sendeMahnungEmail(options: MahnungEmailOptions): Promise<{ success: boolean; error?: string }> {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    console.warn("[Mahnung-Mail] SMTP nicht konfiguriert — Versand übersprungen");
+    logInfo(ROUTE, "Mahnung-Mail SMTP nicht konfiguriert — Versand übersprungen");
     return { success: false, error: "SMTP nicht konfiguriert" };
   }
 
@@ -130,11 +133,11 @@ export async function sendeMahnungEmail(options: MahnungEmailOptions): Promise<{
       text: options.text,
     });
 
-    console.log(`[Mahnung-Mail] Erinnerung gesendet an ${options.empfaengerEmail}`);
+    logInfo(ROUTE, "Mahnung-Mail Erinnerung gesendet", { an: options.empfaengerEmail });
     return { success: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
-    console.error(`[Mahnung-Mail] Fehler: ${msg}`);
+    logError(ROUTE, "Mahnung-Mail Fehler", err);
     return { success: false, error: msg };
   }
 }

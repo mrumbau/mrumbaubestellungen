@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
-import { logError } from "@/lib/logger";
+import { logError, logInfo } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
 import { sendeRechnungAnDatev } from "@/lib/email";
 
@@ -107,7 +107,7 @@ export async function POST(
     if (bezahlt) {
       after(async () => {
         try {
-          console.log(`[DATEV] Start Versand für Bestellung ${id}`);
+          logInfo("/api/bestellungen/[id]/bezahlt", "DATEV-Versand gestartet", { bestellung_id: id });
           const svc = createServiceClient();
 
           const { data: rechnungDok } = await svc
@@ -121,22 +121,22 @@ export async function POST(
             .single();
 
           if (!rechnungDok?.storage_pfad) {
-            console.log(`[DATEV] Keine Rechnungs-PDF für Bestellung ${id} — übersprungen`);
+            logInfo("/api/bestellungen/[id]/bezahlt", "DATEV: keine Rechnungs-PDF, übersprungen", { bestellung_id: id });
             return;
           }
 
-          console.log(`[DATEV] PDF gefunden: ${rechnungDok.storage_pfad}`);
+          logInfo("/api/bestellungen/[id]/bezahlt", "DATEV: PDF gefunden", { storage_pfad: rechnungDok.storage_pfad });
 
           const { data: pdfData, error: dlError } = await svc.storage
             .from("dokumente")
             .download(rechnungDok.storage_pfad);
 
           if (!pdfData || dlError) {
-            console.error(`[DATEV] PDF-Download fehlgeschlagen: ${dlError?.message}`);
+            logError("/api/bestellungen/[id]/bezahlt", "DATEV: PDF-Download fehlgeschlagen", dlError);
             return;
           }
 
-          console.log(`[DATEV] PDF geladen: ${pdfData.size} bytes`);
+          logInfo("/api/bestellungen/[id]/bezahlt", "DATEV: PDF geladen", { size_bytes: pdfData.size });
           const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
           const filename = rechnungDok.storage_pfad.split("/").pop() || "rechnung.pdf";
 
@@ -148,7 +148,7 @@ export async function POST(
             pdfFilename: filename,
           });
 
-          console.log(`[DATEV] Ergebnis: ${result.success ? "GESENDET" : "FEHLER: " + result.error}`);
+          logInfo("/api/bestellungen/[id]/bezahlt", `DATEV-Versand-Ergebnis: ${result.success ? "GESENDET" : "FEHLER"}`, { error: result.error });
           // F5.13 Fix: SMTP-Ergebnis in webhook_logs persistieren — nicht nur console.
           await svc.from("webhook_logs").insert({
             typ: "email",
@@ -159,7 +159,7 @@ export async function POST(
               : `DATEV-Versand fehlgeschlagen: ${result.error}`,
           });
         } catch (datevErr) {
-          console.error(`[DATEV] Exception:`, datevErr instanceof Error ? datevErr.message : datevErr);
+          // logError direkt darunter persistiert ohnehin den Stack — console.error redundant.
           logError("/api/bestellungen/[id]/bezahlt", "DATEV-Versand fehlgeschlagen", datevErr);
           // F5.13: Exception ebenfalls persistieren
           try {

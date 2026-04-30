@@ -1,8 +1,12 @@
 {
   "name": "mrumbaubestellungen",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "MR Umbau GmbH — internes Bestellmanagement (Next.js + Supabase)",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,9 +17,6 @@
     "type": "git",
     "url": "git+https://github.com/mrumbau/mrumbaubestellungen.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/mrumbau/mrumbaubestellungen/issues"
   },

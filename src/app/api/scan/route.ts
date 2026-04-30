@@ -5,7 +5,7 @@ import { analysiereDokument, fuehreAbgleichDurch } from "@/lib/openai";
 import { isValidUUID, isAllowedMimeType, isFileSizeOk, sanitizeFilename, safeBestellnummer } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
-import { logError } from "@/lib/logger";
+import { logError, logInfo } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 
@@ -131,7 +131,10 @@ export async function POST(request: NextRequest) {
           { status: 422 }
         );
       }
-      console.log(`[Scan] GPT-Typ unbekannt ("${analyse.typ}"), Fallback auf erwarteten Typ: ${erkannterTyp}`);
+      logInfo("/api/scan", "GPT-Typ unbekannt, Fallback aktiv", {
+        gpt_typ: analyse.typ,
+        fallback_typ: erkannterTyp,
+      });
     }
 
     // Datei in Storage hochladen (Dateinamen sanitizen)
