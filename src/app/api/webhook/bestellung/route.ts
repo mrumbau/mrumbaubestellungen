@@ -129,28 +129,23 @@ export async function POST(request: NextRequest) {
           .replace(/\/+$/, "") // Trailing Slashes entfernen
           || "/";
 
-        if (pattern.length >= 4) { // Mindestens sinnvoller Pfad
+        if (pattern.length >= 4 && pattern.length <= 200) { // Mindestens sinnvoller Pfad
+          // F6.6 Fix: Atomic Append via RPC — verhindert Lost-Update bei
+          // parallelen Webhook-Calls (Read-Modify-Write Race war im Audit).
           if (haendler) {
-            // Bestehendem Händler URL-Pattern hinzufügen (falls noch nicht vorhanden)
-            const { data: existing } = await supabase
-              .from("haendler")
-              .select("url_muster")
-              .eq("id", haendler.id)
-              .single();
-
-            const muster: string[] = existing?.url_muster || [];
-            if (muster.length < 50 && pattern.length <= 200 && !muster.includes(pattern)) {
-              await supabase
-                .from("haendler")
-                .update({ url_muster: [...muster, pattern] })
-                .eq("id", haendler.id);
+            const { data: added } = await supabase.rpc("append_haendler_url_pattern", {
+              p_haendler_id: haendler.id,
+              p_pattern: pattern,
+              p_max_count: 50,
+            });
+            if (added) {
               logInfo("/api/webhook/bestellung", "URL-Pattern gelernt", { haendler_domain, pattern });
             }
           } else {
             // Neuen Händler mit URL-Pattern anlegen
             const { data: existingH } = await supabase
               .from("haendler")
-              .select("id, url_muster")
+              .select("id")
               .eq("domain", haendler_domain)
               .limit(1);
 
@@ -163,13 +158,12 @@ export async function POST(request: NextRequest) {
               });
               logInfo("/api/webhook/bestellung", "Neuer Händler angelegt", { erkennung, haendler_domain, pattern });
             } else {
-              // Händler existiert, Pattern hinzufügen
-              const muster: string[] = existingH[0].url_muster || [];
-              if (muster.length < 50 && pattern.length <= 200 && !muster.includes(pattern)) {
-                await supabase
-                  .from("haendler")
-                  .update({ url_muster: [...muster, pattern] })
-                  .eq("id", existingH[0].id);
+              const { data: added } = await supabase.rpc("append_haendler_url_pattern", {
+                p_haendler_id: existingH[0].id,
+                p_pattern: pattern,
+                p_max_count: 50,
+              });
+              if (added) {
                 logInfo("/api/webhook/bestellung", "URL-Pattern auf bestehenden Händler gelernt", { haendler_domain, pattern });
               }
             }
@@ -184,12 +178,15 @@ export async function POST(request: NextRequest) {
       logInfo("/api/webhook/bestellung", "Händler erkannt", { erkennung, haendler_domain, kuerzel });
     }
 
-    // Webhook-Log: Erfolg
-    await supabase.from("webhook_logs").insert({
+    // Webhook-Log: Erfolg (F6.13: Result-Check, damit Schema-Verstöße sichtbar werden)
+    const { error: logErr } = await supabase.from("webhook_logs").insert({
       typ: "extension",
       status: "success",
       bestellnummer: bestellnummer || null,
     });
+    if (logErr) {
+      logError("/api/webhook/bestellung", "webhook_logs.insert fehlgeschlagen", logErr);
+    }
 
     return NextResponse.json({ success: true, signal_id: data.id });
   } catch (err) {
