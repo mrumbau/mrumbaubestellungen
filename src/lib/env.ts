@@ -53,10 +53,6 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   VERCEL_URL: z.string().optional(),
 
-  // ── Sentry (optional) ───────────────────────────────────────────────────
-  SENTRY_DSN: z.string().url().optional(),
-  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
-
   // ── Testdaten (Development-Gate, F5.6) ──────────────────────────────────
   ALLOW_TESTDATEN: z.enum(["true", "false"]).optional(),
 
