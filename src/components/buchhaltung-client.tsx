@@ -268,9 +268,9 @@ export function BuchhaltungClient({
     <div>
       {/* Bezahlt error banner */}
       {bezahltError && (
-        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
           <span>{bezahltError}</span>
-          <button type="button" onClick={() => setBezahltError(null)} className="text-red-400 hover:text-red-600 shrink-0">
+          <button type="button" onClick={() => setBezahltError(null)} className="text-error/70 hover:text-error shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -334,8 +334,8 @@ export function BuchhaltungClient({
               )}
 
               {/* DATEV Info-Box */}
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                <p className="text-[11px] text-blue-700 leading-relaxed">
+              <div className="p-3 bg-info-bg border border-info-border rounded-lg">
+                <p className="text-[11px] text-info leading-relaxed">
                   <span className="font-semibold">DATEV Format:</span> EXTF Version 700, Buchungsstapel. Kreditorenkonten werden automatisch pro Händler vergeben (70001+). Projekte werden als KOST1 exportiert.
                 </p>
               </div>
@@ -384,7 +384,7 @@ export function BuchhaltungClient({
               </div>
 
               {datevError && (
-                <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700">{datevError}</div>
+                <div className="p-3 bg-error-bg border border-error-border rounded-lg text-sm text-error">{datevError}</div>
               )}
             </div>
             <div className="p-6 border-t border-line flex justify-end gap-3">
@@ -491,7 +491,7 @@ export function BuchhaltungClient({
             Bezahlt
             {bezahlteRows.length > 0 && (
               <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                tab === "bezahlt" ? "bg-emerald-600 text-white" : "bg-line text-foreground-muted"
+                tab === "bezahlt" ? "bg-success text-white" : "bg-line text-foreground-muted"
               }`}>
                 {bezahlteRows.length}
               </span>
@@ -592,7 +592,7 @@ export function BuchhaltungClient({
                     <span className="font-mono-amount font-semibold text-brand">
                       {r.bestellnummer || "–"}
                       {r.mahnung_am && (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-semibold" title={`Mahnung eingegangen am ${new Date(r.mahnung_am).toLocaleDateString("de-DE")}`}>
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold" title={`Mahnung eingegangen am ${new Date(r.mahnung_am).toLocaleDateString("de-DE")}`}>
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" /></svg>
                           {r.mahnung_count && r.mahnung_count > 1 ? `${r.mahnung_count}. Mahnung` : "Mahnung"}
                         </span>
@@ -603,7 +603,7 @@ export function BuchhaltungClient({
                     <span className="flex items-center gap-1.5">
                       {r.haendler_name || "–"}
                       {r.bestellungsart === "subunternehmer" && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-cyan-50 text-cyan-700 rounded">SUB</span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-bestellungsart-subunternehmer-bg text-bestellungsart-subunternehmer-text rounded">SUB</span>
                       )}
                     </span>
                   </td>
@@ -611,7 +611,7 @@ export function BuchhaltungClient({
                     {r.bestellungsart === "subunternehmer" ? (
                       <span className="text-line-strong text-xs">–</span>
                     ) : r.hat_bestellbestaetigung ? (
-                      <svg className="w-4 h-4 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      <svg className="w-4 h-4 text-success mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     ) : (
                       <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
                     )}
@@ -620,7 +620,7 @@ export function BuchhaltungClient({
                     {r.bestellungsart === "subunternehmer" ? (
                       <span className="text-line-strong text-xs">–</span>
                     ) : r.hat_lieferschein ? (
-                      <svg className="w-4 h-4 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      <svg className="w-4 h-4 text-success mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     ) : (
                       <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
                     )}
@@ -636,9 +636,9 @@ export function BuchhaltungClient({
                     <span
                       className={
                         isUeberfaellig(r.faelligkeitsdatum)
-                          ? "text-red-600 font-semibold font-mono-amount text-xs pulse-urgent"
+                          ? "text-error font-semibold font-mono-amount text-xs pulse-urgent"
                           : isFaelligBald(r.faelligkeitsdatum)
-                          ? "text-amber-600 font-semibold font-mono-amount text-xs"
+                          ? "text-warning font-semibold font-mono-amount text-xs"
                           : "text-foreground-subtle text-xs"
                       }
                     >
@@ -648,7 +648,7 @@ export function BuchhaltungClient({
                   <td className="px-4 py-3.5 text-center">
                     {tab === "bezahlt" ? (
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[11px] text-emerald-600 font-medium">{formatDatum(r.bezahlt_am)}</span>
+                        <span className="text-[11px] text-success font-medium">{formatDatum(r.bezahlt_am)}</span>
                         <span className="text-[10px] text-foreground-subtle">{r.bezahlt_von}</span>
                         {kannBezahlen && (
                           <div className="flex items-center justify-center gap-1.5 mt-1">
@@ -667,7 +667,7 @@ export function BuchhaltungClient({
                               type="button"
                               onClick={() => toggleBezahlt(r.id, true)}
                               disabled={bezahltLoading === r.id}
-                              className="p-1 rounded text-line-strong hover:text-red-500 hover:bg-red-50 transition-colors"
+                              className="p-1 rounded text-line-strong hover:text-error hover:bg-error-bg transition-colors"
                               title="Zahlung zurücksetzen"
                             >
                               {bezahltLoading === r.id ? (
@@ -686,7 +686,7 @@ export function BuchhaltungClient({
                         type="button"
                         onClick={() => toggleBezahlt(r.id, false)}
                         disabled={bezahltLoading === r.id}
-                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-line-strong hover:border-emerald-400 text-transparent hover:text-emerald-400 ${
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-line-strong hover:border-success text-transparent hover:text-success ${
                           bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"
                         }`}
                         title="Als bezahlt markieren"

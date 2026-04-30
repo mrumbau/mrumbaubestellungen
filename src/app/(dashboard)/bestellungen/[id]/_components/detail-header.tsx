@@ -74,15 +74,14 @@ export function DetailHeader({
               <h1 className="font-headline text-[22px] md:text-[24px] tracking-tight text-foreground">
                 {bestellung.bestellnummer || "Ohne Nr."}
               </h1>
-              <span
-                className={`status-tag ${statusConfig.bg} ${statusConfig.text}`}
-                style={{ position: "relative" }}
-              >
+              <span className={`status-tag ${statusConfig.bg} ${statusConfig.text}`}>
                 <span
                   aria-hidden="true"
                   className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
                   style={{ background: statusConfig.color }}
                 />
+                <statusConfig.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
+                <span className="sr-only">Status: </span>
                 {statusConfig.label}
               </span>
               {bestellung.mahnung_am && (

@@ -537,9 +537,9 @@ export function KundenClient({
 
       {/* Error banner */}
       {error && !showForm && (
-        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
           <span>{error}</span>
-          <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 shrink-0">
+          <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-error shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -549,16 +549,16 @@ export function KundenClient({
       {unbestaetigt.length > 0 && (
         <div className="mb-6 card p-5 border-l-[3px] border-l-amber-400">
           <div className="flex items-center gap-2 mb-3">
-            <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
             <h2 className="font-headline text-sm text-foreground">Auto-erkannte Kunden</h2>
-            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">{unbestaetigt.length}</span>
+            <span className="text-[10px] font-bold text-warning bg-warning-bg px-2 py-0.5 rounded">{unbestaetigt.length}</span>
           </div>
           <p className="text-xs text-foreground-subtle mb-3">Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.</p>
           <div className="space-y-2">
             {unbestaetigt.map((k) => (
-              <div key={k.id} className="flex items-center justify-between p-3 bg-amber-50/50 rounded-lg">
+              <div key={k.id} className="flex items-center justify-between p-3 bg-warning-bg/50 rounded-lg">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ background: k.farbe }} />
                   <div className="min-w-0">
@@ -566,7 +566,7 @@ export function KundenClient({
                     {k.keywords.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {k.keywords.map((kw, i) => (
-                          <span key={i} className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">{kw}</span>
+                          <span key={i} className="text-[10px] px-1.5 py-0.5 bg-warning-bg text-warning rounded">{kw}</span>
                         ))}
                       </div>
                     )}
@@ -576,7 +576,7 @@ export function KundenClient({
                   <button
                     onClick={() => handleBestaetigen(k.id)}
                     disabled={confirmLoading === k.id}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-emerald-100 rounded-lg hover:bg-emerald-200 disabled:opacity-50 transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -683,9 +683,9 @@ export function KundenClient({
                 <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Keywords (Enter zum Hinzufügen)</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {formKeywords.map((kw, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[11px] font-medium">
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-info-bg text-info rounded text-[11px] font-medium">
                       {kw}
-                      <button type="button" onClick={() => setFormKeywords((prev) => prev.filter((_, j) => j !== i))} className="text-blue-400 hover:text-blue-700">
+                      <button type="button" onClick={() => setFormKeywords((prev) => prev.filter((_, j) => j !== i))} className="text-blue-400 hover:text-info">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </span>
@@ -721,7 +721,7 @@ export function KundenClient({
                 </div>
               </div>
 
-              {error && <p className="text-red-600 text-sm">{error}</p>}
+              {error && <p className="text-error text-sm">{error}</p>}
             </div>
 
             <div className="p-6 border-t border-line flex justify-end gap-3">
@@ -823,7 +823,7 @@ export function KundenClient({
                         </button>
                         <button
                           onClick={() => setDeleteConfirm({ id: k.id, name: k.name })}
-                          className="p-1 rounded hover:bg-red-50 transition-colors text-foreground-faint hover:text-red-600"
+                          className="p-1 rounded hover:bg-error-bg transition-colors text-foreground-faint hover:text-error"
                           title="Löschen"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -879,7 +879,7 @@ export function KundenClient({
                   {k.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
                       {k.keywords.map((kw, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{kw}</span>
+                        <span key={i} className="text-[10px] px-1.5 py-0.5 bg-info-bg text-info rounded">{kw}</span>
                       ))}
                     </div>
                   )}

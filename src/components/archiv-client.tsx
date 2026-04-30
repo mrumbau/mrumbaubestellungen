@@ -393,7 +393,7 @@ export function ArchivClient({
             <button
               type="button"
               onClick={resetFilters}
-              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-red-50 rounded-lg border border-line transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-error-bg rounded-lg border border-line transition-colors shrink-0"
               title="Filter zurücksetzen"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -674,7 +674,7 @@ function ProjekteTab({
                   )}
                   <h3 className="font-headline text-base text-foreground leading-tight pr-2">{p.name}</h3>
                 </div>
-                <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1 bg-success-bg border border-success-border text-success text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap uppercase tracking-wide">
                   Abgeschlossen
                 </span>
               </div>
@@ -773,7 +773,7 @@ function ProjekteTab({
                           </span>
                           <span className="text-xs text-foreground-muted truncate">{o.haendler_name || o.subunternehmer_firma || ""}</span>
                           {o.bestellungsart === "subunternehmer" && (
-                            <span className="hidden sm:inline px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 rounded">SU</span>
+                            <span className="hidden sm:inline px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-warning-bg text-warning rounded">SU</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
@@ -986,7 +986,7 @@ function OrderRow({
               ? order.subunternehmer_firma || order.haendler_name || "–"
               : order.haendler_name || "–"}
             {type === "subunternehmer" && order.subunternehmer_gewerk && (
-              <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-amber-50 text-amber-700 rounded uppercase">{order.subunternehmer_gewerk}</span>
+              <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-warning-bg text-warning rounded uppercase">{order.subunternehmer_gewerk}</span>
             )}
           </span>
         </td>
@@ -1005,7 +1005,7 @@ function OrderRow({
           return (
             <td key={dok.flag} className="px-3 py-3.5 text-center hidden sm:table-cell">
               {hasDoc ? (
-                <svg className="w-4 h-4 text-green-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <svg className="w-4 h-4 text-success mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               ) : (

@@ -27,8 +27,8 @@ export default async function CardScanPage() {
         className="group block rounded-2xl overflow-hidden active:scale-[0.98] transition-transform duration-150"
       >
         <div className="bg-sidebar px-5 py-5 flex items-center gap-4 relative">
-          <div className="w-14 h-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-            <svg className="w-7 h-7 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="w-14 h-14 rounded-xl bg-cs-accent/10 border border-cs-accent/20 flex items-center justify-center shrink-0">
+            <svg className="w-7 h-7 text-cs-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
             </svg>
@@ -40,7 +40,7 @@ export default async function CardScanPage() {
           <svg className="w-4 h-4 text-white/20 shrink-0 group-hover:text-white/40 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
           </svg>
-          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/15 to-transparent" />
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-cs-accent/15 to-transparent" />
         </div>
       </Link>
 
@@ -75,8 +75,8 @@ export default async function CardScanPage() {
             href={item.href}
             className="group card flex items-center gap-3.5 px-4 py-3.5 active:scale-[0.98] transition-transform duration-150 min-h-[56px]"
           >
-            <div className="w-9 h-9 rounded-lg bg-input flex items-center justify-center shrink-0 group-hover:bg-emerald-50 transition-colors">
-              <svg className="w-[18px] h-[18px] text-foreground-subtle group-hover:text-emerald-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="w-9 h-9 rounded-lg bg-input flex items-center justify-center shrink-0 group-hover:bg-cs-accent-tint transition-colors">
+              <svg className="w-[18px] h-[18px] text-foreground-subtle group-hover:text-cs-accent transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 {item.icon}
               </svg>
             </div>

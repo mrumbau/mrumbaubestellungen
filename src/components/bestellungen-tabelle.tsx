@@ -87,15 +87,15 @@ function DokumentIcon({
         type="button"
         onClick={onClick}
         onMouseEnter={onMouseEnter}
-        className="p-1 -m-1 rounded-md transition-all hover:bg-green-50 hover:scale-125 cursor-pointer group/dok"
+        className="p-1 -m-1 rounded-md transition-all hover:bg-success-bg hover:scale-125 cursor-pointer group/dok"
         title="Klicken für Vorschau"
       >
-        <IconCheck className="w-4 h-4 text-green-600 group-hover/dok:text-green-700" />
+        <IconCheck className="w-4 h-4 text-success group-hover/dok:text-success" />
       </button>
     );
   }
   return vorhanden ? (
-    <IconCheck className="w-4 h-4 text-green-600" />
+    <IconCheck className="w-4 h-4 text-success" />
   ) : (
     <div className="w-4 h-4 rounded-full border-2 border-line-strong" aria-hidden="true" />
   );
@@ -665,6 +665,8 @@ export function BestellungenTabelle({
                 className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
                 style={{ background: status.color }}
               />
+              <status.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
+              <span className="sr-only">Status: </span>
               {status.label}
             </span>
           );
@@ -830,7 +832,7 @@ export function BestellungenTabelle({
                 setArtFilter("");
                 setProjektFilter("");
               }}
-              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-red-50 rounded-lg border border-line transition-colors shrink-0"
+              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-error-bg rounded-lg border border-line transition-colors shrink-0"
               title="Filter zurücksetzen"
             >
               <IconX className="w-4 h-4" />

@@ -21,7 +21,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     >
       {text}
       {copied ? (
-        <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-3.5 h-3.5 text-cs-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>
       ) : (
@@ -56,7 +56,7 @@ function ProjectCreateCard({
 
   if (result === "success") {
     return (
-      <div className="card p-4 mb-5 flex items-center gap-3 text-sm text-emerald-700">
+      <div className="card p-4 mb-5 flex items-center gap-3 text-sm text-cs-accent-text">
         <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>
@@ -81,7 +81,7 @@ function ProjectCreateCard({
           {creating ? <span className="spinner w-4 h-4 border-white/30 border-t-white" /> : "Erstellen"}
         </button>
       </div>
-      {result === "error" && <p className="text-xs text-red-600 mt-2">Konnte nicht erstellt werden.</p>}
+      {result === "error" && <p className="text-xs text-error mt-2">Konnte nicht erstellt werden.</p>}
     </div>
   );
 }
@@ -89,10 +89,10 @@ function ProjectCreateCard({
 function CrmRow({ label, status, refNum, error: err }: { label: string; status: string | null; refNum: string | null; error: string | null }) {
   const s = status || "pending";
   const conf: Record<string, { dot: string; text: string }> = {
-    success: { dot: "bg-emerald-500", text: "Erstellt" },
-    failed: { dot: "bg-red-500", text: "Fehler" },
+    success: { dot: "bg-cs-success", text: "Erstellt" },
+    failed: { dot: "bg-error", text: "Fehler" },
     skipped: { dot: "bg-slate-400", text: "Dry-Run" },
-    pending: { dot: "bg-amber-400", text: "Ausstehend" },
+    pending: { dot: "bg-warning", text: "Ausstehend" },
   };
   const c = conf[s] || conf.pending;
 
@@ -108,7 +108,7 @@ function CrmRow({ label, status, refNum, error: err }: { label: string; status: 
         ) : (
           <span className="text-xs text-foreground-subtle">{c.text}</span>
         )}
-        {err && <p className="text-[10px] text-red-500 mt-0.5 max-w-[200px] truncate">{err}</p>}
+        {err && <p className="text-[10px] text-error mt-0.5 max-w-[200px] truncate">{err}</p>}
       </div>
     </div>
   );
@@ -161,12 +161,12 @@ export default function CardScanSuccessPage() {
       {/* ─── Hero: Kontaktname groß + Icon ─────────────────────────── */}
       <div className="text-center mb-8">
         <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center ${
-          isFailed ? "bg-red-50 animate-shake" : "bg-emerald-50 animate-scale-in"
+          isFailed ? "bg-error-bg animate-shake" : "bg-cs-accent-tint animate-scale-in"
         }`}>
           {isFailed ? (
-            <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            <svg className="w-7 h-7 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           ) : (
-            <svg className="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+            <svg className="w-7 h-7 text-cs-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
           )}
         </div>
 

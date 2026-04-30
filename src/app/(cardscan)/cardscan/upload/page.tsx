@@ -322,7 +322,7 @@ export default function CardScanUploadPage() {
             </span>
             <button
               onClick={handleRemove}
-              className="text-red-600 hover:text-red-700 font-medium"
+              className="text-error hover:text-error font-medium"
             >
               Entfernen
             </button>
@@ -347,7 +347,7 @@ export default function CardScanUploadPage() {
             </div>
             <button
               onClick={handleRemove}
-              className="text-red-600 hover:text-red-700 text-xs font-medium"
+              className="text-error hover:text-error text-xs font-medium"
             >
               Entfernen
             </button>
@@ -357,7 +357,7 @@ export default function CardScanUploadPage() {
 
       {/* Fehler */}
       {error && (
-        <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+        <div className="mt-4 p-3 rounded-md bg-error-bg border border-error-border text-error text-sm">
           {error}
         </div>
       )}

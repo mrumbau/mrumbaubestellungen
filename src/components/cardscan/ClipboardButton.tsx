@@ -105,12 +105,12 @@ export function ClipboardButton() {
         disabled={state === "reading" || state === "processing"}
         className="group relative block w-full card p-0 overflow-hidden text-left disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-cs-success opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         <div className="flex items-center gap-4 px-5 py-4">
           <span className="font-mono-amount text-[11px] text-foreground-subtle w-6 shrink-0">05</span>
           <div className="w-px h-8 bg-[var(--border-subtle)]" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground group-hover:text-emerald-700 transition-colors">
+            <p className="text-sm font-medium text-foreground group-hover:text-cs-accent-text transition-colors">
               {state === "reading" ? "Lese Zwischenablage…" : state === "processing" ? "Analysiere…" : "Aus Zwischenablage"}
             </p>
             <p className="text-[11px] text-foreground-subtle mt-0.5">
@@ -127,7 +127,7 @@ export function ClipboardButton() {
         </div>
       </button>
       {error && (
-        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-xs">
+        <div className="p-3 rounded-md bg-error-bg border border-error-border text-error text-xs">
           {error}
         </div>
       )}

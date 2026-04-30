@@ -8,11 +8,11 @@ import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types
 const STATUS_DOT: Record<string, string> = {
   pending: "bg-slate-400",
   extracting: "bg-blue-400",
-  review: "bg-amber-400",
+  review: "bg-warning",
   writing: "bg-blue-400",
-  success: "bg-emerald-500",
-  partial_success: "bg-amber-500",
-  failed: "bg-red-500",
+  success: "bg-cs-success",
+  partial_success: "bg-warning-bg0",
+  failed: "bg-error",
   discarded: "bg-slate-300",
 };
 

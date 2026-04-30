@@ -242,3 +242,38 @@ export function IconPlay(props: IconProps) {
     </svg>
   );
 }
+
+export function IconClock(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 5v3l2 2" />
+    </svg>
+  );
+}
+
+export function IconCheckCircle(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M5.5 8l2 2 3-4" />
+    </svg>
+  );
+}
+
+export function IconAlertTriangle(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <path d="M8 2.5L1.5 13h13L8 2.5z" />
+      <path d="M8 6.5v3M8 11.5v0.5" />
+    </svg>
+  );
+}
+
+export function IconHourglass(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <path d="M4 2.5h8M4 13.5h8M5 2.5v3l3 2.5-3 2.5v3M11 2.5v3L8 8l3 2.5v3" />
+    </svg>
+  );
+}

@@ -80,8 +80,8 @@ function LoginForm() {
         {isCardScan ? (
           <>
             <div className="absolute inset-0 bg-dot-grid opacity-60" />
-            <div className="absolute top-[40%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500/[0.08] to-transparent" />
-            <div className="absolute top-[60%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500/[0.05] to-transparent" />
+            <div className="absolute top-[40%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-cs-accent/[0.08] to-transparent" />
+            <div className="absolute top-[60%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-cs-accent/[0.05] to-transparent" />
             {/* Geometric corner */}
             <div className="absolute top-0 left-0 w-64 h-64 opacity-[0.06]">
               <svg viewBox="0 0 260 260" fill="none">
@@ -152,8 +152,8 @@ function LoginForm() {
           {isCardScan ? (
             <>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-5 h-5 rounded border border-emerald-500/30 flex items-center justify-center">
-                  <svg className="w-3 h-3 text-emerald-500/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <div className="w-5 h-5 rounded border border-cs-accent/30 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-cs-accent/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
                   </svg>
                 </div>
@@ -161,10 +161,10 @@ function LoginForm() {
               </div>
 
               <h2 className="font-headline text-5xl text-white leading-[1.1] tracking-tight">
-                Card<span className="text-emerald-500/50">Scan</span>
+                Card<span className="text-cs-accent/50">Scan</span>
               </h2>
 
-              <div className="w-12 h-[2px] bg-emerald-500/20 mt-6 mb-5" />
+              <div className="w-12 h-[2px] bg-cs-accent/20 mt-6 mb-5" />
 
               <p className="text-white/30 text-sm leading-relaxed max-w-xs">
                 Kontaktdaten aus Visitenkarten, E-Mails, Webseiten erfassen und direkt ins CRM übertragen.
@@ -173,12 +173,12 @@ function LoginForm() {
               <div className="mt-8 space-y-2.5">
                 {["Foto & Kamera", "Text & Clipboard", "URL & Dateien", "Dual-CRM Write"].map((label, i) => (
                   <div key={label} className="flex items-center gap-3">
-                    <div className="w-5 h-5 border border-emerald-500/15 rounded flex items-center justify-center">
-                      <span className="font-mono-amount text-[9px] text-emerald-500/40">{String(i + 1).padStart(2, "0")}</span>
+                    <div className="w-5 h-5 border border-cs-accent/15 rounded flex items-center justify-center">
+                      <span className="font-mono-amount text-[9px] text-cs-accent/40">{String(i + 1).padStart(2, "0")}</span>
                     </div>
                     <span className="text-white/35 text-xs tracking-wide">{label}</span>
                     <div className="flex-1 h-px bg-white/[0.06]" />
-                    <svg className="w-3 h-3 text-emerald-500/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3 h-3 text-cs-accent/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </div>

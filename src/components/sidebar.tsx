@@ -162,7 +162,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
             onClick={() => setMobileOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all ${
               pathname.startsWith("/cardscan")
-                ? "bg-emerald-500/10 text-emerald-400 font-medium"
+                ? "bg-cs-accent/10 text-cs-accent-light font-medium"
                 : "text-white/40 hover:bg-white/[0.04] hover:text-white/70"
             }`}
           >

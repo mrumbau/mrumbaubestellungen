@@ -150,7 +150,7 @@ export default function CardScanReviewPage() {
   if (error && !capture) {
     return (
       <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
-        <p className="text-red-600 text-sm">{error}</p>
+        <p className="text-error text-sm">{error}</p>
         <button onClick={() => router.push("/cardscan")} className="mt-4 text-sm text-foreground-muted underline">Zurück</button>
       </div>
     );
@@ -312,7 +312,7 @@ export default function CardScanReviewPage() {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm mb-4" role="alert">
+        <div className="p-3 rounded-md bg-error-bg border border-error-border text-error text-sm mb-4" role="alert">
           {error}
         </div>
       )}

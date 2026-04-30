@@ -65,7 +65,7 @@ export default async function CardScanLayout({
 
             <div className="flex items-center gap-2">
               <span className="font-headline text-[13px] text-white/90 tracking-tight">Card</span>
-              <span className="font-headline text-[13px] text-emerald-500/70 tracking-tight">Scan</span>
+              <span className="font-headline text-[13px] text-cs-accent/70 tracking-tight">Scan</span>
             </div>
 
             <div className="w-7 h-7 rounded-md bg-white/[0.07] flex items-center justify-center text-[10px] font-bold text-white/70 border border-white/[0.06]">

@@ -890,7 +890,9 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                             onSuccess={manualRefresh}
                           />
                           <span className={`status-tag ${s.bg} ${s.text}`}>
-                            <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
+                            <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
+                            <s.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
+                            <span className="sr-only">Status: </span>
                             {s.label}
                           </span>
                         </div>
@@ -941,7 +943,9 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                             <span className="font-mono-amount text-sm font-semibold text-foreground hidden sm:inline">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
                           )}
                           <span className={`status-tag ${s.bg} ${s.text}`}>
-                            <span className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
+                            <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
+                            <s.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
+                            <span className="sr-only">Status: </span>
                             {s.label}
                           </span>
                         </div>

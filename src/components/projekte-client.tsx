@@ -57,10 +57,10 @@ const FARBEN = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: "aktiv", label: "Aktiv", icon: "circle", color: "#059669", bg: "bg-green-50", text: "text-green-700", border: "border-green-100" },
-  { value: "pausiert", label: "Pausiert", icon: "pause", color: "#d97706", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-100" },
+  { value: "aktiv", label: "Aktiv", icon: "circle", color: "#059669", bg: "bg-success-bg", text: "text-success", border: "border-success-border" },
+  { value: "pausiert", label: "Pausiert", icon: "pause", color: "#d97706", bg: "bg-warning-bg", text: "text-warning", border: "border-warning-border" },
   { value: "abgeschlossen", label: "Abgeschlossen", icon: "check", color: "#6b7280", bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
-  { value: "archiviert", label: "Archivieren", icon: "archive", color: "#dc2626", bg: "bg-red-50", text: "text-red-600", border: "border-red-100" },
+  { value: "archiviert", label: "Archivieren", icon: "archive", color: "#dc2626", bg: "bg-error-bg", text: "text-error", border: "border-error-border" },
 ];
 
 function getStatusCfg(status: string) {
@@ -153,7 +153,7 @@ function StatusDropdown({
                   isActive
                     ? "bg-input font-semibold text-foreground"
                     : opt.value === "archiviert"
-                      ? "text-red-600 hover:bg-red-50"
+                      ? "text-error hover:bg-error-bg"
                       : "text-foreground-muted hover:bg-input"
                 }`}
               >
@@ -678,9 +678,9 @@ export function ProjekteClient({
 
       {/* Error banner */}
       {error && !showForm && (
-        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
           <span>{error}</span>
-          <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-red-600 shrink-0">
+          <button type="button" onClick={() => setError("")} className="text-red-400 hover:text-error shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -772,7 +772,7 @@ export function ProjekteClient({
                 />
               </div>
 
-              {error && <p className="text-red-600 text-sm">{error}</p>}
+              {error && <p className="text-error text-sm">{error}</p>}
             </div>
 
             <div className="p-6 border-t border-line flex justify-end gap-3">

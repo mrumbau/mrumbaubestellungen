@@ -9,19 +9,19 @@ import type {
 } from "@/lib/cardscan/types";
 
 const STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
-  success: { label: "Erfolgreich angelegt", color: "text-emerald-700" },
-  partial_success: { label: "Teilweise angelegt", color: "text-amber-700" },
-  failed: { label: "Fehlgeschlagen", color: "text-red-700" },
-  review: { label: "In Prüfung", color: "text-blue-700" },
-  discarded: { label: "Verworfen", color: "text-slate-500" },
+  success: { label: "Erfolgreich angelegt", color: "text-cs-accent-text" },
+  partial_success: { label: "Teilweise angelegt", color: "text-warning" },
+  failed: { label: "Fehlgeschlagen", color: "text-error" },
+  review: { label: "In Prüfung", color: "text-info" },
+  discarded: { label: "Verworfen", color: "text-foreground-subtle" },
 };
 
 function CrmBadge({ status, label }: { status: string | null; label: string }) {
   const config: Record<string, { bg: string; text: string; label: string }> = {
-    success: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Erstellt" },
-    failed: { bg: "bg-red-50", text: "text-red-700", label: "Fehlgeschlagen" },
+    success: { bg: "bg-cs-accent-tint", text: "text-cs-accent-text", label: "Erstellt" },
+    failed: { bg: "bg-error-bg", text: "text-error", label: "Fehlgeschlagen" },
     skipped: { bg: "bg-slate-50", text: "text-slate-600", label: "Dry-Run" },
-    pending: { bg: "bg-amber-50", text: "text-amber-700", label: "Ausstehend" },
+    pending: { bg: "bg-warning-bg", text: "text-warning", label: "Ausstehend" },
   };
   const s = config[status || "pending"] || config.pending;
   return (
@@ -80,7 +80,7 @@ export default function HistoryDetailPage() {
   if (!capture) {
     return (
       <div className="max-w-lg md:max-w-xl mx-auto py-20 text-center">
-        <p className="text-sm text-red-600">Eintrag nicht gefunden.</p>
+        <p className="text-sm text-error">Eintrag nicht gefunden.</p>
         <button
           onClick={() => router.push("/cardscan/history")}
           className="mt-4 text-sm text-foreground-muted underline"

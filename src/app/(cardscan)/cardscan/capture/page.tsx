@@ -193,8 +193,8 @@ export default function CardScanCapturePage() {
   if (cameraState === "unsupported") {
     return (
       <div className="max-w-xl mx-auto py-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-amber-50 flex items-center justify-center">
-          <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-warning-bg flex items-center justify-center">
+          <svg className="w-8 h-8 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
         </div>
@@ -214,8 +214,8 @@ export default function CardScanCapturePage() {
   if (cameraState === "denied") {
     return (
       <div className="max-w-xl mx-auto py-12 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
-          <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-error-bg flex items-center justify-center">
+          <svg className="w-8 h-8 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
           </svg>
         </div>
@@ -286,7 +286,7 @@ export default function CardScanCapturePage() {
 
       {/* Fehler */}
       {error && (
-        <div className="px-4 py-2 bg-red-600 text-white text-sm text-center">{error}</div>
+        <div className="px-4 py-2 bg-error text-white text-sm text-center">{error}</div>
       )}
 
       {/* Untere Leiste */}

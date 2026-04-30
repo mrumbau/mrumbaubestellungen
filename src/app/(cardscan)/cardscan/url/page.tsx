@@ -112,8 +112,8 @@ export default function CardScanUrlPage() {
 
         {/* Social-Media-Hinweis */}
         {showSocialHint && (
-          <div className="mt-3 card p-4 border-amber-200 bg-amber-50/50">
-            <p className="text-xs text-amber-700">
+          <div className="mt-3 card p-4 border-warning-border bg-warning-bg/50">
+            <p className="text-xs text-warning">
               <span className="font-medium">Hinweis:</span> LinkedIn, Xing und soziale Netzwerke blockieren automatisches Auslesen.
               Bitte kopiere stattdessen den Profilinhalt und nutze{" "}
               <button
@@ -128,7 +128,7 @@ export default function CardScanUrlPage() {
         )}
 
         {error && (
-          <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+          <div className="mt-4 p-3 rounded-md bg-error-bg border border-error-border text-error text-sm">
             {error}
           </div>
         )}

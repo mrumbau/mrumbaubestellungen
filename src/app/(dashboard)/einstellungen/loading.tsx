@@ -1,6 +1,6 @@
 export default function EinstellungenLoading() {
   return (
-    <div className="animate-pulse">
+    <div>
       {/* SubNav-Platzhalter (horizontaler Rail) */}
       <div className="border-b border-line-subtle mb-6 pb-2 flex gap-4">
         <div className="h-5 skeleton-text w-20" />

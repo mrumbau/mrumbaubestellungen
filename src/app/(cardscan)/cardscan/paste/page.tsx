@@ -86,12 +86,12 @@ export default function CardScanPastePage() {
             {text.length.toLocaleString("de-DE")} <span className="text-foreground-subtle/50">/ 10.000</span>
           </span>
           {text.length > 10_000 && (
-            <span className="text-[10px] text-red-600 font-medium">Zu lang</span>
+            <span className="text-[10px] text-error font-medium">Zu lang</span>
           )}
         </div>
 
         {error && (
-          <div className="mt-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700 text-sm">
+          <div className="mt-4 p-3 rounded-md bg-error-bg border border-error-border text-error text-sm">
             {error}
           </div>
         )}

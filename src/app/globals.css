@@ -96,6 +96,79 @@
   /* Timeline: status-colors are used for workflow-state transitions (abgleich/freigabe).
      Info-events (dok, kommentar) reference the neutral text-* tokens directly —
      no dedicated timeline tokens, since they would be mere aliases. */
+
+  /* Bestellungsart — material/subunternehmer/abo Sub-Categories.
+   * Visual hint in tables and badges to distinguish workflow types.
+   */
+  --bestellungsart-material: #6b6b6b;
+  --bestellungsart-material-bg: #f5f5f5;
+  --bestellungsart-material-text: #4b5563;
+
+  --bestellungsart-subunternehmer: #0e7490;
+  --bestellungsart-subunternehmer-bg: #ecfeff;       /* cyan-50 */
+  --bestellungsart-subunternehmer-text: #155e75;     /* cyan-800 */
+
+  --bestellungsart-abo: #6d28d9;
+  --bestellungsart-abo-bg: #f5f3ff;                  /* violet-50 */
+  --bestellungsart-abo-text: #5b21b6;                /* violet-800 */
+
+  /* CardScan-Sub-Brand — separates visual identity for Modul 02.
+   * Emerald-Akzent neben MR-Red. Plus 8-State-Machine.
+   */
+  --cs-accent: #10b981;          /* emerald-500 */
+  --cs-accent-light: #34d399;    /* emerald-400 */
+  --cs-accent-bg: #d1fae5;       /* emerald-100 */
+  --cs-accent-tint: #ecfdf5;     /* emerald-50 */
+  --cs-accent-text: #065f46;     /* emerald-800 */
+
+  --cs-pending: #8b8b8b;
+  --cs-pending-bg: #f5f5f5;
+  --cs-pending-text: #4b5563;
+
+  --cs-extracting: #2563eb;
+  --cs-extracting-bg: #eff6ff;
+  --cs-extracting-text: #1d4ed8;
+
+  --cs-review: #d97706;
+  --cs-review-bg: #fffbeb;
+  --cs-review-text: #b45309;
+
+  --cs-writing: #2563eb;
+  --cs-writing-bg: #eff6ff;
+  --cs-writing-text: #1d4ed8;
+
+  --cs-success: #059669;
+  --cs-success-bg: #ecfdf5;
+  --cs-success-text: #047857;
+
+  --cs-partial: #d97706;
+  --cs-partial-bg: #fffbeb;
+  --cs-partial-text: #b45309;
+
+  --cs-failed: #dc2626;
+  --cs-failed-bg: #fef2f2;
+  --cs-failed-text: #b91c1c;
+
+  --cs-discarded: #c4c2bf;
+  --cs-discarded-bg: #fafaf9;
+  --cs-discarded-text: #78716c;
+
+  /* Motion — natural easing curves (emil-design-eng / impeccable shared laws).
+   * No bounce, no elastic. Exit shorter than enter for snappy feel.
+   */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-circ: cubic-bezier(0, 0.55, 0.45, 1);
+
+  /* Z-Index Scale — documented layering for systemic UI surfaces.
+   * Use `z-[var(--z-…)]` or the Tailwind classes derived from @theme below.
+   */
+  --z-content: 10;
+  --z-sticky-inner: 20;
+  --z-sticky-page: 30;
+  --z-floating: 40;
+  --z-modal-overlay: 50;
+  --z-toast: 60;
 }
 
 /* ============================================
@@ -184,6 +257,54 @@
   --font-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
   --font-display: var(--font-barlow), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), "SF Mono", "Fira Code", monospace;
+
+  /* Bestellungsart */
+  --color-bestellungsart-material: var(--bestellungsart-material);
+  --color-bestellungsart-material-bg: var(--bestellungsart-material-bg);
+  --color-bestellungsart-material-text: var(--bestellungsart-material-text);
+  --color-bestellungsart-subunternehmer: var(--bestellungsart-subunternehmer);
+  --color-bestellungsart-subunternehmer-bg: var(--bestellungsart-subunternehmer-bg);
+  --color-bestellungsart-subunternehmer-text: var(--bestellungsart-subunternehmer-text);
+  --color-bestellungsart-abo: var(--bestellungsart-abo);
+  --color-bestellungsart-abo-bg: var(--bestellungsart-abo-bg);
+  --color-bestellungsart-abo-text: var(--bestellungsart-abo-text);
+
+  /* CardScan-Sub-Brand */
+  --color-cs-accent: var(--cs-accent);
+  --color-cs-accent-light: var(--cs-accent-light);
+  --color-cs-accent-bg: var(--cs-accent-bg);
+  --color-cs-accent-tint: var(--cs-accent-tint);
+  --color-cs-accent-text: var(--cs-accent-text);
+
+  --color-cs-pending: var(--cs-pending);
+  --color-cs-pending-bg: var(--cs-pending-bg);
+  --color-cs-pending-text: var(--cs-pending-text);
+  --color-cs-extracting: var(--cs-extracting);
+  --color-cs-extracting-bg: var(--cs-extracting-bg);
+  --color-cs-extracting-text: var(--cs-extracting-text);
+  --color-cs-review: var(--cs-review);
+  --color-cs-review-bg: var(--cs-review-bg);
+  --color-cs-review-text: var(--cs-review-text);
+  --color-cs-writing: var(--cs-writing);
+  --color-cs-writing-bg: var(--cs-writing-bg);
+  --color-cs-writing-text: var(--cs-writing-text);
+  --color-cs-success: var(--cs-success);
+  --color-cs-success-bg: var(--cs-success-bg);
+  --color-cs-success-text: var(--cs-success-text);
+  --color-cs-partial: var(--cs-partial);
+  --color-cs-partial-bg: var(--cs-partial-bg);
+  --color-cs-partial-text: var(--cs-partial-text);
+  --color-cs-failed: var(--cs-failed);
+  --color-cs-failed-bg: var(--cs-failed-bg);
+  --color-cs-failed-text: var(--cs-failed-text);
+  --color-cs-discarded: var(--cs-discarded);
+  --color-cs-discarded-bg: var(--cs-discarded-bg);
+  --color-cs-discarded-text: var(--cs-discarded-text);
+
+  /* Motion */
+  --ease-out-quart: var(--ease-out-quart);
+  --ease-out-expo: var(--ease-out-expo);
+  --ease-out-circ: var(--ease-out-circ);
 }
 
 /* ============================================
@@ -485,10 +606,11 @@ body {
   animation: shake 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Reduce Motion: alle Animationen deaktivieren */
+/* Reduce Motion: alle Animationen deaktivieren — auch Tailwind transition-* utilities */
 @media (prefers-reduced-motion: reduce) {
   .animate-scale-in,
   .animate-shake,
+  .animate-fade-in,
   .skeleton,
   .skeleton-text,
   .spinner,
@@ -496,6 +618,14 @@ body {
   .card-hover {
     animation: none !important;
     transition: none !important;
+  }
+
+  /* Catch-all für Tailwind-Transition-Utilities */
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

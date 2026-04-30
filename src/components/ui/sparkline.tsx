@@ -60,16 +60,22 @@ export function Sparkline({
   // Für Fill: Linie schließen zum Baseline (unten) und zurück
   const fillPath = `${linePath} L ${points[points.length - 1][0]} ${height} L ${points[0][0]} ${height} Z`;
 
+  // Default-Label enthält min/max-Werte für Screenreader-Kontext
+  const trend = data[data.length - 1]! >= data[0]! ? "steigend" : "fallend";
+  const computedLabel =
+    ariaLabel ??
+    `Trend mit ${data.length} Datenpunkten (${trend}, Minimum ${min.toLocaleString("de-DE")}, Maximum ${max.toLocaleString("de-DE")})`;
+
   return (
     <svg
       role="img"
-      aria-label={ariaLabel ?? `Trend mit ${data.length} Datenpunkten`}
+      aria-label={computedLabel}
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       className={className}
     >
-      {ariaLabel && <title>{ariaLabel}</title>}
+      <title>{computedLabel}</title>
       {fill && (
         <path d={fillPath} fill={color} fillOpacity={0.08} stroke="none" />
       )}

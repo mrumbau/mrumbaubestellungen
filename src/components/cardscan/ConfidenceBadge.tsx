@@ -1,32 +1,45 @@
 "use client";
 
+import { IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
+
 interface ConfidenceBadgeProps {
   score: number | undefined;
+  /** Wenn true: Prozentwert wird inline angezeigt (für mobile/visible Kontexte). Default: nur Icon, Prozentwert nur per Tooltip/aria-label. */
+  showPercent?: boolean;
 }
 
 /**
- * Zeigt einen farbigen Punkt neben einem Feld an, wenn die Confidence unter 0.8 liegt.
- * - >= 0.8: unsichtbar (kein Badge)
- * - 0.5 - 0.79: gelber Punkt (unsicher)
- * - < 0.5: roter Punkt (sehr unsicher)
+ * Konfidenz-Indikator für KI-extrahierte Felder.
+ *
+ * Color-not-only-konform (WCAG 1.4.1): Icon + Farbe + sr-only-Text statt nur farbiger Punkt.
+ * - >= 0.8: kein Badge (Feld ist sicher)
+ * - 0.5 – 0.79: Warning-Triangle (gelb, "unsicher")
+ * - < 0.5: Alert-Circle (rot, "sehr unsicher")
  */
-export function ConfidenceBadge({ score }: ConfidenceBadgeProps) {
+export function ConfidenceBadge({ score, showPercent = false }: ConfidenceBadgeProps) {
   if (score === undefined || score >= 0.8) return null;
 
   const isLow = score < 0.5;
-  const color = isLow ? "bg-red-500" : "bg-amber-400";
   const percent = Math.round(score * 100);
+  const Icon = isLow ? IconAlertCircle : IconAlertTriangle;
+  const colorClass = isLow ? "text-error" : "text-warning";
   const label = isLow
-    ? `Confidence ${percent} Prozent, sehr unsicher`
-    : `Confidence ${percent} Prozent, unsicher`;
+    ? `Konfidenz ${percent} Prozent, sehr unsicher`
+    : `Konfidenz ${percent} Prozent, unsicher`;
 
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full ${color} ml-1.5`}
+      className={`inline-flex items-center gap-1 ml-1.5 ${colorClass}`}
       role="img"
       aria-label={label}
       title={`${percent}%`}
-    />
+    >
+      <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+      {showPercent && (
+        <span className="text-[10px] font-medium font-mono-amount">{percent}%</span>
+      )}
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }
 
@@ -41,10 +54,10 @@ export function ConfidenceOverview({ overall }: ConfidenceOverviewProps) {
   const percent = Math.round(overall * 100);
   const bgColor =
     overall >= 0.8
-      ? "bg-emerald-600"
+      ? "bg-cs-success"
       : overall >= 0.5
-        ? "bg-amber-500"
-        : "bg-red-600";
+        ? "bg-warning"
+        : "bg-error";
 
   const description =
     overall >= 0.8
@@ -54,7 +67,7 @@ export function ConfidenceOverview({ overall }: ConfidenceOverviewProps) {
         : "Viele unsichere Felder – bitte sorgfältig prüfen";
 
   return (
-    <div className="card p-3 mb-6 flex items-center gap-3" role="status" aria-label={`Gesamt-Confidence: ${percent} Prozent`}>
+    <div className="card p-3 mb-6 flex items-center gap-3" role="status" aria-label={`Gesamt-Konfidenz: ${percent} Prozent`}>
       <div
         className={`w-10 h-10 rounded-md flex items-center justify-center text-white text-sm font-bold ${bgColor}`}
       >
@@ -62,7 +75,7 @@ export function ConfidenceOverview({ overall }: ConfidenceOverviewProps) {
       </div>
       <div>
         <p className="text-sm font-medium text-foreground">
-          Gesamt-Confidence
+          Gesamt-Konfidenz
         </p>
         <p className="text-xs text-foreground-subtle">{description}</p>
       </div>
