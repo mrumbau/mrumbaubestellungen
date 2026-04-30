@@ -119,10 +119,47 @@ export default function CardScanSuccessPage() {
   const router = useRouter();
   const [capture, setCapture] = useState<CardScanCapture | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/cardscan/captures/${id}`).then((r) => r.json()).then((j) => { if (j.data) setCapture(j.data); }).finally(() => setLoading(false));
   }, [id]);
+
+  // F5.4: Re-Try für teilweise fehlgeschlagene CRM-Writes.
+  // Backend create-customer ist idempotent (F7.3): existingCrm1CustomerId
+  // / existingCrm2CustomerId werden gelesen, nur fehlgeschlagene CRM wird
+  // erneut angesprochen. Doppelte Kunden werden NICHT erzeugt.
+  async function handleRetry() {
+    if (!capture) return;
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const finalData = capture.final_data || capture.extracted_data;
+      const res = await fetch("/api/cardscan/create-customer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          capture_id: capture.id,
+          final_data: finalData,
+          duplicate_override: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setRetryError(json.error || "Erneuter Versuch fehlgeschlagen.");
+        return;
+      }
+      // Capture neu laden, um aktualisierten CRM-Status anzuzeigen
+      const refreshRes = await fetch(`/api/cardscan/captures/${id}`);
+      const refreshJson = await refreshRes.json();
+      if (refreshJson.data) setCapture(refreshJson.data);
+    } catch {
+      setRetryError("Verbindungsfehler.");
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   // Haptik
   useEffect(() => {
@@ -183,6 +220,38 @@ export default function CardScanSuccessPage() {
         <CrmRow label="CRM 1" status={capture?.crm1_status || null} refNum={capture?.crm1_reference_number || null} error={capture?.crm1_error || null} />
         <div className="border-t border-line-subtle my-1" />
         <CrmRow label="CRM 2" status={capture?.crm2_status || null} refNum={capture?.crm2_reference_number || null} error={capture?.crm2_error || null} />
+
+        {/* Retry-Button bei Partial-Success: Backend ist idempotent (F7.3) */}
+        {(isPartial || isFailed) && capture?.status !== "writing" && (
+          <div className="border-t border-line-subtle mt-2 pt-3">
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium border border-line bg-input text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors disabled:opacity-50 disabled:cursor-wait min-h-[44px]"
+            >
+              {retrying ? (
+                <>
+                  <span className="spinner w-3.5 h-3.5" aria-hidden="true" />
+                  Wird wiederholt…
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.355m-19.0 4.992h4.992m9.075-4.992A8.249 8.249 0 0119.5 9.348M4.5 14.652A8.25 8.25 0 0017.5 19.5" />
+                  </svg>
+                  CRM-Write erneut versuchen
+                </>
+              )}
+            </button>
+            {retryError && (
+              <p className="mt-2 text-[11px] text-error" role="alert">{retryError}</p>
+            )}
+            <p className="mt-1.5 text-[10px] text-foreground-subtle leading-relaxed">
+              Bereits angelegte Kunden werden nicht doppelt erstellt — nur fehlgeschlagene CRMs werden erneut angesprochen.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ─── Projekt anlegen ──────────────────────────────────────── */}

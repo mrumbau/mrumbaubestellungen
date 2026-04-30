@@ -20,6 +20,39 @@ import { cn } from "@/lib/cn";
  * - role="status" on each toast.
  * - Close button has aria-label.
  * - prefers-reduced-motion is respected via globals.css.
+ *
+ * ────────────────────────────────────────────────────────────────────
+ * Feedback-Pattern Decision Matrix (use the right tool for the situation)
+ * ────────────────────────────────────────────────────────────────────
+ *
+ *   Toast — non-blocking, auto-dismiss (default 4s):
+ *     ✓ Success-Confirms ("Bestellung gespeichert")
+ *     ✓ Background-Action-Acknowledgements ("3 Bestellungen archiviert")
+ *     ✓ Soft-Errors that don't require user action
+ *     ✗ Form-Validation-Errors (use inline Alert/error-prop on Input)
+ *     ✗ Destructive-Confirm (use Modal/ConfirmDialog)
+ *
+ *   Inline Alert (`<Alert tone="error|warning|info|success">`):
+ *     ✓ Form-Level errors (Login: "E-Mail oder Passwort falsch")
+ *     ✓ Page-Level state-banner ("KI-Analyse läuft im Hintergrund…")
+ *     ✓ Persistent until user fixes the underlying issue
+ *     ✗ Transient confirms (use Toast)
+ *
+ *   Modal (`<Modal>` / `<ConfirmDialog>`):
+ *     ✓ Destructive-Confirm ("Bestellung wirklich löschen?")
+ *     ✓ Required user-input that blocks the flow
+ *     ✓ Multi-step wizard (DATEV-Export configuration)
+ *     ✗ Simple acknowledgements (use Toast)
+ *     ✗ Inline-Field-Errors (use Input.error prop)
+ *
+ *   Field-Error (`<Input error="…">` / `aria-invalid`):
+ *     ✓ Per-field validation feedback ("Mindestens 8 Zeichen")
+ *     ✓ Real-time on-blur validation
+ *     ✗ Form-Submit-Errors (use Alert above the form)
+ *
+ * Don't mix patterns: a destructive action either uses ConfirmDialog OR a
+ * toast with an "Undo"-action — not both. A field-error inline OR an alert
+ * above the form — not both.
  */
 
 type ToastTone = "success" | "error" | "warning" | "info";
