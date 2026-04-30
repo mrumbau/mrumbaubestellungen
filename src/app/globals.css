@@ -305,6 +305,13 @@
   --ease-out-quart: var(--ease-out-quart);
   --ease-out-expo: var(--ease-out-expo);
   --ease-out-circ: var(--ease-out-circ);
+
+  /* Tailwind Default-Override: alle `transition-*`-Utilities nutzen ab jetzt
+   * ease-out-quart statt Tailwind's Default ease-in-out.
+   * Dynamischeres Feel ohne per-Komponente-Migration (F8.8).
+   * Pro Komponente kann via `[transition-timing-function:linear]` o.ä. overridden werden.
+   */
+  --default-transition-timing-function: var(--ease-out-quart);
 }
 
 /* ============================================

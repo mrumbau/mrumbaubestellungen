@@ -72,7 +72,7 @@ function ProjectCreateCard({
         <input
           type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
           placeholder="Projektname"
-          className="flex-1 py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-brand min-h-[44px]"
+          className="flex-1 py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-sm focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
         />
         <button
           onClick={handleCreate} disabled={creating || !projectName.trim()}

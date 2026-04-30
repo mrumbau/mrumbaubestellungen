@@ -296,12 +296,12 @@ export function BuchhaltungClient({
                 <div>
                   <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Von</label>
                   <input type="date" value={datevVon} onChange={(e) => setDatevVon(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Bis</label>
                   <input type="date" value={datevBis} onChange={(e) => setDatevBis(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </div>
               </div>
 
@@ -326,7 +326,7 @@ export function BuchhaltungClient({
                 <div>
                   <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Projekt (optional)</label>
                   <select value={datevProjekt} onChange={(e) => setDatevProjekt(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30">
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]">
                     <option value="">Alle Projekte</option>
                     {projekte.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -356,13 +356,13 @@ export function BuchhaltungClient({
                         <label className="block text-[11px] text-foreground-muted mb-1">Berater-Nr.</label>
                         <input type="text" value={datevBeraterNr} onChange={(e) => setDatevBeraterNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
                           maxLength={7} placeholder="231925"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
                       </div>
                       <div>
                         <label className="block text-[11px] text-foreground-muted mb-1">Mandanten-Nr.</label>
                         <input type="text" value={datevMandantenNr} onChange={(e) => setDatevMandantenNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
                           maxLength={7} placeholder="30086"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -370,13 +370,13 @@ export function BuchhaltungClient({
                         <label className="block text-[11px] text-foreground-muted mb-1">Gegenkonto</label>
                         <input type="text" value={datevGegenKonto} onChange={(e) => setDatevGegenKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
                           maxLength={4} placeholder="4980"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
                       </div>
                       <div>
                         <label className="block text-[11px] text-foreground-muted mb-1">Aufwandskonto</label>
                         <input type="text" value={datevAufwandsKonto} onChange={(e) => setDatevAufwandsKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
                           maxLength={4} placeholder="Optional"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30" />
+                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
                       </div>
                     </div>
                   </div>
@@ -503,7 +503,7 @@ export function BuchhaltungClient({
           <select
             value={artFilter}
             onChange={(e) => setArtFilter(e.target.value as "alle" | "material" | "subunternehmer")}
-            className="px-3 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
+            className="px-3 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
           >
             <option value="alle">Alle Arten</option>
             <option value="material">Material</option>
@@ -519,7 +519,7 @@ export function BuchhaltungClient({
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               placeholder="Suche nach Bestellnummer, Händler..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
             />
           </div>
           {tab === "bezahlt" && !selectionMode && (

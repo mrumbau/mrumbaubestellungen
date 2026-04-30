@@ -620,7 +620,7 @@ export function KundenClient({
                   <input
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                     placeholder="z.B. Familie Müller"
                     autoFocus
                   />
@@ -630,7 +630,7 @@ export function KundenClient({
                   <input
                     value={formKuerzel}
                     onChange={(e) => setFormKuerzel(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                     placeholder="z.B. MUE"
                   />
                 </div>
@@ -641,7 +641,7 @@ export function KundenClient({
                 <input
                   value={formAdresse}
                   onChange={(e) => setFormAdresse(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   placeholder="Straße Nr, PLZ Ort"
                 />
               </div>
@@ -655,7 +655,7 @@ export function KundenClient({
                     autoComplete="email"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
                 <div>
@@ -666,7 +666,7 @@ export function KundenClient({
                     autoComplete="tel"
                     value={formTelefon}
                     onChange={(e) => setFormTelefon(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
               </div>
@@ -677,7 +677,7 @@ export function KundenClient({
                   value={formNotizen}
                   onChange={(e) => setFormNotizen(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 resize-none"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
                   placeholder="Interne Notizen..."
                 />
               </div>
@@ -698,7 +698,7 @@ export function KundenClient({
                   value={formKeywordInput}
                   onChange={(e) => setFormKeywordInput(e.target.value)}
                   onKeyDown={handleKeywordAdd}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   placeholder="Keyword eingeben + Enter"
                 />
               </div>

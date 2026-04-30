@@ -706,7 +706,7 @@ export function ProjekteClient({
                 <input
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   placeholder="z.B. Umbau Müller Garage"
                   autoFocus
                 />
@@ -718,7 +718,7 @@ export function ProjekteClient({
                   value={formBeschreibung}
                   onChange={(e) => setFormBeschreibung(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30 resize-none"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
                   placeholder="Optionale Beschreibung..."
                 />
               </div>
@@ -749,7 +749,7 @@ export function ProjekteClient({
                 <select
                   value={formKundenId || ""}
                   onChange={(e) => setFormKundenId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                 >
                   <option value="">Kein Kunde zugeordnet</option>
                   {kunden.map((k) => (
@@ -764,7 +764,7 @@ export function ProjekteClient({
                   type="number"
                   value={formBudget}
                   onChange={(e) => setFormBudget(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:ring-2 focus:ring-brand/15 focus:border-brand/30"
+                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   placeholder="Optional"
                   min="0"
                   step="0.01"

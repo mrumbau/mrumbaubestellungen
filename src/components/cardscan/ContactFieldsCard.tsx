@@ -78,7 +78,7 @@ export function ContactFieldsCard({
                 <select
                   value={value}
                   onChange={(e) => onChange(field.key, e.target.value)}
-                  className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand"
+                  className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 >
                   {field.options?.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -100,7 +100,7 @@ export function ContactFieldsCard({
                 type="text"
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
-                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand"
+                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 placeholder={`${field.label}…`}
               />
             </label>

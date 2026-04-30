@@ -260,7 +260,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 bg-surface border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
+                className="w-full px-4 py-3.5 bg-surface border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors min-h-[48px]"
                 placeholder="name@mrumbau.de"
               />
             </div>
@@ -277,7 +277,7 @@ function LoginForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full pl-4 pr-12 py-3.5 bg-surface border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-colors min-h-[48px]"
+                  className="w-full pl-4 pr-12 py-3.5 bg-surface border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors min-h-[48px]"
                   placeholder="Passwort eingeben"
                 />
                 <button

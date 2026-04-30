@@ -430,31 +430,31 @@ export default function CardScanReviewPage() {
               {formData.letterSalutation !== undefined && (
                 <label className="block">
                   <span className="text-xs text-foreground-muted">Briefanrede</span>
-                  <input type="text" value={formData.letterSalutation || ""} onChange={(e) => updateField("letterSalutation", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
+                  <input type="text" value={formData.letterSalutation || ""} onChange={(e) => updateField("letterSalutation", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </label>
               )}
               {formData.fax !== undefined && (
                 <label className="block">
                   <span className="text-xs text-foreground-muted">Fax</span>
-                  <input type="text" value={formData.fax || ""} onChange={(e) => updateField("fax", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
+                  <input type="text" value={formData.fax || ""} onChange={(e) => updateField("fax", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </label>
               )}
               {formData.website !== undefined && (
                 <label className="block">
                   <span className="text-xs text-foreground-muted">Webseite</span>
-                  <input type="text" value={formData.website || ""} onChange={(e) => updateField("website", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
+                  <input type="text" value={formData.website || ""} onChange={(e) => updateField("website", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </label>
               )}
               {formData.vatId !== undefined && (
                 <label className="block">
                   <span className="text-xs text-foreground-muted">USt-IdNr.</span>
-                  <input type="text" value={formData.vatId || ""} onChange={(e) => updateField("vatId", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
+                  <input type="text" value={formData.vatId || ""} onChange={(e) => updateField("vatId", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </label>
               )}
               {formData.notes !== undefined && (
                 <label className="block">
                   <span className="text-xs text-foreground-muted">Notizen</span>
-                  <input type="text" value={formData.notes || ""} onChange={(e) => updateField("notes", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus:ring-2 focus:ring-brand" />
+                  <input type="text" value={formData.notes || ""} onChange={(e) => updateField("notes", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]" />
                 </label>
               )}
             </div>
