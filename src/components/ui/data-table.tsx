@@ -205,6 +205,8 @@ export function DataTable<TRow>({
   const [focusedRowId, setFocusedRowId] = React.useState<string | null>(null);
   // Anchor for shift-click / shift-arrow range selection
   const [lastToggledIndex, setLastToggledIndex] = React.useState<number | null>(null);
+  // Live-region announcement for shift-range-select feedback (a11y)
+  const [liveAnnouncement, setLiveAnnouncement] = React.useState<string>("");
 
   // If the focused row disappears (after filter/sort/delete), drop the focus.
   React.useEffect(() => {
@@ -247,6 +249,13 @@ export function DataTable<TRow>({
         next.add(getRowId(data[i]));
       }
       onSelectionChange(next);
+      // a11y: Range-Select kommuniziert sich sonst nicht — Screenreader-Hinweis
+      const count = hi - lo + 1;
+      setLiveAnnouncement(
+        `Bereich von Zeile ${lo + 1} bis Zeile ${hi + 1} ausgewählt (${count} ${
+          count === 1 ? "Eintrag" : "Einträge"
+        })`,
+      );
     },
     [data, getRowId, onSelectionChange, selection, selectionEnabled],
   );
@@ -363,6 +372,10 @@ export function DataTable<TRow>({
 
   return (
     <div className={cn("card overflow-hidden", className)}>
+      {/* Screenreader-only live-region für Range-Select-Feedback (F3.10 / WCAG 4.1.3) */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {liveAnnouncement}
+      </div>
       <div className="overflow-x-auto">
         <table
           className={cn("w-full", tableClassName)}
@@ -617,6 +630,22 @@ function SortIndicator({
   );
 }
 
+/**
+ * Deterministische Skeleton-Width pro Spalten-Alignment + Row-Index.
+ * Ersetzt das ehemalige `(i*7+col.key.length)%50`-Pseudo-Random, das
+ * Misleading-Widths erzeugen konnte (kurze Skeletons für breite Spalten).
+ *
+ * Pattern:
+ * - rechtsbündig (Beträge, Datum) → schmaler (35-50%) — passt zu Kurz-Strings
+ * - linksbündig (Text, Namen)     → breiter (50-80%) — passt zu Long-Strings
+ * - alterniert leicht per Row-Index für visuelles Rhythmus
+ */
+function skeletonWidth(align: "left" | "right" | "center" | undefined, rowIndex: number): string {
+  if (align === "right") return `${35 + (rowIndex % 3) * 5}%`; // 35/40/45%
+  if (align === "center") return `${30 + (rowIndex % 2) * 10}%`; // 30/40%
+  return `${55 + (rowIndex % 4) * 5}%`; // 55/60/65/70% (left/default)
+}
+
 function SkeletonBody<TRow>({
   rowCount,
   density,
@@ -650,7 +679,7 @@ function SkeletonBody<TRow>({
                   "h-3 skeleton-text rounded",
                   col.align === "right" ? "ml-auto" : "",
                 )}
-                style={{ width: `${40 + ((i * 7 + col.key.length) % 50)}%` }}
+                style={{ width: skeletonWidth(col.align, i) }}
               />
             </td>
           ))}

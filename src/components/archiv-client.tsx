@@ -198,6 +198,24 @@ export function ArchivClient({
     });
   }
 
+  /**
+   * Batch-toggle einer ganzen Gruppe (z.B. ein Monat).
+   * Single setState statt O(n) toggleSelect-Loop — verhindert Renders-Storm
+   * bei großen Gruppen (F3.12).
+   */
+  function toggleGroupItems(ids: string[]) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) {
+        for (const id of ids) next.delete(id);
+      } else {
+        for (const id of ids) next.add(id);
+      }
+      return next;
+    });
+  }
+
   function exitSelectionMode() {
     setSelectionMode(false);
     setSelectedIds(new Set());
@@ -491,6 +509,7 @@ export function ArchivClient({
             selectionMode={selectionMode}
             selectedIds={selectedIds}
             toggleSelect={toggleSelect}
+            toggleGroupItems={toggleGroupItems}
           />
         )}
 
@@ -506,6 +525,7 @@ export function ArchivClient({
             selectionMode={selectionMode}
             selectedIds={selectedIds}
             toggleSelect={toggleSelect}
+            toggleGroupItems={toggleGroupItems}
           />
         )}
       </div>
@@ -811,6 +831,7 @@ function OrdersTab({
   selectionMode = false,
   selectedIds = new Set(),
   toggleSelect,
+  toggleGroupItems,
 }: {
   orders: PaidBestellung[];
   dokumenteMap: Record<string, Dokument[]>;
@@ -822,6 +843,7 @@ function OrdersTab({
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   toggleSelect?: (id: string) => void;
+  toggleGroupItems?: (ids: string[]) => void;
 }) {
   const monthGroups = useMemo(() => groupByMonth(orders, "bezahlt_am"), [orders]);
   const dokConfig = DOKUMENT_CONFIG[type];
@@ -852,16 +874,11 @@ function OrdersTab({
                     <th className="px-3 py-3 w-10">
                       <input
                         type="checkbox"
+                        aria-label="Alle Einträge dieser Gruppe auswählen"
                         checked={group.items.length > 0 && group.items.every((o) => selectedIds.has(o.id))}
                         onChange={() => {
-                          const allSelected = group.items.every((o) => selectedIds.has(o.id));
-                          const next = new Set(selectedIds);
-                          group.items.forEach((o) => { if (allSelected) next.delete(o.id); else next.add(o.id); });
-                          // We need to call toggleSelect for each — but since we have direct set access via parent, use a workaround
-                          group.items.forEach((o) => {
-                            if (allSelected && selectedIds.has(o.id)) toggleSelect?.(o.id);
-                            else if (!allSelected && !selectedIds.has(o.id)) toggleSelect?.(o.id);
-                          });
+                          // F3.12: Single setState statt O(n) Render-Storm
+                          toggleGroupItems?.(group.items.map((o) => o.id));
                         }}
                         className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
                       />

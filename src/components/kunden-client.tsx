@@ -19,6 +19,7 @@ import {
   type Density,
 } from "@/components/ui";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
+import { deepEqual } from "@/lib/deep-equal";
 import { IconCheck, IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
@@ -99,9 +100,7 @@ export function KundenClient({
   const currentConfig: KundenViewConfig = { viewMode, density, sort };
   const activeCfg =
     activeViewId && savedViews.views.find((v) => v.id === activeViewId)?.config;
-  const currentConfigIsDirty = activeCfg
-    ? JSON.stringify(activeCfg) !== JSON.stringify(currentConfig)
-    : false;
+  const currentConfigIsDirty = activeCfg ? !deepEqual(activeCfg, currentConfig) : false;
 
   // Form state
   const [formName, setFormName] = useState("");

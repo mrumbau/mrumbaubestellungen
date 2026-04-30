@@ -30,6 +30,7 @@ import {
   IconDownload,
 } from "@/components/ui/icons";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
+import { deepEqual } from "@/lib/deep-equal";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Bestellung {
@@ -188,7 +189,7 @@ export function BestellungenTabelle({
   const activeViewConfig =
     activeViewId && savedViews.views.find((v) => v.id === activeViewId)?.config;
   const currentConfigIsDirty = activeViewConfig
-    ? JSON.stringify(activeViewConfig) !== JSON.stringify(currentConfig)
+    ? !deepEqual(activeViewConfig, currentConfig)
     : false;
 
   // Async UI state

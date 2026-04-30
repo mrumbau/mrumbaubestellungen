@@ -10,7 +10,7 @@ import {
   IconChevronDown,
 } from "@/components/ui/icons";
 import { CollapsibleWidget } from "./collapsible-widget";
-import type { Abgleich, Bestellung, DuplikatResult, KatResult } from "./types";
+import type { Abgleich, Bestellung, DuplikatResult, KatResult, WidgetId } from "./types";
 
 /**
  * AIToolsPanel — consolidated "KI-Tools" sidebar widget.

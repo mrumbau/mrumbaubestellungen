@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CollapsibleWidget } from "./collapsible-widget";
-import type { Kommentar } from "./types";
+import type { Kommentar, WidgetId } from "./types";
 
 /**
  * CommentsThread — collapsible comment list + inline input.
@@ -27,7 +27,7 @@ export function CommentsThread({
   kommentare: Kommentar[];
   loading: boolean;
   onSubmit: (text: string) => Promise<boolean>;
-  widgetId: "kommentare" | "m-kommentare";
+  widgetId: Extract<WidgetId, "kommentare" | "m-kommentare">;
   openWidgetId?: string | null;
   onToggleWidget?: (id: string) => void;
   mode?: "collapsible" | "always-open";

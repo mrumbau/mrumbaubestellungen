@@ -19,6 +19,7 @@ import {
   type Density,
 } from "@/components/ui";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
+import { deepEqual } from "@/lib/deep-equal";
 import { IconEdit, IconPlus, IconFolderOpen } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
@@ -231,9 +232,7 @@ export function ProjekteClient({
   const currentConfig: ProjekteViewConfig = { viewMode, density, sort };
   const activeCfg =
     activeViewId && savedViews.views.find((v) => v.id === activeViewId)?.config;
-  const currentConfigIsDirty = activeCfg
-    ? JSON.stringify(activeCfg) !== JSON.stringify(currentConfig)
-    : false;
+  const currentConfigIsDirty = activeCfg ? !deepEqual(activeCfg, currentConfig) : false;
 
   function applyView(view: { id: string; config: ProjekteViewConfig }) {
     setViewMode(view.config.viewMode);

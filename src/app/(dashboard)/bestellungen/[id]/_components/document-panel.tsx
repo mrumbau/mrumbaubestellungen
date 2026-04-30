@@ -63,8 +63,8 @@ export function DocumentPanel({
 
   return (
     <div className="flex-1 card flex flex-col overflow-hidden relative">
-      {/* Tabs */}
-      <div role="tablist" aria-label="Dokument-Typen" className="flex border-b border-line">
+      {/* Tabs — overflow-x-auto verhindert Text-Crush auf Mobile bei 6 Tabs */}
+      <div role="tablist" aria-label="Dokument-Typen" className="flex border-b border-line overflow-x-auto scrollbar-hide">
         {dokTabs.map((tab) => {
           const dok = dokumente.find((d) => d.typ === tab.key);
           const isActive = activeTab === tab.key;
@@ -80,7 +80,7 @@ export function DocumentPanel({
                 setArtikelDrawerOpen(false);
               }}
               className={cn(
-                "relative flex items-center gap-2 px-5 py-3.5 text-[12px] font-medium transition-colors",
+                "relative flex items-center gap-2 px-5 py-3.5 text-[12px] font-medium transition-colors shrink-0 whitespace-nowrap",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 isActive
                   ? "text-brand bg-surface"
@@ -169,11 +169,21 @@ export function DocumentPanel({
         )}
       >
         {aktivesDokument?.storage_pfad ? (
-          <iframe
-            src={`/api/pdfs/${aktivesDokument.id}`}
-            className="w-full h-full"
-            title={`${dokTabs.find((t) => t.key === activeTab)?.label} PDF`}
-          />
+          <>
+            <iframe
+              src={`/api/pdfs/${aktivesDokument.id}`}
+              className="w-full h-full"
+              title={`PDF: ${dokTabs.find((t) => t.key === activeTab)?.label ?? "Dokument"}`}
+            />
+            <noscript>
+              <a
+                href={`/api/pdfs/${aktivesDokument.id}`}
+                className="absolute inset-0 flex items-center justify-center bg-canvas text-foreground underline"
+              >
+                PDF herunterladen
+              </a>
+            </noscript>
+          </>
         ) : aktivesDokument ? (
           <ExtractedDocument
             dokument={aktivesDokument}
@@ -524,17 +534,17 @@ function ArticleDrawer({
   if (!dokument.artikel) return null;
   return (
     <>
+      {/* Sticky-Bottom-Toggle: keine Position-Toggle = kein Layout-Shift beim Öffnen/Schließen */}
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         className={cn(
-          "absolute bottom-0 left-0 right-0 flex items-center justify-center gap-2 py-2",
+          "sticky bottom-0 left-0 right-0 flex items-center justify-center gap-2 py-2 w-full",
           "bg-surface/95 backdrop-blur-sm border-t border-line",
           "hover:bg-surface-hover transition-colors z-20",
           "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
         )}
-        style={open ? { position: "relative" } : {}}
       >
         <IconChevronDown
           className={cn(

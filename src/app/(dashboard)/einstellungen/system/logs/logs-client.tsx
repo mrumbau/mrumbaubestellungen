@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
-import { IconActivity } from "@/components/ui/icons";
+import { IconActivity, IconSearch } from "@/components/ui/icons";
 
 export type WebhookLog = {
   id: string;
@@ -26,12 +26,21 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
   const { toast } = useToast();
   const [logs, setLogs] = useState<WebhookLog[]>(initialLogs);
   const [filter, setFilter] = useState<Filter>("alle");
+  const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const filtered =
-    filter === "alle"
-      ? logs
-      : logs.filter((l) => (filter === "error" ? l.status === "error" : l.status === "info"));
+  const filtered = logs.filter((l) => {
+    // Status-Filter
+    if (filter === "error" && l.status !== "error") return false;
+    if (filter === "info" && l.status !== "info") return false;
+    // Such-Filter (bestellnummer + fehler_text + typ)
+    if (search) {
+      const q = search.toLowerCase();
+      const haystack = `${l.bestellnummer ?? ""} ${l.fehler_text ?? ""} ${l.typ}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
 
   const errorCount = logs.filter((l) => l.status === "error").length;
   const infoCount = logs.filter((l) => l.status === "info").length;
@@ -84,7 +93,7 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
       />
 
       <SectionCard padding="none" headerBorder={false}>
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-line-subtle">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-line-subtle flex-wrap">
           <div
             role="tablist"
             aria-label="Log-Filter"
@@ -107,6 +116,17 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
               label={`Info · ${infoCount}`}
             />
           </div>
+          <label className="relative flex-1 min-w-[220px] max-w-md">
+            <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-subtle pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Bestellnummer / Fehlertext / Typ"
+              aria-label="Logs durchsuchen"
+              className="w-full h-8 pl-8 pr-3 text-[12px] bg-canvas border border-line-subtle rounded-md text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-brand focus:shadow-[var(--shadow-focus-ring)]"
+            />
+          </label>
         </div>
         {filtered.length === 0 ? (
           <EmptyState

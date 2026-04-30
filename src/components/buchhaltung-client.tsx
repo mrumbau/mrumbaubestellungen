@@ -315,7 +315,7 @@ export function BuchhaltungClient({
                 ].map((btn) => (
                   <button key={btn.label} type="button" onClick={btn.fn}
                     // eslint-disable-next-line no-restricted-syntax -- DATEV quick-range hover darker than canvas, no matching token; revisit when these buttons migrate to <Button variant="secondary">.
-                    className="px-2.5 py-1 text-[11px] font-medium text-foreground-muted bg-canvas border border-line rounded-md hover:bg-[#ebe9e6] hover:text-foreground transition-colors">
+                    className="px-2.5 py-1 text-[11px] font-medium text-foreground-muted bg-canvas border border-line rounded-md hover:bg-input hover:text-foreground transition-colors">
                     {btn.label}
                   </button>
                 ))}

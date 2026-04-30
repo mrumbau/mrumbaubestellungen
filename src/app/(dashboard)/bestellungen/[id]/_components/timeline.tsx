@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { CollapsibleWidget } from "./collapsible-widget";
 import { timelineColor } from "@/lib/timeline-config";
-import type { Abgleich, Dokument, Freigabe, Kommentar } from "./types";
+import type { Abgleich, Dokument, Freigabe, Kommentar, WidgetId } from "./types";
 
 /**
  * Timeline — aggregated activity feed for a single Bestellung.
@@ -29,7 +29,7 @@ export function Timeline({
   abgleich: Abgleich | null;
   freigabe: Freigabe | null;
   kommentare: Kommentar[];
-  widgetId: "timeline" | "m-timeline";
+  widgetId: Extract<WidgetId, "timeline" | "m-timeline">;
   openWidgetId: string | null;
   onToggleWidget: (id: string) => void;
 }) {

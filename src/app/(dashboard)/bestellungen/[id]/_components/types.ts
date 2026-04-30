@@ -114,3 +114,16 @@ export type KatResult = {
   kategorien: { artikel: string; kategorie: string }[];
   zusammenfassung: Record<string, number>;
 };
+
+/**
+ * Widget-IDs für die kollabierbaren Sidebar/Mobile-Widgets.
+ * Desktop-Sidebar und Mobile-Details haben separate Accordion-Gruppen,
+ * deshalb sind die IDs explizit doppelt (Desktop vs. mobile-prefix `m-`).
+ */
+export type WidgetId =
+  | "timeline"
+  | "kommentare"
+  | "ki-tools"
+  | "m-timeline"
+  | "m-kommentare"
+  | "m-ki-tools";

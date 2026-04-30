@@ -21,6 +21,7 @@ import type {
   Kommentar,
   ProjektOption,
   SubunternehmerInfo,
+  WidgetId,
 } from "./types";
 import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
 
@@ -69,6 +70,8 @@ export function BestelldetailShell({
   );
 
   // Shared accordion-open-state — opening one widget closes the others.
+  // Domain-Doku: erlaubte WidgetIds in `types.ts` (`WidgetId`-Union),
+  // aber das State-Typing bleibt `string` damit CollapsibleWidget-Variance passt.
   const [openWidgetId, setOpenWidgetId] = useState<string | null>(null);
   const toggleWidget = (id: string) =>
     setOpenWidgetId((prev) => (prev === id ? null : id));
