@@ -17,6 +17,7 @@ import {
   useSavedViews,
   ActionMenu,
   EmptyState,
+  useToast,
   type DataTableColumn,
   type SortState,
   type Density,
@@ -122,6 +123,7 @@ export function BestellungenTabelle({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   // Filters
   const [suche, setSuche] = useState("");
@@ -311,9 +313,19 @@ export function BestellungenTabelle({
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+        toast.success("Bestellung freigegeben");
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      toast.error("Freigabe fehlgeschlagen", {
+        description: data?.error ?? "Bitte erneut versuchen.",
+      });
     } catch {
-      window.alert("Freigabe fehlgeschlagen. Bitte erneut versuchen.");
+      toast.error("Netzwerkfehler", {
+        description: "Freigabe konnte nicht gesendet werden.",
+      });
     } finally {
       setFreigabeLoadingId(null);
     }
@@ -367,7 +379,9 @@ export function BestellungenTabelle({
     try {
       const res = await fetch(`/api/pdfs/zip?bestellung_id=${bestellungId}`);
       if (!res.ok) {
-        window.alert("Fehler beim Herunterladen der Dokumente.");
+        toast.error("Download fehlgeschlagen", {
+          description: "Dokumente konnten nicht geladen werden.",
+        });
         return;
       }
       const blob = await res.blob();
@@ -382,7 +396,9 @@ export function BestellungenTabelle({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch {
-      window.alert("Fehler beim Herunterladen der Dokumente.");
+      toast.error("Download fehlgeschlagen", {
+        description: "Netzwerkfehler — bitte erneut versuchen.",
+      });
     } finally {
       setDownloadingId(null);
     }
@@ -418,15 +434,21 @@ export function BestellungenTabelle({
         body: JSON.stringify({ bestellung_ids: Array.from(selected) }),
       });
       if (res.ok) {
+        const count = selected.size;
         setSelected(new Set());
         setShowDeleteDialog(false);
         router.refresh();
+        toast.success(`${count} ${count === 1 ? "Bestellung entfernt" : "Bestellungen entfernt"}`);
       } else {
         const data = await res.json().catch(() => ({}));
-        window.alert(data.error || "Fehler beim Löschen der Bestellungen");
+        toast.error("Löschen fehlgeschlagen", {
+          description: data.error || "Bitte erneut versuchen.",
+        });
       }
     } catch {
-      window.alert("Netzwerkfehler beim Löschen der Bestellungen");
+      toast.error("Netzwerkfehler", {
+        description: "Bestellungen konnten nicht gelöscht werden.",
+      });
     } finally {
       setDeleteLoading(false);
     }

@@ -384,9 +384,13 @@ export function useBestelldetail({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mahnung_am: null, mahnung_count: 0 }),
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+        return;
+      }
+      setActionError("Mahnung konnte nicht quittiert werden. Bitte erneut versuchen.");
     } catch {
-      /* ignore — banner stays until next refresh */
+      setActionError("Netzwerkfehler beim Quittieren der Mahnung.");
     }
   }, [bestellungId, router]);
 

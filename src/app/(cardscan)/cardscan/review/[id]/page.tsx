@@ -117,9 +117,11 @@ export default function CardScanReviewPage() {
           setTimeout(() => setAutoSaveStatus("idle"), 2000);
         } else {
           setAutoSaveStatus("error");
+          setError("Änderungen konnten nicht automatisch gespeichert werden. Beim Anlegen wird der aktuelle Stand verwendet.");
         }
       } catch {
         setAutoSaveStatus("error");
+        setError("Verbindung unterbrochen — Auto-Speichern pausiert.");
       }
     }, 1500);
     return () => clearTimeout(timer);
@@ -172,8 +174,21 @@ export default function CardScanReviewPage() {
   }
 
   async function handleDiscard() {
-    try { await fetch(`/api/cardscan/captures/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "discarded" }) }); } catch {}
-    router.push("/cardscan");
+    setError(null);
+    try {
+      const res = await fetch(`/api/cardscan/captures/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "discarded" }),
+      });
+      if (!res.ok) {
+        setError("Verwerfen fehlgeschlagen. Bitte erneut versuchen.");
+        return;
+      }
+      router.push("/cardscan");
+    } catch {
+      setError("Netzwerkfehler beim Verwerfen.");
+    }
   }
 
   // ─── Loading ────────────────────────────────────────────────────

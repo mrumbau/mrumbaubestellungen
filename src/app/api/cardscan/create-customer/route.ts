@@ -85,7 +85,12 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    // Capture auf 'writing' setzen – nur wenn Status noch 'review' ist (verhindert doppelte Verarbeitung)
+    // Capture auf 'writing' setzen – nur aus retry-fähigen Status:
+    //   review          — Erstanlage nach Bestätigung
+    //   failed          — Beide CRMs failed → kompletter Re-Try
+    //   partial_success — CRM1 ok, CRM2 down → selektiver Re-Try via F7.3-Idempotenz
+    //                     (UI zeigt Retry-Button bei partial_success — ohne diesen
+    //                     Status hier landet jeder Retry in 409, broken core flow)
     const { data: updatedCapture, error: updateError } = await serviceClient
       .from("cardscan_captures")
       .update({
@@ -96,7 +101,7 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", capture_id)
       .eq("user_id", user.id)
-      .in("status", ["review", "failed"])
+      .in("status", ["review", "failed", "partial_success"])
       .select("id")
       .maybeSingle();
 
