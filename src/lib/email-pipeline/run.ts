@@ -386,9 +386,28 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzelMutable).maybeSingle();
 
   // 12. Bestellung finden oder erstellen
-  const erkannteBestellnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer);
+  let erkannteBestellnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.bestellnummer)?.analyse.bestellnummer);
   const erkannteAuftragsnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer);
   const erkannteLieferscheinnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer);
+
+  // F5.X Fix: Amazon-Body-Pattern als Fallback. Amazon-Bestätigungen haben die
+  // Bestellnummer NICHT im Subject ("Deine Amazon.de Bestellung von ..."), nur
+  // im Body. Pipeline-KI extrahiert sie nicht zuverlässig — Regex-Fallback
+  // reduziert anonyme Backfill-Bestellungen drastisch.
+  // Pattern: "302-0733687-4332321" oder "305-5460716-6276353" etc.
+  if (!erkannteBestellnummer) {
+    const amazonPattern = /\b\d{3}-\d{7}-\d{7}\b/;
+    const subjectMatch = (email_betreff ?? "").match(amazonPattern);
+    const bodyMatch = (input.email_text ?? input.email_body ?? "").match(amazonPattern);
+    const fallbackNummer = subjectMatch?.[0] ?? bodyMatch?.[0] ?? null;
+    if (fallbackNummer) {
+      erkannteBestellnummer = safeBestellnummer(fallbackNummer);
+      logInfo("webhook/email", `Bestellnummer-Body-Fallback gegriffen (Amazon-Pattern): ${fallbackNummer}`, {
+        email_betreff,
+      });
+    }
+  }
+
   const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer].filter((n): n is string => !!n);
 
   // GPT-Bestellnummer-Nachlauf für Besteller-Match
@@ -429,22 +448,55 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     existierendeBestellung = await findByFuzzyNumber(supabase, suchNummern, matchCtx);
   }
 
-  // Duplikat-Typ-Check (gleicher Dokumenttyp existiert schon)
+  // Duplikat-Typ-Check (gleicher Dokumenttyp existiert schon).
+  //
+  // Drei Fälle:
+  //   1. Existierende hat hat_typ=true UND validen Doku-Record mit PDF
+  //      → Multi-Slot: zusätzlicher Doku-Record (z.B. Amazon Teil-Rechnung 2)
+  //   2. Existierende hat hat_typ=true ABER nur Doku-Records ohne PDF
+  //      → Anreichern: alte (PDF-lose) Doku-Records ersetzen mit neuem PDF
+  //   3. Existierende hat hat_typ=true OHNE jeden Doku-Record (Make.com-Erbe)
+  //      → Anreichern: neuer Doku-Record wird angefügt
   if (existierendeBestellung) {
     const hauptTyp = analyseErgebnisse
       .filter((e) => BEKANNTE_TYPEN.includes(e.analyse.typ))
       .map((e) => e.analyse.typ)[0];
     const flagKey = hauptTyp ? FLAG_MAP[hauptTyp] : null;
     if (flagKey && existierendeBestellung[flagKey as keyof BestellungRow]) {
-      logInfo("webhook/email", `Duplikat verworfen: Bestellung hat bereits ${hauptTyp}`, {
-        bestellungId: existierendeBestellung.id, bestellnummer: erkannteBestellnummer, typ: hauptTyp,
-      });
-      return {
-        success: true,
-        skipped: true,
-        reason: "duplikat_typ_existiert",
-        bestellung_id: existierendeBestellung.id,
-      };
+      const { data: existingDoku } = await supabase
+        .from("dokumente")
+        .select("id, storage_pfad")
+        .eq("bestellung_id", existierendeBestellung.id)
+        .eq("typ", hauptTyp);
+
+      const dokuMitPdf = (existingDoku ?? []).filter((d) => d.storage_pfad !== null);
+      const dokuOhnePdf = (existingDoku ?? []).filter((d) => d.storage_pfad === null);
+
+      if (dokuMitPdf.length === 0) {
+        // Fall 2 oder 3: kein valider Doku-Record → die alten PDF-losen
+        // werden ersetzt, der neue Anhang-Insert läuft normal weiter.
+        if (dokuOhnePdf.length > 0) {
+          await supabase
+            .from("dokumente")
+            .delete()
+            .in("id", dokuOhnePdf.map((d) => d.id));
+          logInfo("webhook/email", `Anreicherung: ${dokuOhnePdf.length} alte ${hauptTyp}-Records ohne PDF wurden für Backfill mit neuem PDF ersetzt`, {
+            bestellungId: existierendeBestellung.id,
+          });
+        } else {
+          logInfo("webhook/email", `Anreicherung: hat_${hauptTyp}=true ohne dokumente-Record (Make.com-Erbe) — wird angefügt`, {
+            bestellungId: existierendeBestellung.id,
+          });
+        }
+        // Pipeline läuft weiter — kein skip.
+      } else {
+        // Fall 1: Multi-Slot. Neuer Doku-Record wird zusätzlich angelegt.
+        logInfo("webhook/email", `Multi-Slot: ${hauptTyp} bereits mit PDF vorhanden, neuer Anhang als zusätzlicher Doku-Record (z.B. Teil-Lieferung)`, {
+          bestellungId: existierendeBestellung.id,
+          existing_pdf_count: dokuMitPdf.length,
+        });
+        // Pipeline läuft weiter — kein skip.
+      }
     }
   }
 
