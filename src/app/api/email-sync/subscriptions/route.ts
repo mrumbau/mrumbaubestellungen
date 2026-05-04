@@ -10,8 +10,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { getBenutzerProfil, requireRoles } from "@/lib/auth";
 import { createSubscription } from "@/lib/microsoft-graph/subscriptions";
+import { GraphError } from "@/lib/microsoft-graph/client";
 import { logError, logInfo } from "@/lib/logger";
 import { ERRORS } from "@/lib/errors";
+
+/** Extrahiert die echte Microsoft-Error-Message aus einem GraphError-responseBody.
+ *  Microsoft 400/403 enthalten oft konkrete Hinweise (validation timeout,
+ *  notification URL unreachable, ungültige resource etc.) die im plain
+ *  `err.message` (nur Status + Code) nicht stehen. */
+function describeGraphError(err: unknown): string {
+  if (!(err instanceof GraphError)) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  const body = err.responseBody as { error?: { code?: string; message?: string } } | undefined;
+  const code = body?.error?.code ?? err.graphCode ?? "UnknownCode";
+  const msg = body?.error?.message ?? "(keine Detailmeldung)";
+  return `Graph ${err.status} ${code}: ${msg}`;
+}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -103,7 +118,7 @@ export async function POST() {
         graph_id: fresh.id,
       });
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = describeGraphError(err);
       failures.push({ folder: folder.folder_path, error: errMsg });
       logError("/api/email-sync/subscriptions", `Create failed for ${folder.folder_path}`, err);
     }

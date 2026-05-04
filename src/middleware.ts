@@ -10,6 +10,14 @@ const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/cron", "/api/extension", "
 // Verhindert dass z.B. /api/webhook/debug versehentlich offen ist.
 const AUTH_HEADER_REQUIRED_PREFIXES = ["/api/webhook", "/api/cron", "/api/extension"];
 
+// Ausnahmen vom F2.18-Block: Routen die NICHT mit Header/Body-Secret authen
+// können, weil ein externer Service ohne Vorab-Wissen sie callt.
+// - graph-notification: Microsoft schickt den Validation-Handshake OHNE
+//   Auth-Header (Subscription existiert ja noch nicht). Die Route hat eigene
+//   Auth via `clientState`-DB-Lookup für echte Notifications — siehe
+//   graph-notification/route.ts:128.
+const AUTH_HEADER_REQUIRED_EXCEPTIONS = ["/api/webhook/graph-notification"];
+
 // Exakte Pfade die ohne Auth erreichbar sind (Tool-Auswahl)
 const PUBLIC_EXACT = ["/"];
 
@@ -23,7 +31,10 @@ export async function middleware(request: NextRequest) {
   // F2.18 Defense-in-Depth: webhook/cron/extension benötigen IMMER ein Auth-Token
   // (entweder Authorization-Header ODER secret-Field im Body — Body lesen wir
   // hier nicht, also reicht Header-Check als Sanity-Filter).
-  if (AUTH_HEADER_REQUIRED_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (
+    AUTH_HEADER_REQUIRED_PREFIXES.some((p) => pathname.startsWith(p))
+    && !AUTH_HEADER_REQUIRED_EXCEPTIONS.some((p) => pathname.startsWith(p))
+  ) {
     const authHeader = request.headers.get("authorization");
     const contentType = request.headers.get("content-type") ?? "";
     const looksLikeJson = contentType.includes("application/json");
