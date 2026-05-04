@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { chatCompletion } from "@/lib/openai";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface ErkennungPayload {
   url: string;
@@ -48,7 +46,7 @@ export async function POST(request: NextRequest) {
       title: title || null,
       content_excerpt: kurzText || null,
     });
-    const response = await openai.chat.completions.create({
+    const response = await chatCompletion({
       model: "gpt-4o-mini",
       temperature: 0,
       max_tokens: 200,

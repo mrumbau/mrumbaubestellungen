@@ -33,6 +33,8 @@ export async function ingestEmail(input: IngestEmailInput): Promise<IngestEmailR
     return {
       success: !!result.success,
       bestellung_id: result.bestellung_id,
+      dokument_typ: result.dokument_typ,
+      ki_confidence: result.ki_confidence,
       parser_source: result.parser_source,
       parser_name: result.parser_name ?? null,
     };

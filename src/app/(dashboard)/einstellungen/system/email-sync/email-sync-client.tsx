@@ -310,6 +310,191 @@ function HealthCard() {
 }
 
 /* ════════════════════════════════════════════════════════════════════════
+   Push-Subscriptions: Real-Time Mail-Empfang via Microsoft Graph
+   ════════════════════════════════════════════════════════════════════════ */
+
+interface SubscriptionRow {
+  id: string;
+  graph_subscription_id: string;
+  expiration_at: string;
+  last_renewed_at: string | null;
+  last_renewal_error: string | null;
+  consecutive_failures: number;
+  mail_sync_folders: { folder_path: string; document_hint: string | null; enabled: boolean };
+}
+
+interface SubscriptionData {
+  subscriptions: SubscriptionRow[];
+  notification_url: string;
+}
+
+function SubscriptionCard({
+  activeFolders,
+  toast,
+}: {
+  activeFolders: number;
+  toast: ReturnType<typeof useToast>["toast"];
+}) {
+  const [data, setData] = useState<SubscriptionData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activating, setActivating] = useState(false);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/email-sync/subscriptions");
+      const json = await res.json();
+      if (res.ok) setData(json);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  async function handleActivate() {
+    setActivating(true);
+    try {
+      const res = await fetch("/api/email-sync/subscriptions", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error("Aktivierung fehlgeschlagen", {
+          description: json.error ?? "Bitte erneut versuchen.",
+        });
+        return;
+      }
+      const failures: Array<{ folder: string; error: string }> = json.failures ?? [];
+      if (failures.length > 0) {
+        toast.warning(`${json.created} Subscriptions erstellt, ${failures.length} fehlgeschlagen`, {
+          description: failures.map((f) => `${f.folder}: ${f.error}`).join(" · "),
+        });
+      } else if (json.created === 0) {
+        toast.info("Alle aktiven Folder haben bereits eine Subscription");
+      } else {
+        toast.success(`${json.created} Push-Subscription${json.created === 1 ? "" : "s"} aktiviert`, {
+          description: "Mail-Empfang läuft jetzt nahezu in Echtzeit (<5s).",
+        });
+      }
+      await reload();
+    } catch {
+      toast.error("Netzwerkfehler bei der Aktivierung");
+    } finally {
+      setActivating(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-line-subtle bg-canvas p-3 text-xs text-foreground-subtle">
+        Push-Subscriptions werden geladen…
+      </div>
+    );
+  }
+
+  const subs = data?.subscriptions ?? [];
+  const activeSubs = subs.filter(
+    (s) => s.mail_sync_folders?.enabled && new Date(s.expiration_at).getTime() > Date.now(),
+  );
+  const expiredOrBroken = subs.filter(
+    (s) => new Date(s.expiration_at).getTime() <= Date.now() || s.consecutive_failures >= 2,
+  );
+  const missing = Math.max(0, activeFolders - activeSubs.length);
+
+  // Tone: keine Subscriptions = warning (Polling-Modus, langsam),
+  // alles ok = success, kaputte = error
+  const tone =
+    expiredOrBroken.length > 0
+      ? "error"
+      : activeSubs.length === 0
+        ? "warning"
+        : missing > 0
+          ? "warning"
+          : "success";
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-3 flex flex-col gap-2",
+        tone === "success" && "border-success-border bg-success-bg",
+        tone === "warning" && "border-warning-border bg-warning-bg",
+        tone === "error" && "border-error-border bg-error-bg",
+      )}
+    >
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge tone={tone} size="md">
+            Push-Subscriptions: {activeSubs.length} / {activeFolders} aktiv
+          </Badge>
+          {missing > 0 && (
+            <span className="text-xs text-foreground-muted">
+              {missing} Folder ohne Subscription · läuft auf Polling (~60s Latenz)
+            </span>
+          )}
+          {expiredOrBroken.length > 0 && (
+            <span className="text-xs text-error">
+              {expiredOrBroken.length} expired oder mit Fehler · graph-rescue heilt automatisch
+            </span>
+          )}
+          {activeSubs.length > 0 && missing === 0 && expiredOrBroken.length === 0 && (
+            <span className="text-xs text-foreground-muted">
+              Real-Time-Empfang aktiv · Renewal alle 12h via Cron
+            </span>
+          )}
+        </div>
+        {missing > 0 && (
+          <Button
+            variant={activeSubs.length === 0 ? "primary" : "secondary"}
+            size="sm"
+            onClick={handleActivate}
+            disabled={activating}
+            loading={activating}
+          >
+            <IconPlay className="h-3.5 w-3.5" />
+            {activeSubs.length === 0 ? "Push-Subscriptions aktivieren" : `${missing} Subscription${missing === 1 ? "" : "s"} ergänzen`}
+          </Button>
+        )}
+      </div>
+
+      {data?.notification_url && (
+        <div className="text-[11px] text-foreground-subtle font-mono-amount break-all">
+          Webhook: {data.notification_url}
+        </div>
+      )}
+
+      {subs.length > 0 && (
+        <ul className="text-[11px] space-y-0.5 mt-1">
+          {subs.map((s) => {
+            const expired = new Date(s.expiration_at).getTime() <= Date.now();
+            const broken = s.consecutive_failures >= 2;
+            return (
+              <li
+                key={s.id}
+                className={cn(
+                  "flex items-center justify-between gap-2",
+                  (expired || broken) && "text-error",
+                  !(expired || broken) && "text-foreground-muted",
+                )}
+              >
+                <span>· {s.mail_sync_folders?.folder_path ?? "(unbekannt)"}</span>
+                <span className="font-mono-amount">
+                  {expired
+                    ? "expired"
+                    : broken
+                      ? `${s.consecutive_failures}× Fehler`
+                      : `läuft ab ${relativeTime(s.expiration_at).replace("vor ", "in ")}`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════
    TAB 1: Folder-Verwaltung
    ════════════════════════════════════════════════════════════════════════ */
 
@@ -400,9 +585,12 @@ function FoldersTab({
     }
   }
 
+  const activeFolderCount = folders.filter((f) => f.enabled).length;
+
   return (
     <div className="flex flex-col gap-4">
       <HealthCard />
+      <SubscriptionCard activeFolders={activeFolderCount} toast={toast} />
       <div className="flex items-center justify-between">
         <p className="text-sm text-foreground-muted">
           Konfigurierte Outlook-Folder. Cron iteriert nur aktive Folder. Der Folder-Hint hilft der KI bei

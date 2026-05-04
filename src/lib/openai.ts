@@ -148,6 +148,23 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   throw new Error("Max retries reached");
 }
 
+/**
+ * Generischer Wrapper für `openai.chat.completions.create` (non-streaming),
+ * der den zentralen Client + withRetry + Auto-Cost-Tracking erzwingt.
+ *
+ * Nutze IMMER diese Funktion statt `new OpenAI({...})` + direkter chat-Call.
+ * Sonst: kein Cost-Tracking (AsyncLocalStorage-Bucket bleibt leer), kein
+ * Retry bei OpenAI 5xx, kein einheitliches Timeout.
+ *
+ * Streaming wird bewusst NICHT unterstützt — alle Caller im Repo arbeiten
+ * synchron auf Vercel-Serverless mit kompletter JSON-Response.
+ */
+export async function chatCompletion(
+  params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  return withRetry(() => openai.chat.completions.create(params));
+}
+
 /** Sicherer JSON-Parser für GPT-Responses — gibt Fallback statt Crash.
  *  F4.14 Fix: Parse-Fehler werden geloggt (vorher silent fallback → systematische
  *  Modell-Drift blieb unentdeckt). */

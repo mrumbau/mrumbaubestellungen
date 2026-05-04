@@ -108,6 +108,10 @@ export interface EmailPipelineResult {
   dauer_ms?: number;
   parser_source?: "vendor" | "ki";
   parser_name?: string | null;
+  /** Dominanter erkannter Dokumenttyp für email_processing_log.ki_classified_as. */
+  dokument_typ?: string;
+  /** End-to-End Pipeline-Confidence (Methode + KI aggregiert) für ki_confidence. */
+  ki_confidence?: number;
   skipped?: boolean;
   reason?: string;
   deduplicated?: boolean;
@@ -854,6 +858,13 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     pipeline_confidence: Math.round(pipelineConfidence * 100) / 100,
   });
 
+  // Dominant-Typ aus den Analyse-Ergebnissen (für email_processing_log.ki_classified_as).
+  // Bevorzugt einen PRIMAER_TYPEN-Treffer, fällt sonst auf den ersten bekannten Typ zurück.
+  const dokumentTyp =
+    analyseErgebnisse.find((e) => PRIMAER_TYPEN.includes(e.analyse.typ))?.analyse.typ
+    ?? analyseErgebnisse.find((e) => BEKANNTE_TYPEN.includes(e.analyse.typ))?.analyse.typ
+    ?? undefined;
+
   return {
     success: true,
     bestellung_id: bestellungId,
@@ -862,6 +873,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     dauer_ms: dauer,
     parser_source: parserSource,
     parser_name: parserName,
+    dokument_typ: dokumentTyp,
+    ki_confidence: pipelineConfidence,
     debug_anhaenge: {
       raw_empfangen: Array.isArray(input.anhaenge) ? input.anhaenge.length : 0,
       nach_filter: anhaenge.length,

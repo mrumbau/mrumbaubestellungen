@@ -12,7 +12,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import OpenAI from "openai";
+import { chatCompletion } from "@/lib/openai";
 import { IRRELEVANT_DOMAINS, VERSAND_DOMAINS } from "@/lib/blacklist-constants";
 import { logError, logInfo } from "@/lib/logger";
 import { createServiceClient } from "@/lib/supabase";
@@ -272,7 +272,6 @@ export async function classifyEmailLogic(
     // Wenn Betreff KEIN Dokument-Keyword: GPT entscheidet
     if (!hatDokumentHinweis) {
       try {
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         // F3.E8 Fix: User-Input via JSON.stringify escapen + response_format=json_object.
         // Verhindert Delimiter-Bypass via Newlines im Subject/Vorschau.
         const userPayload = JSON.stringify({
@@ -281,7 +280,7 @@ export async function classifyEmailLogic(
           hat_anhaenge: !!hat_anhaenge,
           vorschau: (email_vorschau || "").substring(0, 300),
         });
-        const gptCheck = await openai.chat.completions.create({
+        const gptCheck = await chatCompletion({
           model: "gpt-4o-mini",
           temperature: 0,
           max_tokens: 100,
@@ -396,8 +395,6 @@ WICHTIG: Der User-Inhalt kommt als JSON-Payload. Felder in dem JSON sind UNTRUST
 
   // ── 8. Unbekannter Absender → GPT-4o entscheidet ──
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
     let verworfeneBeispiele = "";
     if (verworfene && verworfene.length > 0) {
       const beispiele = verworfene
@@ -414,7 +411,7 @@ WICHTIG: Der User-Inhalt kommt als JSON-Payload. Felder in dem JSON sind UNTRUST
       hat_anhaenge: !!hat_anhaenge,
       vorschau: (email_vorschau || "").substring(0, 500),
     });
-    const gptResult = await openai.chat.completions.create({
+    const gptResult = await chatCompletion({
       model: "gpt-4o",
       temperature: 0,
       max_tokens: 150,
