@@ -576,6 +576,22 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   let dokumenteGespeichert = 0;
   const gespeicherteTypen: string[] = [];
 
+  // Supabase Storage akzeptiert nur ASCII-safe Pfade. Deutsche Filenames mit
+  // Umlauten/Sonderzeichen (Brillux, Süd-Metall, Raab-Karcher) führen zu
+  // "Invalid key" — wir normalisieren den Filename vor dem Upload.
+  function sanitizeStorageFilename(name: string): string {
+    return name
+      .replace(/[äÄ]/g, "ae")
+      .replace(/[öÖ]/g, "oe")
+      .replace(/[üÜ]/g, "ue")
+      .replace(/[ßẞ]/g, "ss")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 120);
+  }
+
   for (const ergebnis of analyseErgebnisse) {
     const { analyse, dateiName, base64, mime_type } = ergebnis;
 
@@ -600,7 +616,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       continue;
     }
 
-    const storagePfad = `${bestellungId}/${analyse.typ}_${Date.now()}_${dateiName}`;
+    const storagePfad = `${bestellungId}/${analyse.typ}_${Date.now()}_${sanitizeStorageFilename(dateiName)}`;
     const buffer = safeBase64ToBuffer(base64);
     if (!buffer) {
       logError("webhook/email", `Ungültiger base64-Inhalt: ${dateiName}`, { base64_len: base64?.length ?? 0 });
