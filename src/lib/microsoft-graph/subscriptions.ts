@@ -61,15 +61,18 @@ export async function createSubscription(input: {
   const resource = `users/${mailbox}/mailFolders/${input.folderId}/messages`;
   const clientState = input.clientState ?? generateClientState();
 
+  // graphFetch ruft selbst JSON.stringify() auf body — wir übergeben das Object
+  // direkt (vorher hier nochmal gestringify-t → Microsoft empfing
+  // doppelt-encoded-JSON → "Empty Payload. JSON content expected").
   const sub = await graphFetch<GraphSubscription>("/subscriptions", {
     method: "POST",
-    body: JSON.stringify({
+    body: {
       changeType: "created",
       notificationUrl: input.notificationUrl,
       resource,
       expirationDateTime: newExpirationDate(),
       clientState,
-    }),
+    },
   });
 
   logInfo(ROUTE_TAG, "Subscription created", {
@@ -92,7 +95,7 @@ export async function renewSubscription(graphSubscriptionId: string): Promise<Gr
     `/subscriptions/${graphSubscriptionId}`,
     {
       method: "PATCH",
-      body: JSON.stringify({ expirationDateTime: newExpirationDate() }),
+      body: { expirationDateTime: newExpirationDate() },
     },
   );
   logInfo(ROUTE_TAG, "Subscription renewed", { id: sub.id, expires: sub.expirationDateTime });
