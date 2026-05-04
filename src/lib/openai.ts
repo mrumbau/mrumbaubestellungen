@@ -34,8 +34,12 @@ export interface CostBucket {
   model_breakdown: Record<string, { input_tokens: number; output_tokens: number; cost_eur: number; calls: number }>;
 }
 
-/** USD pro 1M Tokens. Stand 2026-04. Anpassen wenn OpenAI-Preise ändern. */
+/** USD pro 1M Tokens. Stand 2026-05. Anpassen wenn OpenAI-Preise ändern. */
 export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> = {
+  // Aktuell genutzt (Migration auf GPT-5.5 am 2026-05-04)
+  "gpt-5.5": { input: 5.00, output: 30.00 },
+  "gpt-5.5-pro": { input: 30.00, output: 180.00 },
+  // Legacy — bleiben für Cost-Calc historischer Mails (vor Migration verarbeitet)
   "gpt-4o": { input: 2.50, output: 10.00 },
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
   "text-embedding-3-small": { input: 0.02, output: 0 },
@@ -439,7 +443,7 @@ export async function analysiereDokument(
   try {
     const completion = await withRetry(() =>
       openai.chat.completions.parse({
-        model: "gpt-4o",
+        model: "gpt-5.5",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -514,7 +518,7 @@ export async function fuehreAbgleichDurch(
   try {
     const completion = await withRetry(() =>
       openai.chat.completions.parse({
-        model: "gpt-4o",
+        model: "gpt-5.5",
         messages: [
           {
             role: "system",
@@ -567,7 +571,7 @@ export async function erkenneBestellerIntelligent(
 ): Promise<BestellerErkennungErgebnis> {
   const response = await withRetry(() =>
     openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -610,7 +614,7 @@ export async function generiereErinnerungsmail(
 ): Promise<string> {
   const response = await withRetry(() => openai.chat.completions.create({
     // R2/F4.2: gpt-4o-mini ausreichend für simple Text-Generation; ~5x günstiger
-    model: "gpt-4o-mini",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -639,7 +643,7 @@ export async function pruefePreisanomalien(
 ): Promise<PreisAnomalieErgebnis> {
   const response = await withRetry(() => openai.chat.completions.create({
     // R2/F4.2: numerischer Vergleich, kein Reasoning nötig — gpt-4o-mini reicht
-    model: "gpt-4o-mini",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -689,7 +693,7 @@ export async function erkenneHaendlerAusEmail(
 ): Promise<{ name: string; domain: string; email_muster: string } | null> {
   const response = await withRetry(() => openai.chat.completions.create({
     // R2/F4.2: einfache Domain-/Namens-Extraktion — gpt-4o-mini ausreichend
-    model: "gpt-4o-mini",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -739,7 +743,7 @@ export async function erkenneSubunternehmerAusEmail(
 ): Promise<{ firma: string; gewerk: string | null; email_muster: string; steuer_nr: string | null; iban: string | null } | null> {
   const response = await withRetry(() => openai.chat.completions.create({
     // R2/F4.2: Text-Matching für SU-Firmen-Erkennung — gpt-4o-mini ausreichend
-    model: "gpt-4o-mini",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -805,7 +809,7 @@ export async function generiereWochenzusammenfassung(
   }
 ): Promise<WochenzusammenfassungErgebnis> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -868,7 +872,7 @@ export async function pruefeDuplikat(
   }
 
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -920,7 +924,7 @@ export async function kategorisiereArtikel(
 ): Promise<KategorisierungErgebnis> {
   const response = await withRetry(() => openai.chat.completions.create({
     // R2/F4.2: Whitelist-Kategorien-Zuordnung — gpt-4o-mini ausreichend
-    model: "gpt-4o-mini",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -1000,7 +1004,7 @@ export async function priorisiereBestellungen(
   const restSummary = restCount > 0 ? `\n\nWeitere ${restCount} offene Bestellungen (niedrigere Priorität, nicht im Detail).` : "";
 
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -1064,7 +1068,7 @@ export async function extrahiereBestellerHinweise(
 ): Promise<BestellerHinweiseErgebnis> {
   const response = await withRetry(() =>
     openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.5",
       messages: [
         {
           role: "system",
@@ -1119,7 +1123,7 @@ export async function fasseBestellungZusammen(
   kommentare: { autor: string; text: string; datum: string }[]
 ): Promise<string> {
   const response = await withRetry(() => openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -1193,7 +1197,7 @@ export async function erkenneProjektAusInhalt(params: {
 
   const response = await withRetry(() =>
     openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5.5",
       messages: [
         {
           role: "system",

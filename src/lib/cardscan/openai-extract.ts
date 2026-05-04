@@ -9,7 +9,7 @@ import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_JSON_SCHEMA } from "@/lib/cardscan
 import type { ExtractedContactData, ConfidenceScores } from "@/lib/cardscan/types";
 
 const ROUTE_TAG = "/lib/cardscan/openai-extract";
-const MODEL = "gpt-4o";
+const MODEL = "gpt-5.5";
 
 interface ExtractionResult {
   data: ExtractedContactData;

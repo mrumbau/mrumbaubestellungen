@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       content_excerpt: kurzText || null,
     });
     const response = await chatCompletion({
-      model: "gpt-4o-mini",
+      model: "gpt-5.5",
       temperature: 0,
       max_tokens: 200,
       response_format: { type: "json_object" },
