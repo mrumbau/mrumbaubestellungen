@@ -105,13 +105,15 @@ const HINT_LABELS: Record<string, string> = {
 
 function relativeTime(iso: string | null): string {
   if (!iso) return "nie";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60_000) return "gerade eben";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const ms = Math.abs(diffMs);
+  const prefix = diffMs >= 0 ? "vor" : "in";
+  if (ms < 60_000) return diffMs >= 0 ? "gerade eben" : "in wenigen Sekunden";
   const min = Math.floor(ms / 60_000);
-  if (min < 60) return `vor ${min} min`;
+  if (min < 60) return `${prefix} ${min} min`;
   const h = Math.floor(min / 60);
-  if (h < 24) return `vor ${h} h`;
-  return `vor ${Math.floor(h / 24)} Tagen`;
+  if (h < 24) return `${prefix} ${h} h`;
+  return `${prefix} ${Math.floor(h / 24)} Tagen`;
 }
 
 function statusTone(status: string): "neutral" | "warning" | "success" | "error" {
@@ -483,7 +485,7 @@ function SubscriptionCard({
                     ? "expired"
                     : broken
                       ? `${s.consecutive_failures}× Fehler`
-                      : `läuft ab ${relativeTime(s.expiration_at).replace("vor ", "in ")}`}
+                      : `läuft ab ${relativeTime(s.expiration_at)}`}
                 </span>
               </li>
             );
