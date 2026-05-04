@@ -403,10 +403,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       { name: "amazon", regex: /\b\d{3}-\d{7}-\d{7}\b/ },
       // Deutsche Shops: "BESTELLNR.: #DH39680" / "Bestell-Nr.: 12345" / "Bestellnummer: ABC-123"
       { name: "bestellnr-prefix", regex: /(?:bestell(?:[\s-]*nr|nummer|nr\.|-?nummer)|order[\s-]*(?:nr|number|id))[\s.:#-]*(#?[A-Z0-9][A-Z0-9_/-]{3,40})/i },
+      // Deutsche Shop-Mails: "Deine/Ihre Bestellung 3006915 ist am ..." (Possessivpronomen + Bestellung + Digits)
+      { name: "possessiv-bestellung", regex: /\b(?:deine|ihre|eure|meine|unsere)\s+bestellung\s+([A-Z]*[0-9]{4,20}[A-Z0-9_/-]*)\b/i },
       // "#DH39680" oder "#12345" mit Hash-Prefix (mind. 4 alphanumerisch + 1 Digit)
       { name: "hash-prefix", regex: /#([A-Z]*[0-9]+[A-Z0-9_/-]*)\b/i },
-      // "Auftrag XYZ123456" / "Rechnung Nr 12345"
-      { name: "auftrag-rechnung", regex: /(?:auftrag|rechnung)[\s.:#-]*(?:nr\.?:?|nummer:?)?\s*([A-Z]*[0-9]+[A-Z0-9_/-]{2,20})\b/i },
+      // "Auftrag XYZ123456" / "Rechnung Nr 12345" / "Auftragsnummer ABC123"
+      { name: "auftrag-rechnung", regex: /(?:auftrag(?:s[\s-]*nr|s[\s-]*nummer)?|rechnung)[\s.:#-]*(?:nr\.?:?|nummer:?)?\s*([A-Z]*[0-9]+[A-Z0-9_/-]{2,20})\b/i },
     ];
 
     for (const p of patterns) {
@@ -430,9 +432,10 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
     const betragPatterns: RegExp[] = [
       // "Bestellwert 547,95 €" / "Gesamtsumme: 1.234,56 EUR" / "Total: 199,00€"
-      /(?:bestellwert|gesamtsumme|gesamtbetrag|total|rechnungsbetrag|endbetrag)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})\s*(?:€|eur|euro)/i,
+      // "Gesamtkosten Brutto: 64,95 €" — DeubaXXL-Pattern + andere deutsche Shops
+      /(?:bestellwert|gesamtsumme|gesamtbetrag|gesamtkosten(?:[\s.]*brutto)?|total|rechnungsbetrag|endbetrag)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})\s*(?:€|eur|euro)/i,
       // "547,95 EUR" als Anker mit Schlüsselwort davor
-      /(?:summe|betrag)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})/i,
+      /(?:summe|betrag|brutto)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})/i,
     ];
     for (const re of betragPatterns) {
       const m = body.match(re);
