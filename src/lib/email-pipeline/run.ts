@@ -390,21 +390,63 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   const erkannteAuftragsnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer);
   const erkannteLieferscheinnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer);
 
-  // F5.X Fix: Amazon-Body-Pattern als Fallback. Amazon-Bestätigungen haben die
-  // Bestellnummer NICHT im Subject ("Deine Amazon.de Bestellung von ..."), nur
-  // im Body. Pipeline-KI extrahiert sie nicht zuverlässig — Regex-Fallback
-  // reduziert anonyme Backfill-Bestellungen drastisch.
-  // Pattern: "302-0733687-4332321" oder "305-5460716-6276353" etc.
+  // F5.X Fix: Body-Pattern-Fallbacks für Bestellnummer.
+  // KI-Vision extrahiert oft schlecht aus reinen Text-Mails ohne PDF-Anhang.
+  // Diese Patterns greifen für deutsche Online-Shops + Amazon.
   if (!erkannteBestellnummer) {
-    const amazonPattern = /\b\d{3}-\d{7}-\d{7}\b/;
-    const subjectMatch = (email_betreff ?? "").match(amazonPattern);
-    const bodyMatch = (input.email_text ?? input.email_body ?? "").match(amazonPattern);
-    const fallbackNummer = subjectMatch?.[0] ?? bodyMatch?.[0] ?? null;
-    if (fallbackNummer) {
-      erkannteBestellnummer = safeBestellnummer(fallbackNummer);
-      logInfo("webhook/email", `Bestellnummer-Body-Fallback gegriffen (Amazon-Pattern): ${fallbackNummer}`, {
-        email_betreff,
-      });
+    const subject = email_betreff ?? "";
+    const body = input.email_text ?? input.email_body ?? "";
+    const haystack = `${subject}\n${body}`;
+
+    const patterns: Array<{ name: string; regex: RegExp }> = [
+      // Amazon: "302-0733687-4332321"
+      { name: "amazon", regex: /\b\d{3}-\d{7}-\d{7}\b/ },
+      // Deutsche Shops: "BESTELLNR.: #DH39680" / "Bestell-Nr.: 12345" / "Bestellnummer: ABC-123"
+      { name: "bestellnr-prefix", regex: /(?:bestell(?:[\s-]*nr|nummer|nr\.|-?nummer)|order[\s-]*(?:nr|number|id))[\s.:#-]*(#?[A-Z0-9][A-Z0-9_/-]{3,40})/i },
+      // "#DH39680" oder "#12345" mit Hash-Prefix (mind. 4 alphanumerisch + 1 Digit)
+      { name: "hash-prefix", regex: /#([A-Z]*[0-9]+[A-Z0-9_/-]*)\b/i },
+      // "Auftrag XYZ123456" / "Rechnung Nr 12345"
+      { name: "auftrag-rechnung", regex: /(?:auftrag|rechnung)[\s.:#-]*(?:nr\.?:?|nummer:?)?\s*([A-Z]*[0-9]+[A-Z0-9_/-]{2,20})\b/i },
+    ];
+
+    for (const p of patterns) {
+      const match = haystack.match(p.regex);
+      const candidate = match ? (match[1] ?? match[0]) : null;
+      const validated = safeBestellnummer(candidate);
+      if (validated) {
+        erkannteBestellnummer = validated;
+        logInfo("webhook/email", `Bestellnummer-Body-Fallback gegriffen (${p.name}): ${validated}`, {
+          email_betreff,
+        });
+        break;
+      }
+    }
+  }
+
+  // F5.Y Fix: Betrag-Body-Fallback. Wenn KI keinen Betrag erkannt hat, im Body
+  // nach Patterns wie "Bestellwert 547,95 €" / "Gesamtsumme: 1.234,56 EUR" suchen.
+  let bodyExtractedBetrag: number | null = null;
+  if (!analyseErgebnisse.find((e) => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag) {
+    const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
+    const betragPatterns: RegExp[] = [
+      // "Bestellwert 547,95 €" / "Gesamtsumme: 1.234,56 EUR" / "Total: 199,00€"
+      /(?:bestellwert|gesamtsumme|gesamtbetrag|total|rechnungsbetrag|endbetrag)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})\s*(?:€|eur|euro)/i,
+      // "547,95 EUR" als Anker mit Schlüsselwort davor
+      /(?:summe|betrag)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})/i,
+    ];
+    for (const re of betragPatterns) {
+      const m = body.match(re);
+      if (m && m[1]) {
+        const normalized = m[1].replace(/[.\s]/g, "").replace(",", ".");
+        const num = parseFloat(normalized);
+        if (Number.isFinite(num) && num > 0 && num < 1_000_000) {
+          bodyExtractedBetrag = num;
+          logInfo("webhook/email", `Betrag-Body-Fallback gegriffen: ${num}€ aus "${m[0]}"`, {
+            email_betreff,
+          });
+          break;
+        }
+      }
     }
   }
 
@@ -739,7 +781,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       auftragsnummer: analyse.auftragsnummer || null,
       lieferscheinnummer: analyse.lieferscheinnummer || null,
       artikel: analyse.artikel,
-      gesamtbetrag: analyse.gesamtbetrag,
+      gesamtbetrag: analyse.gesamtbetrag ?? bodyExtractedBetrag,
       netto: analyse.netto,
       mwst: analyse.mwst,
       faelligkeitsdatum: analyse.faelligkeitsdatum,
@@ -856,11 +898,11 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
           email_absender,
           email_datum,
           ki_roh_daten: bodyAnalyse,
-          bestellnummer_erkannt: bodyAnalyse.bestellnummer,
+          bestellnummer_erkannt: bodyAnalyse.bestellnummer ?? erkannteBestellnummer,
           auftragsnummer: bodyAnalyse.auftragsnummer || null,
           lieferscheinnummer: bodyAnalyse.lieferscheinnummer || null,
           artikel: bodyAnalyse.artikel,
-          gesamtbetrag: bodyAnalyse.gesamtbetrag,
+          gesamtbetrag: bodyAnalyse.gesamtbetrag ?? bodyExtractedBetrag,
           netto: bodyAnalyse.netto,
           mwst: bodyAnalyse.mwst,
           faelligkeitsdatum: bodyAnalyse.faelligkeitsdatum,

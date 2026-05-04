@@ -56,14 +56,24 @@ export function isValidKuerzel(kuerzel: string): boolean {
  * Gibt eine gültige Bestellnummer zurück oder null wenn:
  * - leer / nicht String
  * - zu lang (> 60 Zeichen, GPT-Halluzination)
- * - nur Whitespace/Sonderzeichen
+ * - zu kurz (< 4 Zeichen — echte Bestellnummern sind länger)
+ * - enthält keine Zahl (KI-Halluzinations-Schutz: "verschicken", "wurden", etc.)
+ * - ist ein bekanntes Halluzinations-Wort
  */
+const BESTELLNUMMER_BLOCKLIST = new Set([
+  "verschicken", "wurden", "versandt", "bestellt", "rechnung", "lieferung",
+  "kunde", "n/a", "none", "null", "unknown", "unbekannt",
+]);
+
 export function safeBestellnummer(value: unknown, maxLen = 60): string | null {
   if (!value || typeof value !== "string") return null;
   const trimmed = value.trim();
-  if (trimmed.length === 0 || trimmed.length > maxLen) return null;
-  // Muss mindestens ein alphanumerisches Zeichen enthalten
+  if (trimmed.length < 4 || trimmed.length > maxLen) return null;
   if (!/[A-Za-z0-9]/.test(trimmed)) return null;
+  // Echte Bestellnummern enthalten fast immer mind. 1 Digit. Reine Wort-Strings
+  // sind KI-Halluzinationen ("verschicken" als Bestellnr aus dem Subject).
+  if (!/[0-9]/.test(trimmed)) return null;
+  if (BESTELLNUMMER_BLOCKLIST.has(trimmed.toLowerCase())) return null;
   return trimmed;
 }
 
