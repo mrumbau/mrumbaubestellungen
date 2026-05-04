@@ -592,28 +592,58 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       .slice(0, 120);
   }
 
+  // Fallback wenn KI-Vision den Doku-Typ nicht erkennt: aus Mail-Betreff ableiten.
+  // Bei deutschen Geschäftsmails ist der Subject sehr aussagekräftig.
+  type DokuTyp = AnalyseErgebnis["analyse"]["typ"];
+  function inferTypFromSubject(subject: string | null | undefined): DokuTyp | null {
+    if (!subject) return null;
+    const s = subject.toLowerCase();
+    if (/\b(rechnung|invoice|rechnr|rg-?nr)\b/.test(s)) return "rechnung";
+    if (/\b(lieferschein|delivery)\b/.test(s)) return "lieferschein";
+    if (/\b(bestellbest[äa]tigung|auftragsbest[äa]tigung|order confirmation|bestellbestaetigung)\b/.test(s)) return "bestellbestaetigung";
+    if (/\b(versand(best[äa]tigung)?|tracking|shipping)\b/.test(s)) return "versandbestaetigung";
+    if (/\b(aufma(?:ss|ß))\b/.test(s)) return "aufmass";
+    if (/\b(leistungsnachweis)\b/.test(s)) return "leistungsnachweis";
+    return null;
+  }
+
   for (const ergebnis of analyseErgebnisse) {
     const { analyse, dateiName, base64, mime_type } = ergebnis;
 
-    if (!BEKANNTE_TYPEN.includes(analyse.typ) || analyse.parse_fehler) {
-      // F4.15 Fix: parse_fehler explizit als Error loggen (Diagnose-Indikator
-      // für systematische Modell-Drift). Unbekannter Typ bleibt info.
-      if (analyse.parse_fehler) {
-        logError("webhook/email", `OpenAI parse_fehler — Dokument wird übersprungen`, {
+    // F5.X Fix: Vision-Fallback. Wenn KI den Typ nicht erkennt (parse_fehler ODER
+    // typ="unbekannt"), versuchen wir den Typ aus dem Mail-Betreff abzuleiten —
+    // bei deutschen Geschäftsmails ist der Subject extrem aussagekräftig
+    // ("Brillux Rechnung Nr. 6887860"). Das PDF wird dann TROTZDEM in Storage
+    // hochgeladen statt silent verworfen.
+    const typIstUnbekannt = !BEKANNTE_TYPEN.includes(analyse.typ);
+    if (typIstUnbekannt || analyse.parse_fehler) {
+      const subjectTyp = inferTypFromSubject(email_betreff);
+      if (subjectTyp && BEKANNTE_TYPEN.includes(subjectTyp)) {
+        // Subject-Fallback greift: Typ überschreiben, weiter mit Storage-Upload.
+        logInfo("webhook/email", `Vision-Fallback: typ="${analyse.typ}" → "${subjectTyp}" (aus Betreff abgeleitet)`, {
           datei: dateiName,
-          typ: analyse.typ,
+          parse_fehler: !!analyse.parse_fehler,
         });
+        analyse.typ = subjectTyp;
+        // Ab hier läuft der normale Storage+Insert-Pfad weiter.
       } else {
-        logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
+        // Subject gibt auch nichts her — als unklassifizierbar verwerfen.
+        if (analyse.parse_fehler) {
+          logError("webhook/email", `OpenAI parse_fehler — Dokument wird übersprungen`, {
+            datei: dateiName,
+            typ: analyse.typ,
+          });
+        } else {
+          logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
+        }
+        await supabase.from("webhook_logs").insert({
+          typ: "email",
+          status: "error",
+          bestellung_id: bestellungId,
+          fehler_text: `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}", parse_fehler=${!!analyse.parse_fehler}, subject="${(email_betreff ?? "").slice(0, 80)}"`,
+        });
+        continue;
       }
-      // Diagnose: warum der Anhang nicht gespeichert wurde — sichtbar in webhook_logs
-      await supabase.from("webhook_logs").insert({
-        typ: "email",
-        status: "error",
-        bestellung_id: bestellungId,
-        fehler_text: `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}", parse_fehler=${!!analyse.parse_fehler}`,
-      });
-      continue;
     }
 
     const storagePfad = `${bestellungId}/${analyse.typ}_${Date.now()}_${sanitizeStorageFilename(dateiName)}`;
