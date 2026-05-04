@@ -590,6 +590,13 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       } else {
         logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
       }
+      // Diagnose: warum der Anhang nicht gespeichert wurde — sichtbar in webhook_logs
+      await supabase.from("webhook_logs").insert({
+        typ: "email",
+        status: "error",
+        bestellung_id: bestellungId,
+        fehler_text: `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}", parse_fehler=${!!analyse.parse_fehler}`,
+      });
       continue;
     }
 
@@ -597,6 +604,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     const buffer = safeBase64ToBuffer(base64);
     if (!buffer) {
       logError("webhook/email", `Ungültiger base64-Inhalt: ${dateiName}`, { base64_len: base64?.length ?? 0 });
+      await supabase.from("webhook_logs").insert({
+        typ: "email",
+        status: "error",
+        bestellung_id: bestellungId,
+        fehler_text: `Anhang base64 ungültig: datei="${dateiName}", len=${base64?.length ?? 0}`,
+      });
       continue;
     }
     const { error: uploadError } = await supabase.storage
@@ -605,6 +618,13 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
     if (uploadError) {
       logError("webhook/email", `Storage Upload fehlgeschlagen: ${storagePfad}`, uploadError);
+      // Echter Storage-Fehler in webhook_logs persistieren — sonst nur in Vercel-Logs
+      await supabase.from("webhook_logs").insert({
+        typ: "email",
+        status: "error",
+        bestellung_id: bestellungId,
+        fehler_text: `Storage-Upload fehlgeschlagen: pfad="${storagePfad}", mime="${mime_type}", buffer_bytes=${buffer.length}, fehler="${uploadError.message ?? String(uploadError)}"`,
+      });
       continue;
     }
 
@@ -634,6 +654,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     });
     if (insertError) {
       logError("webhook/email", "Dokument-Insert fehlgeschlagen", insertError);
+      await supabase.from("webhook_logs").insert({
+        typ: "email",
+        status: "error",
+        bestellung_id: bestellungId,
+        fehler_text: `Dokument-Insert fehlgeschlagen: pfad="${storagePfad}", fehler="${insertError.message}"`,
+      });
       continue;
     }
 
