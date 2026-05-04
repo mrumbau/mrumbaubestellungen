@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BackLink } from "@/components/cardscan/BackLink";
+import { CRM_LABELS } from "@/lib/cardscan/constants";
 
 interface SyncError {
   id: string;
@@ -128,7 +129,7 @@ export default function CardScanErrorsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded bg-error-bg text-error">
-                        {err.crm === "crm1" ? "CRM 1" : "CRM 2"}
+                        {CRM_LABELS[err.crm]}
                       </span>
                       <span className="text-xs text-foreground-subtle">
                         {formatDate(err.created_at)}
@@ -166,7 +167,7 @@ export default function CardScanErrorsPage() {
               <div key={err.id} className="card p-3">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="uppercase tracking-wider font-medium text-foreground-subtle">
-                    {err.crm === "crm1" ? "CRM 1" : "CRM 2"}
+                    {CRM_LABELS[err.crm]}
                   </span>
                   <span className="flex-1 truncate text-foreground-muted">
                     {err.error_message}

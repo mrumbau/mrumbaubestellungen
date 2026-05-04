@@ -59,3 +59,13 @@ export const CARDSCAN_RATE_LIMITS_BY_TYPE = {
 } as const;
 
 export const DAS_PROGRAMM_ENDPOINT = "https://app.das-programm.io/api/graphql";
+
+/**
+ * UI-Labels für die zwei das-programm.io CRM-Mandanten.
+ * Backend-Identifier "CRM1"/"CRM2" bleiben in Logger und Token-Slot-Names
+ * unverändert — diese Labels sind nur für die Anzeige im Frontend.
+ */
+export const CRM_LABELS = {
+  crm1: "CRM MR Umbau",
+  crm2: "CRM Manufactur Raumcultur",
+} as const;

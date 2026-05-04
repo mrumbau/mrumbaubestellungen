@@ -7,6 +7,7 @@ import type {
   CardScanCapture,
   ExtractedContactData,
 } from "@/lib/cardscan/types";
+import { CRM_LABELS } from "@/lib/cardscan/constants";
 
 const STATUS_DISPLAY: Record<string, { label: string; color: string }> = {
   success: { label: "Erfolgreich angelegt", color: "text-cs-accent-text" },
@@ -163,14 +164,14 @@ export default function HistoryDetailPage() {
           <h2 className="text-xs font-medium text-foreground-muted uppercase tracking-wider mb-2">
             CRM-Status
           </h2>
-          <CrmBadge status={capture.crm1_status} label="CRM 1" />
+          <CrmBadge status={capture.crm1_status} label={CRM_LABELS.crm1} />
           {capture.crm1_reference_number && (
             <p className="text-xs text-foreground-subtle mb-1">
               Kundennr.: {capture.crm1_reference_number}
             </p>
           )}
           <div className="border-t border-line-subtle my-1.5" />
-          <CrmBadge status={capture.crm2_status} label="CRM 2" />
+          <CrmBadge status={capture.crm2_status} label={CRM_LABELS.crm2} />
           {capture.crm2_reference_number && (
             <p className="text-xs text-foreground-subtle">
               Kundennr.: {capture.crm2_reference_number}

@@ -1,6 +1,7 @@
 "use client";
 
 import type { DuplicateMatch } from "@/lib/cardscan/types";
+import { CRM_LABELS } from "@/lib/cardscan/constants";
 
 type DuplicateAction = "none" | "override" | "update";
 
@@ -38,7 +39,7 @@ export function DuplicateWarning({
             {matches.slice(0, 3).map((m, i) => (
               <div key={i} className="text-xs text-warning bg-warning-bg/50 rounded px-2 py-1">
                 <span className="font-medium uppercase text-[10px] mr-1.5">
-                  {m.crm === "crm1" ? "CRM 1" : "CRM 2"}
+                  {CRM_LABELS[m.crm]}
                 </span>
                 {m.companyName && <span>{m.companyName} – </span>}
                 {m.firstName} {m.lastName}

@@ -407,23 +407,22 @@ export async function createInBothCRMs(
           durationMs: 0,
         };
 
-  // Gesamt-Status berechnen
+  // Gesamt-Status berechnen.
+  // dry_run ist ein bewusster Konfigurations-Zustand (Token leer/DRY_RUN),
+  // KEIN Fehlschlag — wird wie success behandelt für die Aggregation.
+  const isOkOrSkipped = (s: CrmWriteResult["status"]) =>
+    s === "success" || s === "partial_success" || s === "dry_run";
+
   const bothDryRun = crm1.status === "dry_run" && crm2.status === "dry_run";
-  const bothSuccess =
-    (crm1.status === "success" || crm1.status === "partial_success") &&
-    (crm2.status === "success" || crm2.status === "partial_success");
-  const anySuccess =
-    crm1.status === "success" ||
-    crm1.status === "partial_success" ||
-    crm2.status === "success" ||
-    crm2.status === "partial_success";
+  const allOk = isOkOrSkipped(crm1.status) && isOkOrSkipped(crm2.status);
+  const anyOk = isOkOrSkipped(crm1.status) || isOkOrSkipped(crm2.status);
 
   let overallStatus: DualWriteResult["overallStatus"];
   if (bothDryRun) {
     overallStatus = "dry_run";
-  } else if (bothSuccess) {
+  } else if (allOk) {
     overallStatus = "success";
-  } else if (anySuccess) {
+  } else if (anyOk) {
     overallStatus = "partial_success";
   } else {
     overallStatus = "failed";

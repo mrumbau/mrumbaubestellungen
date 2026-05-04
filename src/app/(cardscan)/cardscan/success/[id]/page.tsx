@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
+import { CRM_LABELS } from "@/lib/cardscan/constants";
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -217,9 +218,9 @@ export default function CardScanSuccessPage() {
 
       {/* ─── CRM-Status ───────────────────────────────────────────── */}
       <div className="card p-4 mb-5">
-        <CrmRow label="CRM 1" status={capture?.crm1_status || null} refNum={capture?.crm1_reference_number || null} error={capture?.crm1_error || null} />
+        <CrmRow label={CRM_LABELS.crm1} status={capture?.crm1_status || null} refNum={capture?.crm1_reference_number || null} error={capture?.crm1_error || null} />
         <div className="border-t border-line-subtle my-1" />
-        <CrmRow label="CRM 2" status={capture?.crm2_status || null} refNum={capture?.crm2_reference_number || null} error={capture?.crm2_error || null} />
+        <CrmRow label={CRM_LABELS.crm2} status={capture?.crm2_status || null} refNum={capture?.crm2_reference_number || null} error={capture?.crm2_error || null} />
 
         {/* Retry-Button bei Partial-Success: Backend ist idempotent (F7.3) */}
         {(isPartial || isFailed) && capture?.status !== "writing" && (
