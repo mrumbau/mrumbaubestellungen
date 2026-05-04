@@ -188,6 +188,10 @@ export async function replayOneMessage(
       openai_input_tokens: cost.input_tokens || undefined,
       openai_output_tokens: cost.output_tokens || undefined,
       openai_cost_eur: cost.cost_eur || undefined,
+      // Diagnose-Felder: Skip-Reason und Anhang-Statistik landen in error_msg
+      // damit pro Mail nachvollziehbar ist warum keine Bestellung entstand.
+      skip_reason: ingestResult.skipped ? ingestResult.reason : undefined,
+      debug_anhaenge: ingestResult.debug_anhaenge,
     });
 
     return { outcome: "processed", bestellung_id: ingestResult.bestellung_id };

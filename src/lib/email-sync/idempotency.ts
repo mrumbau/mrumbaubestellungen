@@ -120,6 +120,11 @@ export interface ProcessedUpdate {
   openai_input_tokens?: number;
   openai_output_tokens?: number;
   openai_cost_eur?: number;
+  /** Diagnose: Pipeline hat Mail bewusst übersprungen — Grund landet in error_msg.
+   *  Beispiel: "skipped: duplikat_typ_existiert" oder "skipped: kein_dokument_erkannt". */
+  skip_reason?: string;
+  /** Diagnose: Anhang-Statistik (raw_empfangen / nach_filter / analysiert). */
+  debug_anhaenge?: { raw_empfangen: number; nach_filter: number; analysiert: number };
 }
 
 /** Markiert eine Mail als erfolgreich verarbeitet. */
@@ -128,12 +133,24 @@ export async function markProcessed(
   internetMessageId: string,
   update: ProcessedUpdate = {},
 ): Promise<void> {
+  // Diagnose-String: Skip-Reason + Anhang-Stats kombinieren wenn vorhanden.
+  // Macht für die UI / Audit nachvollziehbar warum eine Mail keine Bestellung
+  // erzeugt hat (z.B. "skipped: duplikat_typ_existiert | anh: 2 raw → 0 filter").
+  const diagnoseTeile: string[] = [];
+  if (update.skip_reason) diagnoseTeile.push(`skipped: ${update.skip_reason}`);
+  if (update.debug_anhaenge) {
+    const a = update.debug_anhaenge;
+    diagnoseTeile.push(`anh: ${a.raw_empfangen} raw → ${a.nach_filter} filter → ${a.analysiert} analyse`);
+  }
+  const errorMsg = diagnoseTeile.length > 0 ? diagnoseTeile.join(" | ").slice(0, 2000) : null;
+
   const { error } = await supabase
     .from("email_processing_log")
     .update({
       status: "processed",
       check_at: new Date().toISOString(),
       processed_at: new Date().toISOString(),
+      error_msg: errorMsg,
       bestellung_id: update.bestellung_id ?? null,
       ki_classified_as: update.ki_classified_as ?? null,
       ki_confidence: update.ki_confidence ?? null,

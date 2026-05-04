@@ -58,5 +58,11 @@ export interface IngestEmailResult {
   parser_source?: "vendor" | "ki";
   /** Phase 2: Name des Vendor-Parsers (z.B. 'amazon'). null bei reiner KI. */
   parser_name?: string | null;
+  /** Pipeline hat Mail bewusst übersprungen (Duplikat, kein Dokument erkannt etc.). */
+  skipped?: boolean;
+  /** Skip-Grund (z.B. "duplikat_typ_existiert", "kein_dokument_erkannt"). */
+  reason?: string;
+  /** Anhang-Statistik: wieviele empfangen, wieviele nach Filter, wieviele analysiert. */
+  debug_anhaenge?: { raw_empfangen: number; nach_filter: number; analysiert: number };
   fehler?: string;
 }

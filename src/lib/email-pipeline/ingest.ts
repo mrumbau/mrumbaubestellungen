@@ -37,6 +37,9 @@ export async function ingestEmail(input: IngestEmailInput): Promise<IngestEmailR
       ki_confidence: result.ki_confidence,
       parser_source: result.parser_source,
       parser_name: result.parser_name ?? null,
+      skipped: result.skipped,
+      reason: result.reason,
+      debug_anhaenge: result.debug_anhaenge,
     };
   } catch (err) {
     logError("email-pipeline/ingest", "Direct-Call zu runEmailPipeline fehlgeschlagen", err);
