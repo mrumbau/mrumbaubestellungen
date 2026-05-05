@@ -40,6 +40,7 @@ import {
 } from "./pipeline/mail-utils";
 import { checkAndClaimIdempotency } from "./pipeline/idempotency-check";
 import { normalizeAnhaenge } from "./pipeline/anhang-handling";
+import { tryParseEInvoiceFromAttachments } from "./pipeline/xrechnung";
 import { analysiereAnhaenge, type AnalyseErgebnis } from "./pipeline/anhang-analyse";
 import {
   findByExactNumber,
@@ -362,8 +363,48 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
                     absenderDomain.endsWith(".amazon.de") || absenderDomain.endsWith(".amazon.com");
   if (istAmazon) haendlerName = "Amazon Business";
 
-  // 10. Anhänge OpenAI-analysieren
+  // 9b. XRechnung/ZUGFeRD-Schicht — strukturierte E-Rechnungen ohne KI.
+  // Seit 1.1.2025 senden viele Lieferanten XML-Anhänge oder ZUGFeRD-PDFs
+  // (PDF mit eingebetteter XML). Diese sind 100% deterministisch parsebar.
+  // Wenn eine E-Rechnung gefunden wird, überspringen wir die KI komplett für
+  // diese Mail — Halluzinationen und Pattern-Misses ausgeschlossen.
+  const eInvoice = await tryParseEInvoiceFromAttachments(anhaenge);
+
+  // 10. Anhänge OpenAI-analysieren — bei E-Rechnung als zweiter Datensatz
+  // (für Storage-Upload des PDFs), aber die strukturierten Felder kommen aus XML.
   const analyseErgebnisse = await analysiereAnhaenge(anhaenge, { folderHint: documentHint, startTime });
+
+  // Wenn E-Rechnung erfolgreich geparst: Daten in den ersten passenden
+  // analyseErgebnis-Eintrag mergen, damit die Pipeline weiterläuft als wäre
+  // KI gelaufen — aber mit verlässlichen XML-Daten statt Halluzinationen.
+  if (eInvoice && analyseErgebnisse.length > 0) {
+    const target = analyseErgebnisse.find((e) => e.mime_type === "application/pdf") ?? analyseErgebnisse[0];
+    target.analyse = {
+      ...target.analyse,
+      typ: eInvoice.typ,
+      bestellnummer: eInvoice.bestellnummer ?? target.analyse.bestellnummer,
+      haendler: eInvoice.haendler ?? target.analyse.haendler,
+      datum: eInvoice.datum ?? target.analyse.datum,
+      gesamtbetrag: eInvoice.gesamtbetrag ?? target.analyse.gesamtbetrag,
+      netto: eInvoice.netto ?? target.analyse.netto,
+      mwst: eInvoice.mwst ?? target.analyse.mwst,
+      faelligkeitsdatum: eInvoice.faelligkeitsdatum ?? target.analyse.faelligkeitsdatum,
+      iban: eInvoice.iban ?? target.analyse.iban,
+      konfidenz: 1.0,
+    };
+    logInfo("webhook/email", "E-Rechnung-Daten in Anhang-Analyse gemergt", {
+      bestellnummer: eInvoice.bestellnummer,
+      gesamtbetrag: eInvoice.gesamtbetrag,
+    });
+  } else if (eInvoice && analyseErgebnisse.length === 0) {
+    // E-Rechnung als XML-only ohne PDF-Anhang — synthetisches Analyse-Ergebnis
+    analyseErgebnisse.push({
+      analyse: eInvoice,
+      dateiName: "xrechnung.xml",
+      base64: "",
+      mime_type: "application/xml",
+    });
+  }
 
   // 11. Besteller zuordnen
   const { bestellerKuerzel, zuordnungsMethode, signal: bestellerSignal } =

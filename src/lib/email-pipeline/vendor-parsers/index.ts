@@ -18,6 +18,8 @@ import { z } from "zod";
 import { amazonParser } from "./amazon";
 import { raabKarcherParser } from "./raab-karcher";
 import { plancraftParser } from "./plancraft";
+import { brilluxParser } from "./brillux";
+import { fritzBaustoffeParser } from "./fritz-baustoffe";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -70,9 +72,11 @@ export { VENDOR_CONFIDENCE_THRESHOLD } from "./types";
  * Spezifische Domain-Matcher zuerst, generische Pattern-Matcher danach.
  */
 const PARSERS: VendorParser[] = [
-  amazonParser,       // amazon.de etc. — eindeutige Domain
-  raabKarcherParser,  // raab-karcher.de / stark-deutschland.de — eindeutige Domain
-  plancraftParser,    // plancraft.com — SU-Rechnungen im Auftrag
+  amazonParser,         // amazon.de etc. — eindeutige Domain
+  raabKarcherParser,    // raab-karcher.de / stark-deutschland.de — eindeutige Domain
+  brilluxParser,        // brillux.de — Subject-Pattern "Rechnung Nr. XXXXXXX"
+  fritzBaustoffeParser, // f-b.gmbh — Subject-Pattern "RechNr: XX/XXXXXXX vom DD.MM.YYYY"
+  plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
 export interface VendorDispatchResult {

@@ -373,7 +373,44 @@ Extrahiere auch:
 - "projekt_referenz": Projekt- oder Bauvorhabenreferenz (z.B. "BV: Glögler, Prinzenstr. 42", "Bes-Nr.: BV Klöggler", "Kommission: Dörning"). Der vollständige Text.
 - "bestelldatum": Datum der ursprünglichen Bestellung (z.B. "Bestelldatum: 16.04.2026"). Format "YYYY-MM-DD". Nicht verwechseln mit Rechnungsdatum oder Lieferdatum.
 
-Falls ein Feld nicht erkennbar ist, setze null.`;
+Falls ein Feld nicht erkennbar ist, setze null.
+
+═══════════════════════════════════════════════════════════════════════════
+HALLUZINATIONS-SCHUTZ — typische deutsche Mail-Fallen (aus Real-World-Daten):
+═══════════════════════════════════════════════════════════════════════════
+
+❌ FALSCH: "verschicken" oder "wurden" als Bestellnummer interpretieren.
+   Bestellnummern haben IMMER mindestens 1 Ziffer und meist 4+ Zeichen.
+   Verb-Stämme wie "verschicken", "versendet", "bestellt", "lieferung" sind
+   NIE Bestellnummern — setze null wenn nichts klar Numerisches da ist.
+
+✅ "Deine Bestellung 3006915 ist am 17.04.2026 eingegangen" → bestellnummer="3006915"
+✅ "Brillux Rechnung, Kundennummer 4147622, Rechnung Nr. 6887860"
+   → bestellnummer="6887860" (die Rechnungs-Nr.), kundennummer="4147622"
+✅ "BESTELLNR. #DH39680" → bestellnummer="DH39680"
+✅ "Auftrag 2030485657" (Raab Karcher) → auftragsnummer="2030485657"
+✅ Amazon-Format "302-0733687-4332321" → bestellnummer="302-0733687-4332321"
+
+❌ FALSCH: Anwaltskanzlei-Aktenzeichen als invoice_id.
+   Kanzleien wie FASP senden "Akte: 000211-26/RK/30/RK" → das ist KEINE
+   Bestellnummer für unsere Pipeline. Bei Subject "Klageerwiderung",
+   "Stellungnahme", "Gerichtskosten": typ="leistungsnachweis" UND
+   bestellnummer = das Aktenzeichen (für Match-Zwecke ist das die einzige
+   stabile ID).
+
+❌ FALSCH: "Bestellung bei Ada Commerce" hat keine erkennbare Nummer im Subject
+   → trotzdem im Body suchen ("Deine Bestellung XXXXX..."). Nur null wenn
+   wirklich nirgends eine Nummer steht.
+
+❌ FALSCH: bei Versandbestätigungen Wörter wie "verschickt"/"versandt" als
+   tracking_nummer eintragen. Tracking-Nummern haben 8-30 Zeichen, alphanumerisch,
+   typisch nach Pattern "Sendungsnummer: 60224916252" oder "DHL 1Z9999...".
+
+❌ FALSCH: typ="rechnung" für Mahnungen. Mahnschreiben enthalten Wörter wie
+   "Mahnung", "Zahlungserinnerung", "Mahngebühr" — typ="rechnung" ist OK,
+   aber gesamtbetrag nur wenn echter Betrag im Mahn-Text genannt ist.
+
+═══════════════════════════════════════════════════════════════════════════`;
 
 /** Document-Hint-Map: vom Outlook-Folder gelieferter weicher Hinweis auf den Dokumenttyp. */
 const HINT_LABELS: Record<string, string> = {
