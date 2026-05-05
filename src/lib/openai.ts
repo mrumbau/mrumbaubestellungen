@@ -51,8 +51,27 @@ export const USD_TO_EUR = 0.93;
 
 const costStore = new AsyncLocalStorage<CostBucket>();
 
+/**
+ * Normalisiert Model-Namen. OpenAI returnt versionierte Namen wie
+ * "gpt-5.5-2026-04-15" oder "gpt-4o-2024-08-06" — unsere MODEL_COSTS_USD-Map
+ * hat aber nur die Base-Namen. Ohne Normalisierung wäre cost_eur immer 0.
+ *
+ * Strategie: längster Base-Namens-Match-Prefix gewinnt.
+ */
+function normalizeModelName(model: string): string {
+  // Sortiere keys nach Länge (längster zuerst), damit "gpt-4o-mini" vor "gpt-4o" matched
+  const keys = Object.keys(MODEL_COSTS_USD).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (model === key || model.startsWith(key + "-") || model.startsWith(key + ".")) {
+      return key;
+    }
+  }
+  return model;
+}
+
 function calcCostEur(model: string, prompt_tokens: number, completion_tokens: number): number {
-  const rates = MODEL_COSTS_USD[model] ?? { input: 0, output: 0 };
+  const normalized = normalizeModelName(model);
+  const rates = MODEL_COSTS_USD[normalized] ?? { input: 0, output: 0 };
   const usd = (prompt_tokens * rates.input + completion_tokens * rates.output) / 1_000_000;
   return usd * USD_TO_EUR;
 }
@@ -63,6 +82,9 @@ function trackCost(model: string, usage: { prompt_tokens?: number; completion_to
   const outputT = usage.completion_tokens ?? 0;
   if (inputT === 0 && outputT === 0) return;
   const costEur = calcCostEur(model, inputT, outputT);
+  // Versionierten Model-Namen für Breakdown-Key zu Base-Namen normalisieren —
+  // sonst entstehen 100 Sub-Keys pro Modell-Release-Datum.
+  const breakdownKey = normalizeModelName(model);
 
   const bucket = costStore.getStore();
   if (bucket) {
@@ -70,7 +92,7 @@ function trackCost(model: string, usage: { prompt_tokens?: number; completion_to
     bucket.output_tokens += outputT;
     bucket.cost_eur += costEur;
     bucket.calls += 1;
-    const mb = (bucket.model_breakdown[model] ??= { input_tokens: 0, output_tokens: 0, cost_eur: 0, calls: 0 });
+    const mb = (bucket.model_breakdown[breakdownKey] ??= { input_tokens: 0, output_tokens: 0, cost_eur: 0, calls: 0 });
     mb.input_tokens += inputT;
     mb.output_tokens += outputT;
     mb.cost_eur += costEur;
