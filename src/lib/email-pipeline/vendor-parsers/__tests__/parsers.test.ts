@@ -122,6 +122,19 @@ describe("Süd-Metall Parser", () => {
     expect(result!.result.vendor).toBe("sued-metall");
     expect(result!.result.documents[0].auftragsnummer).toBe("AUF7654321");
   });
+
+  it("Versandbestätigung wird KORREKT als versandbestaetigung klassifiziert (Bug 22.04.: KI hatte fälschlich bestellbestaetigung)", async () => {
+    const result = await tryParseVendor(
+      makeInput({
+        email_absender: "lieferschein@suedmetall.com",
+        email_betreff: "Ihre Bestellung AUF3631178 wurde versandt | Süd-Metall Beschläge GmbH",
+      }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.result.vendor).toBe("sued-metall");
+    expect(result!.result.documents[0].typ).toBe("versandbestaetigung");
+    expect(result!.result.documents[0].auftragsnummer).toBe("AUF3631178");
+  });
 });
 
 describe("DeubaXXL Parser", () => {
