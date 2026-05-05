@@ -45,6 +45,13 @@ export interface IngestEmailInput {
   anhaenge?: EmailAttachment[];
   /** Phase-2-Enhancement: Outlook-Folder-Hint (rechnung/lieferschein/etc.) */
   document_hint?: string | null;
+  /**
+   * Re-Backfill-Idempotenz (05.05.2026): wenn diese Mail einer früheren
+   * Pipeline-Run schon einer Bestellung zugeordnet war, wird hier die ID
+   * übergeben. Pipeline UPDATEt die existierende Bestellung statt eine neue
+   * anzulegen — verhindert Duplikat-Bestellungen beim Re-Backfill.
+   */
+  existing_bestellung_id?: string | null;
 }
 
 export interface IngestEmailResult {

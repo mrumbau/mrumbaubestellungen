@@ -112,6 +112,16 @@ export async function replayOneMessage(
     return { outcome: "failed", fehler: msg };
   }
 
+  // Re-Backfill-Idempotenz (05.05.2026): wenn bei einer früheren Pipeline-Run
+  // diese internet_message_id schon einer Bestellung zugeordnet war, geben wir
+  // die ID an die Pipeline weiter — sie UPDATEt dann statt eine neue anzulegen.
+  const { data: prevLog } = await supabase
+    .from("email_processing_log")
+    .select("bestellung_id")
+    .eq("internet_message_id", internetMessageId)
+    .maybeSingle();
+  const existingBestellungId = prevLog?.bestellung_id ?? null;
+
   // R5c: Komplette Pipeline (classify + ingest) in withCostTracking-Bucket
   // → AsyncLocalStorage-Bucket fließt durch alle OpenAI-Calls und wird in
   // markProcessed in email_processing_log.openai_* persistiert.
@@ -148,6 +158,7 @@ export async function replayOneMessage(
         bestellnummer_betreff: classifyResult.bestellnummer_betreff,
         anhaenge: attachments,
         document_hint: folderHint,
+        existing_bestellung_id: existingBestellungId,
       });
 
       return { outcome: "ingested" as const, ingestResult };

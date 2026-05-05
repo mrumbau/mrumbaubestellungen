@@ -28,6 +28,7 @@ export async function ingestEmail(input: IngestEmailInput): Promise<IngestEmailR
       su_id: input.su_id,
       bestellnummer_betreff: input.bestellnummer_betreff,
       document_hint: input.document_hint,
+      existing_bestellung_id: input.existing_bestellung_id,
     });
 
     return {

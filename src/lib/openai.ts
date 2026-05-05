@@ -480,35 +480,47 @@ export async function analysiereDokument(
   // F4.3 Fix: Structured Outputs via zodResponseFormat. Kein safeParseGptJson
   // mehr nötig — die OpenAI-API garantiert valid-JSON conforming zum Schema
   // (oder wirft beim Refusal).
-  try {
-    const completion = await withRetry(() =>
-      openai.chat.completions.parse({
-        model: "gpt-5.5",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-        max_tokens: maxTokens,
-        temperature: 0.1,
-        response_format: zodResponseFormat(DokumentAnalyseSchema, "DokumentAnalyse"),
-      }),
-    );
-
-    const parsed = completion.choices[0]?.message?.parsed;
-    if (!parsed) {
-      const refusal = completion.choices[0]?.message?.refusal;
-      logError("openai/analysiereDokument", "Structured-Outputs lieferte kein parsed-Objekt", {
-        refusal: refusal ?? null,
-      });
-      return makeUnknownDokumentAnalyse(true);
+  //
+  // 05.05.2026: Parse-Fehler-Retry — bei fehlgeschlagenem ersten Versuch
+  // (kein parsed-Objekt oder Exception) einmal mit gpt-4o als Fallback-Modell
+  // (älteres aber stabiles Strukturiertes-Output-Modell). Verhindert dass eine
+  // einmalige GPT-5.5-Macke den ganzen Pipeline-Run für die Mail wertlos macht.
+  const tryAnalyse = async (model: string): Promise<DokumentAnalyse | null> => {
+    try {
+      const completion = await withRetry(() =>
+        openai.chat.completions.parse({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent },
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.1,
+          response_format: zodResponseFormat(DokumentAnalyseSchema, "DokumentAnalyse"),
+        }),
+      );
+      const parsed = completion.choices[0]?.message?.parsed;
+      if (!parsed) {
+        const refusal = completion.choices[0]?.message?.refusal;
+        logError("openai/analysiereDokument", `${model}: kein parsed-Objekt`, { refusal: refusal ?? null });
+        return null;
+      }
+      return parsed as DokumentAnalyse;
+    } catch (err) {
+      logError("openai/analysiereDokument", `${model}: Aufruf fehlgeschlagen`, err);
+      return null;
     }
+  };
 
-    // Strikte Schema-Garantie — Cast ist safe weil zodResponseFormat parsed validiert.
-    return parsed as DokumentAnalyse;
-  } catch (err) {
-    logError("openai/analysiereDokument", "Structured-Outputs-Aufruf fehlgeschlagen", err);
-    return makeUnknownDokumentAnalyse(true);
-  }
+  const primary = await tryAnalyse("gpt-5.5");
+  if (primary) return primary;
+
+  // Retry mit Fallback-Modell — gpt-4o ist battle-tested für Structured-Outputs
+  logInfo("openai/analysiereDokument", "Retry mit Fallback-Modell gpt-4o");
+  const fallback = await tryAnalyse("gpt-4o");
+  if (fallback) return fallback;
+
+  return makeUnknownDokumentAnalyse(true);
 }
 
 /** F4.3 Helper: Default-Fallback wenn analysiereDokument keinen valid-Output liefert. */

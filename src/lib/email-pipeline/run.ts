@@ -99,6 +99,13 @@ export interface EmailPipelineInput {
   su_id?: string | null;
   bestellnummer_betreff?: string | null;
   document_hint?: string | null;
+  /**
+   * Re-Backfill-Idempotenz (05.05.2026): Wenn diese Mail bereits einer
+   * Bestellung zugeordnet war (email_processing_log.bestellung_id != NULL),
+   * wird hier die ID übergeben. Pipeline UPDATEt diese Bestellung dann statt
+   * eine neue anzulegen — verhindert Duplikate beim Re-Backfill.
+   */
+  existing_bestellung_id?: string | null;
 }
 
 export interface EmailPipelineResult {
@@ -219,6 +226,24 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
   // 6. Anhänge normalisieren
   const anhaenge = normalizeAnhaenge(input.anhaenge, email_betreff, email_absender);
+
+  // Anhang-Pipeline-Eskalation (05.05.2026): wenn die Mail Anhänge hatte aber
+  // nach normalizeAnhaenge nichts übrig ist (alle wegen MIME/Größe/Magic-Bytes
+  // gefiltert), eskalieren — damit der Bug nicht still durchschlüpft. Beispiel:
+  // Feistbaur 2026-04-23 hatte has_attachments=true aber 0 PDFs im Storage,
+  // weil das PDF in einer früheren Pipeline-Version den Filter nicht passierte.
+  const rawAnhaengeCount = Array.isArray(input.anhaenge) ? input.anhaenge.length : 0;
+  if (input.hasAttachments === true && rawAnhaengeCount === 0) {
+    logError("webhook/email", "Anhang-Pipeline-Eskalation: hasAttachments=true aber input.anhaenge ist leer", {
+      email_betreff, email_absender, has_attachments: input.hasAttachments,
+    });
+  } else if (rawAnhaengeCount > 0 && anhaenge.length === 0) {
+    logError("webhook/email", "Anhang-Pipeline-Eskalation: alle Anhänge nach Normalisierung gefiltert", {
+      email_betreff, email_absender,
+      raw_count: rawAnhaengeCount,
+      after_filter: anhaenge.length,
+    });
+  }
 
   // 7. Email-Body
   const rawEmailText = input.email_text || input.email_body || "";
@@ -527,7 +552,30 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     haendlerName,
   };
 
-  let existierendeBestellung: BestellungRow | null = await findByExactNumber(supabase, suchNummern, matchCtx);
+  let existierendeBestellung: BestellungRow | null = null;
+
+  // Re-Backfill-Idempotenz (05.05.2026): Wenn diese Mail in einer früheren
+  // Pipeline-Run schon einer Bestellung zugeordnet war, diese als Match nehmen
+  // BEVOR die normale Match-Logic läuft. Verhindert dass Re-Backfills neue
+  // Bestellungen anlegen wenn die Mail-zu-Bestellung-Beziehung schon bekannt ist.
+  if (input.existing_bestellung_id) {
+    const { data: prev } = await supabase
+      .from("bestellungen")
+      .select("id, bestellnummer, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
+      .eq("id", input.existing_bestellung_id)
+      .maybeSingle();
+    if (prev) {
+      existierendeBestellung = prev as BestellungRow;
+      logInfo("webhook/email", "Re-Backfill-Idempotenz: existing_bestellung_id Match übernommen", {
+        bestellung_id: input.existing_bestellung_id,
+        bestellnummer: prev.bestellnummer,
+      });
+    }
+  }
+
+  if (!existierendeBestellung) {
+    existierendeBestellung = await findByExactNumber(supabase, suchNummern, matchCtx);
+  }
 
   // R5c-Bugfix: Fuzzy-Match (Substring + Token)
   if (!existierendeBestellung) {
@@ -884,30 +932,30 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
       let bodyAnalyse: DokumentAnalyse;
 
-      if (vendorResult && vendorResult.acceptWithoutKI && vendorResult.result.documents.length > 0) {
-        bodyAnalyse = vendorResult.result.documents[0];
-        parserSource = "vendor";
-        parserName = vendorResult.result.vendor;
-        logInfo("webhook/email", "Vendor-Parser-Treffer (KI übersprungen)", {
-          vendor: parserName,
-          parser_version: vendorResult.result.parser_version,
-          konfidenz: vendorResult.result.konfidenz,
-          bestellnummer: bodyAnalyse.bestellnummer,
-          typ: bodyAnalyse.typ,
-        });
-      } else {
-        const bodyMitBetreff = email_betreff
-          ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
-          : emailText.slice(0, 15000);
-        const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
-        bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint || undefined });
+      // Always-KI (05.05.2026): KI läuft IMMER parallel zum Vendor-Parser.
+      // Vendor-Parser-Hints werden via mergeVendorIntoKi gemerged. Vorher hatten
+      // wir bei Vendor-Konfidenz ≥0.75 die KI komplett geskipped — das hat
+      // Vendor-Parser-Lücken (z.B. fehlende BN/Beträge im PDF) ungenutzt gelassen.
+      // Cost-Trade: ~5x höhere OpenAI-Cost, dafür konsistente PDF-Inhalts-Extraktion.
+      const bodyMitBetreff = email_betreff
+        ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
+        : emailText.slice(0, 15000);
+      const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
+      bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint || undefined });
 
-        // R5b mergeVendorIntoKi
-        if (vendorResult && vendorResult.result.documents.length > 0) {
-          const vendorDoc = vendorResult.result.documents[0];
-          bodyAnalyse = mergeVendorIntoKi(bodyAnalyse, vendorDoc);
-          parserName = vendorResult.result.vendor;
-        }
+      if (vendorResult && vendorResult.result.documents.length > 0) {
+        const vendorDoc = vendorResult.result.documents[0];
+        bodyAnalyse = mergeVendorIntoKi(bodyAnalyse, vendorDoc);
+        parserName = vendorResult.result.vendor;
+        parserSource = vendorResult.acceptWithoutKI ? "vendor" : "ki";
+        logInfo("webhook/email", "Vendor + KI parallel", {
+          vendor: parserName,
+          vendor_konfidenz: vendorResult.result.konfidenz,
+          ki_konfidenz: bodyAnalyse.konfidenz,
+          accept_without_ki_war_aktiviert: vendorResult.acceptWithoutKI,
+          merged_bestellnummer: bodyAnalyse.bestellnummer,
+          merged_typ: bodyAnalyse.typ,
+        });
       }
 
       // Betreff-Korrektur
