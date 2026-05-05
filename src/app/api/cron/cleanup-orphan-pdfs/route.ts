@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Audit-Log VOR Delete (überlebt auch bei Storage-API-Fehler)
     await supabase.from("webhook_logs").insert({
-      typ: "cron_cleanup_orphans",
+      typ: "cron_cleanup",
       status: "info",
       fehler_text: `${dryRun ? "DRY-RUN: " : ""}${orphanCount} Orphan-PDFs (≥${minAlterStunden}h alt, max ${maxLoeschen}), ${Math.round(orphanBytes / 1024 / 1024 * 100) / 100} MB`,
     });
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     if (removeErr) {
       logError(ROUTE_TAG, "Storage.remove fehlgeschlagen", removeErr);
       await supabase.from("webhook_logs").insert({
-        typ: "cron_cleanup_orphans",
+        typ: "cron_cleanup",
         status: "error",
         fehler_text: `Storage.remove-Fehler: ${removeErr.message} (${orphanCount} Pfade)`,
       });
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     const deletedCount = removed?.length ?? 0;
 
     await supabase.from("webhook_logs").insert({
-      typ: "cron_cleanup_orphans",
+      typ: "cron_cleanup",
       status: "success",
       fehler_text: `${deletedCount} von ${orphanCount} Orphan-PDFs gelöscht (~${Math.round(orphanBytes / 1024 / 1024 * 100) / 100} MB)`,
     });
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     try {
       const supabase = createServiceClient();
       await supabase.from("webhook_logs").insert({
-        typ: "cron_cleanup_orphans",
+        typ: "cron_cleanup",
         status: "error",
         fehler_text: err instanceof Error ? err.message : "Unbekannter Fehler",
       });
