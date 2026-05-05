@@ -23,6 +23,7 @@ import { fritzBaustoffeParser } from "./fritz-baustoffe";
 import { telekomParser } from "./telekom";
 import { kauflandParser } from "./kaufland";
 import { suedMetallParser } from "./sued-metall";
+import { deubaxxlParser } from "./deubaxxl";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -82,6 +83,7 @@ const PARSERS: VendorParser[] = [
   telekomParser,        // telekom.de — Mobilfunk/Festnetz Geschäftskunden-Rechnungen (abo)
   kauflandParser,       // kaufland-marktplatz.de — Marketplace-Bestellungen mit M-Pattern
   suedMetallParser,     // sued-metall.de — AUF\d{7} Auftragsnummer im Subject
+  deubaxxlParser,       // deubaxxl.de — "(Deine|Ihre) Bestellung XXXXXXX" Pattern
   plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
