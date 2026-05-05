@@ -10,6 +10,8 @@ import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { ArtTabs, type ArtFilter } from "@/components/ui/art-tabs";
 import { useTableFilters } from "@/lib/use-table-filters";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { STATUS_FILTER_OPTIONS } from "@/lib/status-config";
 import {
   DataTable,
   DensityToggle,
@@ -68,14 +70,7 @@ interface ProjektOption {
 }
 
 
-const STATUS_OPTIONS = [
-  { value: "", label: "Alle Status" },
-  { value: "offen", label: "Offen" },
-  { value: "vollstaendig", label: "Vollständig" },
-  { value: "abweichung", label: "Abweichung" },
-  { value: "ls_fehlt", label: "LS fehlt" },
-  { value: "freigegeben", label: "Freigegeben" },
-];
+// STATUS_FILTER_OPTIONS wird jetzt aus @/lib/status-config importiert.
 
 // DokumentIcon wurde nach @/components/ui/cells/dokument-icon extrahiert.
 
@@ -741,53 +736,19 @@ export function BestellungenTabelle({
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <ArtTabs value={artFilter} onChange={setArtFilter} counts={artCounts} />
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 min-w-0">
-            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle pointer-events-none" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={suche}
-              onChange={(e) => setSuche(e.target.value)}
-              placeholder="Suchen… (Taste /)"
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="hidden md:block px-3.5 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          {projekte.length > 0 && (
-            <select
-              value={projektFilter}
-              onChange={(e) => setProjektFilter(e.target.value)}
-              className="hidden md:block px-3.5 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
-            >
-              <option value="">Alle Projekte</option>
-              {projekte.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={filters.reset}
-              className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-error-bg rounded-lg border border-line transition-colors shrink-0"
-              title="Filter zurücksetzen"
-            >
-              <IconX className="w-4 h-4" />
-            </button>
-          )}
+        <FilterBar
+          suche={suche}
+          onSucheChange={setSuche}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          projektFilter={projektFilter}
+          onProjektFilterChange={setProjektFilter}
+          hasFilters={hasFilters}
+          onReset={filters.reset}
+          statusOptions={STATUS_FILTER_OPTIONS}
+          projekte={projekte.map((p) => ({ id: p.id, name: p.name }))}
+          searchInputRef={searchInputRef}
+        >
           <DensityToggle density={density} onChange={setDensity} />
           <SavedViewsMenu<ViewConfig>
             views={savedViews.views}
@@ -831,7 +792,7 @@ export function BestellungenTabelle({
             </svg>
             CSV
           </button>
-        </div>
+        </FilterBar>
       </div>
 
       {/* Mobile: Status + Projekt filter below */}
@@ -841,7 +802,7 @@ export function BestellungenTabelle({
           onChange={(e) => setStatusFilter(e.target.value)}
           className="flex-1 px-3.5 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
         >
-          {STATUS_OPTIONS.map((o) => (
+          {STATUS_FILTER_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>

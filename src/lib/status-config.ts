@@ -75,3 +75,19 @@ export const STATUS_CONFIG: Record<
 export function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] || STATUS_CONFIG.offen;
 }
+
+/**
+ * Status-Optionen für Filter-Selects. Synchron mit STATUS_CONFIG-Keys
+ * plus "" für "Alle Status"-Default.
+ *
+ * Single source of truth: bei einem neuen Status muss nur STATUS_CONFIG
+ * (oben) ergänzt werden plus dieser Eintrag.
+ */
+export const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Alle Status" },
+  { value: "offen", label: "Offen" },
+  { value: "vollstaendig", label: "Vollständig" },
+  { value: "abweichung", label: "Abweichung" },
+  { value: "ls_fehlt", label: "LS fehlt" },
+  { value: "freigegeben", label: "Freigegeben" },
+];
