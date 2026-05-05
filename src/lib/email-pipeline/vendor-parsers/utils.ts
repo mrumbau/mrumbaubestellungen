@@ -49,8 +49,9 @@ export function parseGermanDate(raw: string | null | undefined): string | null {
     return `${slashed[3]}-${slashed[2].padStart(2, "0")}-${slashed[1].padStart(2, "0")}`;
   }
 
-  // 16. April 2026 (Langform)
-  const longForm = trimmed.match(/(\d{1,2})\.\s*(\w+)\s*(\d{4})/);
+  // 16. April 2026 (Langform) — \w matcht keine deutschen Umlaute,
+  // deshalb explizite Char-Class mit ä/ö/ü/ß.
+  const longForm = trimmed.match(/(\d{1,2})\.\s*([A-Za-zäöüÄÖÜß]+)\s*(\d{4})/);
   if (longForm) {
     const month = MONTH_MAP_DE[longForm[2].toLowerCase()];
     if (month) {
