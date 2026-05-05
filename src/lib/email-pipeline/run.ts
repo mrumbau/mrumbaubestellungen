@@ -466,10 +466,15 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   const erkannteAuftragsnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer);
   const erkannteLieferscheinnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer);
 
-  // F5.X Fix: Body-Pattern-Fallbacks für Bestellnummer.
-  // KI-Vision extrahiert oft schlecht aus reinen Text-Mails ohne PDF-Anhang.
-  // Diese Patterns greifen für deutsche Online-Shops + Amazon.
-  if (!erkannteBestellnummer) {
+  // F5.X Fix: Body-/Subject-Pattern für Bestellnummer.
+  // 05.05.2026 (Wurzelfix MobiHero-Drift): Subject-Pattern läuft IMMER (nicht
+  // nur als Fallback bei fehlender KI-BN). Sammelt zusätzliche Cross-Reference-
+  // Nummern für die Match-Logic. Beispiel MobiHero: KI extrahiert aus PDF die
+  // Rechnungsnr "21092906", Subject sagt aber "Ihre Rechnung zur Bestellung 54255120".
+  // Beide Nummern müssen in suchNummern landen, damit findByExactNumber gegen die
+  // existierende Bestellung 54255120 matchen kann statt eine neue anzulegen.
+  const subjectExtraNummern: string[] = [];
+  {
     const subject = email_betreff ?? "";
     const body = input.email_text ?? input.email_body ?? "";
     const haystack = `${subject}\n${body}`;
@@ -491,12 +496,20 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       const match = haystack.match(p.regex);
       const candidate = match ? (match[1] ?? match[0]) : null;
       const validated = safeBestellnummer(candidate);
-      if (validated) {
+      if (!validated) continue;
+
+      // Erst-Treffer: Hauptnummer-Fallback wenn KI nichts hatte
+      if (!erkannteBestellnummer) {
         erkannteBestellnummer = validated;
         logInfo("webhook/email", `Bestellnummer-Body-Fallback gegriffen (${p.name}): ${validated}`, {
           email_betreff,
         });
-        break;
+      } else if (validated !== erkannteBestellnummer && validated !== erkannteAuftragsnummer && validated !== erkannteLieferscheinnummer) {
+        // Zusatznummer (Cross-Reference) — wenn nicht bereits in den KI-Nummern
+        subjectExtraNummern.push(validated);
+        logInfo("webhook/email", `Subject-Cross-Reference-Nummer (${p.name}): ${validated}`, {
+          email_betreff,
+        });
       }
     }
   }
@@ -529,7 +542,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     }
   }
 
-  const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer].filter((n): n is string => !!n);
+  const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer, ...subjectExtraNummern].filter((n): n is string => !!n);
 
   // GPT-Bestellnummer-Nachlauf für Besteller-Match
   if (erkannteBestellnummer && !signal && bestellerKuerzelMutable === "UNBEKANNT") {
@@ -713,6 +726,23 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     if (erweiterterMatch) {
       bestellungId = erweiterterMatch;
     } else {
+      // 05.05.2026 (Wurzelfix Geister-Bestellungen): Wenn ALLE Anhang-Analysen
+      // parse_fehler haben UND keine BN/Betrag extrahiert wurde → KEINE neue
+      // Bestellung anlegen. Stattdessen Mail als 'failed' markieren damit der
+      // Auto-Retry-Cron sie später nochmal versucht (möglicherweise greift
+      // dann der gpt-4o-Fallback oder ein Modell-Update).
+      const allAnhaengeFailed = analyseErgebnisse.length > 0
+        && analyseErgebnisse.every((e) => e.analyse.parse_fehler === true || (!e.analyse.bestellnummer && !e.analyse.gesamtbetrag && e.analyse.konfidenz === 0));
+      if (allAnhaengeFailed && !erkannteBestellnummer && !erkannteAuftragsnummer) {
+        logError("webhook/email", "Alle Anhang-Analysen parse_fehler + keine Subject-BN → keine Geister-Bestellung anlegen", {
+          email_betreff, email_absender,
+          anhang_count: analyseErgebnisse.length,
+        });
+        // ingest.ts catched Exceptions → markFailed → Auto-Retry-Cron versucht später nochmal
+        // Verhindert dass eine null-BN-null-Betrag-Geister-Bestellung in der DB landet.
+        throw new Error("parse_fehler_alle_anhaenge: Mail wird zur Wiederverarbeitung markiert");
+      }
+
       // Neue Bestellung anlegen
       if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
         const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
