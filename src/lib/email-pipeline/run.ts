@@ -200,16 +200,26 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     }
   }
 
-  // 3. Idempotenz
-  const idem = await checkAndClaimIdempotency(supabase, {
-    email_absender,
-    email_betreff,
-    email_datum,
-    email_body: input.email_text || input.email_body || "",
-    anhaenge_count: Array.isArray(input.anhaenge) ? input.anhaenge.length : 0,
-  });
-  if (idem.isDuplicate) {
-    return { success: true, deduplicated: true };
+  // 3. Idempotenz (24h-Body-Hash)
+  // Re-Backfill-Bypass: bei explizitem existing_bestellung_id-Hint überspringen
+  // wir den Hash-Check — wir wollen die Mail bewusst neu verarbeiten und
+  // an die existierende Bestellung anhängen. Sonst würde der Hash-Lock aus
+  // dem ursprünglichen Run die zweite Verarbeitung als "duplicate" abwürgen.
+  if (!input.existing_bestellung_id) {
+    const idem = await checkAndClaimIdempotency(supabase, {
+      email_absender,
+      email_betreff,
+      email_datum,
+      email_body: input.email_text || input.email_body || "",
+      anhaenge_count: Array.isArray(input.anhaenge) ? input.anhaenge.length : 0,
+    });
+    if (idem.isDuplicate) {
+      return { success: true, deduplicated: true };
+    }
+  } else {
+    logInfo("webhook/email", "24h-Hash-Idempotenz übersprungen wegen existing_bestellung_id (Re-Backfill)", {
+      existing_bestellung_id: input.existing_bestellung_id,
+    });
   }
 
   // 4. Betreff-Validierung
