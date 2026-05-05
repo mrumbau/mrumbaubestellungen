@@ -26,6 +26,7 @@ import { suedMetallParser } from "./sued-metall";
 import { deubaxxlParser } from "./deubaxxl";
 import { megabadParser } from "./megabad";
 import { feistbaurParser } from "./feistbaur";
+import { holdSpadaParser } from "./hold-spada";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -88,6 +89,7 @@ const PARSERS: VendorParser[] = [
   deubaxxlParser,       // deubaxxl.de — "(Deine|Ihre) Bestellung XXXXXXX" Pattern
   megabadParser,        // megabad.de — 8-digit Bestellnr (8121xxxx), Sender-driven Doku-Typ
   feistbaurParser,      // feistbaur@t-online.de — SU, Sender-Localpart-Match (RechnungsNr im PDF)
+  holdSpadaParser,      // hold-spada.com — SU, Subject "<8-digit>, DD.MM.YYYY, Mailversand"
   plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
