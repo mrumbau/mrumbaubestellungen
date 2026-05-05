@@ -22,6 +22,7 @@ import { brilluxParser } from "./brillux";
 import { fritzBaustoffeParser } from "./fritz-baustoffe";
 import { telekomParser } from "./telekom";
 import { kauflandParser } from "./kaufland";
+import { suedMetallParser } from "./sued-metall";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -80,6 +81,7 @@ const PARSERS: VendorParser[] = [
   fritzBaustoffeParser, // f-b.gmbh — Subject-Pattern "RechNr: XX/XXXXXXX vom DD.MM.YYYY"
   telekomParser,        // telekom.de — Mobilfunk/Festnetz Geschäftskunden-Rechnungen (abo)
   kauflandParser,       // kaufland-marktplatz.de — Marketplace-Bestellungen mit M-Pattern
+  suedMetallParser,     // sued-metall.de — AUF\d{7} Auftragsnummer im Subject
   plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
