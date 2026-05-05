@@ -77,34 +77,46 @@ function calcCostEur(model: string, prompt_tokens: number, completion_tokens: nu
 }
 
 function trackCost(model: string, usage: { prompt_tokens?: number; completion_tokens?: number } | null | undefined) {
-  if (!usage) return;
+  const bucket = costStore.getStore();
+
+  if (!bucket) {
+    // Pipeline-Aufrufer hat kein withCostTracking gewickelt — nur Per-Call-Log.
+    // Sollte normalerweise nicht passieren (replay.ts wickelt classify+ingest in withCostTracking).
+    logInfo("openai/cost-debug", "trackCost: kein AsyncLocalStorage-bucket — Aufrufer ohne withCostTracking?", {
+      model,
+      has_usage: !!usage,
+    });
+    return;
+  }
+
+  if (!usage) {
+    // KI-Call kam zurück ohne usage-Feld (Stream-Response, Error-Response, oder API-Quirk).
+    // Mindestens den Call-Counter inkrementieren damit wir sehen DASS gerufen wurde.
+    bucket.calls += 1;
+    logInfo("openai/cost-debug", "trackCost: usage fehlte — nur Call-Counter inkrementiert", { model });
+    return;
+  }
+
   const inputT = usage.prompt_tokens ?? 0;
   const outputT = usage.completion_tokens ?? 0;
-  if (inputT === 0 && outputT === 0) return;
   const costEur = calcCostEur(model, inputT, outputT);
   // Versionierten Model-Namen für Breakdown-Key zu Base-Namen normalisieren —
   // sonst entstehen 100 Sub-Keys pro Modell-Release-Datum.
   const breakdownKey = normalizeModelName(model);
 
-  const bucket = costStore.getStore();
-  if (bucket) {
-    bucket.input_tokens += inputT;
-    bucket.output_tokens += outputT;
-    bucket.cost_eur += costEur;
-    bucket.calls += 1;
-    const mb = (bucket.model_breakdown[breakdownKey] ??= { input_tokens: 0, output_tokens: 0, cost_eur: 0, calls: 0 });
-    mb.input_tokens += inputT;
-    mb.output_tokens += outputT;
-    mb.cost_eur += costEur;
-    mb.calls += 1;
-  } else {
-    // Per-Call-Log für Cost-Diagnose ohne explizites tracking-context
-    logInfo("openai/cost", "OpenAI-Call", {
-      model,
-      input_tokens: inputT,
-      output_tokens: outputT,
-      cost_eur: Number(costEur.toFixed(6)),
-    });
+  bucket.input_tokens += inputT;
+  bucket.output_tokens += outputT;
+  bucket.cost_eur += costEur;
+  bucket.calls += 1;
+  const mb = (bucket.model_breakdown[breakdownKey] ??= { input_tokens: 0, output_tokens: 0, cost_eur: 0, calls: 0 });
+  mb.input_tokens += inputT;
+  mb.output_tokens += outputT;
+  mb.cost_eur += costEur;
+  mb.calls += 1;
+
+  // Wenn beide 0 sind: log für Diagnose (bei 0-Token-Result wäre das ungewöhnlich)
+  if (inputT === 0 && outputT === 0) {
+    logInfo("openai/cost-debug", "trackCost: beide Token-Counter sind 0", { model, usage });
   }
 }
 
@@ -139,13 +151,19 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const result = await fn();
-      // R2/F4.1: Auto-Cost-Tracking
-      if (result && typeof result === "object" && "model" in result && "usage" in result) {
+      // R2/F4.1: Auto-Cost-Tracking. Auch wenn usage null/undefined ist:
+      // trackCost rufen damit bucket.calls inkrementiert wird + Diagnose-Log.
+      if (result && typeof result === "object" && "model" in result) {
         const r = result as {
           model?: string;
           usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
         };
-        if (r.model && r.usage) trackCost(r.model, r.usage);
+        if (r.model) trackCost(r.model, r.usage ?? null);
+      } else if (result && typeof result === "object") {
+        // Result hat kein "model"-Feld — Cost-Tracking nicht möglich
+        logInfo("openai/cost-debug", "withRetry-Result ohne model-Feld", {
+          result_keys: Object.keys(result as object).slice(0, 10),
+        });
       }
       return result;
     } catch (err: unknown) {
