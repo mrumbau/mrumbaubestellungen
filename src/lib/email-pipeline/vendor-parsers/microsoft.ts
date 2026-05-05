@@ -64,6 +64,16 @@ export const microsoftParser: VendorParser = {
     const bnMatch = searchSpace.match(/\b(?:Rechnungsnummer|Invoice\s+Number|Invoice)[:\s#-]+([A-Z][A-Z0-9]{6,12})\b/i);
     if (bnMatch) bestellnummer = bnMatch[1].toUpperCase();
 
+    // PDF-Filename-Match (häufigster Pfad): Microsoft-Rechnungs-PDFs heißen
+    // typisch "Invoice_E0100ZBO54.pdf" oder "<RechnungsNr>.pdf" pur.
+    if (!bestellnummer) {
+      const pdfAnhang = input.anhaenge.find((a) => a.mime_type === "application/pdf");
+      if (pdfAnhang) {
+        const fileMatch = pdfAnhang.name.match(/(?:Invoice[_-])?([A-Z]\d[A-Z0-9]{6,12})\.pdf$/i);
+        if (fileMatch) bestellnummer = fileMatch[1].toUpperCase();
+      }
+    }
+
     // Datum
     let datum: string | null = null;
     const isoMatch = searchSpace.match(/\b(20\d{2}-\d{2}-\d{2})\b/);

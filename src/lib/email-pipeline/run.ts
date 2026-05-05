@@ -876,7 +876,10 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         email_absender: email_absender || "",
         email_betreff: email_betreff || "",
         email_text: emailText,
-        anhaenge: [],
+        // Anhänge durchreichen — Parser können PDF-Filename-Pattern matchen
+        // (z.B. Telekom: Rechnung_<digits>_<datum>.pdf, Brillux: RE-<n>-<datum>-<kunde>.pdf).
+        // Inhalt (base64) ist enthalten falls ein Parser ZUGFeRD-XML aus PDF lesen will.
+        anhaenge: anhaenge.map((a) => ({ name: a.name, mime_type: a.mime_type, base64: a.base64 })),
       });
 
       let bodyAnalyse: DokumentAnalyse;

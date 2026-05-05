@@ -77,6 +77,19 @@ export const check24Parser: VendorParser = {
       || searchSpace.match(/\bBestellung[\s:#-]+([A-Z0-9]{6,10})\b/i);
     if (pattern) bestellnummer = pattern[1].toUpperCase();
 
+    // PDF-Filename-Match: CHECK24-Rechnungs-PDFs heißen typisch
+    // "Rechnung_<BN>.pdf" oder "<BN>_Rechnung.pdf"
+    if (!bestellnummer) {
+      const pdfAnhang = input.anhaenge.find((a) => a.mime_type === "application/pdf");
+      if (pdfAnhang) {
+        const fileMatch = pdfAnhang.name.match(/\b([A-Z]{4,8}[A-Z0-9]{0,4})\b/);
+        // Nur akzeptieren wenn alphanumerisch und ≥6 Zeichen (CHECK24-Format)
+        if (fileMatch && fileMatch[1].length >= 6 && /[A-Z]/.test(fileMatch[1])) {
+          bestellnummer = fileMatch[1].toUpperCase();
+        }
+      }
+    }
+
     // Datum
     let datum: string | null = null;
     const isoMatch = searchSpace.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
