@@ -185,9 +185,11 @@ export async function replayOneMessage(
       ki_confidence: ingestResult.ki_confidence,
       parser_source: ingestResult.parser_source,
       parser_name: ingestResult.parser_name,
-      openai_input_tokens: cost.input_tokens || undefined,
-      openai_output_tokens: cost.output_tokens || undefined,
-      openai_cost_eur: cost.cost_eur || undefined,
+      // ?? statt ||: 0 ist ein gültiger Wert (Vendor-Parser-Treffer ohne KI-Call)
+      // und muss in der DB als 0 stehen, nicht als NULL.
+      openai_input_tokens: cost.input_tokens ?? undefined,
+      openai_output_tokens: cost.output_tokens ?? undefined,
+      openai_cost_eur: cost.cost_eur ?? undefined,
       // Diagnose-Felder: Skip-Reason und Anhang-Statistik landen in error_msg
       // damit pro Mail nachvollziehbar ist warum keine Bestellung entstand.
       skip_reason: ingestResult.skipped ? ingestResult.reason : undefined,
