@@ -9,6 +9,7 @@ import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { ArtTabs, type ArtFilter } from "@/components/ui/art-tabs";
+import { useTableFilters } from "@/lib/use-table-filters";
 import {
   DataTable,
   DensityToggle,
@@ -101,10 +102,17 @@ export function BestellungenTabelle({
   const { toast } = useToast();
 
   // Filters
-  const [suche, setSuche] = useState("");
-  const [statusFilter, setStatusFilter] = useState("offen");
-  const [artFilter, setArtFilter] = useState<ArtFilter>("");
-  const [projektFilter, setProjektFilter] = useState(aktiverProjektFilter || "");
+  const filters = useTableFilters({
+    defaultStatusFilter: "offen",
+    projektFilter: aktiverProjektFilter || "",
+  });
+  const {
+    suche, setSuche,
+    statusFilter, setStatusFilter,
+    artFilter, setArtFilter,
+    projektFilter, setProjektFilter,
+    hasFilters,
+  } = filters;
   useEffect(() => {
     setProjektFilter(aktiverProjektFilter || "");
   }, [aktiverProjektFilter]);
@@ -132,10 +140,12 @@ export function BestellungenTabelle({
     if (didApplyDefault.current) return;
     if (savedViews.defaultView) {
       const d = savedViews.defaultView;
-      setSuche(d.config.suche);
-      setStatusFilter(d.config.statusFilter);
-      setArtFilter(d.config.artFilter);
-      setProjektFilter(d.config.projektFilter);
+      filters.applyConfig({
+        suche: d.config.suche,
+        statusFilter: d.config.statusFilter,
+        artFilter: d.config.artFilter,
+        projektFilter: d.config.projektFilter,
+      });
       setDensity(d.config.density);
       setSort(d.config.sort);
       setActiveViewId(d.id);
@@ -154,10 +164,12 @@ export function BestellungenTabelle({
   };
 
   function applyView(view: { id: string; config: ViewConfig }) {
-    setSuche(view.config.suche);
-    setStatusFilter(view.config.statusFilter);
-    setArtFilter(view.config.artFilter);
-    setProjektFilter(view.config.projektFilter);
+    filters.applyConfig({
+      suche: view.config.suche,
+      statusFilter: view.config.statusFilter,
+      artFilter: view.config.artFilter,
+      projektFilter: view.config.projektFilter,
+    });
     setDensity(view.config.density);
     setSort(view.config.sort);
     setActiveViewId(view.id);
@@ -271,8 +283,6 @@ export function BestellungenTabelle({
     () => new Map(projekte.map((p) => [p.id, p.farbe])),
     [projekte],
   );
-
-  const hasFilters = suche || statusFilter || artFilter || projektFilter;
 
   function goToPage(page: number) {
     const params = new URLSearchParams(searchParams.toString());
@@ -771,12 +781,7 @@ export function BestellungenTabelle({
           {hasFilters && (
             <button
               type="button"
-              onClick={() => {
-                setSuche("");
-                setStatusFilter("");
-                setArtFilter("");
-                setProjektFilter("");
-              }}
+              onClick={filters.reset}
               className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-error-bg rounded-lg border border-line transition-colors shrink-0"
               title="Filter zurücksetzen"
             >
