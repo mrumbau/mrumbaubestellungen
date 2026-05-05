@@ -8,6 +8,7 @@ import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BulkToolbar, Button, EmptyState as UIEmptyState } from "@/components/ui";
 import { IconTrash, IconFolderOpen } from "@/components/ui/icons";
+import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 
 // ---------------------------------------------------------------------------
@@ -1021,13 +1022,9 @@ function OrderRow({
           const hasDoc = order[dok.flag as keyof PaidBestellung] as boolean;
           return (
             <td key={dok.flag} className="px-3 py-3.5 text-center hidden sm:table-cell">
-              {hasDoc ? (
-                <svg className="w-4 h-4 text-success mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
-              )}
+              <div className="flex justify-center">
+                <DokumentIcon vorhanden={hasDoc} label={dok.label} />
+              </div>
             </td>
           );
         })}

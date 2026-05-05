@@ -3,9 +3,11 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getStatusConfig } from "@/lib/status-config";
-import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { formatDatum } from "@/lib/formatters";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
+import { StatusCell } from "@/components/ui/cells/status-cell";
+import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import {
   DataTable,
   DensityToggle,
@@ -74,34 +76,7 @@ const STATUS_OPTIONS = [
   { value: "freigegeben", label: "Freigegeben" },
 ];
 
-function DokumentIcon({
-  vorhanden,
-  onClick,
-  onMouseEnter,
-}: {
-  vorhanden: boolean;
-  onClick?: (e: React.MouseEvent) => void;
-  onMouseEnter?: () => void;
-}) {
-  if (vorhanden && onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        onMouseEnter={onMouseEnter}
-        className="p-1 -m-1 rounded-md transition-all hover:bg-success-bg hover:scale-125 cursor-pointer group/dok"
-        title="Klicken für Vorschau"
-      >
-        <IconCheck className="w-4 h-4 text-success group-hover/dok:text-success" />
-      </button>
-    );
-  }
-  return vorhanden ? (
-    <IconCheck className="w-4 h-4 text-success" />
-  ) : (
-    <div className="w-4 h-4 rounded-full border-2 border-line-strong" aria-hidden="true" />
-  );
-}
+// DokumentIcon wurde nach @/components/ui/cells/dokument-icon extrahiert.
 
 export function BestellungenTabelle({
   bestellungen,
@@ -679,21 +654,7 @@ export function BestellungenTabelle({
         key: "status",
         label: "Status",
         sortable: true,
-        render: (b) => {
-          const status = getStatusConfig(b.status);
-          return (
-            <span className={`status-tag ${status.bg} ${status.text}`}>
-              <span
-                aria-hidden="true"
-                className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
-                style={{ background: status.color }}
-              />
-              <status.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
-              <span className="sr-only">Status: </span>
-              {status.label}
-            </span>
-          );
-        },
+        render: (b) => <StatusCell status={b.status} />,
       },
       {
         key: "betrag",
@@ -701,14 +662,7 @@ export function BestellungenTabelle({
         sortable: true,
         align: "right",
         className: "font-mono-amount font-semibold",
-        render: (b) => (
-          <>
-            {formatBetrag(b.betrag, b.waehrung)}
-            {b.betrag_ist_netto && b.betrag != null && (
-              <span className="text-[10px] text-foreground-subtle ml-1">netto</span>
-            )}
-          </>
-        ),
+        render: (b) => <BetragCell betrag={b.betrag} waehrung={b.waehrung} istNetto={b.betrag_ist_netto} />,
       },
       {
         key: "actions",
