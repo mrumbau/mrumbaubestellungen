@@ -20,6 +20,7 @@ import { raabKarcherParser } from "./raab-karcher";
 import { plancraftParser } from "./plancraft";
 import { brilluxParser } from "./brillux";
 import { fritzBaustoffeParser } from "./fritz-baustoffe";
+import { telekomParser } from "./telekom";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -76,6 +77,7 @@ const PARSERS: VendorParser[] = [
   raabKarcherParser,    // raab-karcher.de / stark-deutschland.de — eindeutige Domain
   brilluxParser,        // brillux.de — Subject-Pattern "Rechnung Nr. XXXXXXX"
   fritzBaustoffeParser, // f-b.gmbh — Subject-Pattern "RechNr: XX/XXXXXXX vom DD.MM.YYYY"
+  telekomParser,        // telekom.de — Mobilfunk/Festnetz Geschäftskunden-Rechnungen (abo)
   plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 

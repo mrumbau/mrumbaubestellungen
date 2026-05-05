@@ -201,7 +201,7 @@ const DokumentAnalyseSchema = z.object({
     "bestellbestaetigung", "lieferschein", "rechnung",
     "aufmass", "leistungsnachweis", "versandbestaetigung", "unbekannt",
   ]),
-  vermutete_bestellungsart: z.enum(["material", "subunternehmer"]).nullable(),
+  vermutete_bestellungsart: z.enum(["material", "subunternehmer", "abo"]).nullable(),
   bestellnummer: z.string().nullable(),
   auftragsnummer: z.string().nullable(),
   lieferscheinnummer: z.string().nullable(),
@@ -234,7 +234,7 @@ const DokumentAnalyseSchema = z.object({
 
 export interface DokumentAnalyse {
   typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "versandbestaetigung" | "unbekannt";
-  vermutete_bestellungsart?: "material" | "subunternehmer";
+  vermutete_bestellungsart?: "material" | "subunternehmer" | "abo";
   bestellnummer: string | null;
   auftragsnummer: string | null;
   lieferscheinnummer: string | null;
@@ -318,8 +318,11 @@ Hinweise zur Typ-Erkennung:
 Erkenne außerdem die "vermutete_bestellungsart":
 - "material" = Warenlieferung von einem Händler/Lieferant (Produkte, Baumaterial, Werkzeug)
 - "subunternehmer" = Dienstleistung/Arbeitsleistung von einem Subunternehmer (Handwerksleistung, Gewerk, Stundenlohn, Pauschalpreis für Arbeit)
+- "abo" = wiederkehrende Vertrags-/Abo-Rechnung (Telekom-/Internet-/Mobilfunk-Verträge, SaaS-Abos, Versicherungen, Strom/Gas, Leasing) — typisch monatlich, mit Periode/Abrechnungszeitraum im Subject
 
 Signale für "subunternehmer": Stundensätze, Pauschalpreise für Arbeitsleistungen, Gewerk-Bezeichnungen (Elektro, Trockenbau, Sanitär, Maler etc.), Leistungsbeschreibungen statt Artikellisten, Begriffe wie "Montage", "Einbau", "Verlegung", "Installation".
+
+Signale für "abo": Abrechnungszeitraum / Monat im Subject ("März 2026", "Q1 2026"), Vertragsnummer/Buchungskonto, wiederkehrende Pauschalen, Begriffe wie "Mobilfunk-Rechnung", "Festnetz-Rechnung", "Abonnement", "Vertrag", "Mitgliedsbeitrag".
 
 WICHTIG zu den Nummern-Feldern — extrahiere ALLE vorhandenen Nummern:
 - "bestellnummer": Die HAUPTNUMMER des Dokuments — steht typischerweise groß im Titel/Header. Bei Rechnungen: Rechnungsnummer. Bei Auftragsbestätigungen: Auftragsnummer. Bei Lieferscheinen: Lieferscheinnummer als bestellnummer verwenden falls keine andere Hauptnummer vorhanden.
