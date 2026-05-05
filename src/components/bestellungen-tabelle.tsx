@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
+import { ArtTabs, type ArtFilter } from "@/components/ui/art-tabs";
 import {
   DataTable,
   DensityToggle,
@@ -65,7 +66,6 @@ interface ProjektOption {
   farbe: string;
 }
 
-type ArtFilter = "" | "material" | "subunternehmer" | "abo";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Alle Status" },
@@ -729,39 +729,7 @@ export function BestellungenTabelle({
 
       {/* Art-Tabs + Search + Filters */}
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg shrink-0">
-          {(
-            [
-              { key: "" as ArtFilter, label: "Alle" },
-              { key: "material" as ArtFilter, label: "Material" },
-              { key: "subunternehmer" as ArtFilter, label: "Subunternehmer" },
-              { key: "abo" as ArtFilter, label: "Abo" },
-            ]
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setArtFilter(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                artFilter === tab.key
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-foreground-muted hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              {tab.key && artCounts[tab.key] > 0 && (
-                <span
-                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                    artFilter === tab.key
-                      ? "bg-brand text-white"
-                      : "bg-line text-foreground-muted"
-                  }`}
-                >
-                  {artCounts[tab.key]}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <ArtTabs value={artFilter} onChange={setArtFilter} counts={artCounts} />
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 min-w-0">
