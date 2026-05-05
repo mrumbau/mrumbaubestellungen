@@ -27,6 +27,12 @@ import { deubaxxlParser } from "./deubaxxl";
 import { megabadParser } from "./megabad";
 import { feistbaurParser } from "./feistbaur";
 import { holdSpadaParser } from "./hold-spada";
+import { rexelParser } from "./rexel";
+import { check24Parser } from "./check24";
+import { microsoftParser } from "./microsoft";
+import { shopifyParser } from "./shopify";
+import { faspParser } from "./fasp";
+import { hamdiMuhametiParser } from "./hamdi-muhameti";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -90,6 +96,12 @@ const PARSERS: VendorParser[] = [
   megabadParser,        // megabad.de — 8-digit Bestellnr (8121xxxx), Sender-driven Doku-Typ
   feistbaurParser,      // feistbaur@t-online.de — SU, Sender-Localpart-Match (RechnungsNr im PDF)
   holdSpadaParser,      // hold-spada.com — SU, Subject "<8-digit>, DD.MM.YYYY, Mailversand"
+  rexelParser,          // rexel.de — "Rechnung Nr. <digits> vom DD.MM.YYYY - Kunden Nr. <digits>"
+  check24Parser,        // check24.de — Plattform-Anker, mehrere Sender-Localparts
+  microsoftParser,      // microsoft.com — abo, Billing-Subject-Filter
+  shopifyParser,        // shopify.com — abo, Marketing-Domain (email.shopify.com) explizit ausgeschlossen
+  faspParser,           // fasp.de — Anwaltskanzlei, Aktenzeichen als bestellnummer (leistungsnachweis)
+  hamdiMuhametiParser,  // hmfliesenleger.de — SU, "Rechnung <Nr> <Jahr>" → RE<padded>
   plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
