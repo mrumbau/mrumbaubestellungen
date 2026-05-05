@@ -24,6 +24,7 @@ import { telekomParser } from "./telekom";
 import { kauflandParser } from "./kaufland";
 import { suedMetallParser } from "./sued-metall";
 import { deubaxxlParser } from "./deubaxxl";
+import { megabadParser } from "./megabad";
 import {
   VENDOR_CONFIDENCE_THRESHOLD,
   type VendorParser,
@@ -84,6 +85,7 @@ const PARSERS: VendorParser[] = [
   kauflandParser,       // kaufland-marktplatz.de — Marketplace-Bestellungen mit M-Pattern
   suedMetallParser,     // sued-metall.de — AUF\d{7} Auftragsnummer im Subject
   deubaxxlParser,       // deubaxxl.de — "(Deine|Ihre) Bestellung XXXXXXX" Pattern
+  megabadParser,        // megabad.de — 8-digit Bestellnr (8121xxxx), Sender-driven Doku-Typ
   plancraftParser,      // plancraft.com — SU-Rechnungen im Auftrag
 ];
 
