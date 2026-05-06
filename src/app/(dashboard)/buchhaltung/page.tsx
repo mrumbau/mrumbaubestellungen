@@ -5,32 +5,38 @@ import { BuchhaltungClient } from "@/components/buchhaltung-client";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 20;
+// 07.05.2026 — Pagination komplett client-side (analog Bestellungen).
+// Vorher: server-side range(0,19) + client-side Tabs/Filter → Filter+Sort sahen
+// nur 20er-Slice, Bezahlt/Offen-Counts waren falsch über Pages, Suche traf
+// nicht alle Treffer. Bei freigegebenen Bestellungen reicht alles-laden bis
+// HARD_CAP. Darüber hinaus archivieren oder Server-Pagination.
+const HARD_CAP = 500;
 
-export default async function BuchhaltungPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string }>;
-}) {
+export default async function BuchhaltungPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 
   const supabase = await createServerSupabaseClient();
-  const { page: pageStr } = await searchParams;
-  const page = Math.max(1, parseInt(pageStr || "1", 10) || 1);
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
 
-  // Phase 1: Count + Daten + Projekte parallel
-  const [{ count }, { data: bestellungen }, { data: projekte }] = await Promise.all([
-    supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
-    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
-    supabase.from("projekte").select("id, name").in("status", ["aktiv", "pausiert", "abgeschlossen"]).order("name"),
+  // Alle freigegebenen Bestellungen + Projekte parallel
+  const [{ data: bestellungen }, { data: projekte }] = await Promise.all([
+    supabase
+      .from("bestellungen")
+      .select(
+        "id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+      )
+      .eq("status", "freigegeben")
+      .order("updated_at", { ascending: false })
+      .limit(HARD_CAP),
+    supabase
+      .from("projekte")
+      .select("id, name")
+      .in("status", ["aktiv", "pausiert", "abgeschlossen"])
+      .order("name"),
   ]);
 
-  const total = count || 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const total = bestellungen?.length ?? 0;
+  const reachedCap = total >= HARD_CAP;
 
   // Phase 2: Freigaben parallel; faelligkeitsdatum kommt jetzt direkt aus
   // bestellungen-Spalte (06.05.2026 — kein Doku-Join mehr nötig).
@@ -81,11 +87,10 @@ export default async function BuchhaltungPage({
   return (
     <BuchhaltungClient
       rows={rows}
-      currentPage={currentPage}
-      totalPages={totalPages}
-      totalCount={total}
       projekte={(projekte || []).map((p) => ({ id: p.id, name: p.name }))}
       rolle={profil.rolle}
+      reachedCap={reachedCap}
+      hardCap={HARD_CAP}
     />
   );
 }

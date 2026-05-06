@@ -5,6 +5,12 @@ import { ArchivClient } from "@/components/archiv-client";
 
 export const dynamic = "force-dynamic";
 
+// 07.05.2026 — Hard-Cap analog Bestellungen/Buchhaltung (vorher 100, jetzt 500).
+// Archiv-Client hat KEINE eigene Pagination — alle geladenen Rows werden
+// gezeigt + client-side gefiltert. Bei mehr als HARD_CAP würden älteste
+// Einträge nicht angezeigt → Warning rendern.
+const HARD_CAP = 500;
+
 export default async function ArchivPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
@@ -24,7 +30,7 @@ export default async function ArchivPage() {
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "material")
     .order("archiviert_am", { ascending: false })
-    .limit(100);
+    .limit(HARD_CAP);
 
   let suQuery = supabase
     .from("bestellungen")
@@ -34,7 +40,7 @@ export default async function ArchivPage() {
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "subunternehmer")
     .order("archiviert_am", { ascending: false })
-    .limit(100);
+    .limit(HARD_CAP);
 
   let aboQuery = supabase
     .from("bestellungen")
@@ -44,7 +50,7 @@ export default async function ArchivPage() {
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "abo")
     .order("archiviert_am", { ascending: false })
-    .limit(100);
+    .limit(HARD_CAP);
 
   if (istBesteller) {
     materialQuery = materialQuery.eq("besteller_kuerzel", profil.kuerzel);
@@ -139,8 +145,8 @@ export default async function ArchivPage() {
       }}
       istAdmin={profil.rolle === "admin"}
       limitReached={{
-        material: safeMatOrders.length >= 100,
-        su: safeSuOrders.length >= 100,
+        material: safeMatOrders.length >= HARD_CAP,
+        su: safeSuOrders.length >= HARD_CAP,
       }}
     />
   );

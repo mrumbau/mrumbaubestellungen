@@ -46,19 +46,25 @@ interface ProjektOption {
 
 export function BuchhaltungClient({
   rows,
-  currentPage,
-  totalPages,
-  totalCount,
   projekte = [],
   rolle,
+  reachedCap = false,
+  hardCap = 500,
 }: {
   rows: BuchhaltungRow[];
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
   projekte?: ProjektOption[];
   rolle: Rolle;
+  reachedCap?: boolean;
+  hardCap?: number;
 }) {
+  // 07.05.2026 — Client-side Pagination.
+  // Vorher: Server-range(0,19) + Client-Tab/Filter → Filter sah nur 20er-Slice,
+  // Bezahlt/Offen-Counts waren falsch über Pages, Suche traf nur Slice.
+  // Jetzt: rows enthält ALLE freigegebenen (bis HARD_CAP) → Filter+Pagination
+  // arbeiten auf der Gesamt-Menge.
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalCount = rows.length;
   const [suche, setSuche] = useState("");
   const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
@@ -107,6 +113,20 @@ export function BuchhaltungClient({
     );
   });
 
+  // 07.05.2026 — Pagination-Slice nach Filter+Tab.
+  // totalPages aus gefilterten Resultaten → Pages stimmen mit aktuellem Filter.
+  const totalPages = Math.max(1, Math.ceil(gefiltert.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedRows = gefiltert.slice(
+    (safeCurrentPage - 1) * PAGE_SIZE,
+    safeCurrentPage * PAGE_SIZE,
+  );
+
+  // Filter/Tab-Wechsel → Page 1 zurücksetzen
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [suche, tab, artFilter]);
+
   const summeOffen = offeneRows.reduce((sum, r) => sum + (r.betrag || 0), 0);
   const summeBezahlt = bezahlteRows.reduce((sum, r) => sum + (r.betrag || 0), 0);
   const summeMonat = rows
@@ -123,9 +143,7 @@ export function BuchhaltungClient({
     .sort((a, b) => new Date(a.faelligkeitsdatum!).getTime() - new Date(b.faelligkeitsdatum!).getTime())[0];
 
   function goToPage(page: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", page.toString());
-    router.push(`/buchhaltung?${params.toString()}`);
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }
 
   function exportCSV() {
@@ -636,7 +654,7 @@ export function BuchhaltungClient({
             </tr>
           </thead>
           <tbody>
-            {gefiltert.length === 0 ? (
+            {paginatedRows.length === 0 ? (
               <tr>
                 <td colSpan={selectionMode ? 11 : 10} className="px-4 py-12 text-center text-foreground-subtle">
                   {aktiveRows.length === 0
@@ -647,7 +665,7 @@ export function BuchhaltungClient({
                 </td>
               </tr>
             ) : (
-              gefiltert.map((r, i) => (
+              paginatedRows.map((r, i) => (
                 <tr key={r.id} className={`table-row-hover border-b border-line-subtle ${i % 2 === 1 ? "bg-zebra" : ""} ${selectedIds.has(r.id) ? "bg-brand/[0.03]" : ""}`}>
                   {selectionMode && (
                     <td className="px-3 py-3.5">
@@ -844,18 +862,18 @@ export function BuchhaltungClient({
         {totalPages > 1 && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => goToPage(currentPage - 1)}
-              disabled={currentPage <= 1}
+              onClick={() => goToPage(safeCurrentPage - 1)}
+              disabled={safeCurrentPage <= 1}
               className="px-3 py-1.5 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Vorherige
             </button>
             <span className="text-foreground-muted font-medium px-2 font-mono-amount text-xs">
-              {currentPage} / {totalPages}
+              {safeCurrentPage} / {totalPages}
             </span>
             <button
-              onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage >= totalPages}
+              onClick={() => goToPage(safeCurrentPage + 1)}
+              disabled={safeCurrentPage >= totalPages}
               className="px-3 py-1.5 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Nächste
@@ -863,6 +881,13 @@ export function BuchhaltungClient({
           </div>
         )}
       </div>
+
+      {/* HARD_CAP-Warnung wenn 500 erreicht */}
+      {reachedCap && (
+        <div className="mt-4 rounded-md border border-warning-border bg-warning-bg px-4 py-2 text-[12px] text-warning">
+          Hard-Cap von {hardCap} freigegebenen Bestellungen erreicht. Älteste werden nicht angezeigt — bitte archivieren.
+        </div>
+      )}
     </div>
   );
 }
