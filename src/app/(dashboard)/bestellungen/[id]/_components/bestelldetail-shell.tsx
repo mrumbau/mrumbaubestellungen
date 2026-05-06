@@ -64,6 +64,9 @@ export function BestelldetailShell({
     bestellungId: bestellung.id,
     initialBestellungsart: bestellung.bestellungsart,
     initialProjektId: bestellung.projekt_id,
+    initialFreigabe: freigabe,
+    bestellerName: profil.name,
+    bestellerKuerzel: profil.kuerzel,
   });
 
   const dokTabs = DOKUMENT_CONFIG[bestellung.bestellungsart || "material"];
@@ -124,7 +127,7 @@ export function BestelldetailShell({
         <div className="w-80 flex flex-col gap-4 overflow-auto">
           <ApprovalPanel
             bestellung={bestellung}
-            freigabe={freigabe}
+            freigabe={bd.optimisticFreigabe ?? freigabe}
             profil={profil}
             kannFreigeben={kannFreigeben}
             hatRechnung={hatRechnung}
@@ -277,7 +280,7 @@ export function BestelldetailShell({
           <div className="flex flex-col gap-4 overflow-auto pb-20">
             <ApprovalPanel
               bestellung={bestellung}
-              freigabe={freigabe}
+              freigabe={bd.optimisticFreigabe ?? freigabe}
               profil={profil}
               kannFreigeben={kannFreigeben}
               hatRechnung={hatRechnung}
@@ -303,7 +306,7 @@ export function BestelldetailShell({
       {/* Mobile fixed bottom bar */}
       <ApprovalPanel
         bestellung={bestellung}
-        freigabe={freigabe}
+        freigabe={bd.optimisticFreigabe ?? freigabe}
         profil={profil}
         kannFreigeben={kannFreigeben}
         hatRechnung={hatRechnung}

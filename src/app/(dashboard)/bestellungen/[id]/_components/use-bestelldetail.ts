@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
 import { useBestellungRealtime } from "@/lib/hooks/use-bestellung-realtime";
-import type { DuplikatResult, KatResult, ProjektStats } from "./types";
+import type { DuplikatResult, Freigabe, KatResult, ProjektStats } from "./types";
 
 /**
  * use-bestelldetail — centralises all API handlers + cross-section state.
@@ -18,12 +18,28 @@ export function useBestelldetail({
   bestellungId,
   initialBestellungsart,
   initialProjektId,
+  initialFreigabe = null,
+  bestellerName,
+  bestellerKuerzel,
 }: {
   bestellungId: string;
   initialBestellungsart: Bestellungsart | null;
   initialProjektId: string | null;
+  /** 06.05.2026 (Welle 4) — Freigabe-Prop für useOptimistic-Override */
+  initialFreigabe?: Freigabe | null;
+  bestellerName?: string;
+  bestellerKuerzel?: string;
 }) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  // 06.05.2026 (Welle 4 Frontend) — Optimistic Freigabe.
+  // Bei Click → UI zeigt sofort "Freigegeben"-State, dann fetch + refresh.
+  // Bei Error → useOptimistic rollback automatisch (next state-update von initialFreigabe).
+  const [optimisticFreigabe, addOptimisticFreigabe] = useOptimistic<
+    Freigabe | null,
+    Freigabe
+  >(initialFreigabe, (_current, next) => next);
 
   // Shared loading/error banner
   const [loading, setLoading] = useState(false);
@@ -339,6 +355,19 @@ export function useBestelldetail({
     setShowFreigabeDialog(false);
     setFreigabeError(null);
     setLoading(true);
+
+    // Optimistic: UI zeigt sofort "Freigegeben"-Pill (auch wenn Server noch
+    // 200-400ms braucht). useOptimistic in Transition damit React den State
+    // automatisch zurücksetzt wenn Error oder neuer Server-State kommt.
+    startTransition(() => {
+      addOptimisticFreigabe({
+        id: "optimistic",
+        freigegeben_von_name: bestellerName ?? bestellerKuerzel ?? "—",
+        freigegeben_am: new Date().toISOString(),
+        kommentar: null,
+      });
+    });
+
     try {
       const res = await fetch(`/api/bestellungen/${bestellungId}/freigeben`, {
         method: "POST",
@@ -350,13 +379,14 @@ export function useBestelldetail({
       } else {
         const data = await res.json().catch(() => ({}));
         setFreigabeError(data.error || "Freigabe fehlgeschlagen");
+        // useOptimistic rollback automatisch beim nächsten Render
       }
     } catch {
       setFreigabeError("Netzwerkfehler bei der Freigabe");
     } finally {
       setLoading(false);
     }
-  }, [bestellungId, router]);
+  }, [bestellungId, router, addOptimisticFreigabe, bestellerName, bestellerKuerzel]);
 
   // ─── Verwerfen ──────────────────────────────────────────
 
@@ -474,6 +504,8 @@ export function useBestelldetail({
     setShowFreigabeDialog,
     freigabeError,
     handleFreigabe,
+    /** 06.05.2026 — useOptimistic-Override für ApprovalPanel. */
+    optimisticFreigabe,
 
     // Verwerfen
     showVerwerfenDialog,

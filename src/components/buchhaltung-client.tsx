@@ -187,6 +187,25 @@ export function BuchhaltungClient({
   async function toggleBezahlt(bestellungId: string, aktuellBezahlt: boolean) {
     setBezahltLoading(bestellungId);
     setBezahltError(null);
+
+    // 06.05.2026 (Welle 4 Frontend) — echte Optimistic-UI.
+    // Vorher: setLocalRows nach Server-Response (=quasi-optimistic, aber 200-400ms Delay).
+    // Jetzt: setLocalRows VOR fetch, Rollback bei Error → 0ms perceived latency.
+    const optimisticBezahltAm = !aktuellBezahlt ? new Date().toISOString() : null;
+    setLocalRows((prev) =>
+      prev.map((r) =>
+        r.id === bestellungId
+          ? {
+              ...r,
+              bezahlt_am: optimisticBezahltAm,
+              // bezahlt_von wird vom Server gesetzt — bei optimistic nehmen wir
+              // einen Platzhalter oder leeren String, wird beim Erfolg korrigiert.
+              bezahlt_von: !aktuellBezahlt ? (r.bezahlt_von ?? "…") : null,
+            }
+          : r,
+      ),
+    );
+
     try {
       const res = await fetch(`/api/bestellungen/${bestellungId}/bezahlt`, {
         method: "POST",
@@ -194,24 +213,44 @@ export function BuchhaltungClient({
         body: JSON.stringify({ bezahlt: !aktuellBezahlt }),
       });
       if (!res.ok) {
+        // ROLLBACK: optimistic state revertieren
+        setLocalRows((prev) =>
+          prev.map((r) =>
+            r.id === bestellungId
+              ? {
+                  ...r,
+                  bezahlt_am: aktuellBezahlt ? r.bezahlt_am : null,
+                  bezahlt_von: aktuellBezahlt ? r.bezahlt_von : null,
+                }
+              : r,
+          ),
+        );
         const data = await res.json().catch(() => ({}));
         setBezahltError(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
         return;
       }
+      // Server-Authority: bezahlt_von echten Wert übernehmen
       const result = await res.json();
-      // Update local state — no page reload needed
+      setLocalRows((prev) =>
+        prev.map((r) =>
+          r.id === bestellungId
+            ? { ...r, bezahlt_von: result.bezahlt_von || null }
+            : r,
+        ),
+      );
+    } catch {
+      // Network-Fehler → Rollback
       setLocalRows((prev) =>
         prev.map((r) =>
           r.id === bestellungId
             ? {
                 ...r,
-                bezahlt_am: result.bezahlt ? new Date().toISOString() : null,
-                bezahlt_von: result.bezahlt_von || null,
+                bezahlt_am: aktuellBezahlt ? r.bezahlt_am : null,
+                bezahlt_von: aktuellBezahlt ? r.bezahlt_von : null,
               }
-            : r
-        )
+            : r,
+        ),
       );
-    } catch {
       setBezahltError("Netzwerkfehler beim Aktualisieren des Zahlungsstatus");
     } finally {
       setBezahltLoading(null);
