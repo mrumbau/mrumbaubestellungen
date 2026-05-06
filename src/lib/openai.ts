@@ -553,12 +553,28 @@ export async function analysiereDokument(
   };
 
   const primary = await tryAnalyse("gpt-5.5");
-  if (primary) return primary;
+
+  // 06.05.2026 — Erweiterung des Fallback-Triggers:
+  // Bisher nur bei null-Result oder Exception. Jetzt auch wenn KI eine
+  // Rechnung erkennt aber gesamtbetrag NULL liefert → vermutlich
+  // Extraktions-Schwäche, gpt-4o-Retry hat bessere Chance den Betrag aus
+  // Tabellen-Layouts zu extrahieren. Verhindert "Rechnung ohne Betrag" im UI
+  // (Amazon DE6000C2..., Elektroservice Feistbaur, etc.)
+  const primaryNeedsRetry =
+    !primary ||
+    (primary.typ === "rechnung" && primary.gesamtbetrag == null && primary.parse_fehler !== true);
+
+  if (primary && !primaryNeedsRetry) return primary;
 
   // Retry mit Fallback-Modell — gpt-4o ist battle-tested für Structured-Outputs
-  logInfo("openai/analysiereDokument", "Retry mit Fallback-Modell gpt-4o");
+  logInfo("openai/analysiereDokument", primary
+    ? "Retry mit gpt-4o (Rechnung ohne gesamtbetrag erkannt)"
+    : "Retry mit Fallback-Modell gpt-4o");
   const fallback = await tryAnalyse("gpt-4o");
-  if (fallback) return fallback;
+  // Wenn fallback einen Betrag liefert, nimm fallback. Sonst behalte primary
+  // (besser unvollständige Analyse als Komplett-Verlust).
+  if (fallback && (fallback.gesamtbetrag != null || !primary)) return fallback;
+  if (primary) return primary;
 
   return makeUnknownDokumentAnalyse(true);
 }
