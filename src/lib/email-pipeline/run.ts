@@ -495,7 +495,15 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       { name: "possessiv-bestellung", regex: /\b(?:deine|ihre|eure|meine|unsere)\s+bestellung\s+([A-Z]*[0-9]{4,20}[A-Z0-9_/-]*)\b/i },
       // "#DH39680" oder "#12345" mit Hash-Prefix (mind. 4 alphanumerisch + 1 Digit)
       { name: "hash-prefix", regex: /#([A-Z]*[0-9]+[A-Z0-9_/-]*)\b/i },
-      // "Auftrag XYZ123456" / "Rechnung Nr 12345" / "Auftragsnummer ABC123"
+      // 06.05.2026 — Rechnungsnummer/Lieferscheinnummer/RechNr-Patterns. Vorher
+      // griff der "auftrag-rechnung"-Regex nicht auf "Rechnungsnummer: 8778804884"
+      // weil das "snummer" nach "rechnung" nicht behandelt wurde. Verhindert die
+      // Wave-1-Cluster (RK/Brillux/Fritz/Baustoff Union) ohne BN.
+      { name: "rechnungsnummer", regex: /\brechnungs?\s*[\s.:#-]*nummer[\s.:#-]*\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
+      { name: "rechnung-nr", regex: /\brech(?:nung)?\s*[-.\s]*nr\.?\s*[:#-]?\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
+      { name: "lieferscheinnummer", regex: /\blieferschein(?:s)?\s*[\s.:#-]*nummer[\s.:#-]*\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
+      { name: "auftragsnummer", regex: /\bauftrag(?:s)?\s*[\s.:#-]*nummer[\s.:#-]*\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
+      // "Auftrag: 2030561109" / "Rechnung Nr 12345" — bisheriger Fallback
       { name: "auftrag-rechnung", regex: /(?:auftrag(?:s[\s-]*nr|s[\s-]*nummer)?|rechnung)[\s.:#-]*(?:nr\.?:?|nummer:?)?\s*([A-Z]*[0-9]+[A-Z0-9_/-]{2,20})\b/i },
     ];
 
@@ -750,6 +758,26 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         throw new Error("parse_fehler_alle_anhaenge: Mail wird zur Wiederverarbeitung markiert");
       }
 
+      // 06.05.2026 (Pseudo-Bestellung-Filter): Mails OHNE Anhang + OHNE
+      // erkannte BN + haendlerName ist nur eine Mail-Domain → das ist
+      // höchstwahrscheinlich Korrespondenz / Notification / Mahnung, KEINE
+      // echte Bestellung. Verhindert die printful/rolladenplanet/wk-transport/
+      // studio-46/Bau-Technik-Pseudo-Bestellungen die User im UI verwirren.
+      // Mail wird als 'failed' markiert (nicht stillschweigend verworfen) —
+      // wenn es doch eine Bestellung war, kann der User manuell anlegen.
+      const haendlerSiehtNachDomainAus = haendlerName === absenderDomain
+        || /\.(de|com|net|info|eu|pl|org|at|ch)$/i.test(haendlerName)
+        || /-mail\.com$/i.test(haendlerName);
+      if (analyseErgebnisse.length === 0
+          && !erkannteBestellnummer
+          && !erkannteAuftragsnummer
+          && haendlerSiehtNachDomainAus) {
+        logError("webhook/email", "Pseudo-Bestellung verhindert: kein Anhang + keine BN + Domain-Händler → vermutlich Korrespondenz", {
+          email_betreff, email_absender, haendlerName,
+        });
+        throw new Error("pseudo_bestellung_kein_anhang_keine_bn: Mail wird als 'failed' markiert");
+      }
+
       // Neue Bestellung anlegen
       if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
         const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
@@ -762,6 +790,18 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
           logInfo("webhook/email", `Händlername aus GPT übernommen (statt Domain ${absenderDomain})`, { gptHaendler });
           haendlerName = gptHaendler;
         }
+      }
+
+      // 06.05.2026 — Letzte Verteidigung: wenn haendlerName immer noch wie
+      // eine Mail-Domain aussieht (KI hat keinen Firmennamen erkannt), markiere
+      // das im UI klar erkennbar. Verhindert dass "rolladenplanet.info" oder
+      // "studio-46.eu" als Pseudo-Händler in der Liste erscheinen — der User
+      // weiß so dass diese Bestellung manuell-händler-zugeordnet werden muss.
+      if (/\.(de|com|net|info|eu|pl|org|at|ch)$/i.test(haendlerName) && !haendlerName.includes(" ")) {
+        haendlerName = `Unbekannter Lieferant (${haendlerName})`;
+        logInfo("webhook/email", `haendlerName war Domain — markiert als 'Unbekannter Lieferant'`, {
+          original: absenderDomain,
+        });
       }
 
       const { data: neue, error: insertError } = await supabase
