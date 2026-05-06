@@ -276,6 +276,7 @@ export type Database = {
           projekt_vorschlag_id: string | null
           projekt_vorschlag_konfidenz: number | null
           projekt_vorschlag_methode: string | null
+          reply_token: string | null
           status: string
           subunternehmer_id: string | null
           tracking_nummer: string | null
@@ -327,6 +328,7 @@ export type Database = {
           projekt_vorschlag_id?: string | null
           projekt_vorschlag_konfidenz?: number | null
           projekt_vorschlag_methode?: string | null
+          reply_token?: string | null
           status?: string
           subunternehmer_id?: string | null
           tracking_nummer?: string | null
@@ -378,6 +380,7 @@ export type Database = {
           projekt_vorschlag_id?: string | null
           projekt_vorschlag_konfidenz?: number | null
           projekt_vorschlag_methode?: string | null
+          reply_token?: string | null
           status?: string
           subunternehmer_id?: string | null
           tracking_nummer?: string | null
@@ -1385,6 +1388,37 @@ export type Database = {
         }
         Relationships: []
       }
+      openai_cost_daily: {
+        Row: {
+          cost_eur: number | null
+          date: string | null
+          input_tokens: number | null
+          num_requests: number | null
+          output_tokens: number | null
+          source: string | null
+        }
+        Relationships: []
+      }
+      pipeline_quality_daily: {
+        Row: {
+          avg_konfidenz: number | null
+          bestellungen_neu: number | null
+          date: string | null
+          day_cost_eur: number | null
+          failed: number | null
+          folder_mismatch: number | null
+          input_tokens: number | null
+          irrelevant: number | null
+          ohne_bestellnummer: number | null
+          ohne_betrag: number | null
+          output_tokens: number | null
+          processed: number | null
+          prozent_ohne_betrag: number | null
+          terminally_failed: number | null
+          total_mails: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       append_haendler_url_pattern: {
@@ -1448,6 +1482,10 @@ export type Database = {
       }
       get_user_kuerzel: { Args: never; Returns: string }
       get_user_rolle: { Args: never; Returns: string }
+      increment_cache_hit: {
+        Args: { p_content_hash: string }
+        Returns: undefined
+      }
       increment_email_retry_count: {
         Args: { p_internet_message_id: string }
         Returns: undefined
@@ -1512,6 +1550,14 @@ export type Database = {
       }
       trigger_discover_emails: { Args: never; Returns: number }
       trigger_retry_failed_emails: { Args: never; Returns: number }
+      try_lock_message: {
+        Args: { p_internet_message_id: string }
+        Returns: boolean
+      }
+      unlock_message: {
+        Args: { p_internet_message_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       email_processing_status: "pending" | "irrelevant" | "processed" | "failed"

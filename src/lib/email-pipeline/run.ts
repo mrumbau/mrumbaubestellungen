@@ -44,7 +44,13 @@ import {
 import { checkAndClaimIdempotency } from "./pipeline/idempotency-check";
 import { normalizeAnhaenge } from "./pipeline/anhang-handling";
 import { tryParseEInvoiceFromAttachments } from "./pipeline/xrechnung";
-import { analysiereAnhaenge, type AnalyseErgebnis } from "./pipeline/anhang-analyse";
+import {
+  analysiereAnhaenge,
+  type AnalyseErgebnis,
+  getCachedAnalyse,
+  setCachedAnalyse,
+  hashBody,
+} from "./pipeline/anhang-analyse";
 import {
   findByExactNumber,
   findByFuzzyNumber,
@@ -1096,12 +1102,41 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   // BEKANNTE_TYPEN) gingen Bestellnummer/Betrag/Daten verloren obwohl die KI
   // sie korrekt extrahiert hatte. Resultat: ~22 Bestellungen mit leeren Spalten.
   let bodyAnalyse: DokumentAnalyse | null = null;
+  // 06.05.2026 — Cutoff-Logging: wenn wir die Body-Analyse skippen wegen 45s-Limit,
+  // wird das jetzt explizit geloggt + in webhook_logs persistiert. Vorher wurde
+  // skip stillschweigend gemacht und der Fallback-Pfad lief mit unvollständigen
+  // Daten weiter. Mit Logging können wir Mails finden die vom Cutoff betroffen
+  // sind und sie später re-processen (retry-Cron findet sie via 'failed').
+  const istBodyTimeout = emailText.length > 100 && Date.now() - startTime >= 45_000;
+  if (istBodyTimeout) {
+    logError("webhook/email", "Body-Analyse SKIP wegen 45s-Cutoff — Mail wird mit Anhang-Werten weitergeführt", {
+      bestellungId,
+      email_betreff,
+      email_absender,
+      elapsed_ms: Date.now() - startTime,
+      anhaenge_count: anhaenge.length,
+    });
+    // webhook_logs-Eintrag damit Admin sieht welche Mails Cutoff-betroffen sind
+    void supabase.from("webhook_logs").insert({
+      typ: "pipeline_cutoff",
+      status: "warning",
+      bestellung_id: bestellungId,
+      fehler_text: `Body-Analyse-Cutoff bei 45s — Mail "${(email_betreff || "").slice(0, 80)}" von ${email_absender} (${anhaenge.length} Anhänge). Bei unvollständigen Werten retry-failed-emails-Cron triggern.`,
+    }).then(() => undefined);
+  }
   if (emailText && emailText.length > 100 && Date.now() - startTime < 45_000) {
     try {
+      // Vendor-Parser bekommen den strukturerhaltenden Text wenn HTML-Body
+      // vorhanden war. Bei Plain-Text-Mails ist emailTextStrukturiert ≈ emailText.
+      // Tabellen-Cells sind via ` | ` getrennt, was Regex-Matches auf Spalten
+      // (z.B. Brutto-Spalte in Telekom-/Brillux-/Raab-Karcher-Mails) erleichtert.
+      const vendorEmailText = emailTextStrukturiert && emailTextStrukturiert.length > 50
+        ? emailTextStrukturiert
+        : emailText;
       const vendorResult = await tryParseVendor({
         email_absender: email_absender || "",
         email_betreff: email_betreff || "",
-        email_text: emailText,
+        email_text: vendorEmailText,
         // Anhänge durchreichen — Parser können PDF-Filename-Pattern matchen
         // (z.B. Telekom: Rechnung_<digits>_<datum>.pdf, Brillux: RE-<n>-<datum>-<kunde>.pdf).
         // Inhalt (base64) ist enthalten falls ein Parser ZUGFeRD-XML aus PDF lesen will.
@@ -1122,8 +1157,29 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       const bodyMitBetreff = email_betreff
         ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${kiBody.slice(0, 15000)}`
         : kiBody.slice(0, 15000);
-      const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
-      let bodyAnalyseLokal: DokumentAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint || undefined });
+
+      // 06.05.2026 — Body-Cache via openai_analysis_cache (Hash-basiert).
+      // Bei wiederkehrenden Mails (Telekom-Abo, Amazon-Reminder mit identischem
+      // Footer, Buchhaltungs-Erinnerungen) trifft der Cache → spart ~20%
+      // OpenAI-Cost und beschleunigt Pipeline um ~3-5s pro Mail.
+      // Bei DB-Fehler fail-open: KI-Call läuft normal.
+      const bodyHashKey = hashBody(bodyMitBetreff);
+      let bodyAnalyseLokal: DokumentAnalyse | null = await getCachedAnalyse(supabase, bodyHashKey);
+      if (bodyAnalyseLokal) {
+        logInfo("webhook/email", "Body-Cache HIT — KI-Call übersprungen", {
+          email_betreff,
+          hash_prefix: bodyHashKey.slice(0, 12),
+        });
+      } else {
+        const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
+        bodyAnalyseLokal = await analysiereDokument(bodyBase64, "text/plain", {
+          folderHint: documentHint || undefined,
+        });
+        // Best-effort Cache-Write (nur wenn KI brauchbares Ergebnis lieferte).
+        if (bodyAnalyseLokal && bodyAnalyseLokal.typ !== "unbekannt") {
+          void setCachedAnalyse(supabase, bodyHashKey, "text/plain", bodyAnalyseLokal);
+        }
+      }
 
       if (vendorResult && vendorResult.result.documents.length > 0) {
         const vendorDoc = vendorResult.result.documents[0];

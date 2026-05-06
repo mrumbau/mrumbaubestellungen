@@ -102,5 +102,66 @@ export async function runRetryFailedEmails(): Promise<RetryResult> {
     logInfo("email-sync/retry", "Retry-Run abgeschlossen", { ...result });
   }
 
+  // 06.05.2026 — Per-Mail-Eskalation: Mails die jetzt MAX_RETRIES erreicht haben
+  // bekommen einen webhook_logs-Eintrag damit Admin in /einstellungen/system/logs
+  // sieht welche Mails dauerhaft failed sind. Dedup via internet_message_id —
+  // pro Mail nur ein Alert.
+  await escalatePermanentFailures(supabase);
+
   return result;
+}
+
+async function escalatePermanentFailures(supabase: ReturnType<typeof createServiceClient>): Promise<void> {
+  try {
+    // Mails die MAX_RETRIES erreicht haben innerhalb der letzten 24h
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: terminallyFailed } = await supabase
+      .from("email_processing_log")
+      .select("internet_message_id, subject, sender, error_msg, retry_count")
+      .eq("status", "failed")
+      .gte("retry_count", MAX_RETRIES)
+      .gte("last_retry_at", since)
+      .limit(20);
+
+    if (!terminallyFailed || terminallyFailed.length === 0) return;
+
+    // Welche haben schon einen Alert?
+    const { data: existing } = await supabase
+      .from("webhook_logs")
+      .select("fehler_text")
+      .eq("typ", "retry_max")
+      .gte("created_at", since)
+      .limit(50);
+
+    const alertedIds = new Set(
+      (existing || [])
+        .map((r) => /\[mid=([^\]]+)\]/.exec(r.fehler_text ?? "")?.[1])
+        .filter(Boolean) as string[],
+    );
+
+    for (const m of terminallyFailed) {
+      if (alertedIds.has(m.internet_message_id)) continue;
+
+      const subject = (m.subject ?? "").slice(0, 100);
+      const sender = m.sender ?? "?";
+      const errMsg = (m.error_msg ?? "kein Detail").slice(0, 200);
+
+      await supabase.from("webhook_logs").insert({
+        typ: "retry_max",
+        status: "error",
+        fehler_text:
+          `Mail erreichte ${MAX_RETRIES} Retries ohne Erfolg [mid=${m.internet_message_id}]. ` +
+          `Subject: "${subject}" · Absender: ${sender} · Letzter Fehler: ${errMsg}`,
+      });
+
+      logInfo("email-sync/retry", "Permanent-Failure Alert geloggt", {
+        internet_message_id: m.internet_message_id,
+        subject,
+        sender,
+      });
+    }
+  } catch (err) {
+    // Eskalation-Fehler darf den Retry-Cron nicht failen lassen
+    logError("email-sync/retry", "Eskalation fehlgeschlagen (fail-open)", err);
+  }
 }

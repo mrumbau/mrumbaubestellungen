@@ -407,3 +407,38 @@ describe("Fritz Baustoffe Parser", () => {
     expect(result!.result.vendor).toBe("fritz-baustoffe");
   });
 });
+
+describe("Plancraft Parser", () => {
+  it("matched plancraft.com mit erwartetem Subject-Pattern (Rechnung X von Y)", async () => {
+    const result = await tryParseVendor(
+      makeInput({
+        email_absender: "rechnung@plancraft.com",
+        email_betreff: "Rechnung 2026-042 von Elektro Müller GmbH",
+      }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.result.vendor).toBe("plancraft");
+  });
+
+  it("liefert null für fremde Domains die 'plancraft' im Localpart haben", async () => {
+    const result = await tryParseVendor(
+      makeInput({
+        email_absender: "plancraft-fan@gmail.com",
+        email_betreff: "Rechnung 2026-042 von Elektro Müller GmbH",
+      }),
+    );
+    expect(result).toBeNull();
+  });
+});
+
+describe("Raab Karcher / Stark Parser", () => {
+  it("liefert null für fremde Domain trotz raab-Match im Localpart", async () => {
+    const result = await tryParseVendor(
+      makeInput({
+        email_absender: "raab@example.com",
+        email_betreff: "Test",
+      }),
+    );
+    expect(result).toBeNull();
+  });
+});

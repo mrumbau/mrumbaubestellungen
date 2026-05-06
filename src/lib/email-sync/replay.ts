@@ -19,7 +19,7 @@ import { classifyEmail } from "@/lib/email-pipeline/classify";
 import { ingestEmail } from "@/lib/email-pipeline/ingest";
 import { withCostTracking } from "@/lib/openai";
 import { markIrrelevant, markProcessed, markFailed } from "./idempotency";
-import { logError, logInfo } from "@/lib/logger";
+import { logError, logInfo, withRequestId } from "@/lib/logger";
 
 export type ReplayOutcome = "processed" | "irrelevant" | "failed" | "gone";
 
@@ -49,6 +49,47 @@ interface FullMessage {
  * @param incrementRetryCount true bei Auto-Retry-Cron, false bei manuellem Replay
  */
 export async function replayOneMessage(
+  supabase: SupabaseClient,
+  internetMessageId: string,
+  options: { incrementRetryCount?: boolean } = {},
+): Promise<ReplayResult> {
+  // 06.05.2026 — request_id-Wrap: alle nested logInfo/logError-Calls bekommen
+  // die internet_message_id als request_id. Damit lassen sich Pipeline-Logs
+  // einer einzelnen Mail über alle Schritte (classify, ingest, vendor-parser,
+  // KI, persist) korrelieren — vorher waren sie unzuordbar bei parallelen Runs.
+  const reqId = `replay:${internetMessageId.slice(0, 32)}`;
+  return withRequestId(() => replayOneMessageInner(supabase, internetMessageId, options), reqId);
+}
+
+async function replayOneMessageInner(
+  supabase: SupabaseClient,
+  internetMessageId: string,
+  options: { incrementRetryCount?: boolean } = {},
+): Promise<ReplayResult> {
+  // 06.05.2026 — Advisory-Lock pro internet_message_id.
+  // Verhindert Race-Conditions wenn zwei Worker (Cron + Retry, oder paralleler
+  // Replay) gleichzeitig auf der gleichen Mail laufen → sonst Doppel-Bestellung.
+  // try_lock_message ist non-blocking: bei Konflikt return false → wir überspringen
+  // diese Mail und der andere Worker macht weiter.
+  const { data: lockAcquired } = await supabase.rpc("try_lock_message", {
+    p_internet_message_id: internetMessageId,
+  });
+  if (!lockAcquired) {
+    logInfo("email-sync/replay", "Mail bereits von anderem Worker beansprucht — skipping", {
+      internet_message_id: internetMessageId,
+    });
+    return { outcome: "failed", fehler: "locked_by_other_worker" };
+  }
+
+  try {
+    return await replayOneMessageWithLock(supabase, internetMessageId, options);
+  } finally {
+    // Lock IMMER freigeben — auch bei Errors. Sonst bleibt Mail bis Connection-Tod blockiert.
+    await supabase.rpc("unlock_message", { p_internet_message_id: internetMessageId });
+  }
+}
+
+async function replayOneMessageWithLock(
   supabase: SupabaseClient,
   internetMessageId: string,
   options: { incrementRetryCount?: boolean } = {},

@@ -17,6 +17,7 @@ import { analysiereDokument, type DokumentAnalyse } from "@/lib/openai";
 import { createServiceClient } from "@/lib/supabase";
 import { logError, logInfo } from "@/lib/logger";
 import { safeBase64ToBuffer } from "./mail-utils";
+import { maybeVisionFallback } from "./vision-fallback";
 import type { NormalizedAnhang } from "./anhang-handling";
 
 export interface AnalyseErgebnis {
@@ -33,10 +34,20 @@ function hashContent(buffer: Buffer, mimeType: string): string {
 }
 
 /**
+ * Body-Hash für Email-Body-Cache (06.05.2026).
+ * Nimmt den strukturierten Body + mime "text/plain" und liefert einen Hash der
+ * identisch ist für identische Mails — z.B. Telekom-Abo-Rechnungen mit gleichem
+ * Footer/Disclaimer treffen den Cache. Damit ~20% OpenAI-Cost-Saving.
+ */
+export function hashBody(text: string): string {
+  return createHash("sha256").update(text, "utf8").update("|text/plain").digest("hex");
+}
+
+/**
  * F3.F4: Cache-Lookup. Bei Hit hit_count + last_hit_at update (best-effort).
  * Bei DB-Fehler fail-open (gibt null zurück → Caller macht OpenAI-Call).
  */
-async function getCachedAnalyse(
+export async function getCachedAnalyse(
   supabase: ReturnType<typeof createServiceClient>,
   contentHash: string,
 ): Promise<DokumentAnalyse | null> {
@@ -48,11 +59,10 @@ async function getCachedAnalyse(
       .maybeSingle();
     if (!data) return null;
 
-    // Best-effort hit-Counter erhöhen
+    // Best-effort hit-Counter inkrementieren (race-free via RPC).
+    // 06.05.2026 Bug-Fix: vorher schrieb das blind `hit_count: 0` statt zu inkrementieren.
     void supabase
-      .from("openai_analysis_cache")
-      .update({ hit_count: 0, last_hit_at: new Date().toISOString() })
-      .eq("content_hash", contentHash)
+      .rpc("increment_cache_hit", { p_content_hash: contentHash })
       .then(() => undefined);
 
     return data.analyse_data as DokumentAnalyse;
@@ -62,7 +72,7 @@ async function getCachedAnalyse(
   }
 }
 
-async function setCachedAnalyse(
+export async function setCachedAnalyse(
   supabase: ReturnType<typeof createServiceClient>,
   contentHash: string,
   mimeType: string,
@@ -119,6 +129,18 @@ export async function analysiereAnhaenge(
         analyse = await analysiereDokument(anhang.base64, anhang.mime_type, {
           folderHint: options.folderHint || undefined,
         });
+
+        // 06.05.2026 — Vision-OCR-Fallback für Bild-Anhänge.
+        // Wenn KI typ='rechnung'/'bestellbestaetigung' aber kein Brutto findet,
+        // versuchen wir Google-Vision-OCR + Re-Analyse. PDFs werden geskippt
+        // (GPT-4o-File-API ist schon Vision für PDFs).
+        analyse = await maybeVisionFallback(
+          analyse,
+          anhang.base64,
+          anhang.mime_type,
+          options.folderHint ?? null,
+        );
+
         if (contentHash && !analyse.parse_fehler) {
           await setCachedAnalyse(supabase, contentHash, anhang.mime_type, analyse);
         }
