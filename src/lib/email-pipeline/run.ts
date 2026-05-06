@@ -1400,22 +1400,28 @@ async function assignBesteller(
   }
 
   // STUFE 3: Händler-Affinität
+  // 06.05.2026 — Cache: Historie wird in STUFE 4.5 wiederverwendet (gleiche
+  // bestellungen-Tabelle + ähnlicher Filter). Prefetch hier in einem
+  // gemeinsamen Block. Nur fetchen wenn wirklich nötig (kein bestellerKuerzel).
+  let historieCache: Array<{ besteller_kuerzel: string; besteller_name: string | null; haendler_name: string | null }> | null = null;
   if (!bestellerKuerzel) {
     const { data: affinitaet } = await supabase
-      .from("bestellungen").select("besteller_kuerzel")
-      .eq("haendler_name", haendlerName)
+      .from("bestellungen").select("besteller_kuerzel, besteller_name, haendler_name")
+      .ilike("haendler_name", haendlerName)
       .neq("besteller_kuerzel", "UNBEKANNT")
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (affinitaet && affinitaet.length >= 3) {
+    historieCache = affinitaet || [];
+
+    if (historieCache.length >= 3) {
       const zaehler = new Map<string, number>();
-      for (const b of affinitaet) {
+      for (const b of historieCache) {
         zaehler.set(b.besteller_kuerzel, (zaehler.get(b.besteller_kuerzel) || 0) + 1);
       }
       const sortiert = [...zaehler.entries()].sort((a, b) => b[1] - a[1]);
       const [topKuerzel, topAnzahl] = sortiert[0];
-      if (topAnzahl / affinitaet.length > 0.6) {
+      if (topAnzahl / historieCache.length > 0.6) {
         bestellerKuerzel = topKuerzel;
         zuordnungsMethode = "haendler_affinitaet";
       }
@@ -1466,11 +1472,8 @@ async function assignBesteller(
     const gptArtikel = analyseErgebnisse.flatMap((e) => e.analyse.artikel || []).slice(0, 10);
     if (gptArtikel.length > 0) {
       try {
-        const { data: historie } = await supabase
-          .from("bestellungen").select("besteller_kuerzel, besteller_name, haendler_name")
-          .ilike("haendler_name", haendlerName)
-          .neq("besteller_kuerzel", "UNBEKANNT")
-          .limit(50);
+        // 06.05.2026 — historieCache aus STUFE 3 wiederverwenden (gleiche Query)
+        const historie = historieCache;
 
         if (historie && historie.length >= 5) {
           const bestellerIds = [...new Set(historie.map((b) => b.besteller_kuerzel))];
@@ -1515,112 +1518,153 @@ async function assignBesteller(
 }
 
 // =====================================================================
-// HELPER: Analyse → Bestellung Update
+// HELPER: Analyse → Bestellung Field-Propagation
+// 06.05.2026 (Welle 1, H1) — applyAnalyseToBestellung + ergaenzeFelder waren
+// 200 LOC Duplikat. Jetzt eine einzige Function `propagateAnalyseFields`
+// mit options-basierten Modi:
+//
+//   mode="document"  → setzt hat_*-Flag, RG überschreibt betrag (= applyAnalyse)
+//   mode="body"      → keine Flags (Body ist kein Doku), kein betrag-overwrite
+//
+// Beide Modi propagieren ALLE übrigen Felder fill-if-empty. Identische Lese-
+// Query (1 SELECT statt 2). Verhindert Drift bei künftigen neuen Feldern.
 // =====================================================================
 
+interface PropagateOptions {
+  /** "document" = Doku-basiert (mit FLAG-Set + RG-Betrag-Overwrite). "body" = Body-Analyse (nur fill-if-empty). */
+  mode: "document" | "body";
+  /** Händler-Kontext für haendler_name-Auto-Fill (wenn aktueller Wert leer/Domain). */
+  haendlerContext?: { current: string; absenderDomain: string };
+}
+
+async function propagateAnalyseFields(
+  supabase: ReturnType<typeof createServiceClient>,
+  bestellungId: string,
+  analyse: DokumentAnalyse,
+  options: PropagateOptions,
+): Promise<{ haendlerName: string | null }> {
+  // Lese-Query: 1 SELECT mit allen propagierbaren Feldern.
+  type ExistingRow = {
+    bestellnummer: string | null;
+    auftragsnummer: string | null;
+    lieferscheinnummer: string | null;
+    betrag: number | null;
+    voraussichtliche_lieferung: string | null;
+    lieferadresse_erkannt: string | null;
+    tracking_nummer: string | null;
+    bestelldatum: string | null;
+    faelligkeitsdatum: string | null;
+    kundennummer: string | null;
+    projekt_referenz: string | null;
+  };
+  const { data } = await supabase
+    .from("bestellungen")
+    .select(
+      "bestellnummer, auftragsnummer, lieferscheinnummer, betrag, " +
+      "voraussichtliche_lieferung, lieferadresse_erkannt, tracking_nummer, " +
+      "bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+    )
+    .eq("id", bestellungId)
+    .maybeSingle();
+  const existing = data as ExistingRow | null;
+  if (!existing) return { haendlerName: null };
+
+  const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  // hat_*-Flag (nur bei Doku-Mode)
+  if (options.mode === "document" && FLAG_MAP[analyse.typ]) {
+    updateFields[FLAG_MAP[analyse.typ]] = true;
+  }
+
+  // ----- Identifikatoren — fill-if-empty außer bei VB -----
+  if (analyse.typ !== "versandbestaetigung") {
+    // Im Body-Mode immer fill-if-empty; im Doku-Mode überschreibt aus Doku
+    const fillOrOverwrite = (field: keyof ExistingRow, value: string | null | undefined) => {
+      if (!value) return;
+      if (options.mode === "body" && existing[field]) return;
+      updateFields[field] = value;
+    };
+    fillOrOverwrite("bestellnummer", analyse.bestellnummer);
+    fillOrOverwrite("auftragsnummer", analyse.auftragsnummer);
+    fillOrOverwrite("lieferscheinnummer", analyse.lieferscheinnummer);
+  }
+
+  // ----- Betrag — RG überschreibt im Doku-Mode, sonst fill-if-empty -----
+  // (DB-Trigger sync_bestellung_betrag_from_rechnungen liefert finale RG-Summe)
+  const effektiverBetrag = analyse.gesamtbetrag != null ? analyse.gesamtbetrag : (analyse.netto ?? null);
+  const istNetto = !analyse.gesamtbetrag && !!analyse.netto;
+  if (effektiverBetrag != null && analyse.typ !== "versandbestaetigung") {
+    const istRgOverwrite = options.mode === "document" && analyse.typ === "rechnung";
+    if (istRgOverwrite || !existing.betrag) {
+      updateFields.betrag = effektiverBetrag;
+      if (istNetto) updateFields.betrag_ist_netto = true;
+    }
+  }
+
+  // ----- Tracking-Felder (auch BB/RG können Tracking liefern) -----
+  if (analyse.tracking_nummer && (options.mode === "document" || !existing.tracking_nummer)) {
+    updateFields.tracking_nummer = analyse.tracking_nummer;
+    if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;
+    if (analyse.tracking_url) {
+      updateFields.tracking_url = analyse.tracking_url;
+    } else if (analyse.versanddienstleister) {
+      const autoUrl = buildTrackingUrl(analyse.versanddienstleister, analyse.tracking_nummer);
+      if (autoUrl) updateFields.tracking_url = autoUrl;
+    }
+  }
+
+  // ----- Liefertermin (VB liefert voraussichtliche_lieferung, BB lieferdatum) -----
+  const lieferterminKandidat = analyse.voraussichtliche_lieferung ?? analyse.lieferdatum;
+  if (lieferterminKandidat && !existing.voraussichtliche_lieferung) {
+    updateFields.voraussichtliche_lieferung = lieferterminKandidat;
+  }
+
+  // ----- Lieferadresse, Bestelldatum, Kundennummer, Projekt-Referenz — fill-if-empty -----
+  if (analyse.lieferadressen && analyse.lieferadressen.length > 0
+      && analyse.lieferadressen[0] && !existing.lieferadresse_erkannt) {
+    updateFields.lieferadresse_erkannt = analyse.lieferadressen[0];
+  }
+  if (analyse.bestelldatum && !existing.bestelldatum) {
+    updateFields.bestelldatum = analyse.bestelldatum;
+  }
+  // Fälligkeit NUR aus Rechnung (= echte Zahlfrist; BB-Liefertermin wäre falsch)
+  if (analyse.faelligkeitsdatum && analyse.typ === "rechnung" && !existing.faelligkeitsdatum) {
+    updateFields.faelligkeitsdatum = analyse.faelligkeitsdatum;
+  }
+  if (analyse.kundennummer && !existing.kundennummer) {
+    updateFields.kundennummer = analyse.kundennummer;
+  }
+  if (analyse.projekt_referenz && !existing.projekt_referenz) {
+    updateFields.projekt_referenz = analyse.projekt_referenz;
+  }
+
+  // ----- Händlername — fallback wenn Domain-Pseudo / leer -----
+  let haendlerNameAfter: string | null = null;
+  if (options.haendlerContext && analyse.haendler) {
+    const ctx = options.haendlerContext;
+    if (!ctx.current || ctx.current === ctx.absenderDomain || ctx.current === "") {
+      updateFields.haendler_name = analyse.haendler;
+      haendlerNameAfter = analyse.haendler;
+      logInfo("webhook/email", `Händlername aus ${options.mode}-Analyse übernommen: ${analyse.haendler}`);
+    }
+  }
+
+  await supabase.from("bestellungen").update(updateFields).eq("id", bestellungId);
+  return { haendlerName: haendlerNameAfter };
+}
+
+// Backward-compat-Wrapper: alte Signatur für die existing Call-Sites
 async function applyAnalyseToBestellung(
   supabase: ReturnType<typeof createServiceClient>,
   bestellungId: string,
   analyse: DokumentAnalyse,
   ctx?: { haendlerName: string; absenderDomain: string },
 ): Promise<string | null> {
-  // 06.05.2026 (Make.com-Niveau-Fix): Maximale Field-Propagation aus jedem
-  // Dokument. Vorher wurden Tracking-Felder nur bei VB übernommen, betrag nur
-  // bei rechnung sofort gesetzt, lieferadresse_erkannt nirgends. Make.com hat
-  // immer alles aus jedem Dokument extrahiert + zur Bestellung propagiert.
-  // Jetzt analog: jedes Feld wird aus jedem Doku übernommen, "fehlend"-fill
-  // wenn bestellung-Spalte noch leer ist.
-
-  const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (FLAG_MAP[analyse.typ]) updateFields[FLAG_MAP[analyse.typ]] = true;
-
-  // ----- Identifikatoren — jeder Doku-Typ darf Nummern liefern -----
-  if (analyse.typ !== "versandbestaetigung") {
-    if (analyse.bestellnummer) updateFields.bestellnummer = analyse.bestellnummer;
-    if (analyse.auftragsnummer) updateFields.auftragsnummer = analyse.auftragsnummer;
-    if (analyse.lieferscheinnummer) updateFields.lieferscheinnummer = analyse.lieferscheinnummer;
-  }
-
-  // ----- Betrag — jeder Doku-Typ mit Betrag wird genutzt -----
-  // Rechnung: setze immer (RG ist die Wahrheit, überschreibt BB-Schätzung).
-  // Andere Doku-Typen (BB/LS/Aufmaß/LN): setze NUR wenn bestellung.betrag noch
-  // leer — verhindert dass eine spätere VB ohne Betrag den BB-Betrag löscht
-  // oder dass eine RG-Summe vom Trigger durch BB überschrieben wird.
-  // (DB-Trigger sync_bestellung_betrag_from_rechnungen sorgt dann bei
-  // RG-Insert für SUM(rechnung.gesamtbetrag) als finalen Wert.)
-  const effektiverBetrag = analyse.gesamtbetrag != null ? analyse.gesamtbetrag : (analyse.netto ?? null);
-  const istNetto = !analyse.gesamtbetrag && !!analyse.netto;
-  if (effektiverBetrag != null && analyse.typ !== "versandbestaetigung") {
-    if (analyse.typ === "rechnung") {
-      updateFields.betrag = effektiverBetrag;
-      if (istNetto) updateFields.betrag_ist_netto = true;
-    } else {
-      // BB/LS/Aufmaß/LN: nur fill-if-empty
-      const { data: existing } = await supabase
-        .from("bestellungen").select("betrag").eq("id", bestellungId).maybeSingle();
-      if (existing && !existing.betrag) {
-        updateFields.betrag = effektiverBetrag;
-        if (istNetto) updateFields.betrag_ist_netto = true;
-      }
-    }
-  }
-
-  // ----- Tracking-Felder — auch BB/RG können Tracking-Infos liefern -----
-  // (Manche Händler schicken Tracking-Link bereits in Bestellbestätigung.)
-  if (analyse.tracking_nummer) updateFields.tracking_nummer = analyse.tracking_nummer;
-  if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;
-  if (analyse.tracking_url) {
-    updateFields.tracking_url = analyse.tracking_url;
-  } else if (analyse.versanddienstleister && analyse.tracking_nummer && !updateFields.tracking_url) {
-    const autoUrl = buildTrackingUrl(analyse.versanddienstleister, analyse.tracking_nummer);
-    if (autoUrl) updateFields.tracking_url = autoUrl;
-  }
-
-  // ----- Liefertermin / Lieferadresse / Bestelldatum / Fälligkeit / Kundennr / Projekt-Ref -----
-  // 06.05.2026 — Make.com-Niveau-Maximalismus. Alle KI-extrahierten Felder die
-  // einer bestellungen-Spalte entsprechen werden fill-if-empty propagiert.
-  // Faelligkeitsdatum: NUR aus Rechnung (= echte Zahlfrist). Andere Felder
-  // aus jedem Dokument-Typ.
-  const { data: existing } = await supabase
-    .from("bestellungen")
-    .select("voraussichtliche_lieferung, lieferadresse_erkannt, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz")
-    .eq("id", bestellungId).maybeSingle();
-
-  if (existing) {
-    const lieferterminKandidat = analyse.voraussichtliche_lieferung ?? analyse.lieferdatum;
-    if (lieferterminKandidat && !existing.voraussichtliche_lieferung) {
-      updateFields.voraussichtliche_lieferung = lieferterminKandidat;
-    }
-    if (analyse.lieferadressen && analyse.lieferadressen.length > 0
-        && analyse.lieferadressen[0] && !existing.lieferadresse_erkannt) {
-      updateFields.lieferadresse_erkannt = analyse.lieferadressen[0];
-    }
-    if (analyse.bestelldatum && !existing.bestelldatum) {
-      updateFields.bestelldatum = analyse.bestelldatum;
-    }
-    // Fälligkeit nur aus echten Rechnungen (sonst wäre BB-Zustelltermin
-    // fälschlicherweise als Mahn-Trigger eingetragen)
-    if (analyse.faelligkeitsdatum && analyse.typ === "rechnung" && !existing.faelligkeitsdatum) {
-      updateFields.faelligkeitsdatum = analyse.faelligkeitsdatum;
-    }
-    if (analyse.kundennummer && !existing.kundennummer) {
-      updateFields.kundennummer = analyse.kundennummer;
-    }
-    if (analyse.projekt_referenz && !existing.projekt_referenz) {
-      updateFields.projekt_referenz = analyse.projekt_referenz;
-    }
-  }
-
-  // ----- Händlername aus Body/Doku übernehmen wenn fehlend -----
-  let haendlerNameAfter: string | null = null;
-  if (ctx && analyse.haendler && (!ctx.haendlerName || ctx.haendlerName === ctx.absenderDomain || ctx.haendlerName === "")) {
-    updateFields.haendler_name = analyse.haendler;
-    haendlerNameAfter = analyse.haendler;
-    logInfo("webhook/email", `Händlername aus Body-Analyse übernommen: ${analyse.haendler}`);
-  }
-
-  await supabase.from("bestellungen").update(updateFields).eq("id", bestellungId);
-  return haendlerNameAfter;
+  const result = await propagateAnalyseFields(supabase, bestellungId, analyse, {
+    mode: "document",
+    haendlerContext: ctx ? { current: ctx.haendlerName, absenderDomain: ctx.absenderDomain } : undefined,
+  });
+  return result.haendlerName;
 }
 
 async function ergaenzeFelder(
@@ -1630,86 +1674,10 @@ async function ergaenzeFelder(
   haendlerName: string,
   absenderDomain: string,
 ): Promise<void> {
-  // 06.05.2026 (Make.com-Niveau-Fix): Body-Analyse-Felder maximal propagieren.
-  // Vorher nur 3 Felder (BN, betrag, haendler_name). Jetzt analog zu
-  // applyAnalyseToBestellung — alle nutzbaren Felder werden fill-if-empty
-  // übernommen.
-  const ergaenzung: Record<string, unknown> = {};
-
-  // Lese aktuelle Bestellungs-Werte einmal — vermeidet pro-Feld separate Reads
-  const { data: existing } = await supabase
-    .from("bestellungen")
-    .select("bestellnummer, auftragsnummer, lieferscheinnummer, betrag, voraussichtliche_lieferung, lieferadresse_erkannt, tracking_nummer, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz")
-    .eq("id", bestellungId)
-    .maybeSingle();
-  if (!existing) return;
-
-  // Identifikatoren
-  if (bodyAnalyse.bestellnummer && bodyAnalyse.typ !== "versandbestaetigung" && !existing.bestellnummer) {
-    ergaenzung.bestellnummer = bodyAnalyse.bestellnummer;
-  }
-  if (bodyAnalyse.auftragsnummer && !existing.auftragsnummer) {
-    ergaenzung.auftragsnummer = bodyAnalyse.auftragsnummer;
-  }
-  if (bodyAnalyse.lieferscheinnummer && !existing.lieferscheinnummer) {
-    ergaenzung.lieferscheinnummer = bodyAnalyse.lieferscheinnummer;
-  }
-
-  // Betrag (fill-if-empty bei body-Analyse — Trigger setzt finale RG-Summe)
-  if (bodyAnalyse.typ !== "versandbestaetigung" && !existing.betrag) {
-    const ergBetrag = bodyAnalyse.gesamtbetrag != null ? bodyAnalyse.gesamtbetrag : (bodyAnalyse.netto ?? null);
-    if (ergBetrag != null) {
-      ergaenzung.betrag = ergBetrag;
-      if (!bodyAnalyse.gesamtbetrag && !!bodyAnalyse.netto) ergaenzung.betrag_ist_netto = true;
-    }
-  }
-
-  // Tracking — auch aus BB-Body möglich
-  if (bodyAnalyse.tracking_nummer && !existing.tracking_nummer) {
-    ergaenzung.tracking_nummer = bodyAnalyse.tracking_nummer;
-    if (bodyAnalyse.versanddienstleister) ergaenzung.versanddienstleister = bodyAnalyse.versanddienstleister;
-    if (bodyAnalyse.tracking_url) {
-      ergaenzung.tracking_url = bodyAnalyse.tracking_url;
-    } else if (bodyAnalyse.versanddienstleister) {
-      const autoUrl = buildTrackingUrl(bodyAnalyse.versanddienstleister, bodyAnalyse.tracking_nummer);
-      if (autoUrl) ergaenzung.tracking_url = autoUrl;
-    }
-  }
-
-  // Liefertermin — voraussichtliche_lieferung oder lieferdatum
-  const liefertermin = bodyAnalyse.voraussichtliche_lieferung ?? bodyAnalyse.lieferdatum;
-  if (liefertermin && !existing.voraussichtliche_lieferung) {
-    ergaenzung.voraussichtliche_lieferung = liefertermin;
-  }
-
-  // Lieferadresse
-  if (bodyAnalyse.lieferadressen && bodyAnalyse.lieferadressen.length > 0
-      && bodyAnalyse.lieferadressen[0] && !existing.lieferadresse_erkannt) {
-    ergaenzung.lieferadresse_erkannt = bodyAnalyse.lieferadressen[0];
-  }
-
-  // Bestelldatum / Fälligkeit / Kundennummer / Projekt-Referenz
-  if (bodyAnalyse.bestelldatum && !existing.bestelldatum) {
-    ergaenzung.bestelldatum = bodyAnalyse.bestelldatum;
-  }
-  if (bodyAnalyse.faelligkeitsdatum && bodyAnalyse.typ === "rechnung" && !existing.faelligkeitsdatum) {
-    ergaenzung.faelligkeitsdatum = bodyAnalyse.faelligkeitsdatum;
-  }
-  if (bodyAnalyse.kundennummer && !existing.kundennummer) {
-    ergaenzung.kundennummer = bodyAnalyse.kundennummer;
-  }
-  if (bodyAnalyse.projekt_referenz && !existing.projekt_referenz) {
-    ergaenzung.projekt_referenz = bodyAnalyse.projekt_referenz;
-  }
-
-  // Händlername (fallback wenn Domain-Pseudo)
-  if (bodyAnalyse.haendler && (!haendlerName || haendlerName === absenderDomain || haendlerName === "")) {
-    ergaenzung.haendler_name = bodyAnalyse.haendler;
-  }
-
-  if (Object.keys(ergaenzung).length > 0) {
-    await supabase.from("bestellungen").update(ergaenzung).eq("id", bestellungId);
-  }
+  await propagateAnalyseFields(supabase, bestellungId, bodyAnalyse, {
+    mode: "body",
+    haendlerContext: { current: haendlerName, absenderDomain },
+  });
 }
 
 // =====================================================================

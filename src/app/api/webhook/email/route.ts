@@ -17,6 +17,8 @@ import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { safeCompare } from "@/lib/safe-compare";
 import { logError, withRequestId } from "@/lib/logger";
 import { runEmailPipeline, type EmailPipelineInput } from "@/lib/email-pipeline/run";
+import { withCostTracking } from "@/lib/openai";
+import { logInfo } from "@/lib/logger";
 
 export const maxDuration = 60;
 
@@ -96,7 +98,23 @@ export async function POST(request: NextRequest) {
     };
 
     // F3.F16: alle Logs der Pipeline-Run via Request-ID korrelierbar
-    const result = await withRequestId(() => runEmailPipeline(input));
+    // 06.05.2026 (Welle 2 C3): Pipeline JETZT auch hier in withCostTracking
+    // wrappen — vorher fehlte das im Make.com-Webhook-Pfad → openai_cost_eur
+    // blieb 0 für direkt-via-Webhook eingehende Mails (z.B. Make.com-Tests).
+    const { result, cost } = await withCostTracking(() =>
+      withRequestId(() => runEmailPipeline(input)),
+    );
+
+    if (cost.calls > 0) {
+      logInfo("webhook/email", "Cost-Bucket aggregiert", {
+        calls: cost.calls,
+        input_tokens: cost.input_tokens,
+        output_tokens: cost.output_tokens,
+        cost_eur: Number(cost.cost_eur.toFixed(6)),
+        models: Object.keys(cost.model_breakdown),
+      });
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     logError("webhook/email", "Webhook Fehler", err);

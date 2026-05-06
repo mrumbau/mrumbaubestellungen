@@ -41,9 +41,16 @@ export async function GET(
     }
 
     // Dokumente laden
+    // 06.05.2026 (H3): ki_roh_daten ausgeschlossen — JSONB-Blob ist 0.5-2MB pro
+    // Doku, wird nur lazy via separater Route geladen wenn UI ihn anzeigt.
     const { data: dokumente } = await supabase
       .from("dokumente")
-      .select("*")
+      .select("id, bestellung_id, typ, quelle, storage_pfad, content_hash, " +
+              "email_betreff, email_absender, email_datum, " +
+              "bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, " +
+              "artikel, gesamtbetrag, netto, mwst, faelligkeitsdatum, " +
+              "lieferdatum, iban, kundennummer, besteller_im_dokument, " +
+              "projekt_referenz, bestelldatum, created_at")
       .eq("bestellung_id", id)
       .order("created_at", { ascending: true });
 

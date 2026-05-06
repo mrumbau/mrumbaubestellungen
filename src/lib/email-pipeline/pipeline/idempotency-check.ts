@@ -90,30 +90,47 @@ export async function checkAndClaimIdempotency(
     `${absenderNorm}|${subjectNorm}|${input.email_datum || ""}|${bodyHead}|${bodyLen}|${anhaengeSignatur}`;
   const hash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 64);
 
+  // 06.05.2026 — H8 Atomic-Claim via Partial-Unique-Index.
+  // Vorher SELECT-then-INSERT-Race: 2 parallele Worker konnten beide
+  // "kein Duplikat" sehen und beide INSERTen → echte Doppel-Verarbeitung.
+  // Jetzt: INSERT mit ON CONFLICT ist atomar. Wenn returning empty → Hash existiert.
+  // Plus: 24h-Window via created_at-Check des bestehenden Eintrags.
   try {
-    const { data: existing, error: idempotencyError } = await supabase
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: inserted, error: insertError } = await supabase
       .from("webhook_logs")
-      .select("id")
-      .eq("typ", "email")
-      .eq("bestellnummer", hash)
-      .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .limit(1);
+      .insert({
+        typ: "email",
+        status: "processing",
+        bestellnummer: hash,
+      })
+      .select("id, created_at")
+      .single();
 
-    if (idempotencyError) {
-      logError("webhook/email/idempotency", "DB-Fehler (fail-open)", idempotencyError);
+    if (!insertError && inserted) {
+      // Insert war erfolgreich → wir haben den Lock
       return { hash, isDuplicate: false };
     }
+
+    // Konflikt — Hash existiert. Prüfe ob im 24h-Window.
+    const { data: existing } = await supabase
+      .from("webhook_logs")
+      .select("id, created_at")
+      .eq("typ", "email")
+      .eq("bestellnummer", hash)
+      .gte("created_at", cutoff)
+      .limit(1);
 
     if (existing && existing.length > 0) {
       return { hash, isDuplicate: true };
     }
 
-    // Lock setzen — bei parallel laufenden Workers verhindert das Doppelt-Verarbeitung
-    await supabase.from("webhook_logs").insert({
-      typ: "email",
-      status: "processing",
-      bestellnummer: hash,
-    });
+    // Hash existiert aber älter als 24h → alten Eintrag aktualisieren
+    await supabase
+      .from("webhook_logs")
+      .update({ status: "processing", created_at: new Date().toISOString() })
+      .eq("typ", "email")
+      .eq("bestellnummer", hash);
   } catch (idempotencyErr) {
     logError("webhook/email/idempotency", "Fehler (fail-open)", idempotencyErr);
   }
