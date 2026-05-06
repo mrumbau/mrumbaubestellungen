@@ -15,6 +15,7 @@
  * `erkenneBestellerIntelligent` und `kategorisiereArtikel`.
  */
 
+import { createHash } from "crypto";
 import { createServiceClient } from "@/lib/supabase";
 import {
   analysiereDokument,
@@ -35,6 +36,7 @@ import {
   isVersandDomain,
   isVersandBetreff,
   isBestellBetreff,
+  isStrictVersandBetreff,
   stripHtml,
   safeBase64ToBuffer,
 } from "./pipeline/mail-utils";
@@ -260,10 +262,15 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   const emailText = stripHtml(rawEmailText);
 
   // 8. Versand-Email-Weiche
+  // 06.05.2026: Strict-VB-Override hinzugefügt — Subjects wie "Ihre Bestellung
+  // ist unterwegs", "wird heute zugestellt", "voraussichtlicher Liefertermin"
+  // sind eindeutig Versand auch wenn "Bestellung"/BB-Keyword im Subject steht.
+  // Verhindert die CHECK24/Megabad-Misklassifikation als BB.
   const istVersandDomain = isVersandDomain(absenderDomain);
   const istVersandSubject = isVersandBetreff(email_betreff || "");
+  const istStrictVersand = isStrictVersandBetreff(email_betreff || "");
   const istBestellSubject = isBestellBetreff(email_betreff || "");
-  if (istVersandDomain || (istVersandSubject && !istBestellSubject)) {
+  if (istVersandDomain || istStrictVersand || (istVersandSubject && !istBestellSubject)) {
     logInfo("webhook/email", `Versand-Email erkannt via ${istVersandDomain ? "Domain" : "Betreff"}`, {
       email_betreff, absenderDomain,
     });
@@ -836,6 +843,18 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   for (const ergebnis of analyseErgebnisse) {
     const { analyse, dateiName, base64, mime_type } = ergebnis;
 
+    // 06.05.2026 — Strict-VB-Subject-Override: bei eindeutigen Versand-Subjects
+    // ("ist unterwegs", "wird zugestellt", "voraussichtlicher Liefertermin")
+    // überstimmt das einen falschen KI-Klassifizierten BB-Typ. Verhindert die
+    // CHECK24/Megabad-Misklassifikation. Greift NUR wenn KI BB sagt — wenn KI
+    // schon VB sagt, kein Eingriff.
+    if (analyse.typ === "bestellbestaetigung" && isStrictVersandBetreff(email_betreff || "")) {
+      logInfo("webhook/email", `Strict-VB-Override: KI sagte bestellbestaetigung, Subject ist eindeutig Versand`, {
+        subject: email_betreff,
+      });
+      analyse.typ = "versandbestaetigung";
+    }
+
     // F5.X Fix: Vision-Fallback. Wenn KI den Typ nicht erkennt (parse_fehler ODER
     // typ="unbekannt"), versuchen wir den Typ aus dem Mail-Betreff abzuleiten —
     // bei deutschen Geschäftsmails ist der Subject extrem aussagekräftig
@@ -872,7 +891,6 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       }
     }
 
-    const storagePfad = `${bestellungId}/${analyse.typ}_${Date.now()}_${sanitizeStorageFilename(dateiName)}`;
     const buffer = safeBase64ToBuffer(base64);
     if (!buffer) {
       logError("webhook/email", `Ungültiger base64-Inhalt: ${dateiName}`, { base64_len: base64?.length ?? 0 });
@@ -884,6 +902,29 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       });
       continue;
     }
+
+    // 06.05.2026 — PDF-Content-Hash. Verhindert Doku-Duplikate über exakt
+    // gleiches PDF (Reply-Mails mit gleichem Anhang, Re-Backfill-Doppelt-
+    // Verarbeitung). Pre-Insert-Check + Partial-Unique-Index als doppelte
+    // Verteidigung. Storage-Pfad enthält den Hash damit auch das Storage-
+    // File deterministisch ist (kein Date.now()-Random-Suffix mehr).
+    const contentHash = createHash("sha256").update(buffer).digest("hex");
+    const { data: existingDoku } = await supabase
+      .from("dokumente")
+      .select("id, storage_pfad")
+      .eq("bestellung_id", bestellungId)
+      .eq("typ", analyse.typ)
+      .eq("content_hash", contentHash)
+      .limit(1);
+    if (existingDoku && existingDoku.length > 0) {
+      logInfo("webhook/email", `Doku-Duplikat erkannt via content_hash — übersprungen`, {
+        bestellungId, typ: analyse.typ, content_hash: contentHash.slice(0, 16),
+        bestehender_pfad: existingDoku[0].storage_pfad,
+      });
+      continue;
+    }
+
+    const storagePfad = `${bestellungId}/${analyse.typ}_${contentHash.slice(0, 16)}_${sanitizeStorageFilename(dateiName)}`;
     const { error: uploadError } = await supabase.storage
       .from("dokumente")
       .upload(storagePfad, buffer, { contentType: mime_type, upsert: true });
@@ -905,6 +946,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       typ: analyse.typ,
       quelle: "email",
       storage_pfad: storagePfad,
+      content_hash: contentHash,
       email_betreff,
       email_absender,
       email_datum,

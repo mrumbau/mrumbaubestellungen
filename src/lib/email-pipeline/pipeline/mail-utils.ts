@@ -158,3 +158,42 @@ export function isBestellBetreff(betreff: string): boolean {
   const lower = (betreff || "").toLowerCase();
   return BESTELL_BETREFF_KEYWORDS.some((kw) => lower.includes(kw));
 }
+
+/**
+ * Strikte Versand-Indikatoren — wenn ein Subject EINS davon enthält, ist es
+ * EINDEUTIG eine Versand-/Liefermitteilung, auch wenn das Wort "Bestellung"
+ * gleichzeitig vorkommt ("Ihre Bestellung ist unterwegs", "Ihre Bestellung
+ * wird heute zugestellt", "Voraussichtlicher Liefertermin der Bestellung X").
+ *
+ * Diese Liste überstimmt den BB/VB-Tie-Break in der Pipeline-Weiche und die
+ * KI-Klassifikation. Hintergrund: KI sieht "Bestellung" und klassifiziert
+ * gerne als BB, obwohl der Inhalt klar Versand-Status ist (CHECK24, Megabad,
+ * Hermes, DHL).
+ */
+const STRICT_VERSAND_OVERRIDE_KEYWORDS = [
+  "ist unterwegs",
+  "wird heute zugestellt",
+  "wird zugestellt",
+  "wurde zugestellt",
+  "wurde geliefert",
+  "ist da",
+  "ist da!",
+  "voraussichtlicher liefertermin",
+  "lieferterminankündigung",
+  "lieferterminankuendigung",
+  "wurde versendet",
+  "wurde versandt",
+  "out for delivery",
+  "has been delivered",
+  "has been shipped",
+  "sendung wird voraussichtlich",
+  "sendung wurde geliefert",
+  "sendung ist unterwegs",
+  "haustürzustellung",
+  "haustuerzustellung",
+];
+
+export function isStrictVersandBetreff(betreff: string): boolean {
+  const lower = (betreff || "").toLowerCase();
+  return STRICT_VERSAND_OVERRIDE_KEYWORDS.some((kw) => lower.includes(kw));
+}

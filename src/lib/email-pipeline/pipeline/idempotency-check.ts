@@ -9,6 +9,12 @@
  * False-Positive-Dedup geführt. Jetzt: bis zu 5000 chars + Body-Länge im
  * Hash-Input.
  *
+ * 06.05.2026 — Subject-Normalisierung: Re:/Fwd:/Aw:/Antw:-Prefixes und
+ * unterschiedliche Quote-Varianten (' " ‚ ' ' " " ' ›) werden vor dem Hash
+ * angeglichen. Damit erkennen wir Reply-Duplikate und Plain-vs-HTML-Quote-
+ * Varianten als identische Mail (verhindert die Hamdi-RE012- und
+ * Amazon-Quote-Variant-Duplikate).
+ *
  * Fail-open: Bei DB-Fehler trotzdem verarbeiten (lieber Duplikat als Daten-
  * verlust). Schreib-Fehler werden geloggt.
  */
@@ -16,6 +22,30 @@
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logError } from "@/lib/logger";
+
+/**
+ * Normalisiert Subject + Body so, dass Reply-Prefixe und Quote-Varianten
+ * keine False-Positive-Unterschiede erzeugen. Idempotent (kann mehrfach
+ * angewendet werden).
+ */
+export function normalizeForIdempotency(text: string): string {
+  if (!text) return "";
+  let s = text;
+  // Reply/Forward-Prefixe iterativ strippen ("Re: Re: Aw: Original")
+  // matcht: Re:, RE:, Re :, Aw:, AW:, Antw:, Antwort:, Fwd:, FW:, Wg:, WG:
+  for (let i = 0; i < 8; i++) {
+    const next = s.replace(/^\s*(re|aw|antw(?:ort)?|fwd?|wg)\s*:\s*/i, "");
+    if (next === s) break;
+    s = next;
+  }
+  // Alle Quote-/Apostroph-Varianten auf gerade " vereinheitlichen
+  s = s
+    .replace(/[‘’‚‛‹›`´']/g, '"')
+    .replace(/[“”„‟«»]/g, '"');
+  // Whitespace kollabieren
+  s = s.replace(/\s+/g, " ").trim().toLowerCase();
+  return s;
+}
 
 export interface IdempotencyInput {
   email_absender: string | null | undefined;
@@ -48,13 +78,16 @@ export async function checkAndClaimIdempotency(
   // F3.F3: Body-Head von 200 → 5000 chars erweitert. Bei gleichem
   // Subject/Datum/Absender erkennt der Hash so unterschiedliche Body-Varianten.
   // Hash-Input enthält auch Body-Länge zur weiteren Differenzierung.
+  // 06.05.2026: Subject + Body normalisiert (Reply-Prefix, Quote-Varianten).
   const fullBody = input.email_body || "";
-  const bodyHead = fullBody.slice(0, 5000);
+  const bodyHead = normalizeForIdempotency(fullBody.slice(0, 5000));
   const bodyLen = String(fullBody.length);
+  const subjectNorm = normalizeForIdempotency(input.email_betreff || "");
+  const absenderNorm = (input.email_absender || "").trim().toLowerCase();
   const anhaengeSignatur = `n${input.anhaenge_count}`;
 
   const idempotencyKey =
-    `${input.email_absender || ""}|${input.email_betreff || ""}|${input.email_datum || ""}|${bodyHead}|${bodyLen}|${anhaengeSignatur}`;
+    `${absenderNorm}|${subjectNorm}|${input.email_datum || ""}|${bodyHead}|${bodyLen}|${anhaengeSignatur}`;
   const hash = createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 64);
 
   try {
