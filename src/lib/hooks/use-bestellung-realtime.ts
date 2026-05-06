@@ -6,9 +6,11 @@ import { createBrowserSupabaseClient } from "@/lib/supabase";
 
 /**
  * Realtime-Hook: abonniert Postgres-Changes auf einer einzelnen Bestellung
- * und triggert router.refresh() wenn extern geändert (Pipeline/Cron/anderer User).
+ * UND auf events der Bestellung. Triggert router.refresh() wenn extern
+ * geändert (Pipeline/Cron/anderer User) oder neues Audit-Event eintrifft.
  *
  * 06.05.2026 — Welle 3 Frontend-Adoption.
+ * 06.05.2026 — Welle 4 erweitert um events-Subscription für Live-Audit-Trail.
  */
 export function useBestellungRealtime(
   bestellungId: string | null,
@@ -21,6 +23,11 @@ export function useBestellungRealtime(
 
     const supabase = createBrowserSupabaseClient();
 
+    const trigger = () => {
+      if (options?.onUpdate) options.onUpdate();
+      else router.refresh();
+    };
+
     const channel = supabase
       .channel(`bestellung-${bestellungId}`)
       .on(
@@ -31,13 +38,17 @@ export function useBestellungRealtime(
           table: "bestellungen",
           filter: `id=eq.${bestellungId}`,
         },
-        () => {
-          if (options?.onUpdate) {
-            options.onUpdate();
-          } else {
-            router.refresh();
-          }
+        trigger,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "events",
+          filter: `entity_id=eq.${bestellungId}`,
         },
+        trigger,
       )
       .subscribe();
 

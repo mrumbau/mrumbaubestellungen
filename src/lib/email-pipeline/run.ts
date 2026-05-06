@@ -981,30 +981,34 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       continue;
     }
 
-    const { error: insertError } = await supabase.from("dokumente").insert({
-      bestellung_id: bestellungId,
-      typ: analyse.typ,
-      quelle: "email",
-      storage_pfad: storagePfad,
-      content_hash: contentHash,
-      email_betreff,
-      email_absender,
-      email_datum,
-      ki_roh_daten: analyse,
-      bestellnummer_erkannt: analyse.bestellnummer,
-      auftragsnummer: analyse.auftragsnummer || null,
-      lieferscheinnummer: analyse.lieferscheinnummer || null,
-      artikel: analyse.artikel,
-      gesamtbetrag: analyse.gesamtbetrag ?? bodyExtractedBetrag,
-      netto: analyse.netto,
-      mwst: analyse.mwst,
-      faelligkeitsdatum: analyse.faelligkeitsdatum,
-      lieferdatum: analyse.lieferdatum,
-      iban: analyse.iban,
-      kundennummer: analyse.kundennummer || null,
-      besteller_im_dokument: analyse.besteller_im_dokument || null,
-      projekt_referenz: analyse.projekt_referenz || null,
-      bestelldatum: analyse.bestelldatum || null,
+    // 06.05.2026 (Welle 2 C4) — atomic-Persist via RPC mit Pre-Insert-Check.
+    // Vorher: direkter INSERT → bei content_hash-Konflikt (Race-Condition,
+    // Doppel-Webhook) gab's Unique-Constraint-Error. Jetzt: RPC macht
+    // Pre-Check + idempotenter Return des existierenden doku_id.
+    const { error: insertError } = await supabase.rpc("persist_dokument_atomic", {
+      p_bestellung_id: bestellungId,
+      p_typ: analyse.typ,
+      p_quelle: "email",
+      p_storage_pfad: storagePfad,
+      p_content_hash: contentHash,
+      p_email_betreff: email_betreff ?? null,
+      p_email_absender: email_absender ?? null,
+      p_email_datum: email_datum ?? null,
+      p_ki_roh_daten: analyse as unknown as Record<string, unknown>,
+      p_bestellnummer_erkannt: analyse.bestellnummer ?? null,
+      p_auftragsnummer: analyse.auftragsnummer || null,
+      p_lieferscheinnummer: analyse.lieferscheinnummer || null,
+      p_artikel: analyse.artikel as unknown as Record<string, unknown>,
+      p_gesamtbetrag: analyse.gesamtbetrag ?? bodyExtractedBetrag,
+      p_netto: analyse.netto,
+      p_mwst: analyse.mwst,
+      p_faelligkeitsdatum: analyse.faelligkeitsdatum,
+      p_lieferdatum: analyse.lieferdatum,
+      p_iban: analyse.iban,
+      p_kundennummer: analyse.kundennummer || null,
+      p_besteller_im_dokument: analyse.besteller_im_dokument || null,
+      p_projekt_referenz: analyse.projekt_referenz || null,
+      p_bestelldatum: analyse.bestelldatum || null,
     });
     if (insertError) {
       logError("webhook/email", "Dokument-Insert fehlgeschlagen", insertError);

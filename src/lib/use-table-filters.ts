@@ -14,11 +14,24 @@
 import { useCallback, useMemo, useState } from "react";
 import type { ArtFilter } from "@/components/ui/art-tabs";
 
+/**
+ * 06.05.2026 (Welle 4 Frontend) — Fälligkeits-Filter ergänzt damit Saved-Views
+ * "Überfällig" / "Diese Woche fällig" möglich werden. Default = "alle"
+ * (kein Filter). Werte werden client-side gegen `bestellung.faelligkeitsdatum`
+ * + `bezahlt_am` ausgewertet.
+ */
+export type FaelligkeitsFilter =
+  | "alle"
+  | "ueberfaellig"           // faelligkeitsdatum < heute UND bezahlt_am IS NULL
+  | "diese_woche"            // faelligkeitsdatum heute..+7d UND bezahlt_am IS NULL
+  | "next_30d";              // faelligkeitsdatum heute..+30d UND bezahlt_am IS NULL
+
 export interface TableFiltersConfig {
   suche: string;
   statusFilter: string;
   artFilter: ArtFilter;
   projektFilter: string;
+  faelligkeitsFilter?: FaelligkeitsFilter;
 }
 
 export interface UseTableFiltersOptions extends Partial<TableFiltersConfig> {
@@ -27,13 +40,15 @@ export interface UseTableFiltersOptions extends Partial<TableFiltersConfig> {
 }
 
 export interface TableFilters extends TableFiltersConfig {
+  faelligkeitsFilter: FaelligkeitsFilter;
   setSuche: (next: string) => void;
   setStatusFilter: (next: string) => void;
   setArtFilter: (next: ArtFilter) => void;
   setProjektFilter: (next: string) => void;
+  setFaelligkeitsFilter: (next: FaelligkeitsFilter) => void;
   /** True wenn mindestens ein Filter aktiv (für "Filter zurücksetzen"-Button) */
   hasFilters: boolean;
-  /** Setzt alle 4 Filter auf leer/Default */
+  /** Setzt alle Filter auf leer/Default */
   reset: () => void;
   /** Liefert den aktuellen Filter-Snapshot — für saved-views-Persistierung */
   getConfig: () => TableFiltersConfig;
@@ -48,10 +63,16 @@ export function useTableFilters(options: UseTableFiltersOptions = {}): TableFilt
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [artFilter, setArtFilter] = useState<ArtFilter>(options.artFilter ?? "");
   const [projektFilter, setProjektFilter] = useState(options.projektFilter ?? "");
+  const [faelligkeitsFilter, setFaelligkeitsFilter] = useState<FaelligkeitsFilter>(
+    options.faelligkeitsFilter ?? "alle",
+  );
 
   const hasFilters = useMemo(
-    () => Boolean(suche || statusFilter || artFilter || projektFilter),
-    [suche, statusFilter, artFilter, projektFilter],
+    () => Boolean(
+      suche || statusFilter || artFilter || projektFilter
+      || (faelligkeitsFilter && faelligkeitsFilter !== "alle"),
+    ),
+    [suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter],
   );
 
   const reset = useCallback(() => {
@@ -59,11 +80,14 @@ export function useTableFilters(options: UseTableFiltersOptions = {}): TableFilt
     setStatusFilter("");
     setArtFilter("");
     setProjektFilter("");
+    setFaelligkeitsFilter("alle");
   }, []);
 
   const getConfig = useCallback(
-    (): TableFiltersConfig => ({ suche, statusFilter, artFilter, projektFilter }),
-    [suche, statusFilter, artFilter, projektFilter],
+    (): TableFiltersConfig => ({
+      suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter,
+    }),
+    [suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter],
   );
 
   const applyConfig = useCallback((cfg: TableFiltersConfig) => {
@@ -71,6 +95,7 @@ export function useTableFilters(options: UseTableFiltersOptions = {}): TableFilt
     setStatusFilter(cfg.statusFilter);
     setArtFilter(cfg.artFilter);
     setProjektFilter(cfg.projektFilter);
+    setFaelligkeitsFilter(cfg.faelligkeitsFilter ?? "alle");
   }, []);
 
   return {
@@ -78,13 +103,38 @@ export function useTableFilters(options: UseTableFiltersOptions = {}): TableFilt
     statusFilter,
     artFilter,
     projektFilter,
+    faelligkeitsFilter,
     setSuche,
     setStatusFilter,
     setArtFilter,
     setProjektFilter,
+    setFaelligkeitsFilter,
     hasFilters,
     reset,
     getConfig,
     applyConfig,
   };
+}
+
+/**
+ * 06.05.2026 — Predicate-Helper für FaelligkeitsFilter. Wird in der
+ * Tabellen-Komponente angewendet (client-side, weil bestellungen schon
+ * voll geladen sind). Bei Performance-Bedarf könnte ein Server-Side-Filter
+ * via .gte/.lte auf faelligkeitsdatum ergänzt werden.
+ */
+export function matchesFaelligkeitsFilter(
+  bestellung: { faelligkeitsdatum?: string | null; bezahlt_am?: string | null },
+  filter: FaelligkeitsFilter,
+): boolean {
+  if (filter === "alle") return true;
+  if (bestellung.bezahlt_am) return false;
+  const f = bestellung.faelligkeitsdatum;
+  if (!f) return false;
+  const datum = new Date(f).getTime();
+  const heuteMs = new Date(new Date().toDateString()).getTime();
+  const tag = 24 * 60 * 60 * 1000;
+  if (filter === "ueberfaellig") return datum < heuteMs;
+  if (filter === "diese_woche") return datum >= heuteMs && datum < heuteMs + 7 * tag;
+  if (filter === "next_30d") return datum >= heuteMs && datum < heuteMs + 30 * tag;
+  return true;
 }

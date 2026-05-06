@@ -9,7 +9,7 @@ import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { ArtTabs, type ArtFilter } from "@/components/ui/art-tabs";
-import { useTableFilters } from "@/lib/use-table-filters";
+import { useTableFilters, matchesFaelligkeitsFilter, type FaelligkeitsFilter } from "@/lib/use-table-filters";
 import { useBestellungenListRealtime } from "@/lib/hooks/use-bestellung-realtime";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { STATUS_FILTER_OPTIONS } from "@/lib/status-config";
@@ -112,6 +112,7 @@ export function BestellungenTabelle({
     statusFilter, setStatusFilter,
     artFilter, setArtFilter,
     projektFilter, setProjektFilter,
+    faelligkeitsFilter, setFaelligkeitsFilter,
     hasFilters,
   } = filters;
   useEffect(() => {
@@ -135,10 +136,41 @@ export function BestellungenTabelle({
     statusFilter: string;
     artFilter: ArtFilter;
     projektFilter: string;
+    faelligkeitsFilter?: FaelligkeitsFilter;
     density: Density;
     sort: SortState;
   };
-  const savedViews = useSavedViews<ViewConfig>("bestellungen");
+  // 06.05.2026 (Welle 4 Frontend) — System-Defaults für sinnvolle Pre-Set-Views.
+  // Idempotent geseedet: einmal gelöscht bleiben sie weg.
+  const systemDefaults: Array<{ id: string; name: string; config: ViewConfig }> = [
+    {
+      id: "system-ueberfaellig",
+      name: "Überfällig",
+      config: {
+        suche: "",
+        statusFilter: "",
+        artFilter: "",
+        projektFilter: "",
+        faelligkeitsFilter: "ueberfaellig",
+        density: "comfortable",
+        sort: { key: "created_at", direction: "asc" },  // älteste zuerst
+      },
+    },
+    {
+      id: "system-diese-woche-faellig",
+      name: "Diese Woche fällig",
+      config: {
+        suche: "",
+        statusFilter: "",
+        artFilter: "",
+        projektFilter: "",
+        faelligkeitsFilter: "diese_woche",
+        density: "comfortable",
+        sort: { key: "created_at", direction: "asc" },
+      },
+    },
+  ];
+  const savedViews = useSavedViews<ViewConfig>("bestellungen", { systemDefaults });
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   // Auto-apply default view on first mount (once)
@@ -152,6 +184,7 @@ export function BestellungenTabelle({
         statusFilter: d.config.statusFilter,
         artFilter: d.config.artFilter,
         projektFilter: d.config.projektFilter,
+        faelligkeitsFilter: d.config.faelligkeitsFilter,
       });
       setDensity(d.config.density);
       setSort(d.config.sort);
@@ -166,6 +199,7 @@ export function BestellungenTabelle({
     statusFilter,
     artFilter,
     projektFilter,
+    faelligkeitsFilter,
     density,
     sort,
   };
@@ -176,6 +210,7 @@ export function BestellungenTabelle({
       statusFilter: view.config.statusFilter,
       artFilter: view.config.artFilter,
       projektFilter: view.config.projektFilter,
+      faelligkeitsFilter: view.config.faelligkeitsFilter,
     });
     setDensity(view.config.density);
     setSort(view.config.sort);
@@ -232,10 +267,11 @@ export function BestellungenTabelle({
           (statusFilter === "offen" ? b.status !== "freigegeben" : b.status === statusFilter);
         const artMatch = !artFilter || (b.bestellungsart || "material") === artFilter;
         const projektMatch = !projektFilter || b.projekt_id === projektFilter;
+        const faelligkeitsMatch = matchesFaelligkeitsFilter(b, faelligkeitsFilter);
 
-        return suchMatch && statusMatch && artMatch && projektMatch;
+        return suchMatch && statusMatch && artMatch && projektMatch && faelligkeitsMatch;
       }),
-    [bestellungen, suche, statusFilter, artFilter, projektFilter],
+    [bestellungen, suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter],
   );
 
   // Client-side sort
