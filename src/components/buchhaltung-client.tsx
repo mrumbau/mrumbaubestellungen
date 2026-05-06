@@ -23,6 +23,9 @@ interface BuchhaltungRow {
   hat_lieferschein?: boolean;
   mahnung_am?: string | null;
   mahnung_count?: number;
+  bestelldatum?: string | null;
+  kundennummer?: string | null;
+  projekt_referenz?: string | null;
 }
 
 function isFaelligBald(datum: string | null) {

@@ -61,6 +61,11 @@ interface Bestellung {
   mahnung_am: string | null;
   mahnung_count?: number;
   created_at: string;
+  // 06.05.2026 — extrahierte Felder aus Mail/PDF
+  bestelldatum?: string | null;
+  faelligkeitsdatum?: string | null;
+  kundennummer?: string | null;
+  projekt_referenz?: string | null;
 }
 
 interface ProjektOption {
@@ -244,8 +249,9 @@ export function BestellungenTabelle({
           bv = (b.haendler_name || "").toLowerCase();
           break;
         case "created_at":
-          av = a.created_at;
-          bv = b.created_at;
+          // bestelldatum bevorzugt für Sortierung (echtes Datum, nicht Erfassung)
+          av = a.bestelldatum ?? a.created_at;
+          bv = b.bestelldatum ?? b.created_at;
           break;
         case "betrag":
           av = a.betrag ?? 0;
@@ -529,7 +535,19 @@ export function BestellungenTabelle({
         sortable: true,
         hideBelow: "md",
         className: "text-foreground-subtle whitespace-nowrap",
-        render: (b) => formatDatum(b.created_at),
+        // 06.05.2026 — bestelldatum (echtes Bestelldatum aus BB-Doku) bevorzugt
+        // vor created_at (Pipeline-Erfassungszeitpunkt). Tooltip zeigt beide.
+        render: (b) => {
+          const echtBestellt = b.bestelldatum;
+          if (echtBestellt) {
+            return (
+              <span title={`Bestellt am ${formatDatum(echtBestellt)} · Erfasst ${formatDatum(b.created_at)}`}>
+                {formatDatum(echtBestellt)}
+              </span>
+            );
+          }
+          return formatDatum(b.created_at);
+        },
       },
       {
         key: "hat_bestellbestaetigung",

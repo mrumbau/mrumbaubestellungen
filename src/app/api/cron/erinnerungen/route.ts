@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     const { data: bestellungen } = await supabase
       .from("bestellungen")
-      .select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, created_at, mahnung_am, mahnung_count")
+      .select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, created_at, bestelldatum, mahnung_am, mahnung_count")
       .eq("hat_lieferschein", false)
       .neq("bestellungsart", "subunternehmer")
       .neq("bestellungsart", "abo")
@@ -127,7 +127,8 @@ export async function POST(request: NextRequest) {
         bestellnummer: b.bestellnummer || "Ohne Nr.",
         haendler: b.haendler_name || "Unbekannt",
         besteller: b.besteller_name,
-        tage_alt: Math.floor((Date.now() - new Date(b.created_at).getTime()) / (24 * 60 * 60 * 1000)),
+        // 06.05.2026: bestelldatum (echtes Datum aus BB) bevorzugt vor created_at (Pipeline-Erfassung)
+        tage_alt: Math.floor((Date.now() - new Date(b.bestelldatum ?? b.created_at).getTime()) / (24 * 60 * 60 * 1000)),
         betrag: Number(b.betrag) || 0,
       }));
 

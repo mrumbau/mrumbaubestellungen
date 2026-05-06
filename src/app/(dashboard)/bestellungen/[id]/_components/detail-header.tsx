@@ -126,18 +126,38 @@ export function DetailHeader({
                 ·
               </span>
 
-              <span
-                className="cursor-default"
-                title={new Date(bestellung.created_at).toLocaleString("de-DE", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              >
-                {relativeZeit(bestellung.created_at)}
-              </span>
+              {/* 06.05.2026 — Bestelldatum (echtes Datum aus BB) bevorzugt vor
+                  created_at (Pipeline-Erfassung). User sieht den echten Tag der
+                  Bestellung statt das System-Insert-Datum. */}
+              {bestellung.bestelldatum ? (
+                <span
+                  className="cursor-default"
+                  title={`Bestellt am ${new Date(bestellung.bestelldatum).toLocaleDateString("de-DE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })} (erfasst ${new Date(bestellung.created_at).toLocaleString("de-DE", {
+                    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+                  })})`}
+                >
+                  Bestellt {new Date(bestellung.bestelldatum).toLocaleDateString("de-DE", {
+                    day: "2-digit", month: "2-digit", year: "numeric",
+                  })}
+                </span>
+              ) : (
+                <span
+                  className="cursor-default"
+                  title={new Date(bestellung.created_at).toLocaleString("de-DE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                >
+                  {relativeZeit(bestellung.created_at)}
+                </span>
+              )}
               {bestellung.updated_at && bestellung.updated_at !== bestellung.created_at && (
                 <>
                   <span aria-hidden="true" className="text-line-strong">
@@ -170,6 +190,55 @@ export function DetailHeader({
                   style={{ background: projektFarbe || "var(--mr-red)" }}
                 />
                 <span className="font-medium text-foreground">{bestellung.projekt_name}</span>
+              </div>
+            )}
+
+            {/* 06.05.2026 — Extra-Kontext-Pills aus Mail/PDF: Kundennummer,
+                Projekt-Referenz, Fälligkeit. Werden nur angezeigt wenn die KI
+                tatsächlich was extrahiert hat — sonst leise im UI. */}
+            {(bestellung.kundennummer || bestellung.projekt_referenz || bestellung.faelligkeitsdatum) && (
+              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[11px]">
+                {bestellung.kundennummer && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                    title={`Kundennummer beim Lieferanten: ${bestellung.kundennummer}`}
+                  >
+                    <span className="text-foreground-subtle">Kd-Nr.</span>
+                    <span className="font-mono-amount font-medium text-foreground">{bestellung.kundennummer}</span>
+                  </span>
+                )}
+                {bestellung.projekt_referenz && !bestellung.projekt_name && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                    title={`Projekt-Referenz aus Dokument — bei keinem Projekt zugeordnet, kann als Match-Hinweis dienen: ${bestellung.projekt_referenz}`}
+                  >
+                    <span className="text-foreground-subtle">Ref:</span>
+                    <span className="font-medium text-foreground line-clamp-1 max-w-[280px]">{bestellung.projekt_referenz}</span>
+                  </span>
+                )}
+                {bestellung.faelligkeitsdatum && (() => {
+                  const f = new Date(bestellung.faelligkeitsdatum);
+                  const tageBis = Math.ceil((f.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+                  const ueberfaellig = tageBis < 0 && bestellung.status !== "freigegeben";
+                  const baldFaellig = tageBis >= 0 && tageBis <= 7;
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
+                        ueberfaellig
+                          ? "bg-error-bg border-error-border text-error"
+                          : baldFaellig
+                            ? "bg-warning-bg border-warning-border text-warning"
+                            : "bg-canvas border-line-subtle text-foreground-muted"
+                      }`}
+                      title={`Zahlfrist aus Rechnung: ${f.toLocaleDateString("de-DE")}`}
+                    >
+                      <span className="text-foreground-subtle">Fällig</span>
+                      <span className="font-medium">{f.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span>
+                      {ueberfaellig && <span className="font-semibold">· überfällig</span>}
+                      {baldFaellig && !ueberfaellig && <span className="font-semibold">· in {tageBis}d</span>}
+                    </span>
+                  );
+                })()}
               </div>
             )}
           </div>

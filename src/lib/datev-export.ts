@@ -30,6 +30,11 @@ export interface FreigegebeneRechnung {
   netto: number | null;
   mwst: number | null;
   bestellungsart?: "material" | "subunternehmer" | "abo" | null;
+  // 06.05.2026 — Datev-Spec konformer Beleg-Daten:
+  // bestelldatum = echtes Bestelldatum aus BB (statt Pipeline-Erfassung)
+  // faelligkeitsdatum = Zahlfrist aus Rechnung (für Beleginfo / OPOS-Auswertung)
+  bestelldatum?: string | null;
+  faelligkeitsdatum?: string | null;
 }
 
 /**
@@ -138,7 +143,11 @@ export function generiereZEILE(
 
   const betragFormatiert = formatiereBetrag(netto);
 
-  const datum = new Date(rechnung.updated_at || rechnung.created_at);
+  // 06.05.2026 — Belegdatum priorisiert aus echtem bestelldatum (BB).
+  // Vorher wurde updated_at (= Freigabe-Datum) als Belegdatum gebucht — das
+  // ist falsch für die Buchhaltung. Belegdatum = Rechnungsdatum/Bestelldatum.
+  const datumQuelle = rechnung.bestelldatum || rechnung.updated_at || rechnung.created_at;
+  const datum = new Date(datumQuelle);
   const belegDatum = formatiereDatum(datum, "TTMM");
 
   const belegfeld1 = csvSafe((rechnung.bestellnummer || "").slice(0, 12));
@@ -149,18 +158,28 @@ export function generiereZEILE(
   }
   buchungstext = csvSafe(buchungstext.slice(0, 60));
 
+  // 06.05.2026 — Beleginfo Art 1 + Inhalt 1: Fälligkeitsdatum mitgeben.
+  // DATEV nutzt das im OPOS-Kontext für Zahlfrist-Auswertungen.
+  const faelligkeitDatev = rechnung.faelligkeitsdatum
+    ? formatiereDatum(new Date(rechnung.faelligkeitsdatum), "TTMMJJJJ")
+    : "";
+  const beleginfoArt1 = faelligkeitDatev ? '"Faelligkeit"' : '""';
+  const beleginfoInhalt1 = faelligkeitDatev ? `"${faelligkeitDatev}"` : '""';
+
   // Felder bis KOST1 (39 Felder total)
   const felder = [
     betragFormatiert, '"S"', '"EUR"', '""',
     '""', '""', kreditorenkonto, gegenKonto, buSchluessel,
     belegDatum, `"${belegfeld1}"`, '""',
     '""', `"${buchungstext}"`,
-    // Postensperre bis Beleginfo (24 leere Felder)
-    '""', '""', '""', '""', '""',
-    '""', '""', '""', '""', '""',
-    '""', '""', '""', '""', '""',
-    '""', '""', '""', '""', '""',
-    '""', '""', '""', '""',
+    // Postensperre, Diverse Adressnummer, Geschäftspartnerbank, Sachverhalt, Zinssperre, Beleglink
+    '""', '""', '""', '""', '""', '""',
+    // Beleginfo Art 1 + Inhalt 1 = Fälligkeit
+    beleginfoArt1, beleginfoInhalt1,
+    // Beleginfo Art 2-8 + Inhalt 2-8 (14 leere Felder)
+    '""', '""', '""', '""', '""', '""',
+    '""', '""', '""', '""', '""', '""',
+    '""', '""',
     // KOST1, KOST2, KOST-Menge
     kost1 ? `"${csvSafe(kost1.slice(0, 36))}"` : '""',
     '""', '""',

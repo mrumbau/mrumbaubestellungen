@@ -24,7 +24,7 @@ export default async function BuchhaltungPage({
   // Phase 1: Count + Daten + Projekte parallel
   const [{ count }, { data: bestellungen }, { data: projekte }] = await Promise.all([
     supabase.from("bestellungen").select("*", { count: "exact", head: true }).eq("status", "freigegeben"),
-    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, mahnung_am, mahnung_count, updated_at").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
+    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz").eq("status", "freigegeben").order("updated_at", { ascending: false }).range(from, to),
     supabase.from("projekte").select("id, name").in("status", ["aktiv", "pausiert", "abgeschlossen"]).order("name"),
   ]);
 
@@ -32,12 +32,14 @@ export default async function BuchhaltungPage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
 
-  // Phase 2: Freigaben + Rechnungen parallel (brauchen bestellIds)
+  // Phase 2: Freigaben parallel; faelligkeitsdatum kommt jetzt direkt aus
+  // bestellungen-Spalte (06.05.2026 — kein Doku-Join mehr nötig).
+  // Wir laden trotzdem rechnung_id für PDF-Download-Link (datev-modal etc.).
   const bestellIds = (bestellungen || []).map((b) => b.id);
   const [{ data: freigaben }, { data: rechnungen }] = bestellIds.length
     ? await Promise.all([
         supabase.from("freigaben").select("bestellung_id, freigegeben_von_name, freigegeben_am").in("bestellung_id", bestellIds),
-        supabase.from("dokumente").select("id, bestellung_id, faelligkeitsdatum").in("bestellung_id", bestellIds).eq("typ", "rechnung"),
+        supabase.from("dokumente").select("id, bestellung_id").in("bestellung_id", bestellIds).eq("typ", "rechnung"),
       ])
     : [{ data: [] as never[] }, { data: [] as never[] }];
 
@@ -60,7 +62,7 @@ export default async function BuchhaltungPage({
       waehrung: b.waehrung || "EUR",
       freigegeben_von: freigabe?.freigegeben_von_name || "–",
       freigegeben_am: freigabe?.freigegeben_am || null,
-      faelligkeitsdatum: rechnung?.faelligkeitsdatum || null,
+      faelligkeitsdatum: b.faelligkeitsdatum,
       rechnung_id: rechnung?.id || null,
       bezahlt_am: b.bezahlt_am || null,
       bezahlt_von: b.bezahlt_von || null,
@@ -70,6 +72,9 @@ export default async function BuchhaltungPage({
       hat_lieferschein: b.hat_lieferschein || false,
       mahnung_am: b.mahnung_am || null,
       mahnung_count: b.mahnung_count || 0,
+      bestelldatum: b.bestelldatum,
+      kundennummer: b.kundennummer,
+      projekt_referenz: b.projekt_referenz,
     };
   });
 

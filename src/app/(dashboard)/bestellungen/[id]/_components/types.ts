@@ -95,6 +95,11 @@ export type Bestellung = {
   voraussichtliche_lieferung?: string | null;
   mahnung_am?: string | null;
   mahnung_count?: number;
+  // 06.05.2026 — extrahierte Felder aus Mail/PDF
+  bestelldatum?: string | null;
+  faelligkeitsdatum?: string | null;
+  kundennummer?: string | null;
+  projekt_referenz?: string | null;
 };
 
 export type ProjektStats = {

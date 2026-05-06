@@ -21,9 +21,12 @@ export async function POST(request: NextRequest) {
     const supabase = await createServerSupabaseClient();
 
     // Alle offenen Bestellungen laden (nicht freigegeben, nicht erwartet)
+    // 06.05.2026: bestelldatum + faelligkeitsdatum direkt aus bestellungen-Spalte
+    // (vorher Join über dokumente-Tabelle für faelligkeitsdatum nötig). Plus
+    // bestelldatum für genaueres tage_alt — Make.com-Niveau-Datenfluss.
     const { data: bestellungen } = await supabase
       .from("bestellungen")
-      .select("id, bestellnummer, haendler_name, status, betrag, hat_rechnung, hat_lieferschein, created_at")
+      .select("id, bestellnummer, haendler_name, status, betrag, hat_rechnung, hat_lieferschein, created_at, bestelldatum, faelligkeitsdatum")
       .in("status", ["offen", "abweichung", "ls_fehlt", "vollstaendig"])
       .order("created_at", { ascending: false })
       .limit(30);
@@ -48,29 +51,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ...leer, generated_at: generatedAt });
     }
 
-    // Fälligkeitsdaten aus Rechnungen laden (Batch)
-    const bestellIds = bestellungen.map((b) => b.id);
-    const { data: rechnungen } = await supabase
-      .from("dokumente")
-      .select("bestellung_id, faelligkeitsdatum")
-      .in("bestellung_id", bestellIds)
-      .eq("typ", "rechnung")
-      .not("faelligkeitsdatum", "is", null);
-
-    const faelligkeitsMap = new Map(
-      (rechnungen || []).map((r) => [r.bestellung_id, r.faelligkeitsdatum])
-    );
-
     const now = Date.now();
     const prioInput = bestellungen.map((b) => ({
       bestellnummer: b.bestellnummer || "Ohne Nr.",
       haendler: b.haendler_name || "–",
       status: b.status,
       betrag: Number(b.betrag) || null,
-      tage_alt: Math.floor((now - new Date(b.created_at).getTime()) / (1000 * 60 * 60 * 24)),
+      // bestelldatum bevorzugt — created_at ist Pipeline-Erfassung, nicht Bestelltag
+      tage_alt: Math.floor((now - new Date(b.bestelldatum ?? b.created_at).getTime()) / (1000 * 60 * 60 * 24)),
       hat_rechnung: b.hat_rechnung,
       hat_lieferschein: b.hat_lieferschein,
-      faelligkeitsdatum: faelligkeitsMap.get(b.id) || null,
+      faelligkeitsdatum: b.faelligkeitsdatum,
     }));
 
     const ergebnis = await priorisiereBestellungen(prioInput);
