@@ -51,25 +51,6 @@ export default async function BestellungenPage({
       .order("name"),
   ]);
 
-  // Audit-Trail-Spalte: events-Count für ALLE geladenen Bestellungen
-  // (vorher war es nur für die 20 der server-side-Page → jetzt für alle).
-  const ids = (bestellungen || []).map((b) => b.id);
-  const eventCountMap: Record<string, { count: number; lastAt: string | null }> = {};
-  if (ids.length > 0) {
-    const { data: summaries } = await supabase
-      .from("bestellung_event_summary")
-      .select("bestellung_id, event_count, last_event_at")
-      .in("bestellung_id", ids);
-    for (const s of summaries || []) {
-      if (s.bestellung_id) {
-        eventCountMap[s.bestellung_id] = {
-          count: s.event_count ?? 0,
-          lastAt: s.last_event_at ?? null,
-        };
-      }
-    }
-  }
-
   const total = bestellungen?.length ?? 0;
   const reachedCap = total >= HARD_CAP;
 
@@ -124,7 +105,6 @@ export default async function BestellungenPage({
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
         isAdmin={profil?.rolle === "admin"}
-        eventCountMap={eventCountMap}
       />
     </div>
   );

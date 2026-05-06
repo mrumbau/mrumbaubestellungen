@@ -22,7 +22,6 @@ import {
   Badge,
   SavedViewsMenu,
   useSavedViews,
-  ActionMenu,
   EmptyState,
   useToast,
   type DataTableColumn,
@@ -35,8 +34,6 @@ import {
   IconCheck,
   IconTrash,
   IconAlertCircle,
-  IconDownload,
-  IconClock,
 } from "@/components/ui/icons";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
@@ -86,14 +83,12 @@ export function BestellungenTabelle({
   projekte = [],
   aktiverProjektFilter,
   aktiverProjektName,
-  eventCountMap,
 }: {
   bestellungen: Bestellung[];
   projekte?: ProjektOption[];
   aktiverProjektFilter?: string | null;
   aktiverProjektName?: string | null;
   isAdmin?: boolean;
-  eventCountMap?: Record<string, { count: number; lastAt: string | null }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -134,6 +129,9 @@ export function BestellungenTabelle({
   const [density, setDensity] = useTableDensity("bestellungen.density");
   const [sort, setSort] = useState<SortState>({ key: "created_at", direction: "desc" });
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Mehrfachauswahl-Modus: Checkbox-Spalte ist standardmäßig aus, der User
+  // schaltet sie nur ein wenn er Bulk-Aktionen (z.B. Löschen) braucht.
+  const [selectMode, setSelectMode] = useState(false);
 
   // Saved Views — shape of what's persisted per view
   type ViewConfig = {
@@ -229,7 +227,6 @@ export function BestellungenTabelle({
     : false;
 
   // Async UI state
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [freigabeLoadingId, setFreigabeLoadingId] = useState<string | null>(null);
@@ -411,36 +408,6 @@ export function BestellungenTabelle({
   function closePreview() {
     setPreviewId(null);
     setPreviewUrl(null);
-  }
-
-  async function downloadZip(bestellungId: string) {
-    setDownloadingId(bestellungId);
-    try {
-      const res = await fetch(`/api/pdfs/zip?bestellung_id=${bestellungId}`);
-      if (!res.ok) {
-        toast.error("Download fehlgeschlagen", {
-          description: "Dokumente konnten nicht geladen werden.",
-        });
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const disposition = res.headers.get("Content-Disposition");
-      const match = disposition?.match(/filename="?([^"]+)"?/);
-      link.download = match?.[1] || "Dokumente.zip";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Download fehlgeschlagen", {
-        description: "Netzwerkfehler — bitte erneut versuchen.",
-      });
-    } finally {
-      setDownloadingId(null);
-    }
   }
 
   function handleCsvExport(rowsToExport: Bestellung[]) {
@@ -741,64 +708,36 @@ export function BestellungenTabelle({
         render: (b) => <BetragCell betrag={b.betrag} waehrung={b.waehrung} istNetto={b.betrag_ist_netto} />,
       },
       {
-        key: "audit",
-        label: "Audit",
-        align: "center",
-        hideBelow: "xl",
-        stopPropagation: true,
-        render: (b) => {
-          const audit = eventCountMap?.[b.id];
-          if (!audit || audit.count === 0) {
-            return <span className="text-line-strong text-[12px]">–</span>;
-          }
-          const tooltip = audit.lastAt
-            ? `${audit.count} Events · zuletzt ${formatDatum(audit.lastAt)}`
-            : `${audit.count} Events`;
-          return (
-            <Link
-              href={`/bestellungen/${b.id}#timeline`}
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-[12px] text-foreground-muted hover:text-brand transition-colors"
-              title={tooltip}
-              aria-label={`Audit-Trail öffnen: ${tooltip}`}
-            >
-              <IconClock className="w-3 h-3" />
-              <span className="font-mono-amount tabular-nums">{audit.count}</span>
-            </Link>
-          );
-        },
-      },
-      {
         key: "actions",
         label: "",
         stopPropagation: true,
-        width: 56,
+        width: 48,
         align: "right",
         render: (b) => {
           const kannFreigeben = b.status !== "freigegeben" && b.hat_rechnung;
+          if (!kannFreigeben) {
+            return <span className="text-line-strong text-[12px]">–</span>;
+          }
+          const isLoading = freigabeLoadingId === b.id;
           return (
-            <ActionMenu
-              label={`Aktionen für ${b.bestellnummer || "Bestellung"}`}
-              items={[
-                {
-                  label: "Rechnung freigeben",
-                  icon: <IconCheck />,
-                  onSelect: () => setFreigabeConfirmId(b.id),
-                  disabled: !kannFreigeben || freigabeLoadingId === b.id,
-                },
-                {
-                  label: "Dokumente herunterladen",
-                  icon: <IconDownload />,
-                  onSelect: () => downloadZip(b.id),
-                  disabled: downloadingId === b.id,
-                },
-              ]}
-            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFreigabeConfirmId(b.id);
+              }}
+              disabled={isLoading}
+              title="Rechnung freigeben"
+              aria-label={`Rechnung freigeben für ${b.bestellnummer || "Bestellung"}`}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground-muted hover:text-status-freigegeben hover:bg-success-bg transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <IconCheck className="w-4 h-4" />
+            </button>
           );
         },
       },
     ],
-    [projektFarbenMap, freigabeLoadingId, downloadingId, eventCountMap],
+    [projektFarbenMap, freigabeLoadingId],
   );
 
   return (
@@ -849,6 +788,37 @@ export function BestellungenTabelle({
           searchInputRef={searchInputRef}
         >
           <DensityToggle density={density} onChange={setDensity} />
+          <button
+            type="button"
+            onClick={() => {
+              setSelectMode((prev) => {
+                if (prev) setSelected(new Set());
+                return !prev;
+              });
+            }}
+            aria-pressed={selectMode}
+            title={selectMode ? "Auswahl-Modus beenden" : "Mehrere Bestellungen auswählen"}
+            className={
+              selectMode
+                ? "inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-brand bg-brand/[0.08] text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                : "inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+            }
+          >
+            <svg
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5"
+              aria-hidden="true"
+            >
+              <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
+              {selectMode && <path d="M5 8.5l2 2 4-4.5" />}
+            </svg>
+            Auswählen
+          </button>
           <SavedViewsMenu<ViewConfig>
             views={savedViews.views}
             activeViewId={activeViewId}
@@ -951,8 +921,8 @@ export function BestellungenTabelle({
           getRowId={(b) => b.id}
           ariaLabel="Bestellübersicht"
           density={density}
-          selection={selected}
-          onSelectionChange={setSelected}
+          selection={selectMode ? selected : undefined}
+          onSelectionChange={selectMode ? setSelected : undefined}
           getSelectionAriaLabel={(b) =>
             `Bestellung ${b.bestellnummer || "ohne Nummer"} auswählen`
           }
