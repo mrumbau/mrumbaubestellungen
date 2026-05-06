@@ -45,7 +45,10 @@ export default async function BuchhaltungPage() {
   const [{ data: freigaben }, { data: rechnungen }] = bestellIds.length
     ? await Promise.all([
         supabase.from("freigaben").select("bestellung_id, freigegeben_von_name, freigegeben_am").in("bestellung_id", bestellIds),
-        supabase.from("dokumente").select("id, bestellung_id").in("bestellung_id", bestellIds).eq("typ", "rechnung"),
+        // 07.05.2026 — Nur Rechnungen mit echtem PDF-File anzeigen.
+        // Body-only / Vendor-Parser-Extraktionen schreiben dokumente-Rows mit
+        // storage_pfad=NULL — der PDF-Link würde sonst 404 liefern.
+        supabase.from("dokumente").select("id, bestellung_id").in("bestellung_id", bestellIds).eq("typ", "rechnung").not("storage_pfad", "is", null),
       ])
     : [{ data: [] as never[] }, { data: [] as never[] }];
 
