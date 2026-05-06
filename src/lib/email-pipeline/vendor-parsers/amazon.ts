@@ -145,14 +145,29 @@ export const amazonParser: VendorParser = {
     const typ = classifyDocumentType(subject, body);
 
     // 3. Beträge
+    // 06.05.2026 — erweiterte Patterns. Amazon-BB-Mails (HTML→Plain durch
+    // stripHtml) haben den Gesamtbetrag in unterschiedlichen Formaten:
+    // "Gesamtsumme: EUR X", "Bestellsumme: EUR X", "Summe: EUR X",
+    // "Endbetrag: EUR X", "EUR X" am Zeilen-Ende mit "Gesamt" davor, oder
+    // ohne "EUR"-Prefix nur "X EUR" / "X €". Plus: deutsche Zahlen mit
+    // Komma als Dezimaltrenner.
     const gesamtMatch = body.match(/Gesamtsumme:?\s*EUR\s*([\d.,]+)/i)
       ?? body.match(/Bestellsumme:?\s*EUR\s*([\d.,]+)/i)
-      ?? body.match(/Order\s*Total:?\s*EUR\s*([\d.,]+)/i);
+      ?? body.match(/Order\s*Total:?\s*EUR\s*([\d.,]+)/i)
+      ?? body.match(/Summe:?\s*EUR\s*([\d.,]+)/i)
+      ?? body.match(/Endbetrag:?\s*EUR\s*([\d.,]+)/i)
+      ?? body.match(/Gesamtbetrag:?\s*EUR\s*([\d.,]+)/i)
+      ?? body.match(/Rechnungsbetrag:?\s*EUR\s*([\d.,]+)/i)
+      // Format ohne EUR-Prefix: "Gesamt: 12,34 €" oder "Summe: 12,34"
+      ?? body.match(/Gesamt(?:summe|betrag)?:?\s*([\d.,]+)\s*(?:€|EUR)/i)
+      ?? body.match(/Bestellsumme:?\s*([\d.,]+)\s*(?:€|EUR)/i);
     const gesamtbetrag = gesamtMatch ? parseEuroAmount(gesamtMatch[1]) : null;
 
     const mwstMatch = body.match(/Mehrwertsteuer:?\s*EUR\s*([\d.,]+)/i)
       ?? body.match(/MwSt\.?:?\s*EUR\s*([\d.,]+)/i)
-      ?? body.match(/VAT:?\s*EUR\s*([\d.,]+)/i);
+      ?? body.match(/VAT:?\s*EUR\s*([\d.,]+)/i)
+      ?? body.match(/Umsatzsteuer:?\s*EUR\s*([\d.,]+)/i)
+      ?? body.match(/MwSt\.?:?\s*([\d.,]+)\s*(?:€|EUR)/i);
     const mwst = mwstMatch ? parseEuroAmount(mwstMatch[1]) : null;
 
     const netto = gesamtbetrag !== null && mwst !== null

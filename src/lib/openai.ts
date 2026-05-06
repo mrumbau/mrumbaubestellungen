@@ -419,6 +419,30 @@ Extrahiere auch:
 Falls ein Feld nicht erkennbar ist, setze null.
 
 ═══════════════════════════════════════════════════════════════════════════
+BETRAG-EXTRAKTION — auch bei Bestellbestätigungen / Auftragsbestätigungen!
+═══════════════════════════════════════════════════════════════════════════
+
+WICHTIG: "gesamtbetrag" muss NICHT NUR bei Rechnungen extrahiert werden,
+sondern AUCH bei Bestellbestätigungen, Auftragsbestätigungen und
+Lieferscheinen — diese Dokumente enthalten in 90%+ der Fälle einen
+Gesamtpreis im Mail-Body oder PDF.
+
+Suche aktiv nach diesen Signalen für gesamtbetrag (Reihenfolge: am
+zuverlässigsten zuerst):
+  • "Gesamtsumme", "Gesamtbetrag", "Bestellsumme", "Endbetrag",
+    "Rechnungsbetrag", "Total", "Order Total" (typische Footer-Position)
+  • Summe der Artikel-Zeilen (falls einzelne Positionen aufgeführt sind)
+  • Bei Amazon-BB-Mails: "EUR XX,XX" am Ende von "Bestellsumme:" oder
+    am Ende der Artikel-Tabelle (z.B. "Summe X Artikel: EUR 12,34")
+  • Bei Mehrwertsteuer-/Brutto-Netto-Aufschlüsselung: brutto = gesamtbetrag
+
+❌ FALSCH: gesamtbetrag=null setzen weil "es ist nur eine Bestellbestätigung,
+   kommt erst mit Rechnung". NEIN — wenn ein Betrag im Body / PDF steht,
+   extrahiere ihn auch bei BB/Auftragsbestätigung/Lieferschein.
+✅ RICHTIG: Nur null wenn kein einziger Betrag in der Mail / im Dokument
+   steht (z.B. reine Versand-Status-Mails ohne Preisinformation).
+
+═══════════════════════════════════════════════════════════════════════════
 HALLUZINATIONS-SCHUTZ — typische deutsche Mail-Fallen (aus Real-World-Daten):
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -555,20 +579,24 @@ export async function analysiereDokument(
   const primary = await tryAnalyse("gpt-5.5");
 
   // 06.05.2026 — Erweiterung des Fallback-Triggers:
-  // Bisher nur bei null-Result oder Exception. Jetzt auch wenn KI eine
-  // Rechnung erkennt aber gesamtbetrag NULL liefert → vermutlich
-  // Extraktions-Schwäche, gpt-4o-Retry hat bessere Chance den Betrag aus
-  // Tabellen-Layouts zu extrahieren. Verhindert "Rechnung ohne Betrag" im UI
-  // (Amazon DE6000C2..., Elektroservice Feistbaur, etc.)
+  // Bisher nur bei null-Result oder Exception. Jetzt auch wenn KI ein
+  // betragsführendes Dokument erkennt (Rechnung/BB/LS) aber gesamtbetrag NULL
+  // liefert → vermutlich Extraktions-Schwäche, gpt-4o-Retry hat bessere Chance
+  // den Betrag aus Tabellen-Layouts zu extrahieren.
+  // Anwendung: nicht nur Rechnung — auch Bestellbestätigungen tragen Beträge
+  // (User-Feedback 06.05.2026: "Amazon BB haben immer preise drinnen, der
+  // Preis darf durch Bestellbestätigung aufgenommen werden").
+  // Verhindert "BB/RG ohne Betrag" im UI (Amazon-BBs, Elektroservice Feistbaur).
+  const TYPEN_MIT_BETRAG = ["rechnung", "bestellbestaetigung", "lieferschein"];
   const primaryNeedsRetry =
     !primary ||
-    (primary.typ === "rechnung" && primary.gesamtbetrag == null && primary.parse_fehler !== true);
+    (TYPEN_MIT_BETRAG.includes(primary.typ) && primary.gesamtbetrag == null && primary.parse_fehler !== true);
 
   if (primary && !primaryNeedsRetry) return primary;
 
   // Retry mit Fallback-Modell — gpt-4o ist battle-tested für Structured-Outputs
   logInfo("openai/analysiereDokument", primary
-    ? "Retry mit gpt-4o (Rechnung ohne gesamtbetrag erkannt)"
+    ? `Retry mit gpt-4o (typ=${primary.typ} ohne gesamtbetrag)`
     : "Retry mit Fallback-Modell gpt-4o");
   const fallback = await tryAnalyse("gpt-4o");
   // Wenn fallback einen Betrag liefert, nimm fallback. Sonst behalte primary
