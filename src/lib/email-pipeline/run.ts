@@ -38,6 +38,7 @@ import {
   isBestellBetreff,
   isStrictVersandBetreff,
   stripHtml,
+  htmlToStructuredText,
   safeBase64ToBuffer,
 } from "./pipeline/mail-utils";
 import { checkAndClaimIdempotency } from "./pipeline/idempotency-check";
@@ -298,8 +299,13 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   }
 
   // 7. Email-Body
+  // emailText (flat) für Vendor-Parser, Idempotenz-Hash, Subject-Heuristiken.
+  // emailTextStrukturiert (HTML→Plain mit Tabellen-Erhalt) speziell für KI-Analyse:
+  // bewahrt Spalten/Zeilen-Trennung sodass Brutto/Netto/MwSt-Tabellen korrekt
+  // extrahiert werden (Make.com hat das nie gemacht — Beträge gingen oft verloren).
   const rawEmailText = input.email_text || input.email_body || "";
   const emailText = stripHtml(rawEmailText);
+  const emailTextStrukturiert = htmlToStructuredText(rawEmailText);
 
   // 8. Versand-Email-Weiche
   // 06.05.2026: Strict-VB-Override hinzugefügt — Subjects wie "Ihre Bestellung
@@ -1107,9 +1113,15 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       // wir bei Vendor-Konfidenz ≥0.75 die KI komplett geskipped — das hat
       // Vendor-Parser-Lücken (z.B. fehlende BN/Beträge im PDF) ungenutzt gelassen.
       // Cost-Trade: ~5x höhere OpenAI-Cost, dafür konsistente PDF-Inhalts-Extraktion.
+      // KI bekommt strukturerhaltenden Text (Tabellen mit ` | ` zwischen Cells,
+      // Block-Elemente als Newlines). Bei reinen Plain-Text-Mails fällt es auf
+      // emailText (flat) zurück damit nichts verloren geht.
+      const kiBody = emailTextStrukturiert && emailTextStrukturiert.length > 50
+        ? emailTextStrukturiert
+        : emailText;
       const bodyMitBetreff = email_betreff
-        ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
-        : emailText.slice(0, 15000);
+        ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${kiBody.slice(0, 15000)}`
+        : kiBody.slice(0, 15000);
       const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
       let bodyAnalyseLokal: DokumentAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint || undefined });
 

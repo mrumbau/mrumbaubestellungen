@@ -126,6 +126,110 @@ export function stripHtml(html: string): string {
 }
 
 // =====================================================================
+// HTML → strukturerhaltendes Plain-Text (für KI-Body-Vorbereitung).
+// 06.05.2026 — Make.com hat HTML einfach zu Single-Line-Whitespace gestripped,
+// was bei Tabellen-Mails (Amazon-BB, Megabad, Telekom-Rechnungen) Beträge an
+// die KI lieferte ohne Spalten-Kontext. Diese Variante bewahrt Block- und
+// Tabellen-Struktur, sodass die KI Brutto/Netto/MwSt klar zuordnen kann.
+//
+// Strategie:
+//   - <script>/<style> komplett entfernt
+//   - <br>, <p>, <div>, <li>, <h1-h6> → Newline
+//   - <tr> → Newline; <td>/<th> → ` | ` Trennung
+//   - HTML-Entities decoded (&nbsp;, &amp;, &euro;, &#8364; etc.)
+//   - Dangerous-Protocols neutralisiert (gleich wie stripHtml)
+//   - Multi-Whitespace normalisiert (max 2 Newlines hintereinander)
+// =====================================================================
+const NUMERIC_ENTITY = /&#(\d+);/g;
+const HEX_ENTITY = /&#x([0-9a-fA-F]+);/g;
+const NAMED_ENTITY_MAP: Record<string, string> = {
+  nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  euro: "€", pound: "£", yen: "¥", cent: "¢", copy: "©", reg: "®",
+  trade: "™", hellip: "…", mdash: "—", ndash: "–", laquo: "«", raquo: "»",
+  bdquo: "„", ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’",
+  szlig: "ß", auml: "ä", ouml: "ö", uuml: "ü", Auml: "Ä", Ouml: "Ö", Uuml: "Ü",
+};
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(NUMERIC_ENTITY, (_, n) => {
+      const code = parseInt(n, 10);
+      return code > 0 && code < 0x10ffff ? String.fromCodePoint(code) : "";
+    })
+    .replace(HEX_ENTITY, (_, h) => {
+      const code = parseInt(h, 16);
+      return code > 0 && code < 0x10ffff ? String.fromCodePoint(code) : "";
+    })
+    .replace(/&([a-zA-Z]+);/g, (m, name) => NAMED_ENTITY_MAP[name] ?? m);
+}
+
+export function htmlToStructuredText(html: string): string {
+  if (!html || typeof html !== "string") return "";
+
+  // Wenn kein HTML drin ist (Plain-Text-Mail), nur normalisieren.
+  // Entities trotzdem decoden \u2014 manche Mail-Clients escapen `&amp;` oder
+  // `&euro;` auch in Plain-Text.
+  if (!/<[a-zA-Z\/!][^>]*>/.test(html)) {
+    return decodeEntities(html)
+      .replace(/\r\n?/g, "\n")
+      .replace(/\u00A0/g, " ")
+      .replace(/\u2028|\u2029/g, "\n")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(DANGEROUS_PROTOCOLS, "[blocked-protocol]:")
+      .trim();
+  }
+
+  let s = html;
+
+  // 1. Komplett entfernen: script, style, head, comments
+  s = s
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "");
+
+  // 2. Block-Strukturen → Marker (vor Tag-Removal damit Newlines bleiben)
+  s = s
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\s*\/\s*(p|div|section|article|header|footer|nav|aside|main|figure|blockquote|pre|h[1-6]|li|tr|table|thead|tbody|tfoot)\s*>/gi, "\n")
+    .replace(/<\s*li\b[^>]*>/gi, "\n• ")
+    .replace(/<\s*hr\s*\/?\s*>/gi, "\n———\n")
+    // Tabellen-Cells: ` | ` zwischen td/th. Erste Cell pro Zeile bekommt nur Whitespace,
+    // damit die Zeile nicht mit ` | ` startet.
+    .replace(/<\s*\/\s*(td|th)\s*>\s*<\s*(td|th)\b[^>]*>/gi, " | ")
+    .replace(/<\s*(td|th)\b[^>]*>/gi, "")
+    .replace(/<\s*\/\s*(td|th)\s*>/gi, "");
+
+  // 3. Übrige Tags entfernen (nach Block-Markern, sonst gehen die verloren)
+  s = s.replace(/<[^>]+>/g, " ");
+
+  // 4. HTML-Entities decoden
+  s = decodeEntities(s);
+
+  // 5. Dangerous-Protocols neutralisieren (gleich wie stripHtml)
+  s = s.replace(DANGEROUS_PROTOCOLS, "[blocked-protocol]:");
+
+  // 6. Whitespace normalisieren — pro Zeile, dann Multi-Newlines reduzieren
+  s = s
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00A0/g, " ")        // non-breaking space
+    .replace(/\u2028|\u2029/g, "\n") // line/paragraph separator
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "") // Control-Chars
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter((line, i, arr) => {
+      // Mehrere leere Zeilen hintereinander → eine
+      if (line === "" && arr[i - 1] === "") return false;
+      return true;
+    })
+    .join("\n")
+    .trim();
+
+  return s;
+}
+
+// =====================================================================
 // Versand-Erkennung via Betreff
 // =====================================================================
 const VERSAND_BETREFF_KEYWORDS = [

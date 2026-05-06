@@ -17,6 +17,7 @@ import {
   isVersandDomain,
   safeBase64ToBuffer,
   stripHtml,
+  htmlToStructuredText,
   isVersandBetreff,
   isBestellBetreff,
 } from "../mail-utils";
@@ -168,6 +169,116 @@ describe("stripHtml — XSS-Schutz + Dangerous-Protocols (F3.F8)", () => {
     expect(stripHtml(null)).toBe("");
     // @ts-expect-error testing runtime defense
     expect(stripHtml(undefined)).toBe("");
+  });
+});
+
+describe("htmlToStructuredText — Tabellen-Erhalt für KI-Body-Vorbereitung", () => {
+  it("liefert leeren String für null/undefined/leer", () => {
+    // @ts-expect-error testing runtime defense
+    expect(htmlToStructuredText(null)).toBe("");
+    // @ts-expect-error testing runtime defense
+    expect(htmlToStructuredText(undefined)).toBe("");
+    expect(htmlToStructuredText("")).toBe("");
+  });
+
+  it("normalisiert Plain-Text-Mails ohne HTML-Tags", () => {
+    const plain = "Hallo,\n\ndas ist eine Plain-Text-Mail.\n\nGruß";
+    const result = htmlToStructuredText(plain);
+    expect(result).toContain("Hallo");
+    expect(result).toContain("Plain-Text-Mail");
+    expect(result).toContain("Gruß");
+  });
+
+  it("entfernt <script> und <style> komplett", () => {
+    const html = "<div>Vorher<script>alert('xss')</script>Nachher</div><style>.x{color:red}</style>";
+    const result = htmlToStructuredText(html);
+    expect(result).not.toContain("alert");
+    expect(result).not.toContain("xss");
+    expect(result).not.toContain("color:red");
+    expect(result).toContain("Vorher");
+    expect(result).toContain("Nachher");
+  });
+
+  it("bewahrt Tabellen-Struktur mit ` | ` zwischen Cells", () => {
+    const html = `
+      <table>
+        <tr><th>Produkt</th><th>Menge</th><th>Brutto</th></tr>
+        <tr><td>Bohrmaschine</td><td>2</td><td>179,98 €</td></tr>
+        <tr><td>Akkuschrauber</td><td>1</td><td>89,90 €</td></tr>
+      </table>
+    `;
+    const result = htmlToStructuredText(html);
+    expect(result).toContain("Produkt | Menge | Brutto");
+    expect(result).toContain("Bohrmaschine | 2 | 179,98 €");
+    expect(result).toContain("Akkuschrauber | 1 | 89,90 €");
+  });
+
+  it("Block-Elemente werden zu Newlines (Amazon-BB-typisch)", () => {
+    const html = "<p>Ihre Amazon.de Bestellung</p><div>Bestellsumme: 50,14 €</div><p>Lieferadresse: ...</p>";
+    const result = htmlToStructuredText(html);
+    const lines = result.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(lines).toContain("Ihre Amazon.de Bestellung");
+    expect(lines).toContain("Bestellsumme: 50,14 €");
+    expect(lines).toContain("Lieferadresse: ...");
+  });
+
+  it("dekodiert HTML-Entities (&euro;, &nbsp;, &amp;, &#8364;)", () => {
+    expect(htmlToStructuredText("Preis: 50&euro;")).toContain("Preis: 50€");
+    expect(htmlToStructuredText("&amp;")).toContain("&");
+    expect(htmlToStructuredText("Preis: 100&#8364;")).toContain("Preis: 100€");
+    expect(htmlToStructuredText("Datum:&nbsp;01.01.2026")).toContain("Datum: 01.01.2026");
+  });
+
+  it("dekodiert deutsche Umlaute via named entities", () => {
+    expect(htmlToStructuredText("Schl&ouml;sser &amp; Gr&uuml;&szlig;e")).toContain("Schlösser & Grüße");
+  });
+
+  it("neutralisiert Dangerous-Protocols", () => {
+    const result = htmlToStructuredText("<p>Klick javascript:alert(1) hier</p>");
+    expect(result).not.toContain("javascript:alert");
+    expect(result).toContain("[blocked-protocol]:");
+  });
+
+  it("Listen werden zu Bullet-Points", () => {
+    const html = "<ul><li>Erste Position</li><li>Zweite Position</li></ul>";
+    const result = htmlToStructuredText(html);
+    expect(result).toContain("• Erste Position");
+    expect(result).toContain("• Zweite Position");
+  });
+
+  it("normalisiert Whitespace ohne Beträge zu zerstören", () => {
+    const html = "<p>Brutto:    1.999,30  €</p>";
+    const result = htmlToStructuredText(html);
+    expect(result).toContain("Brutto: 1.999,30 €");
+  });
+
+  it("Multi-Newlines werden auf max 2 reduziert", () => {
+    const html = "<p>A</p><br><br><br><br><p>B</p>";
+    const result = htmlToStructuredText(html);
+    expect(result).not.toMatch(/\n{3,}/);
+    expect(result).toContain("A");
+    expect(result).toContain("B");
+  });
+
+  it("reale Amazon-BB Tabelle: Beträge bleiben spaltenweise zuordbar", () => {
+    const html = `
+      <table>
+        <tr><td>Zwischensumme:</td><td>42,14&nbsp;€</td></tr>
+        <tr><td>Versand:</td><td>0,00&nbsp;€</td></tr>
+        <tr><td><strong>Gesamtsumme:</strong></td><td><strong>50,14&nbsp;€</strong></td></tr>
+      </table>
+    `;
+    const result = htmlToStructuredText(html);
+    expect(result).toContain("Zwischensumme: | 42,14 €");
+    expect(result).toContain("Gesamtsumme: | 50,14 €");
+  });
+
+  it("entfernt <head>-Block samt Meta-Tags", () => {
+    const html = "<html><head><meta charset='utf-8'><title>RG</title></head><body>Inhalt</body></html>";
+    const result = htmlToStructuredText(html);
+    expect(result).not.toContain("meta charset");
+    expect(result).not.toContain("<title>");
+    expect(result).toContain("Inhalt");
   });
 });
 
