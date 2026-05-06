@@ -1084,6 +1084,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   }
 
   // 15. Body-Analyse (Vendor-Parser oder KI)
+  // 06.05.2026 — bodyAnalyse hochgezogen damit der Fallback-Pfad (Schritt 16)
+  // die extrahierten KI-Werte mitnehmen kann, statt hardcoded NULLs zu schreiben.
+  // Vorher: bei typ='unbekannt' (KI versteht Mail nicht oder erkennt keinen
+  // BEKANNTE_TYPEN) gingen Bestellnummer/Betrag/Daten verloren obwohl die KI
+  // sie korrekt extrahiert hatte. Resultat: ~22 Bestellungen mit leeren Spalten.
+  let bodyAnalyse: DokumentAnalyse | null = null;
   if (emailText && emailText.length > 100 && Date.now() - startTime < 45_000) {
     try {
       const vendorResult = await tryParseVendor({
@@ -1096,8 +1102,6 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         anhaenge: anhaenge.map((a) => ({ name: a.name, mime_type: a.mime_type, base64: a.base64 })),
       });
 
-      let bodyAnalyse: DokumentAnalyse;
-
       // Always-KI (05.05.2026): KI läuft IMMER parallel zum Vendor-Parser.
       // Vendor-Parser-Hints werden via mergeVendorIntoKi gemerged. Vorher hatten
       // wir bei Vendor-Konfidenz ≥0.75 die KI komplett geskipped — das hat
@@ -1107,20 +1111,20 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${emailText.slice(0, 15000)}`
         : emailText.slice(0, 15000);
       const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
-      bodyAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint || undefined });
+      let bodyAnalyseLokal: DokumentAnalyse = await analysiereDokument(bodyBase64, "text/plain", { folderHint: documentHint || undefined });
 
       if (vendorResult && vendorResult.result.documents.length > 0) {
         const vendorDoc = vendorResult.result.documents[0];
-        bodyAnalyse = mergeVendorIntoKi(bodyAnalyse, vendorDoc);
+        bodyAnalyseLokal = mergeVendorIntoKi(bodyAnalyseLokal, vendorDoc);
         parserName = vendorResult.result.vendor;
         parserSource = vendorResult.acceptWithoutKI ? "vendor" : "ki";
         logInfo("webhook/email", "Vendor + KI parallel", {
           vendor: parserName,
           vendor_konfidenz: vendorResult.result.konfidenz,
-          ki_konfidenz: bodyAnalyse.konfidenz,
+          ki_konfidenz: bodyAnalyseLokal.konfidenz,
           accept_without_ki_war_aktiviert: vendorResult.acceptWithoutKI,
-          merged_bestellnummer: bodyAnalyse.bestellnummer,
-          merged_typ: bodyAnalyse.typ,
+          merged_bestellnummer: bodyAnalyseLokal.bestellnummer,
+          merged_typ: bodyAnalyseLokal.typ,
         });
       }
 
@@ -1128,14 +1132,18 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       if (email_betreff) {
         const betreffLower = email_betreff.toLowerCase();
         const betreffIstBestellung = ["ihre bestellung", "bestellbestätigung", "auftragsbestätigung", "order confirmation", "bestellung eingegangen", "bestellung bei"].some((kw) => betreffLower.includes(kw));
-        if (betreffIstBestellung && bodyAnalyse.typ === "versandbestaetigung") {
-          logInfo("webhook/email", "Betreff-Korrektur: Versand → Bestellung", { email_betreff, gpt_typ: bodyAnalyse.typ });
-          bodyAnalyse.typ = "bestellbestaetigung";
+        if (betreffIstBestellung && bodyAnalyseLokal.typ === "versandbestaetigung") {
+          logInfo("webhook/email", "Betreff-Korrektur: Versand → Bestellung", { email_betreff, gpt_typ: bodyAnalyseLokal.typ });
+          bodyAnalyseLokal.typ = "bestellbestaetigung";
         }
       }
 
+      // Outer-Variable für Fallback-Pfad zuweisen — auch bei typ=unbekannt,
+      // weil die KI-Werte (Bestellnr, Betrag, Daten) im Fallback genutzt werden.
+      bodyAnalyse = bodyAnalyseLokal;
+
       // Body-only Versand-Rollback
-      if (bodyAnalyse.typ === "versandbestaetigung" && bestellungNeuErstellt && dokumenteGespeichert === 0) {
+      if (bodyAnalyseLokal.typ === "versandbestaetigung" && bestellungNeuErstellt && dokumenteGespeichert === 0) {
         logInfo("webhook/email", "Rollback: Body-only Versandbestätigung", {
           bestellungId, email_absender, email_betreff,
         });
@@ -1148,43 +1156,62 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         };
       }
 
-      if (BEKANNTE_TYPEN.includes(bodyAnalyse.typ) && !gespeicherteTypen.includes(bodyAnalyse.typ)) {
+      if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ) && !gespeicherteTypen.includes(bodyAnalyseLokal.typ)) {
         // Neuer Typ aus Body
         await supabase.from("dokumente").insert({
           bestellung_id: bestellungId,
-          typ: bodyAnalyse.typ,
+          typ: bodyAnalyseLokal.typ,
           quelle: "email",
           storage_pfad: null,
           email_betreff,
           email_absender,
           email_datum,
-          ki_roh_daten: bodyAnalyse,
-          bestellnummer_erkannt: bodyAnalyse.bestellnummer ?? erkannteBestellnummer,
-          auftragsnummer: bodyAnalyse.auftragsnummer || null,
-          lieferscheinnummer: bodyAnalyse.lieferscheinnummer || null,
-          artikel: bodyAnalyse.artikel,
-          gesamtbetrag: bodyAnalyse.gesamtbetrag ?? bodyExtractedBetrag,
-          netto: bodyAnalyse.netto,
-          mwst: bodyAnalyse.mwst,
-          faelligkeitsdatum: bodyAnalyse.faelligkeitsdatum,
-          lieferdatum: bodyAnalyse.lieferdatum,
-          iban: bodyAnalyse.iban,
-          kundennummer: bodyAnalyse.kundennummer || null,
-          besteller_im_dokument: bodyAnalyse.besteller_im_dokument || null,
-          projekt_referenz: bodyAnalyse.projekt_referenz || null,
-          bestelldatum: bodyAnalyse.bestelldatum || null,
+          ki_roh_daten: bodyAnalyseLokal,
+          bestellnummer_erkannt: bodyAnalyseLokal.bestellnummer ?? erkannteBestellnummer,
+          auftragsnummer: bodyAnalyseLokal.auftragsnummer || null,
+          lieferscheinnummer: bodyAnalyseLokal.lieferscheinnummer || null,
+          artikel: bodyAnalyseLokal.artikel,
+          gesamtbetrag: bodyAnalyseLokal.gesamtbetrag ?? bodyExtractedBetrag,
+          netto: bodyAnalyseLokal.netto,
+          mwst: bodyAnalyseLokal.mwst,
+          faelligkeitsdatum: bodyAnalyseLokal.faelligkeitsdatum,
+          lieferdatum: bodyAnalyseLokal.lieferdatum,
+          iban: bodyAnalyseLokal.iban,
+          kundennummer: bodyAnalyseLokal.kundennummer || null,
+          besteller_im_dokument: bodyAnalyseLokal.besteller_im_dokument || null,
+          projekt_referenz: bodyAnalyseLokal.projekt_referenz || null,
+          bestelldatum: bodyAnalyseLokal.bestelldatum || null,
         });
 
-        const haendlerNameAfter = await applyAnalyseToBestellung(supabase, bestellungId, bodyAnalyse, {
+        const haendlerNameAfter = await applyAnalyseToBestellung(supabase, bestellungId, bodyAnalyseLokal, {
           haendlerName,
           absenderDomain,
         });
         if (haendlerNameAfter) haendlerName = haendlerNameAfter;
         dokumenteGespeichert++;
-        gespeicherteTypen.push(bodyAnalyse.typ);
-      } else if (BEKANNTE_TYPEN.includes(bodyAnalyse.typ)) {
+        gespeicherteTypen.push(bodyAnalyseLokal.typ);
+      } else if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ)) {
         // Nur Felder ergänzen
-        await ergaenzeFelder(supabase, bestellungId, bodyAnalyse, haendlerName, absenderDomain);
+        await ergaenzeFelder(supabase, bestellungId, bodyAnalyseLokal, haendlerName, absenderDomain);
+      } else {
+        // 06.05.2026 — Werte-Propagation auch bei typ='unbekannt': KI hat
+        // ggf. Bestellnummer/Betrag/Datum extrahiert, auch wenn sie den
+        // Doku-Typ nicht erkannt hat. Wir propagieren diese Werte trotzdem
+        // in die `bestellungen`-Tabelle, sodass die UI sie sieht.
+        const hatExtrahierteWerte =
+          bodyAnalyseLokal.bestellnummer ||
+          bodyAnalyseLokal.gesamtbetrag != null ||
+          bodyAnalyseLokal.faelligkeitsdatum ||
+          bodyAnalyseLokal.bestelldatum ||
+          bodyAnalyseLokal.kundennummer ||
+          bodyAnalyseLokal.projekt_referenz ||
+          bodyAnalyseLokal.auftragsnummer;
+        if (hatExtrahierteWerte) {
+          logInfo("webhook/email", "Werte-Propagation bei typ='unbekannt'", {
+            bestellungId, typ: bodyAnalyseLokal.typ, bn: bodyAnalyseLokal.bestellnummer, betrag: bodyAnalyseLokal.gesamtbetrag,
+          });
+          await ergaenzeFelder(supabase, bestellungId, bodyAnalyseLokal, haendlerName, absenderDomain);
+        }
       }
     } catch (bodyErr) {
       logError("webhook/email", "Body-Analyse fehlgeschlagen", bodyErr);
@@ -1200,6 +1227,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       email_datum,
       anhaenge_count: anhaenge.length,
       bestellungNeuErstellt,
+      // 06.05.2026 — KI-Werte (Bestellnr/Betrag/Daten) durchreichen, damit der
+      // Fallback sie ins neue Doku schreibt statt hardcoded NULLs. Vorher gingen
+      // diese Werte verloren wenn die KI typ='unbekannt' lieferte.
+      bodyAnalyse,
+      haendlerName,
+      absenderDomain,
     });
     if (fallbackResult.shortCircuit) return fallbackResult.response!;
     if (fallbackResult.gespeichert) dokumenteGespeichert = 1;
@@ -1762,6 +1795,15 @@ interface FallbackInput {
   email_datum: string;
   anhaenge_count: number;
   bestellungNeuErstellt: boolean;
+  /**
+   * 06.05.2026 — KI-Analyse-Result aus Schritt 15. Wenn vorhanden, werden
+   * extrahierte Werte (Bestellnr, Betrag, Daten) ins Fallback-Doku übernommen
+   * statt hardcoded NULLs. Greift z.B. bei Mails wo die KI typ='unbekannt'
+   * liefert aber Bestellnummer/Betrag erkannt hat.
+   */
+  bodyAnalyse?: DokumentAnalyse | null;
+  haendlerName?: string | null;
+  absenderDomain?: string | null;
 }
 
 interface FallbackResult {
@@ -1775,7 +1817,11 @@ async function tryFallbackKeywordTyp(
   bestellungId: string,
   input: FallbackInput,
 ): Promise<FallbackResult> {
-  const { emailText, email_betreff, email_absender, email_datum, anhaenge_count, bestellungNeuErstellt } = input;
+  const {
+    emailText, email_betreff, email_absender, email_datum,
+    anhaenge_count, bestellungNeuErstellt,
+    bodyAnalyse, haendlerName, absenderDomain,
+  } = input;
 
   if (emailText && emailText.length > 20) {
     const suchText = ((email_betreff || "") + " " + emailText.slice(0, 500)).toLowerCase();
@@ -1850,6 +1896,15 @@ async function tryFallbackKeywordTyp(
       }
     }
 
+    // 06.05.2026 — Fallback-Insert nutzt KI-Werte (falls vorhanden) statt
+    // hardcoded NULLs. Selbst wenn die KI typ='unbekannt' lieferte (deshalb
+    // sind wir im Fallback gelandet), hat sie oft trotzdem Bestellnr/Betrag/
+    // Daten extrahiert — die wären sonst verloren gegangen.
+    const ki = bodyAnalyse ?? null;
+    const fallbackKiRoh: Record<string, unknown> = ki
+      ? { ...(ki as unknown as Record<string, unknown>), fallback_typ: fallbackTyp, quelle: "email_body" }
+      : { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000) };
+
     await supabase.from("dokumente").insert({
       bestellung_id: bestellungId,
       typ: fallbackTyp,
@@ -1858,17 +1913,33 @@ async function tryFallbackKeywordTyp(
       email_betreff,
       email_absender,
       email_datum,
-      ki_roh_daten: { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000) },
-      bestellnummer_erkannt: null,
-      artikel: null,
-      gesamtbetrag: null,
-      netto: null,
-      mwst: null,
-      faelligkeitsdatum: null,
-      lieferdatum: null,
-      iban: null,
+      ki_roh_daten: fallbackKiRoh,
+      bestellnummer_erkannt: ki?.bestellnummer ?? null,
+      auftragsnummer: ki?.auftragsnummer || null,
+      lieferscheinnummer: ki?.lieferscheinnummer || null,
+      artikel: ki?.artikel ?? null,
+      gesamtbetrag: ki?.gesamtbetrag ?? null,
+      netto: ki?.netto ?? null,
+      mwst: ki?.mwst ?? null,
+      faelligkeitsdatum: ki?.faelligkeitsdatum ?? null,
+      lieferdatum: ki?.lieferdatum ?? null,
+      iban: ki?.iban ?? null,
+      kundennummer: ki?.kundennummer || null,
+      besteller_im_dokument: ki?.besteller_im_dokument || null,
+      projekt_referenz: ki?.projekt_referenz || null,
+      bestelldatum: ki?.bestelldatum || null,
     });
+
+    // bestellungen-Update: Flag setzen + KI-Werte (Betrag, Daten, BN) ergänzen
+    // via applyAnalyseToBestellung damit Bestellnummer/betrag/faelligkeit/
+    // bestelldatum/kundennummer in der UI sichtbar werden.
     await supabase.from("bestellungen").update(bestellungUpdate).eq("id", bestellungId);
+    if (ki) {
+      await applyAnalyseToBestellung(supabase, bestellungId, ki, {
+        haendlerName: haendlerName ?? "",
+        absenderDomain: absenderDomain ?? "",
+      });
+    }
     return { shortCircuit: false, gespeichert: true };
   }
 
