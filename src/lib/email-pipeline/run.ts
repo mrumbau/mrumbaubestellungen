@@ -1344,6 +1344,33 @@ async function assignBesteller(
   const parsedDate = email_datum ? new Date(email_datum) : new Date();
   const emailZeit = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
 
+  // 06.05.2026 (Welle 4 O8) — STUFE -1: Rules-Engine.
+  // Admin-konfigurierbare Regeln aus besteller_rules-Tabelle. Wenn DB-Match
+  // → Besteller direkt setzen ohne weitere Stufen zu durchlaufen. Tabelle
+  // leer → kein Effekt (silent skip), nachfolgende Stufen greifen wie gewohnt.
+  // Plus: Statistik (hit_count + last_hit_at) wird automatisch upd via RPC.
+  try {
+    const { data: ruleMatch } = await supabase
+      .rpc("match_besteller_rules", {
+        p_haendler_domain: haendlerDomain,
+        p_haendler_id: null,
+        p_email_absender: ctx.haendlerName ?? null,  // Absender-Domain via haendlerDomain abgedeckt; pattern matcht haendlerName auch
+        p_email_betreff: email_betreff ?? null,
+      });
+    if (ruleMatch && Array.isArray(ruleMatch) && ruleMatch.length > 0) {
+      const match = ruleMatch[0] as { rule_id: string; target_kuerzel: string; confidence: number; rule_name: string };
+      bestellerKuerzel = match.target_kuerzel;
+      zuordnungsMethode = `rule:${match.rule_name}`;
+      logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
+        target_kuerzel: match.target_kuerzel,
+        confidence: match.confidence,
+        rule_id: match.rule_id,
+      });
+    }
+  } catch (e) {
+    logError("webhook/email", "match_besteller_rules fehlgeschlagen (fail-open, weiter mit STUFE 0+)", e);
+  }
+
   // STUFE 0: Bestellnummer-Match
   const betreffNrMatch =
     (email_betreff || "").match(/(?:bestellnummer|bestellung|order|auftrag|auftrags-?nr)[:\s#]*([A-Z0-9][\w\-]{2,29})/i)

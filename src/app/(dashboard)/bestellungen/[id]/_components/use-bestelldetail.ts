@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
+import { useBestellungRealtime } from "@/lib/hooks/use-bestellung-realtime";
 import type { DuplikatResult, KatResult, ProjektStats } from "./types";
 
 /**
@@ -63,6 +64,12 @@ export function useBestelldetail({
   // File inputs (shared across desktop + mobile)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // 06.05.2026 (Welle 3) — Realtime-Subscription auf diese Bestellung.
+  // Wenn Pipeline-Cron Status/Felder updated (z.B. neue RG kommt rein, oder
+  // anderer Besteller markiert bezahlt) → router.refresh() lädt Server-Component
+  // neu. Kein manueller F5 nötig.
+  useBestellungRealtime(bestellungId);
 
   // Projekt-Stats on mount + whenever projekt_id changes
   useEffect(() => {

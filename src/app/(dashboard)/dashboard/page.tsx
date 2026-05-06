@@ -36,11 +36,18 @@ export default async function DashboardPage({
     return istBesteller ? query.or(`besteller_kuerzel.eq.${kuerzel},bestellungsart.in.(abo,subunternehmer)`) : query;
   }
 
+  // 06.05.2026 (Welle 3 Frontend-Adoption): MView statt Live-Aggregation.
+  // Vorher: alleStatusRaw lud ALLE Bestellungen-Rows + zählte client-side.
+  // Jetzt: 1 Row aus dashboard_kpis_per_besteller (15min-cached MView) → 10x schneller.
+  // Plus neue KPIs ueberfaellig_count + diese_woche_faellig_count + _volumen direkt verfügbar.
+  const kpiQuery = istBesteller
+    ? supabase.from("dashboard_kpis_per_besteller").select("*").eq("besteller_kuerzel", kuerzel).maybeSingle()
+    : supabase.from("dashboard_kpis_global").select("*").maybeSingle();
+
   // Dashboard-Config + alle Daten parallel laden
-  // 1 Query für alle Status-Counts statt 6 einzelne Count-Queries
   const [
     { data: profilRow },
-    { data: alleStatusRaw },
+    { data: kpiRow },
     { data: letzteRaw },
     { data: aktionenNoetigRaw },
     { data: unzugeordnetRaw },
@@ -57,8 +64,7 @@ export default async function DashboardPage({
     { data: trendDataRoh },
   ] = await Promise.all([
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
-    // 1 Query statt 6: alle Status-Werte holen und clientseitig zählen
-    eigene(supabase.from("bestellungen").select("status")),
+    kpiQuery,
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").order("created_at", { ascending: false }).limit(5)),
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
     supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("besteller_kuerzel", "UNBEKANNT").not("bestellungsart", "in", "(abo,subunternehmer)").order("created_at", { ascending: false }),
@@ -99,18 +105,34 @@ export default async function DashboardPage({
   // Dashboard-Config aus DB
   const dashboardConfig = (profilRow?.dashboard_config as { stats?: Record<string, boolean>; widgets?: Record<string, boolean> }) || {};
 
-  // Status-Counts aus einer Query berechnen (statt 6 einzelne)
-  const statusCounts: Record<string, number> = {};
-  for (const row of alleStatusRaw || []) {
-    statusCounts[row.status] = (statusCounts[row.status] || 0) + 1;
-  }
-  const offen = statusCounts["offen"] ?? 0;
-  const abweichungen = statusCounts["abweichung"] ?? 0;
-  const lsFehlt = statusCounts["ls_fehlt"] ?? 0;
-  const freigegeben = statusCounts["freigegeben"] ?? 0;
+  // 06.05.2026: Status-Counts kommen jetzt aus MView (15min-cached). Bei
+  // staleness < 15min ist das für Dashboard-KPIs vollkommen ausreichend.
+  // Plus neue Fälligkeit-KPIs (überfällig + diese-Woche-fällig).
+  type KpiRow = {
+    offen_count: number | null;
+    vollstaendig_count: number | null;
+    abweichung_count: number | null;
+    ls_fehlt_count: number | null;
+    freigegeben_count: number | null;
+    aktiv_count: number | null;
+    ueberfaellig_count: number | null;
+    ueberfaellig_volumen: number | null;
+    diese_woche_faellig_count: number | null;
+    diese_woche_faellig_volumen: number | null;
+    total_count?: number | null;       // nur global
+  };
+  const kpi = (kpiRow as KpiRow | null) ?? null;
+  const offen = kpi?.offen_count ?? 0;
+  const abweichungen = kpi?.abweichung_count ?? 0;
+  const lsFehlt = kpi?.ls_fehlt_count ?? 0;
+  const freigegeben = kpi?.freigegeben_count ?? 0;
   const erwartet = 0; // nicht mehr verwendet
-  const vollstaendig = statusCounts["vollstaendig"] ?? 0;
-  const gesamtAnzahl = (alleStatusRaw || []).length;
+  const vollstaendig = kpi?.vollstaendig_count ?? 0;
+  const gesamtAnzahl = istBesteller ? (kpi?.aktiv_count ?? 0) : (kpi?.total_count ?? 0);
+  const ueberfaelligCount = kpi?.ueberfaellig_count ?? 0;
+  const ueberfaelligVolumen = Number(kpi?.ueberfaellig_volumen ?? 0);
+  const dieseWocheFaelligCount = kpi?.diese_woche_faellig_count ?? 0;
+  const dieseWocheFaelligVolumen = Number(kpi?.diese_woche_faellig_volumen ?? 0);
   const letzte = letzteRaw || [];
   const aktionenNoetig = aktionenNoetigRaw || [];
   const unzugeordnet = unzugeordnetRaw || [];
@@ -258,7 +280,10 @@ export default async function DashboardPage({
   // Farben referenzieren Status-Tokens (globals.css) — Status-Pills sind die einzige Stelle
   // wo Farbe semantische Workflow-Bedeutung trägt. Gesamt + Aktive Projekte sind keine Status,
   // darum Brand-Rot (Identität) bzw. neutrales Grau (informativ).
-  const statCards = [
+  const statCards: Array<{
+    id: string; label: string; value: number; color: string; row: number;
+    alert?: boolean; volumen?: number;
+  }> = [
     { id: "offen", label: "Offen", value: offen, color: "var(--status-offen)", row: 1 },
     { id: "abweichungen", label: "Abweichungen", value: abweichungen, color: "var(--status-abweichung)", alert: abweichungen > 0, row: 1 },
     { id: "ls_fehlt", label: "LS fehlt", value: lsFehlt, color: "var(--status-ls-fehlt)", row: 1 },
@@ -267,6 +292,30 @@ export default async function DashboardPage({
     { id: "gesamt", label: "Gesamt", value: gesamtAnzahl, color: "var(--mr-red)", row: 2 },
     { id: "aktive_projekte", label: "Aktive Projekte", value: (aktiveProjekte || []).length, color: "var(--text-secondary)", row: 2 },
   ];
+
+  // 06.05.2026 — Neue Fälligkeit-KPIs aus MView. Werden nur angezeigt wenn > 0
+  // (sonst Noise für Besteller die keine RG verwalten).
+  if (ueberfaelligCount > 0) {
+    statCards.push({
+      id: "ueberfaellig",
+      label: "Überfällig",
+      value: ueberfaelligCount,
+      color: "var(--feedback-error)",
+      alert: true,
+      row: 3,
+      volumen: ueberfaelligVolumen,
+    });
+  }
+  if (dieseWocheFaelligCount > 0) {
+    statCards.push({
+      id: "diese_woche_faellig",
+      label: "Diese Woche fällig",
+      value: dieseWocheFaelligCount,
+      color: "var(--feedback-warning)",
+      row: 3,
+      volumen: dieseWocheFaelligVolumen,
+    });
+  }
 
   return (
     <div>
