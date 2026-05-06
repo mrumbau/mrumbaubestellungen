@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 // Server Client (für Server Components & Route Handlers)
+// Untyped — Generic-typed Variant via createTypedServerSupabaseClient verfügbar.
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies();
 

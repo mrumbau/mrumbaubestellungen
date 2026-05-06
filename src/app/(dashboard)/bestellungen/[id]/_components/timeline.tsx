@@ -198,7 +198,11 @@ function buildTimelineFromEvents(events: AuditEvent[]): {
       typ: "dok" | "abgleich" | "freigabe" | "kommentar" | "status" | "info";
       farbe: string;
     } | null>((e) => {
-      const p = e.payload || {};
+      // payload ist DB-Json (string | number | bool | obj | array). Per
+      // Convention sind unsere Event-Payloads immer Objekte → cast für
+      // bequeme Property-Lookup. Pro Event-Type sind die erwarteten Felder
+      // im Trigger-Code (run.ts log_event-Aufrufe) definiert.
+      const p = (e.payload ?? {}) as Record<string, unknown>;
       switch (e.event_type) {
         case "created":
           return {
@@ -207,20 +211,25 @@ function buildTimelineFromEvents(events: AuditEvent[]): {
             typ: "info",
             farbe: timelineColor("created"),
           };
-        case "doku_added":
+        case "doku_added": {
+          const typ = String(p.typ ?? "");
           return {
             zeit: e.created_at,
-            label: `${typLabels[p.typ] || p.typ || "Dokument"} eingegangen${p.gesamtbetrag ? ` (${p.gesamtbetrag} €)` : ""}`,
+            label: `${typLabels[typ] || typ || "Dokument"} eingegangen${p.gesamtbetrag ? ` (${p.gesamtbetrag} €)` : ""}`,
             typ: "dok",
             farbe: timelineColor("dok"),
           };
-        case "status_changed":
+        }
+        case "status_changed": {
+          const from = String(p.from ?? "");
+          const to = String(p.to ?? "");
           return {
             zeit: e.created_at,
-            label: `Status: ${statusLabels[p.from] || p.from} → ${statusLabels[p.to] || p.to}`,
+            label: `Status: ${statusLabels[from] || from} → ${statusLabels[to] || to}`,
             typ: "status",
             farbe: timelineColor("status_changed"),
           };
+        }
         case "freigegeben":
         case "freigabe_eingetragen":
           return {

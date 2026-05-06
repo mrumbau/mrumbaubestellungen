@@ -136,6 +136,51 @@ export type Database = {
         }
         Relationships: []
       }
+      besteller_rules: {
+        Row: {
+          condition: Json
+          confidence: number
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          hit_count: number
+          id: string
+          last_hit_at: string | null
+          name: string
+          notes: string | null
+          priority: number
+          target_kuerzel: string | null
+        }
+        Insert: {
+          condition: Json
+          confidence?: number
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          hit_count?: number
+          id?: string
+          last_hit_at?: string | null
+          name: string
+          notes?: string | null
+          priority?: number
+          target_kuerzel?: string | null
+        }
+        Update: {
+          condition?: Json
+          confidence?: number
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          hit_count?: number
+          id?: string
+          last_hit_at?: string | null
+          name?: string
+          notes?: string | null
+          priority?: number
+          target_kuerzel?: string | null
+        }
+        Relationships: []
+      }
       bestellung_signale: {
         Row: {
           confidence: number | null
@@ -766,6 +811,36 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          actor: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id: number
+          payload: Json
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id?: number
+          payload?: Json
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          event_type?: string
+          id?: number
+          payload?: Json
+        }
+        Relationships: []
+      }
       firma_einstellungen: {
         Row: {
           id: string
@@ -1370,6 +1445,30 @@ export type Database = {
         Returns: undefined
       }
       increment_mahnung: { Args: { p_bestellung_id: string }; Returns: number }
+      log_event: {
+        Args: {
+          p_actor: string
+          p_entity_id: string
+          p_entity_type: string
+          p_event_type: string
+          p_payload?: Json
+        }
+        Returns: undefined
+      }
+      match_besteller_rules: {
+        Args: {
+          p_email_absender: string
+          p_email_betreff: string
+          p_haendler_domain: string
+          p_haendler_id: string
+        }
+        Returns: {
+          confidence: number
+          rule_id: string
+          rule_name: string
+          target_kuerzel: string
+        }[]
+      }
       persist_dokument_atomic: {
         Args: {
           p_artikel: Json

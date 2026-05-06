@@ -1,4 +1,5 @@
 import type { Bestellungsart } from "@/lib/bestellung-utils";
+import type { Tables } from "@/types/database";
 
 /** Shared types for all /bestellungen/[id] sub-components. */
 
@@ -52,15 +53,17 @@ export type Freigabe = {
   kommentar: string | null;
 };
 
-/** Welle 4 O2 — Event aus events-Tabelle für Audit-Timeline. */
-export type AuditEvent = {
-  id: number | string;
-  event_type: string;
-  actor: string | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload: Record<string, any> | null;
-  created_at: string;
-};
+/**
+ * Welle 4 O2 — Event aus events-Tabelle für Audit-Timeline.
+ *
+ * 06.05.2026 (gen-types-Adoption): Type-Alias auf DB-Schema. UI nutzt nur
+ * Subset. payload ist Json (string | number | boolean | null | Object | Array)
+ * — bei Verwendung im UI als Record<string, unknown> casten.
+ */
+export type AuditEvent = Pick<
+  Tables<"events">,
+  "id" | "event_type" | "actor" | "payload" | "created_at"
+>;
 
 export type ProjektOption = {
   id: string;
