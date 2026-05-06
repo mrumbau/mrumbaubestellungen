@@ -20,14 +20,26 @@ type HealthStatus = {
 
 type Besteller = { id: string; name: string; kuerzel: string };
 
+export type CrossDuplikat = {
+  content_hash: string;
+  bestellung_ids: string[];
+  typen: string[];
+  anzahl_bestellungen: number;
+  anzahl_dokus: number;
+  erste_erfassung: string;
+  letzte_erfassung: string;
+};
+
 export function SystemOverviewClient({
   firma,
   besteller,
   extensionSignale,
+  crossDuplikate = [],
 }: {
   firma: { bueroAdresse: string; konfidenzDirekt: string; konfidenzVorschlag: string };
   besteller: Besteller[];
   extensionSignale: Record<string, string>;
+  crossDuplikate?: CrossDuplikat[];
 }) {
   const { toast } = useToast();
 
@@ -248,6 +260,53 @@ export function SystemOverviewClient({
           (Entwicklermodus). Die Extension sendet bei jeder erkannten Händler-Bestellung ein Signal.
         </p>
       </SectionCard>
+
+      {/* Welle 4 — Cross-Bestellung-PDF-Hash-Anomalien */}
+      {crossDuplikate.length > 0 && (
+        <SectionCard
+          title="PDF-Hash-Anomalien"
+          description={`${crossDuplikate.length} Befund${crossDuplikate.length === 1 ? "" : "e"}: gleicher PDF in mehreren Bestellungen — möglicherweise falsch-getrennte Pseudo-Duplikate.`}
+        >
+          <div className="flex flex-col gap-2">
+            {crossDuplikate.map((d) => (
+              <div
+                key={d.content_hash}
+                className="flex items-start gap-3 p-3 rounded-md bg-warning-bg border border-warning-border"
+              >
+                <span className="text-warning text-[11px] font-mono-amount mt-0.5">
+                  {d.content_hash.slice(0, 12)}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12.5px] text-foreground">
+                    <span className="font-semibold">{d.anzahl_dokus} Doku{d.anzahl_dokus === 1 ? "" : "s"}</span>
+                    {" "}in {d.anzahl_bestellungen} verschiedenen Bestellungen — Typen: {d.typen.join(", ")}
+                  </p>
+                  <p className="text-[10.5px] text-foreground-subtle font-mono-amount mt-0.5">
+                    {d.bestellung_ids.slice(0, 3).map((id) => (
+                      <a
+                        key={id}
+                        href={`/bestellungen/${id}`}
+                        className="hover:text-brand underline-offset-2 hover:underline mr-2"
+                      >
+                        {id.slice(0, 8)}
+                      </a>
+                    ))}
+                    {d.bestellung_ids.length > 3 && <span>+{d.bestellung_ids.length - 3} weitere</span>}
+                    <span className="ml-2 text-foreground-subtle">
+                      · letzter Eintrag: {new Date(d.letzte_erfassung).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11.5px] text-foreground-subtle">
+            Diese View zeigt PDFs deren content_hash in &gt;1 Bestellung vorkommt.
+            Häufig Symptom für falsch-getrennte Re-Backfill-Pseudo-Duplikate.
+            Manuell prüfen + ggf. Bestellungen konsolidieren.
+          </p>
+        </SectionCard>
+      )}
     </div>
   );
 }

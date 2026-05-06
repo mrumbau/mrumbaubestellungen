@@ -7,7 +7,12 @@ export default async function SystemOverviewPage() {
   // Role-gate is handled in /einstellungen/system/layout.tsx
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: firmaRaw }, { data: besteller }, { data: signale }] = await Promise.all([
+  const [
+    { data: firmaRaw },
+    { data: besteller },
+    { data: signale },
+    { data: crossDuplikate },
+  ] = await Promise.all([
     supabase.from("firma_einstellungen").select("schluessel, wert"),
     supabase
       .from("benutzer_rollen")
@@ -18,6 +23,12 @@ export default async function SystemOverviewPage() {
       .from("bestellung_signale")
       .select("kuerzel, zeitstempel")
       .order("zeitstempel", { ascending: false }),
+    // Welle 4 — Cross-Bestellung-PDF-Hash-Anomalie-View
+    supabase
+      .from("dokumente_cross_bestellung_duplikate")
+      .select("*")
+      .order("letzte_erfassung", { ascending: false })
+      .limit(20),
   ]);
 
   const firmaMap: Record<string, string> = {};
@@ -41,6 +52,17 @@ export default async function SystemOverviewPage() {
         (besteller as { id: string; name: string; kuerzel: string }[]) || []
       }
       extensionSignale={signalMap}
+      crossDuplikate={
+        (crossDuplikate as Array<{
+          content_hash: string;
+          bestellung_ids: string[];
+          typen: string[];
+          anzahl_bestellungen: number;
+          anzahl_dokus: number;
+          erste_erfassung: string;
+          letzte_erfassung: string;
+        }> | null) || []
+      }
     />
   );
 }

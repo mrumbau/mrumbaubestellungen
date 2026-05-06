@@ -7,6 +7,7 @@ import {
   IconUsers,
   IconTool,
   IconMail,
+  IconShield,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,11 @@ export default async function SystemLayout({
       label: "Benutzer",
       href: "/einstellungen/system/benutzer",
       icon: <IconUsers />,
+    },
+    {
+      label: "Auto-Zuordnung",
+      href: "/einstellungen/system/rules",
+      icon: <IconShield />,
     },
     {
       label: "Testdaten",
