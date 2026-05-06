@@ -83,18 +83,12 @@ interface ProjektOption {
 
 export function BestellungenTabelle({
   bestellungen,
-  currentPage,
-  totalPages,
-  totalCount,
   projekte = [],
   aktiverProjektFilter,
   aktiverProjektName,
   eventCountMap,
 }: {
   bestellungen: Bestellung[];
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
   projekte?: ProjektOption[];
   aktiverProjektFilter?: string | null;
   aktiverProjektName?: string | null;
@@ -104,6 +98,14 @@ export function BestellungenTabelle({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
+
+  // 07.05.2026 — Client-side Pagination.
+  // Bestellungen kommen vom Server vollständig (oder bis HARD_CAP).
+  // Filter+Sort+Pagination laufen alle hier — damit funktionieren Filter
+  // korrekt über die Gesamt-Menge und Sort-Reihenfolge ist global.
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalCount = bestellungen.length;
 
   // Filters
   const filters = useTableFilters({
@@ -317,6 +319,22 @@ export function BestellungenTabelle({
     return arr;
   }, [gefiltert, sort]);
 
+  // 07.05.2026 — Client-side Pagination.
+  // totalPages aus gefilterten Resultaten (nicht totalCount), damit User die
+  // ECHTE Anzahl Pages für seine Filter sieht. Page 1 wenn Filter wechselt.
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedRows = useMemo(() => {
+    const from = (safeCurrentPage - 1) * PAGE_SIZE;
+    return sorted.slice(from, from + PAGE_SIZE);
+  }, [sorted, safeCurrentPage]);
+
+  // Filter/Sort-Wechsel → Page 1. Realtime-Refresh hält Page erhalten
+  // (Bestellungen-Array ändert sich, aber Filter nicht → kein Reset).
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter, sort]);
+
   const artCounts = useMemo(() => {
     const counts = { material: 0, subunternehmer: 0, abo: 0 };
     for (const b of bestellungen) {
@@ -332,9 +350,7 @@ export function BestellungenTabelle({
   );
 
   function goToPage(page: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", page.toString());
-    router.push(`/bestellungen?${params.toString()}`);
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   }
 
   async function handleQuickFreigabe(bestellungId: string) {
@@ -940,7 +956,7 @@ export function BestellungenTabelle({
       <div className="mt-4">
         <DataTable<Bestellung>
           columns={columns}
-          data={sorted}
+          data={paginatedRows}
           getRowId={(b) => b.id}
           ariaLabel="Bestellübersicht"
           density={density}
@@ -1004,16 +1020,19 @@ export function BestellungenTabelle({
         />
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — basiert auf gefilterten Resultaten (sorted.length),
+          NICHT totalCount. So sieht User die echten Pages für seine Filter. */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-foreground-subtle">
-            {totalCount} Bestellung{totalCount !== 1 ? "en" : ""} gesamt
+            {sorted.length === totalCount
+              ? <>{totalCount} Bestellung{totalCount !== 1 ? "en" : ""} gesamt</>
+              : <>{sorted.length} von {totalCount} Bestellungen sichtbar</>}
           </span>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => goToPage(currentPage - 1)}
-              disabled={currentPage <= 1}
+              onClick={() => goToPage(safeCurrentPage - 1)}
+              disabled={safeCurrentPage <= 1}
               className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Vorherige Seite"
             >
@@ -1032,11 +1051,11 @@ export function BestellungenTabelle({
               </svg>
             </button>
             <span className="text-foreground-muted font-medium px-3 font-mono-amount text-xs">
-              {currentPage} / {totalPages}
+              {safeCurrentPage} / {totalPages}
             </span>
             <button
-              onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage >= totalPages}
+              onClick={() => goToPage(safeCurrentPage + 1)}
+              disabled={safeCurrentPage >= totalPages}
               className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Nächste Seite"
             >

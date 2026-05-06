@@ -4,43 +4,55 @@ import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 20;
+// 07.05.2026 — Pagination komplett client-side.
+// Vorher: server-side range(0,19) + client-side filter → mathematischer Unfug
+// (Filter sah nur 20er-Ausschnitt, Sort funktionierte nur lokal pro Page,
+// Saved-Views "Überfällig" zeigten leere Page weil Server-Sort nicht zur
+// Client-Sort passte). Bei aktuell 113 aktiven Bestellungen ist alles-laden
+// trivial (~30 KB gzipped). Cap bei 500 — darüber hinaus Server-Pagination
+// nötig (dann Re-Architektur).
+const HARD_CAP = 500;
 
 export default async function BestellungenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; projekt_id?: string }>;
+  searchParams: Promise<{ projekt_id?: string }>;
 }) {
   const profil = await getBenutzerProfil();
   const supabase = await createServerSupabaseClient();
-  const { page: pageStr, projekt_id: projektIdParam } = await searchParams;
-  const page = Math.max(1, parseInt(pageStr || "1", 10) || 1);
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  const { projekt_id: projektIdParam } = await searchParams;
 
-  // Count + Daten + Projekte parallel laden
-  let countQuery = supabase.from("bestellungen").select("*", { count: "exact", head: true });
-  let dataQuery = supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz").order("created_at", { ascending: false }).range(from, to);
+  let dataQuery = supabase
+    .from("bestellungen")
+    .select(
+      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+    )
+    .is("archiviert_am", null)
+    .order("created_at", { ascending: false })
+    .limit(HARD_CAP);
 
   // Besteller: eigene Material-Bestellungen + alle Abo/SU Bestellungen (Freigabe durch jeden Besteller möglich)
   if (profil?.rolle === "besteller") {
-    countQuery = countQuery.or(`besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`);
-    dataQuery = dataQuery.or(`besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`);
+    dataQuery = dataQuery.or(
+      `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
+    );
   }
 
   if (projektIdParam) {
-    countQuery = countQuery.eq("projekt_id", projektIdParam);
     dataQuery = dataQuery.eq("projekt_id", projektIdParam);
   }
 
-  const [{ count }, { data: bestellungen }, { data: projekte }] = await Promise.all([
-    countQuery,
+  const [{ data: bestellungen }, { data: projekte }] = await Promise.all([
     dataQuery,
-    supabase.from("projekte").select("id, name, farbe").neq("status", "archiviert").order("name"),
+    supabase
+      .from("projekte")
+      .select("id, name, farbe")
+      .neq("status", "archiviert")
+      .order("name"),
   ]);
 
-  // 06.05.2026 — Audit-Trail-Spalte: events-Count pro Bestellung aggregiert
-  // aus bestellung_event_summary-View laden (security_invoker, RLS greift via events).
+  // Audit-Trail-Spalte: events-Count für ALLE geladenen Bestellungen
+  // (vorher war es nur für die 20 der server-side-Page → jetzt für alle).
   const ids = (bestellungen || []).map((b) => b.id);
   const eventCountMap: Record<string, { count: number; lastAt: string | null }> = {};
   if (ids.length > 0) {
@@ -58,9 +70,8 @@ export default async function BestellungenPage({
     }
   }
 
-  const total = count || 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const total = bestellungen?.length ?? 0;
+  const reachedCap = total >= HARD_CAP;
 
   const aktiverProjektName = projektIdParam
     ? (projekte || []).find((p) => p.id === projektIdParam)?.name || null
@@ -95,15 +106,20 @@ export default async function BestellungenPage({
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono-amount text-xs text-foreground-subtle">{total}</span>
-          <span className="text-[10px] text-foreground-faint uppercase tracking-wide">Gesamt</span>
+          <span className="text-[10px] text-foreground-faint uppercase tracking-wide">
+            {reachedCap ? `≥ ${HARD_CAP}` : "Geladen"}
+          </span>
         </div>
       </div>
 
+      {reachedCap && (
+        <div className="mb-4 rounded-md border border-warning-border bg-warning-bg px-4 py-2 text-[12px] text-warning">
+          Hard-Cap von {HARD_CAP} Bestellungen erreicht. Älteste Einträge werden nicht angezeigt — bitte archivieren oder Server-Pagination einführen.
+        </div>
+      )}
+
       <BestellungenTabelle
         bestellungen={bestellungen || []}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalCount={total}
         projekte={(projekte || []) as { id: string; name: string; farbe: string }[]}
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
