@@ -53,7 +53,8 @@ export async function extractContactFromText(
       type: "json_schema",
       json_schema: EXTRACTION_JSON_SCHEMA,
     },
-    temperature: 0.1,
+    // Kein temperature-Param: gpt-5/o-Series akzeptieren nur den Default (1).
+    // Mit json_schema strict ist temperature ohnehin nahezu wirkungslos.
   });
 
   const durationMs = Date.now() - start;
@@ -157,7 +158,8 @@ export async function extractContactFromImage(
       type: "json_schema",
       json_schema: EXTRACTION_JSON_SCHEMA,
     },
-    temperature: 0.1,
+    // Kein temperature-Param: gpt-5/o-Series akzeptieren nur den Default (1).
+    // Mit json_schema strict ist temperature ohnehin nahezu wirkungslos.
   });
 
   const durationMs = Date.now() - start;

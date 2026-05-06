@@ -34,18 +34,30 @@ const PRIVATE_IP_RANGES = [
   /^10\./,
   /^172\.(1[6-9]|2\d|3[01])\./,
   /^192\.168\./,
-  /^fc00:/i,
-  /^fd/i,
-  /^fe80:/i,
-  // IPv6-mapped IPv4 (::ffff:127.0.0.1 etc.)
+  // IPv6 Unique-Local (fc00::/7) und Link-Local (fe80::/10)
+  /^fc[0-9a-f]{2}:/i,
+  /^fd[0-9a-f]{2}:/i,
+  /^fe[89ab][0-9a-f]:/i,
+  // IPv6-mapped IPv4 dotted (::ffff:127.0.0.1)
   /^::ffff:10\./i,
   /^::ffff:172\.(1[6-9]|2\d|3[01])\./i,
   /^::ffff:192\.168\./i,
   /^::ffff:127\./i,
   /^::ffff:0\./i,
+  // IPv6-mapped IPv4 hex form (Node WHATWG-URL normalisiert dorthin):
+  // ::ffff:7fXX:YYYY → 127.0.0.0/8 (loopback)
+  /^::ffff:7f[0-9a-f]{2}:/i,
+  // ::ffff:aXX:YYYY → 10.0.0.0/8
+  /^::ffff:a[0-9a-f]{2}:/i,
+  // ::ffff:ac1X:YYYY → 172.16.0.0/12 (ac10-ac1f)
+  /^::ffff:ac1[0-9a-f]:/i,
+  // ::ffff:c0a8:YYYY → 192.168.0.0/16
+  /^::ffff:c0a8:/i,
+  // ::ffff:0:YYYY → 0.0.0.0/8
+  /^::ffff:0:/i,
 ];
 
-function isBlockedUrl(url: string): boolean {
+export function isBlockedUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
 
@@ -53,10 +65,14 @@ function isBlockedUrl(url: string): boolean {
     if (!["http:", "https:"].includes(parsed.protocol)) return true;
 
     // Hostname-Blockliste
-    const host = parsed.hostname.toLowerCase();
-    if (BLOCKED_HOSTS.includes(host)) return true;
+    // WHATWG URL liefert IPv6-Hostnames in Brackets ([fc00::1]) — für IP-Pattern-Match abziehen
+    const rawHost = parsed.hostname.toLowerCase();
+    const host = rawHost.startsWith("[") && rawHost.endsWith("]")
+      ? rawHost.slice(1, -1)
+      : rawHost;
+    if (BLOCKED_HOSTS.includes(rawHost) || BLOCKED_HOSTS.includes(host)) return true;
 
-    // Private IP-Ranges (inkl. IPv6-mapped)
+    // Private IP-Ranges (inkl. IPv6-mapped + Bracket-stripped IPv6)
     if (PRIVATE_IP_RANGES.some((r) => r.test(host))) return true;
 
     // Port-Check (nur Standard-Ports erlaubt)

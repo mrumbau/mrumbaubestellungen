@@ -100,12 +100,30 @@ export async function GET(
       });
     }
 
-    // Fallback: Datei direkt streamen (für iframe-Einbettung in Detailansicht)
-    const { data, error } = await supabase.storage
+    // 07.05.2026 — Stream-Pipe-Through statt Blob-Buffering.
+    // Vorher: supabase.storage.download() lud das gesamte PDF in Memory bevor
+    // wir streamten → ~300-500ms Latenz selbst bei kleinen PDFs.
+    // Jetzt: Signed-URL erstellen + raw fetch() + body als ReadableStream
+    // direkt durchreichen. Browser kann progressive PDF-Rendering machen
+    // während der Stream noch läuft. Range-Requests werden vom Upstream
+    // (Supabase-CDN) durchgereicht → Browser kann nur die ersten Seiten
+    // laden bei großen PDFs.
+    const { data: signedData, error: signError } = await supabase.storage
       .from("dokumente")
-      .download(dokument.storage_pfad);
+      .createSignedUrl(dokument.storage_pfad, 60);
 
-    if (error || !data) {
+    if (signError || !signedData?.signedUrl) {
+      return NextResponse.json({ error: "Datei nicht gefunden" }, { status: 404 });
+    }
+
+    // Range-Header durchreichen für progressive Loading
+    const rangeHeader = _request.headers.get("range");
+    const upstreamHeaders: HeadersInit = {};
+    if (rangeHeader) upstreamHeaders["Range"] = rangeHeader;
+
+    const upstreamRes = await fetch(signedData.signedUrl, { headers: upstreamHeaders });
+
+    if (!upstreamRes.ok || !upstreamRes.body) {
       return NextResponse.json({ error: "Datei nicht gefunden" }, { status: 404 });
     }
 
@@ -125,14 +143,23 @@ export async function GET(
     const rawFilename = dokument.storage_pfad.split("/").pop() || "dokument";
     const safeFilename = sanitizeFilename(rawFilename);
 
-    return new NextResponse(data, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${safeFilename}"`,
-        "Cache-Control": "private, max-age=300",
-        "X-Frame-Options": "SAMEORIGIN",
-        "Content-Security-Policy": "frame-ancestors 'self'",
-      },
+    // Wichtige Upstream-Header durchreichen für Range/Streaming
+    const responseHeaders: Record<string, string> = {
+      "Content-Type": contentType,
+      "Content-Disposition": `inline; filename="${safeFilename}"`,
+      "Cache-Control": "private, max-age=300",
+      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy": "frame-ancestors 'self'",
+      "Accept-Ranges": "bytes",
+    };
+    const contentLength = upstreamRes.headers.get("content-length");
+    if (contentLength) responseHeaders["Content-Length"] = contentLength;
+    const contentRange = upstreamRes.headers.get("content-range");
+    if (contentRange) responseHeaders["Content-Range"] = contentRange;
+
+    return new NextResponse(upstreamRes.body, {
+      status: upstreamRes.status, // 200 oder 206 (Partial Content) durchreichen
+      headers: responseHeaders,
     });
   } catch {
     return NextResponse.json(

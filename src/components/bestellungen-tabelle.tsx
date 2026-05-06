@@ -236,8 +236,6 @@ export function BestellungenTabelle({
   const [freigabeConfirmId, setFreigabeConfirmId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const previewCache = useRef<Map<string, string>>(new Map());
 
   // Search input focus (/ shortcut)
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -379,42 +377,35 @@ export function BestellungenTabelle({
     }
   }
 
-  const fetchSignedUrl = useCallback(
-    async (bestellungId: string, typ: string): Promise<string | null> => {
-      const cacheKey = `${bestellungId}:${typ}`;
-      const cached = previewCache.current.get(cacheKey);
-      if (cached) return cached;
-      try {
-        const res = await fetch(
-          `/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}&mode=url`,
-        );
-        if (res.ok) {
-          const { url } = await res.json();
-          if (url) {
-            previewCache.current.set(cacheKey, url);
-            setTimeout(() => previewCache.current.delete(cacheKey), 240_000);
-            return url;
-          }
-        }
-      } catch {
-        /* ignore */
-      }
-      return null;
-    },
+  // 07.05.2026 — PDF-Vorschau via Same-Origin-Proxy statt Signed-URL.
+  // Signed-URL → iframe → Browser-Block (X-Frame-Options vom Supabase-Storage).
+  // Proxy ist langsamer (Vercel-Lambda zwischenschieben), kompensiert durch
+  // (1) Hover-Preload, der den Browser-HTTP-Cache vorwärmt — beim Click ist
+  //     der Stream schon im Cache, iframe rendert instant.
+  // (2) `Cache-Control: private, max-age=300` im Proxy → Browser cached 5 Min.
+  // (3) Mehrere Hovers gleicher PDF → preloadedSet verhindert doppelte Fetches.
+  const preloadedSet = useRef<Set<string>>(new Set());
+
+  const buildPreviewUrl = useCallback(
+    (bestellungId: string, typ: string) =>
+      `/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}`,
     [],
   );
 
   function preloadPreview(bestellungId: string, typ: string) {
-    fetchSignedUrl(bestellungId, typ);
+    const key = `${bestellungId}:${typ}`;
+    if (preloadedSet.current.has(key)) return;
+    preloadedSet.current.add(key);
+    // Fetch füllt Browser-HTTP-Cache. Beim späteren iframe-Document-Request
+    // greift derselbe Cache (gleiche URL + Cache-Control). Kein await nötig —
+    // der Browser handhabt das im Hintergrund.
+    void fetch(buildPreviewUrl(bestellungId, typ), { credentials: "same-origin" })
+      .catch(() => preloadedSet.current.delete(key));
   }
 
-  async function handlePreview(bestellungId: string, typ: string) {
+  function handlePreview(bestellungId: string, typ: string) {
     setPreviewId(bestellungId);
-    setPreviewUrl(null);
-    setPreviewLoading(true);
-    const url = await fetchSignedUrl(bestellungId, typ);
-    setPreviewUrl(url);
-    setPreviewLoading(false);
+    setPreviewUrl(buildPreviewUrl(bestellungId, typ));
   }
 
   function closePreview() {
@@ -1125,11 +1116,7 @@ export function BestellungenTabelle({
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              {previewLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="spinner w-8 h-8 text-brand" />
-                </div>
-              ) : previewUrl ? (
+              {previewUrl ? (
                 <iframe
                   src={previewUrl}
                   className="w-full h-full border-0"

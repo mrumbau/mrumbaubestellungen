@@ -203,9 +203,27 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
  * Streaming wird bewusst NICHT unterstützt — alle Caller im Repo arbeiten
  * synchron auf Vercel-Serverless mit kompletter JSON-Response.
  */
+/**
+ * Modelle die nur den Default-`temperature`-Wert (1) akzeptieren.
+ * Reasoning-Familie: gpt-5*, o1, o3, o4. Custom temperature → 400 Fehler.
+ * Wird beim Wechsel des Org/Project-Keys oft sichtbar, weil die
+ * strict-Validierung dort serverseitig anders gehandhabt wird.
+ */
+function modelDisallowsCustomTemperature(model: string): boolean {
+  const m = model.toLowerCase();
+  return m.startsWith("gpt-5") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4");
+}
+
 export async function chatCompletion(
   params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
 ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+  // Reasoning-Modelle (gpt-5*, o-Series) lehnen custom temperature ab.
+  // Mit json_schema strict ist temperature ohnehin nahezu wirkungslos.
+  if (params.temperature !== undefined && modelDisallowsCustomTemperature(params.model)) {
+    const { temperature: _ignore, ...rest } = params;
+    void _ignore;
+    return withRetry(() => openai.chat.completions.create(rest));
+  }
   return withRetry(() => openai.chat.completions.create(params));
 }
 
@@ -559,7 +577,6 @@ export async function analysiereDokument(
             { role: "user", content: userContent },
           ],
           max_tokens: maxTokens,
-          temperature: 0.1,
           response_format: zodResponseFormat(DokumentAnalyseSchema, "DokumentAnalyse"),
         }),
       );
@@ -676,7 +693,6 @@ Rechnung: ${JSON.stringify(rechnung)}`,
           },
         ],
         max_tokens: 2000,
-        temperature: 0.1,
         response_format: zodResponseFormat(AbgleichErgebnisSchema, "AbgleichErgebnis"),
       }),
     );
@@ -736,7 +752,6 @@ ${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.arti
       },
     ],
     max_tokens: 500,
-    temperature: 0.1,
   })
   );
 
@@ -766,7 +781,6 @@ ${bestellungen.map((b) => `- ${b.bestellnummer} bei ${b.haendler} (${b.tage_alt}
       },
     ],
     max_tokens: 500,
-    temperature: 0.5,
   }));
 
   return response.choices[0]?.message?.content || "";
@@ -814,7 +828,6 @@ ${historischePreise.map((h) => `${h.name}: ${h.preise.map((p) => p.toFixed(2) + 
       },
     ],
     max_tokens: 1000,
-    temperature: 0.1,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
@@ -856,7 +869,6 @@ Falls du den Händler nicht erkennen kannst, gib null zurück.`,
       },
     ],
     max_tokens: 300,
-    temperature: 0.1,
   }));
 
   const text = response.choices[0]?.message?.content || "null";
@@ -916,7 +928,6 @@ Falls du den Subunternehmer nicht erkennen kannst, gib null zurück.`,
       },
     ],
     max_tokens: 400,
-    temperature: 0.1,
   }));
 
   const text = response.choices[0]?.message?.content || "null";
@@ -984,7 +995,6 @@ ${stats.abweichende_bestellungen.length > 0
       },
     ],
     max_tokens: 800,
-    temperature: 0.3,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
@@ -1039,7 +1049,6 @@ ${existierendeBestellungen.map((b) => `- ${b.bestellnummer} (${b.datum}): ${b.be
       },
     ],
     max_tokens: 500,
-    temperature: 0.1,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
@@ -1092,7 +1101,6 @@ Gib NUR ein JSON-Objekt zurück:
       },
     ],
     max_tokens: 1000,
-    temperature: 0.1,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
@@ -1177,7 +1185,6 @@ Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
       },
     ],
     max_tokens: 1500,
-    temperature: 0.2,
   }));
 
   const text = response.choices[0]?.message?.content || "{}";
@@ -1244,7 +1251,6 @@ ${dokumentTexte.map((t, i) => `--- Dokument ${i + 1} ---\n${t.slice(0, 1500)}`).
         },
       ],
       max_tokens: 800,
-      temperature: 0.1,
     })
   );
 
@@ -1285,7 +1291,6 @@ ${kommentare.length > 0
       },
     ],
     max_tokens: 300,
-    temperature: 0.3,
   }));
 
   return response.choices[0]?.message?.content || "Zusammenfassung konnte nicht erstellt werden.";
@@ -1381,7 +1386,6 @@ ${params.dokument_texte.length > 0
         },
       ],
       max_tokens: 500,
-      temperature: 0.1,
     })
   );
 
