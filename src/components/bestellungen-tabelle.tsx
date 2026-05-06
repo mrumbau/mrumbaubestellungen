@@ -10,6 +10,7 @@ import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { ArtTabs, type ArtFilter } from "@/components/ui/art-tabs";
 import { useTableFilters } from "@/lib/use-table-filters";
+import { useBestellungenListRealtime } from "@/lib/hooks/use-bestellung-realtime";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { STATUS_FILTER_OPTIONS } from "@/lib/status-config";
 import {
@@ -116,6 +117,12 @@ export function BestellungenTabelle({
   useEffect(() => {
     setProjektFilter(aktiverProjektFilter || "");
   }, [aktiverProjektFilter]);
+
+  // 06.05.2026 (Welle 4 Frontend-Adoption) — Realtime-Subscribe.
+  // Auto-Refresh bei jedem INSERT/UPDATE/DELETE auf bestellungen mit 1.5s
+  // Debounce gegen Burst-Updates (Re-Backfill-Cron). Server-Component lädt
+  // dann die neue Page neu — inkl. der gerade angekommenen Mail.
+  useBestellungenListRealtime();
 
   // Table state
   const [density, setDensity] = useTableDensity("bestellungen.density");

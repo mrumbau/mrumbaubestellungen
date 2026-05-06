@@ -15,7 +15,13 @@ export type TimelineEventType =
   | "freigabe"
   | "kommentar"
   | "mahnung"
-  | "bezahlt";
+  | "bezahlt"
+  // 06.05.2026 (Welle 4 O2) — neue Event-Types aus events-Tabelle
+  | "created"
+  | "status_changed"
+  | "archiviert"
+  | "projekt_bestaetigt"
+  | "bestellungsart_geaendert";
 
 export const TIMELINE_EVENT_CONFIG: Record<
   TimelineEventType,
@@ -48,6 +54,26 @@ export const TIMELINE_EVENT_CONFIG: Record<
   bezahlt: {
     farbe: "var(--status-freigegeben)",
     kontext: "Rechnung als bezahlt markiert (DATEV-Export)",
+  },
+  created: {
+    farbe: "var(--mr-red)",
+    kontext: "Bestellung wurde angelegt",
+  },
+  status_changed: {
+    farbe: "var(--text-secondary)",
+    kontext: "Status-Wechsel im Workflow",
+  },
+  archiviert: {
+    farbe: "var(--text-tertiary)",
+    kontext: "Bestellung archiviert (GoBD-konform)",
+  },
+  projekt_bestaetigt: {
+    farbe: "var(--mr-red)",
+    kontext: "Projekt-Vorschlag bestätigt",
+  },
+  bestellungsart_geaendert: {
+    farbe: "var(--text-secondary)",
+    kontext: "Bestellungsart manuell geändert (material/subunternehmer/abo)",
   },
 };
 

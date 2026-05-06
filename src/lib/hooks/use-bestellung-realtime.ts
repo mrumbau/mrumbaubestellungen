@@ -6,14 +6,9 @@ import { createBrowserSupabaseClient } from "@/lib/supabase";
 
 /**
  * Realtime-Hook: abonniert Postgres-Changes auf einer einzelnen Bestellung
- * (oder ALL bestellungen wenn id=null) und triggert router.refresh() wenn
- * die Bestellung extern geändert wird (z.B. Pipeline-Update via Cron, oder
- * Status-Wechsel durch anderen User).
+ * und triggert router.refresh() wenn extern geändert (Pipeline/Cron/anderer User).
  *
  * 06.05.2026 — Welle 3 Frontend-Adoption.
- *
- * Voraussetzung: bestellungen-Tabelle ist in supabase_realtime-Publication
- * (siehe Migration "welle3_materialized_views_kpis").
  */
 export function useBestellungRealtime(
   bestellungId: string | null,
@@ -40,7 +35,6 @@ export function useBestellungRealtime(
           if (options?.onUpdate) {
             options.onUpdate();
           } else {
-            // Default: Server-Component refreshen — Bestellung wird neu vom Server geladen
             router.refresh();
           }
         },
@@ -51,4 +45,47 @@ export function useBestellungRealtime(
       supabase.removeChannel(channel);
     };
   }, [bestellungId, router, options]);
+}
+
+/**
+ * 06.05.2026 (Welle 4) — Realtime-Hook für die Bestellungen-Liste.
+ *
+ * Abonniert ALLE INSERT/UPDATE/DELETE-Events auf bestellungen, triggert
+ * router.refresh() (= Server-Component lädt neue Daten). Mit Debounce damit
+ * bei Backfill-Bursts (cron-getriggerte Massen-Updates) die UI nicht im
+ * Sekunden-Takt rerendert.
+ */
+export function useBestellungenListRealtime(options?: {
+  debounceMs?: number;
+  onChange?: () => void;
+}) {
+  const router = useRouter();
+  const debounceMs = options?.debounceMs ?? 1500;
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const triggerRefresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (options?.onChange) options.onChange();
+        else router.refresh();
+      }, debounceMs);
+    };
+
+    const channel = supabase
+      .channel("bestellungen-list")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bestellungen" },
+        triggerRefresh,
+      )
+      .subscribe();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [router, debounceMs, options]);
 }

@@ -7,6 +7,7 @@ import { DetailHeader } from "./_components/detail-header";
 import { BestelldetailShell } from "./_components/bestelldetail-shell";
 import type {
   Abgleich,
+  AuditEvent,
   Bestellung,
   Dokument,
   Freigabe,
@@ -57,6 +58,7 @@ export default async function BestellungDetailPage({
     { data: freigabe },
     { data: projekte },
     { data: subunternehmerData },
+    { data: events },
   ] = await Promise.all([
     supabase
       .from("dokumente")
@@ -94,6 +96,15 @@ export default async function BestellungDetailPage({
           .eq("id", bestellung.subunternehmer_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // 06.05.2026 (Welle 4 O2) — Audit-Events aus events-Tabelle laden für
+    // reichhaltigere Timeline (status-Wechsel, Bezahlung, Mahnung, etc.)
+    supabase
+      .from("events")
+      .select("id, event_type, actor, payload, created_at")
+      .eq("entity_type", "bestellung")
+      .eq("entity_id", id)
+      .order("created_at", { ascending: true })
+      .limit(500),
   ]);
 
   return (
@@ -119,6 +130,7 @@ export default async function BestellungDetailPage({
         abgleich={(abgleich as Abgleich | null) ?? null}
         kommentare={(kommentare as Kommentar[]) || []}
         freigabe={(freigabe as Freigabe | null) ?? null}
+        events={(events as AuditEvent[]) || []}
         profil={profil}
         projekte={(projekte as ProjektOption[]) || []}
         subunternehmer={(subunternehmerData as SubunternehmerInfo | null) || undefined}

@@ -3,14 +3,15 @@
 import { useMemo } from "react";
 import { CollapsibleWidget } from "./collapsible-widget";
 import { timelineColor } from "@/lib/timeline-config";
-import type { Abgleich, Dokument, Freigabe, Kommentar, WidgetId } from "./types";
+import type { Abgleich, AuditEvent, Dokument, Freigabe, Kommentar, WidgetId } from "./types";
 
 /**
  * Timeline — aggregated activity feed for a single Bestellung.
  *
- * Combines entries from `dokumente`, `abgleich`, `freigabe` and `kommentare`
- * into one chronological list. Pure derived state — no API calls. Uses a
- * vertical rail + dot pattern for dense, scannable output.
+ * 06.05.2026 (Welle 4 O2): nutzt jetzt vorrangig events-Tabelle als
+ * Single-Source-of-Truth. Wenn events fehlen (vor Backfill / RLS-Filter blockt)
+ * fällt der Build auf abgeleitete Items aus dokumente/abgleich/freigabe/kommentare
+ * zurück (backward-kompatibel).
  *
  * `widgetId` prop lets the caller decide whether the widget belongs to the
  * desktop-sidebar accordion group or the mobile-details accordion group, so
@@ -21,6 +22,7 @@ export function Timeline({
   abgleich,
   freigabe,
   kommentare,
+  events,
   widgetId,
   openWidgetId,
   onToggleWidget,
@@ -29,16 +31,20 @@ export function Timeline({
   abgleich: Abgleich | null;
   freigabe: Freigabe | null;
   kommentare: Kommentar[];
+  events?: AuditEvent[];
   widgetId: Extract<WidgetId, "timeline" | "m-timeline">;
   openWidgetId: string | null;
   onToggleWidget: (id: string) => void;
 }) {
-  const items = useMemo(() => buildTimeline(dokumente, abgleich, freigabe, kommentare), [
-    dokumente,
-    abgleich,
-    freigabe,
-    kommentare,
-  ]);
+  const items = useMemo(() => {
+    // Events-Tabelle ist die reichhaltigere Quelle (status_changed, bezahlt,
+    // mahnung, archiviert + alle alten Events). Fallback auf derived nur wenn
+    // events leer (z.B. RLS-Filter blockt).
+    if (events && events.length > 0) {
+      return buildTimelineFromEvents(events);
+    }
+    return buildTimeline(dokumente, abgleich, freigabe, kommentare);
+  }, [events, dokumente, abgleich, freigabe, kommentare]);
 
   if (items.length === 0) return null;
 
@@ -155,4 +161,126 @@ function buildTimeline(
     });
   }
   return items.sort((a, b) => new Date(a.zeit).getTime() - new Date(b.zeit).getTime());
+}
+
+/**
+ * 06.05.2026 (Welle 4 O2) — Timeline-Items aus events-Tabelle bauen.
+ * Reichhaltiger als der derived buildTimeline: enthält status_changed,
+ * bezahlt_markiert, mahnung_versendet, archiviert, projekt_bestaetigt etc.
+ */
+function buildTimelineFromEvents(events: AuditEvent[]): {
+  zeit: string;
+  label: string;
+  typ: "dok" | "abgleich" | "freigabe" | "kommentar" | "status" | "info";
+  farbe: string;
+}[] {
+  const typLabels: Record<string, string> = {
+    bestellbestaetigung: "Bestellbestätigung",
+    lieferschein: "Lieferschein",
+    rechnung: "Rechnung",
+    aufmass: "Aufmaß",
+    leistungsnachweis: "Leistungsnachweis",
+    versandbestaetigung: "Versandbestätigung",
+  };
+  const statusLabels: Record<string, string> = {
+    erwartet: "Erwartet",
+    offen: "Offen",
+    vollstaendig: "Vollständig",
+    abweichung: "Abweichung",
+    ls_fehlt: "LS fehlt",
+    freigegeben: "Freigegeben",
+  };
+
+  return events
+    .map<{
+      zeit: string;
+      label: string;
+      typ: "dok" | "abgleich" | "freigabe" | "kommentar" | "status" | "info";
+      farbe: string;
+    } | null>((e) => {
+      const p = e.payload || {};
+      switch (e.event_type) {
+        case "created":
+          return {
+            zeit: e.created_at,
+            label: `Bestellung angelegt${p.zuordnung_methode ? ` (Zuordnung: ${p.zuordnung_methode})` : ""}`,
+            typ: "info",
+            farbe: timelineColor("created"),
+          };
+        case "doku_added":
+          return {
+            zeit: e.created_at,
+            label: `${typLabels[p.typ] || p.typ || "Dokument"} eingegangen${p.gesamtbetrag ? ` (${p.gesamtbetrag} €)` : ""}`,
+            typ: "dok",
+            farbe: timelineColor("dok"),
+          };
+        case "status_changed":
+          return {
+            zeit: e.created_at,
+            label: `Status: ${statusLabels[p.from] || p.from} → ${statusLabels[p.to] || p.to}`,
+            typ: "status",
+            farbe: timelineColor("status_changed"),
+          };
+        case "freigegeben":
+        case "freigabe_eingetragen":
+          return {
+            zeit: e.created_at,
+            label: `Freigegeben${e.actor ? ` von ${e.actor}` : ""}${p.kommentar ? `: "${String(p.kommentar).slice(0, 60)}"` : ""}`,
+            typ: "freigabe",
+            farbe: timelineColor("freigabe"),
+          };
+        case "bezahlt_markiert":
+          return {
+            zeit: e.created_at,
+            label: `Als bezahlt markiert${e.actor ? ` von ${e.actor}` : ""}${p.betrag ? ` (${p.betrag} €)` : ""}`,
+            typ: "info",
+            farbe: timelineColor("bezahlt"),
+          };
+        case "archiviert":
+          return {
+            zeit: e.created_at,
+            label: `Archiviert${e.actor ? ` von ${e.actor}` : ""}`,
+            typ: "info",
+            farbe: timelineColor("archiviert"),
+          };
+        case "mahnung_versendet":
+          return {
+            zeit: e.created_at,
+            label: `Mahnung versendet (${p.mahnung_count || 1}.)`,
+            typ: "info",
+            farbe: timelineColor("mahnung"),
+          };
+        case "kommentar_added":
+          return {
+            zeit: e.created_at,
+            label: `${e.actor || "?"}: "${String(p.text_excerpt || "").slice(0, 60)}${String(p.text_excerpt || "").length > 60 ? "…" : ""}"`,
+            typ: "kommentar",
+            farbe: timelineColor("kommentar"),
+          };
+        case "projekt_bestaetigt":
+          return {
+            zeit: e.created_at,
+            label: `Projekt bestätigt${p.projekt_name ? `: ${p.projekt_name}` : ""}`,
+            typ: "info",
+            farbe: timelineColor("projekt_bestaetigt"),
+          };
+        case "bestellungsart_geaendert":
+          return {
+            zeit: e.created_at,
+            label: `Bestellungsart: ${p.from} → ${p.to}`,
+            typ: "info",
+            farbe: timelineColor("bestellungsart_geaendert"),
+          };
+        default:
+          // Unbekannter Event-Type — fallback-Render
+          return {
+            zeit: e.created_at,
+            label: e.event_type,
+            typ: "info",
+            farbe: timelineColor("status_changed"),
+          };
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => new Date(a.zeit).getTime() - new Date(b.zeit).getTime());
 }

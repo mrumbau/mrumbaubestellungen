@@ -44,21 +44,62 @@ function storageKey(tableKey: string) {
 
 export function useSavedViews<TConfig>(
   tableKey: string,
+  options?: {
+    /**
+     * 06.05.2026 (Welle 4) — System-Defaults werden bei leerem localStorage
+     * (= erster Login) als initiale Views gesetzt. Sind read-only-Vorlagen
+     * (User darf sie aber löschen oder umbenennen). Idempotent: bei späteren
+     * Mounts werden sie nicht erneut hinzugefügt wenn ihre Stable-IDs schon
+     * existieren.
+     */
+    systemDefaults?: Array<{ id: string; name: string; config: TConfig; isDefault?: boolean }>;
+  },
 ): UseSavedViewsResult<TConfig> {
   const [views, setViews] = React.useState<SavedView<TConfig>[]>([]);
 
-  // Load on mount
+  // Load on mount + System-Defaults seeden falls leer
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(storageKey(tableKey));
-      if (raw) {
-        const parsed = JSON.parse(raw) as SavedView<TConfig>[];
-        if (Array.isArray(parsed)) setViews(parsed);
+      const existing = raw ? (JSON.parse(raw) as SavedView<TConfig>[]) : [];
+      const isArray = Array.isArray(existing);
+      const current = isArray ? existing : [];
+
+      // Seed System-Defaults: nur Items hinzufügen deren stable id NICHT
+      // bereits in current (User kann sie löschen → bleiben gelöscht).
+      const systemSeen = new Set<string>();
+      try {
+        const seenRaw = window.localStorage.getItem(`${storageKey(tableKey)}.system-seeded`);
+        if (seenRaw) {
+          for (const id of JSON.parse(seenRaw) as string[]) systemSeen.add(id);
+        }
+      } catch { /* ignore */ }
+
+      const newSystem: SavedView<TConfig>[] = (options?.systemDefaults ?? [])
+        .filter((s) => !systemSeen.has(s.id) && !current.some((v) => v.id === s.id))
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          isDefault: s.isDefault ?? false,
+          createdAt: new Date().toISOString(),
+          config: s.config,
+        }));
+
+      const merged = [...current, ...newSystem];
+      setViews(merged);
+
+      if (newSystem.length > 0) {
+        try {
+          window.localStorage.setItem(storageKey(tableKey), JSON.stringify(merged));
+          const allSeen = [...systemSeen, ...newSystem.map((v) => v.id)];
+          window.localStorage.setItem(`${storageKey(tableKey)}.system-seeded`, JSON.stringify(allSeen));
+        } catch { /* ignore */ }
       }
     } catch {
       /* storage blocked or invalid JSON */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableKey]);
 
   const persist = React.useCallback(

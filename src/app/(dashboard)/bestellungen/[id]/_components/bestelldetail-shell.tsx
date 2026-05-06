@@ -15,6 +15,7 @@ import { CommentsThread } from "./comments-thread";
 import { ApprovalPanel } from "./approval-panel";
 import type {
   Abgleich,
+  AuditEvent,
   Bestellung,
   Dokument,
   Freigabe,
@@ -44,6 +45,7 @@ export function BestelldetailShell({
   abgleich,
   kommentare,
   freigabe,
+  events,
   profil,
   projekte,
   subunternehmer,
@@ -53,6 +55,7 @@ export function BestelldetailShell({
   abgleich: Abgleich | null;
   kommentare: Kommentar[];
   freigabe: Freigabe | null;
+  events?: AuditEvent[];
   profil: BenutzerProfil;
   projekte: ProjektOption[];
   subunternehmer?: SubunternehmerInfo;
@@ -158,6 +161,7 @@ export function BestelldetailShell({
             abgleich={abgleich}
             freigabe={freigabe}
             kommentare={kommentare}
+            events={events}
             widgetId="timeline"
             openWidgetId={openWidgetId}
             onToggleWidget={toggleWidget}
@@ -252,6 +256,7 @@ export function BestelldetailShell({
               abgleich={abgleich}
               freigabe={freigabe}
               kommentare={kommentare}
+              events={events}
               widgetId="m-timeline"
               openWidgetId={openWidgetId}
               onToggleWidget={toggleWidget}

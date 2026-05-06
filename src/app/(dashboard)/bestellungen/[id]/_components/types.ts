@@ -52,6 +52,16 @@ export type Freigabe = {
   kommentar: string | null;
 };
 
+/** Welle 4 O2 — Event aus events-Tabelle für Audit-Timeline. */
+export type AuditEvent = {
+  id: number | string;
+  event_type: string;
+  actor: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload: Record<string, any> | null;
+  created_at: string;
+};
+
 export type ProjektOption = {
   id: string;
   name: string;
