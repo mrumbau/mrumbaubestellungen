@@ -1157,30 +1157,34 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       }
 
       if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ) && !gespeicherteTypen.includes(bodyAnalyseLokal.typ)) {
-        // Neuer Typ aus Body
-        await supabase.from("dokumente").insert({
-          bestellung_id: bestellungId,
-          typ: bodyAnalyseLokal.typ,
-          quelle: "email",
-          storage_pfad: null,
-          email_betreff,
-          email_absender,
-          email_datum,
-          ki_roh_daten: bodyAnalyseLokal,
-          bestellnummer_erkannt: bodyAnalyseLokal.bestellnummer ?? erkannteBestellnummer,
-          auftragsnummer: bodyAnalyseLokal.auftragsnummer || null,
-          lieferscheinnummer: bodyAnalyseLokal.lieferscheinnummer || null,
-          artikel: bodyAnalyseLokal.artikel,
-          gesamtbetrag: bodyAnalyseLokal.gesamtbetrag ?? bodyExtractedBetrag,
-          netto: bodyAnalyseLokal.netto,
-          mwst: bodyAnalyseLokal.mwst,
-          faelligkeitsdatum: bodyAnalyseLokal.faelligkeitsdatum,
-          lieferdatum: bodyAnalyseLokal.lieferdatum,
-          iban: bodyAnalyseLokal.iban,
-          kundennummer: bodyAnalyseLokal.kundennummer || null,
-          besteller_im_dokument: bodyAnalyseLokal.besteller_im_dokument || null,
-          projekt_referenz: bodyAnalyseLokal.projekt_referenz || null,
-          bestelldatum: bodyAnalyseLokal.bestelldatum || null,
+        // Neuer Typ aus Body — über persist_dokument_atomic damit Re-Backfill
+        // existing Dokus updated statt zu duplizieren (06.05.2026).
+        // content_hash auf Body-Hash setzen für Idempotenz.
+        const bodyHash = createHash("sha256").update(emailText).digest("hex");
+        await supabase.rpc("persist_dokument_atomic", {
+          p_bestellung_id: bestellungId,
+          p_typ: bodyAnalyseLokal.typ,
+          p_quelle: "email",
+          p_storage_pfad: null,
+          p_content_hash: bodyHash,
+          p_email_betreff: email_betreff,
+          p_email_absender: email_absender,
+          p_email_datum: email_datum,
+          p_ki_roh_daten: bodyAnalyseLokal as unknown as Record<string, unknown>,
+          p_bestellnummer_erkannt: bodyAnalyseLokal.bestellnummer ?? erkannteBestellnummer,
+          p_auftragsnummer: bodyAnalyseLokal.auftragsnummer || null,
+          p_lieferscheinnummer: bodyAnalyseLokal.lieferscheinnummer || null,
+          p_artikel: (bodyAnalyseLokal.artikel ?? null) as unknown as Record<string, unknown>,
+          p_gesamtbetrag: bodyAnalyseLokal.gesamtbetrag ?? bodyExtractedBetrag,
+          p_netto: bodyAnalyseLokal.netto,
+          p_mwst: bodyAnalyseLokal.mwst,
+          p_faelligkeitsdatum: bodyAnalyseLokal.faelligkeitsdatum,
+          p_lieferdatum: bodyAnalyseLokal.lieferdatum,
+          p_iban: bodyAnalyseLokal.iban,
+          p_kundennummer: bodyAnalyseLokal.kundennummer || null,
+          p_besteller_im_dokument: bodyAnalyseLokal.besteller_im_dokument || null,
+          p_projekt_referenz: bodyAnalyseLokal.projekt_referenz || null,
+          p_bestelldatum: bodyAnalyseLokal.bestelldatum || null,
         });
 
         const haendlerNameAfter = await applyAnalyseToBestellung(supabase, bestellungId, bodyAnalyseLokal, {
@@ -1905,29 +1909,34 @@ async function tryFallbackKeywordTyp(
       ? { ...(ki as unknown as Record<string, unknown>), fallback_typ: fallbackTyp, quelle: "email_body" }
       : { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000) };
 
-    await supabase.from("dokumente").insert({
-      bestellung_id: bestellungId,
-      typ: fallbackTyp,
-      quelle: "email",
-      storage_pfad: null,
-      email_betreff,
-      email_absender,
-      email_datum,
-      ki_roh_daten: fallbackKiRoh,
-      bestellnummer_erkannt: ki?.bestellnummer ?? null,
-      auftragsnummer: ki?.auftragsnummer || null,
-      lieferscheinnummer: ki?.lieferscheinnummer || null,
-      artikel: ki?.artikel ?? null,
-      gesamtbetrag: ki?.gesamtbetrag ?? null,
-      netto: ki?.netto ?? null,
-      mwst: ki?.mwst ?? null,
-      faelligkeitsdatum: ki?.faelligkeitsdatum ?? null,
-      lieferdatum: ki?.lieferdatum ?? null,
-      iban: ki?.iban ?? null,
-      kundennummer: ki?.kundennummer || null,
-      besteller_im_dokument: ki?.besteller_im_dokument || null,
-      projekt_referenz: ki?.projekt_referenz || null,
-      bestelldatum: ki?.bestelldatum || null,
+    // 06.05.2026 — Fallback-Insert via persist_dokument_atomic-RPC für
+    // Re-Backfill-Idempotenz. content_hash = sha256(email_text) verhindert
+    // doppelte Dokus beim retry derselben Mail.
+    const fallbackBodyHash = createHash("sha256").update(emailText).digest("hex");
+    await supabase.rpc("persist_dokument_atomic", {
+      p_bestellung_id: bestellungId,
+      p_typ: fallbackTyp,
+      p_quelle: "email",
+      p_storage_pfad: null,
+      p_content_hash: fallbackBodyHash,
+      p_email_betreff: email_betreff,
+      p_email_absender: email_absender,
+      p_email_datum: email_datum,
+      p_ki_roh_daten: fallbackKiRoh,
+      p_bestellnummer_erkannt: ki?.bestellnummer ?? null,
+      p_auftragsnummer: ki?.auftragsnummer || null,
+      p_lieferscheinnummer: ki?.lieferscheinnummer || null,
+      p_artikel: (ki?.artikel ?? null) as unknown as Record<string, unknown>,
+      p_gesamtbetrag: ki?.gesamtbetrag ?? null,
+      p_netto: ki?.netto ?? null,
+      p_mwst: ki?.mwst ?? null,
+      p_faelligkeitsdatum: ki?.faelligkeitsdatum ?? null,
+      p_lieferdatum: ki?.lieferdatum ?? null,
+      p_iban: ki?.iban ?? null,
+      p_kundennummer: ki?.kundennummer || null,
+      p_besteller_im_dokument: ki?.besteller_im_dokument || null,
+      p_projekt_referenz: ki?.projekt_referenz || null,
+      p_bestelldatum: ki?.bestelldatum || null,
     });
 
     // bestellungen-Update: Flag setzen + KI-Werte (Betrag, Daten, BN) ergänzen
