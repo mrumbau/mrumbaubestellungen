@@ -13,6 +13,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { chatCompletion } from "@/lib/openai";
+import {
+  istSicherheitsdatenblattMail,
+  istJuristischerSchriftverkehr,
+  istBehoerdenGenehmigung,
+} from "./pipeline/mail-utils";
 import { IRRELEVANT_DOMAINS, VERSAND_DOMAINS } from "@/lib/blacklist-constants";
 import { logError, logInfo } from "@/lib/logger";
 import { createServiceClient } from "@/lib/supabase";
@@ -146,6 +151,29 @@ export async function classifyEmailLogic(
   // ── 2d. PayPal — immer irrelevant ──
   if (absenderDomain === "paypal.com" || absenderDomain === "paypal.de" || absenderDomain === "e.paypal.de") {
     return { relevant: false, grund: "paypal_irrelevant" };
+  }
+
+  // ── 2d.1. Sicherheitsdatenblätter (REACH-Pflichtmails) — irrelevant ──
+  if (istSicherheitsdatenblattMail({
+    subject: email_betreff || "",
+    sender: absenderAdresse,
+    vorschau: email_vorschau || "",
+  })) {
+    return { relevant: false, grund: "sicherheitsdatenblatt_reach" };
+  }
+
+  // ── 2d.2. Juristischer Schriftverkehr — irrelevant ──
+  // 06.05.2026 — Anwaltskanzlei-Schriftverkehr (Klageerwiderung, Schriftsatz,
+  // Aktenzeichen-Korrespondenz) gehört nicht ins Bestellwesen. Honorar-
+  // Rechnungen einer Kanzlei sind explizit ausgenommen.
+  if (istJuristischerSchriftverkehr({ subject: email_betreff || "", sender: absenderAdresse })) {
+    return { relevant: false, grund: "juristischer_schriftverkehr" };
+  }
+
+  // ── 2d.3. Behörden-Genehmigungen / Halteverbot-Workflow — irrelevant ──
+  // Stadt-München, WH-Schilderdienst, Bauamt-Genehmigungen sind keine Bestellungen.
+  if (istBehoerdenGenehmigung({ subject: email_betreff || "", sender: absenderAdresse })) {
+    return { relevant: false, grund: "behoerden_genehmigung" };
   }
 
   // ── 2e. Plancraft — Subunternehmer-Rechnungen ──

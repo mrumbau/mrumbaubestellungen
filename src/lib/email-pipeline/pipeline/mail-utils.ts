@@ -230,6 +230,99 @@ export function htmlToStructuredText(html: string): string {
 }
 
 // =====================================================================
+// Sicherheitsdatenblatt-Detection (REACH-Pflichtmails)
+// 06.05.2026 — Vendoren senden gesetzlich verpflichtet 1×/Jahr/Artikel ein
+// Sicherheitsdatenblatt mit PDF-Anhang. Kein Bestelldokument, nur
+// Compliance-Info. Bisher führten 3 SDB-Mails von SDBVersand@stark-deutschland.de
+// zu leeren "Raab Karcher"-Bestellungen ohne Betrag/Bestellnummer.
+//
+// Detektiert per Subject-Prefix, Sender-Localpart, oder REACH-Vorschau.
+// =====================================================================
+export function istSicherheitsdatenblattMail(input: {
+  subject: string;
+  sender: string;
+  vorschau: string;
+}): boolean {
+  const subject = input.subject || "";
+  const localpart = (input.sender.split("@")[0] || "").toLowerCase();
+  const vorschau = input.vorschau || "";
+
+  if (/^\s*sicherheitsdatenblatt\b/i.test(subject)) return true;
+  if (/^\s*safety\s*data\s*sheet\b/i.test(subject)) return true;
+  if (/^\s*sdb\b/i.test(subject)) return true;
+  if (localpart.startsWith("sdbversand")) return true;
+  if (localpart === "sdb" || localpart === "msds" || localpart === "reach") return true;
+  if (/\breach[- ]verordnung\b/i.test(vorschau)) return true;
+  if (/\b(reach|clp|ghs)[- ]regulation\b/i.test(vorschau)) return true;
+  return false;
+}
+
+// =====================================================================
+// Juristischer Schriftverkehr / Behörden-Korrespondenz (irrelevant)
+// 06.05.2026 — Anwaltskanzlei-Schriftverkehr (Klageerwiderung, Schriftsatz),
+// Behörden-Genehmigungen (Halteverbot, Bauamt) und Gerichts-Korrespondenz
+// gehören nicht ins Bestellwesen. ABER: Honorar-Rechnungen einer Kanzlei
+// und behördliche Gebühren-Bescheide sind sehr wohl relevant.
+//
+// Filter ist konservativ: nur klare Marker (`./.` Rechtssache, "Akte:" +
+// Aktenzeichen-Pattern, "Genehmigung im Anhang", "Klageerwiderung"). Im
+// Zweifel relevant — der User kann manuell verwerfen, dann lernt
+// `verworfene_emails` für die Zukunft.
+// =====================================================================
+const AKTENZEICHEN_PATTERN = /\b\d{1,4}\s+[A-Z]{1,3}\s+\d{1,6}\/\d{2,4}\b/;
+
+export function istJuristischerSchriftverkehr(input: {
+  subject: string;
+  sender?: string;
+}): boolean {
+  const subject = input.subject || "";
+
+  // Honorar-Rechnung explizit ausnehmen — Anwaltskanzleien verschicken auch
+  // Rechnungen, die sind relevant.
+  if (/\bRechnung\b/i.test(subject) && !/\bKlage\b|\bSchriftsatz\b/i.test(subject)) {
+    return false;
+  }
+
+  // ./. ist Standard-Marker für Rechtssachen ("MR Umbau ./. von Nordenskjöld")
+  if (/\.\/\./.test(subject)) return true;
+
+  // Klage-/Schriftsatz-Indikatoren
+  if (/\bKlageerwiderung\b/i.test(subject)) return true;
+  if (/\bKlageschrift\b/i.test(subject)) return true;
+  if (/\b(Mahnbescheid|Vollstreckungsbescheid|Pfändungsbeschluss|Pfaendungsbeschluss)\b/i.test(subject)) return true;
+
+  // Aktenzeichen + Schriftsatz/Stellungnahme/Akte
+  if (AKTENZEICHEN_PATTERN.test(subject)) {
+    if (/\b(Schriftsatz|Stellungnahme|Klage|in\s+Sachen|in\s+der\s+Sache|Erwiderung|Akte:?)\b/i.test(subject)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function istBehoerdenGenehmigung(input: {
+  subject: string;
+  sender?: string;
+}): boolean {
+  const subject = input.subject || "";
+
+  // "Genehmigung im Anhang" / "Kfz-Liste im Anhang" — typische
+  // Halteverbots- + Stadt-Münchner-Genehmigungs-Patterns
+  if (/\bGenehmigung\s+im\s+Anhang\b/i.test(subject)) return true;
+  if (/\bKfz-?Liste\s+im\s+Anhang\b/i.test(subject)) return true;
+  if (/\b(Halteverbots?zone|Halteverbots?antrag|Halteverbots?genehmigung)\b/i.test(subject)) return true;
+
+  // "Unser Zeichen: NNNNN" + "im Anhang" + nicht "Rechnung" → Behörden-/
+  // Schilderdienst-Workflow ohne Bestelldoku-Charakter
+  if (/\bUnser\s+Zeichen:?\s*\d+/i.test(subject) && /\bim\s+Anhang\b/i.test(subject)) {
+    if (!/\bRechnung\b/i.test(subject)) return true;
+  }
+
+  return false;
+}
+
+// =====================================================================
 // Versand-Erkennung via Betreff
 // =====================================================================
 const VERSAND_BETREFF_KEYWORDS = [
