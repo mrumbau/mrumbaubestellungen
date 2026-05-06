@@ -21,6 +21,7 @@ import { generiereErinnerungsmail } from "@/lib/openai";
 import { sendeMahnungEmail } from "@/lib/email";
 import { logError, logInfo } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
+import { ensureReplyToken } from "@/lib/email-pipeline/pipeline/reply-action";
 
 const BodySchema = z.object({
   secret: z.string().optional(),
@@ -141,12 +142,41 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // Welle 5 O7 — Reply-Token-Footer pro Bestellung anhängen.
+      // Antwortet der User auf diese Mail mit z.B. "FREIGEBEN [REF:<token>]",
+      // erkennt die Pipeline die Aktion und wechselt den Status der spezifischen
+      // Bestellung — ohne UI-Klick.
+      const replyTokenZeilen: string[] = [];
+      for (const b of gruppe) {
+        const token = await ensureReplyToken(supabase, b.id);
+        if (token) {
+          const label = b.bestellnummer || `ID ${b.id.slice(0, 8)}`;
+          const haendler = b.haendler_name || "Unbekannter Händler";
+          replyTokenZeilen.push(`  ${label} (${haendler}) → FREIGEBEN [REF:${token}]`);
+        }
+      }
+      const replyFooter = replyTokenZeilen.length > 0
+        ? [
+            "",
+            "──────────────────────────────────────────────",
+            "Antwort-Aktionen (per Mail-Reply möglich):",
+            "Antworte einfach auf diese Mail und schreibe z.B.:",
+            "    FREIGEBEN [REF:…]   – Bestellung freigeben",
+            "    BEZAHLT [REF:…]     – Rechnung als bezahlt markieren",
+            "    NEIN [REF:…]        – Bestellung als problematisch markieren",
+            "",
+            "Tokens je Bestellung:",
+            ...replyTokenZeilen,
+            "──────────────────────────────────────────────",
+          ].join("\n")
+        : "";
+
       const betreff = `Erinnerung: ${gruppe.length} Lieferschein${gruppe.length > 1 ? "e" : ""} fehlt noch`;
       const result = await sendeMahnungEmail({
         empfaengerEmail: benutzer.email,
         empfaengerName: benutzer.name,
         betreff,
-        text: mailText,
+        text: mailText + replyFooter,
       });
 
       versandResults.push({

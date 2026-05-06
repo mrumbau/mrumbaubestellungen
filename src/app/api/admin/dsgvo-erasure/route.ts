@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServiceClient } from "@/lib/supabase";
+import { createTypedServiceClient } from "@/lib/supabase";
 import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
     const { besteller_kuerzel } = parsed.data;
 
-    const supabase = createServiceClient();
+    const supabase = createTypedServiceClient();
     const { data: result, error } = await supabase
       .rpc("dsgvo_anonymize_besteller", { p_kuerzel: besteller_kuerzel });
 

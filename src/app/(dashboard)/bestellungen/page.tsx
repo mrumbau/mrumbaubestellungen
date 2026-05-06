@@ -39,6 +39,25 @@ export default async function BestellungenPage({
     supabase.from("projekte").select("id, name, farbe").neq("status", "archiviert").order("name"),
   ]);
 
+  // 06.05.2026 — Audit-Trail-Spalte: events-Count pro Bestellung aggregiert
+  // aus bestellung_event_summary-View laden (security_invoker, RLS greift via events).
+  const ids = (bestellungen || []).map((b) => b.id);
+  const eventCountMap: Record<string, { count: number; lastAt: string | null }> = {};
+  if (ids.length > 0) {
+    const { data: summaries } = await supabase
+      .from("bestellung_event_summary")
+      .select("bestellung_id, event_count, last_event_at")
+      .in("bestellung_id", ids);
+    for (const s of summaries || []) {
+      if (s.bestellung_id) {
+        eventCountMap[s.bestellung_id] = {
+          count: s.event_count ?? 0,
+          lastAt: s.last_event_at ?? null,
+        };
+      }
+    }
+  }
+
   const total = count || 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -89,6 +108,7 @@ export default async function BestellungenPage({
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
         isAdmin={profil?.rolle === "admin"}
+        eventCountMap={eventCountMap}
       />
     </div>
   );

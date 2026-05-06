@@ -57,6 +57,7 @@ import { handleVersandEmail } from "./pipeline/versand-handler";
 import { tryAbgleich } from "./pipeline/abgleich";
 import { tryPreisanomalieCheck } from "./pipeline/preisanomalie";
 import { handleAboLogik } from "./pipeline/abo-handling";
+import { detectReplyAction, applyReplyAction } from "./pipeline/reply-action";
 
 // =====================================================================
 // INTERNAL TYPES (F3.F10: typed statt any)
@@ -198,6 +199,45 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       });
       if (istBlockiert) {
         return { success: true, skipped: true, reason: "blacklisted" };
+      }
+    }
+  }
+
+  // 2.5 Welle 5 O7 — Email-Reply-as-Action.
+  // Vor dem Idempotency-Check, damit Reply-Mails nicht als 24h-Body-Duplikate
+  // verworfen werden und auch keine PDF-Pipeline durchlaufen. Wenn die Mail einen
+  // gültigen [REF:<token>] + Action-Keyword enthält → Status-Wechsel + return.
+  if (!input.existing_bestellung_id) {
+    const replyBody = input.email_text || input.email_body || "";
+    if (replyBody) {
+      const replyMatch = await detectReplyAction(supabase, replyBody);
+      if (replyMatch) {
+        const senderAdresse = absenderAdresse;
+        const result = await applyReplyAction(supabase, replyMatch, senderAdresse);
+        if (result.success) {
+          logInfo("webhook/email", "Email-Reply-Action ausgeführt", {
+            bestellung_id: replyMatch.bestellungId,
+            action: replyMatch.action,
+            sender: senderAdresse,
+            new_status: result.newStatus,
+            skipped: result.skipped,
+          });
+          return {
+            success: true,
+            skipped: true,
+            reason: result.skipped
+              ? `reply_action_${replyMatch.action}_${result.reason ?? "skipped"}`
+              : `reply_action_${replyMatch.action}`,
+            bestellung_id: replyMatch.bestellungId,
+          };
+        }
+        // Bei !success und reason=sender_unknown / rolle_unzulaessig: weiter
+        // mit normaler Pipeline (z.B. wenn ein anderer Empfänger geantwortet hat).
+        logInfo("webhook/email", "Email-Reply-Action nicht ausgeführt", {
+          bestellung_id: replyMatch.bestellungId,
+          action: replyMatch.action,
+          reason: result.reason,
+        });
       }
     }
   }

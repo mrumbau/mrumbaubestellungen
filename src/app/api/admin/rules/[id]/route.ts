@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createTypedServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -64,7 +64,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Body invalid", issues: parsed.error.issues }, { status: 400 });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createTypedServerSupabaseClient();
     const { data, error } = await supabase
       .from("besteller_rules")
       .update(parsed.data)
@@ -100,7 +100,7 @@ export async function DELETE(
     const guard = await ensureAdmin();
     if (guard.error) return guard.error;
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createTypedServerSupabaseClient();
     const { error } = await supabase
       .from("besteller_rules")
       .delete()

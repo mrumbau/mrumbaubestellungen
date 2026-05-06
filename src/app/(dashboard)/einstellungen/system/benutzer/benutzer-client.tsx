@@ -1,11 +1,16 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
-import { IconUsers } from "@/components/ui/icons";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { IconUsers, IconShield } from "@/components/ui/icons";
 
 export type Benutzer = {
   id: string;
@@ -28,6 +33,8 @@ export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
   const sonstige = benutzer.filter(
     (b) => !["admin", "buchhaltung", "besteller"].includes(b.rolle),
   );
+
+  const [erasureTarget, setErasureTarget] = useState<Benutzer | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -73,13 +80,23 @@ export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
             <Gruppe title="Buchhaltung" rolle="buchhaltung" benutzer={buchhaltung} />
           )}
           {besteller.length > 0 && (
-            <Gruppe title="Besteller" rolle="besteller" benutzer={besteller} />
+            <Gruppe
+              title="Besteller"
+              rolle="besteller"
+              benutzer={besteller}
+              onErasureRequest={setErasureTarget}
+            />
           )}
           {sonstige.length > 0 && (
             <Gruppe title="Sonstige" rolle="unbekannt" benutzer={sonstige} />
           )}
         </>
       )}
+
+      <DsgvoErasureModal
+        target={erasureTarget}
+        onClose={() => setErasureTarget(null)}
+      />
     </div>
   );
 }
@@ -88,10 +105,12 @@ function Gruppe({
   title,
   rolle,
   benutzer,
+  onErasureRequest,
 }: {
   title: string;
   rolle: string;
   benutzer: Benutzer[];
+  onErasureRequest?: (b: Benutzer) => void;
 }) {
   return (
     <SectionCard
@@ -119,7 +138,21 @@ function Gruppe({
                 </p>
               </div>
             </div>
-            <RolleBadge rolle={u.rolle} />
+            <div className="flex items-center gap-2">
+              <RolleBadge rolle={u.rolle} />
+              {onErasureRequest && rolle === "besteller" && (
+                <button
+                  type="button"
+                  onClick={() => onErasureRequest(u)}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-foreground-subtle hover:text-error hover:bg-error-bg transition-colors"
+                  title="DSGVO Right-to-Erasure ausführen"
+                  aria-label={`DSGVO-Erasure für ${u.name}`}
+                >
+                  <IconShield className="w-3 h-3" />
+                  DSGVO
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -154,5 +187,119 @@ function RolleBadge({ rolle }: { rolle: string }) {
     <Badge tone="muted" size="md">
       {label}
     </Badge>
+  );
+}
+
+function DsgvoErasureModal({
+  target,
+  onClose,
+}: {
+  target: Benutzer | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [confirmText, setConfirmText] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  const open = target !== null;
+  const expectedToken = target?.kuerzel ?? "";
+  const canSubmit = open && confirmText.trim() === expectedToken;
+
+  const handleClose = () => {
+    if (isPending) return;
+    setConfirmText("");
+    onClose();
+  };
+
+  const handleSubmit = () => {
+    if (!target || !canSubmit) return;
+    const kuerzel = target.kuerzel;
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/admin/dsgvo-erasure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            besteller_kuerzel: kuerzel,
+            bestaetigung: "DSGVO_ERASURE_CONFIRMED",
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error("DSGVO-Erasure fehlgeschlagen", {
+            description: data.error || data.details || `HTTP ${res.status}`,
+          });
+          return;
+        }
+        toast.success("DSGVO-Erasure ausgeführt", {
+          description: `Personenbezug für ${kuerzel} wurde anonymisiert.`,
+        });
+        setConfirmText("");
+        onClose();
+        router.refresh();
+      } catch (err) {
+        toast.error("Netzwerk-Fehler", {
+          description: err instanceof Error ? err.message : "Unbekannt",
+        });
+      }
+    });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      size="lg"
+      title="DSGVO Right-to-Erasure"
+      description={
+        target
+          ? `Personenbezug für ${target.name} (${target.kuerzel}) anonymisieren`
+          : undefined
+      }
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={handleClose} disabled={isPending}>
+            Abbrechen
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleSubmit}
+            disabled={!canSubmit || isPending}
+            loading={isPending}
+          >
+            Anonymisierung ausführen
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Alert tone="error" title="Diese Aktion ist irreversibel">
+          <ul className="list-disc pl-5 text-[13px] space-y-1 mt-1">
+            <li>Personenbezug wird auf <code className="font-mono-amount">[anonymisiert]</code> gesetzt</li>
+            <li>Alle Kommentare des Bestellers werden gelöscht</li>
+            <li>Belege (Bestellungen, Dokumente, Freigaben) bleiben erhalten — GoBD §147</li>
+            <li>Archivierte Bestellungen bleiben unverändert (DB-Trigger blockiert)</li>
+            <li>Audit-Log in <code className="font-mono-amount">webhook_logs</code> wird angelegt</li>
+          </ul>
+        </Alert>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] text-foreground-subtle">
+            Tippe das Kürzel <code className="font-mono-amount font-semibold text-foreground">{expectedToken}</code> ein, um zu bestätigen:
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={expectedToken}
+            disabled={isPending}
+            autoComplete="off"
+            spellCheck={false}
+            className="px-3 py-2 rounded-md border border-line-strong bg-input text-foreground font-mono-amount text-sm focus:outline-none focus:shadow-[var(--shadow-focus-ring)]"
+          />
+        </div>
+      </div>
+    </Modal>
   );
 }

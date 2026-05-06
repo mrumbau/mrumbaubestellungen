@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
     const beraterNr = url.searchParams.get("berater_nr") || "00000";
     const mandantenNr = url.searchParams.get("mandanten_nr") || "00000";
     const gegenKonto = url.searchParams.get("gegen_konto") || "4980";
+    // 06.05.2026 — neuer Filter: nach welchem Datumsfeld wird der Zeitraum gemessen?
+    // freigabe (Default) = updated_at, faelligkeit = faelligkeitsdatum, bestellung = bestelldatum.
+    const datumBasisRaw = url.searchParams.get("datum_basis") || "freigabe";
+    const datumBasis: "freigabe" | "faelligkeit" | "bestellung" =
+      datumBasisRaw === "faelligkeit" || datumBasisRaw === "bestellung"
+        ? datumBasisRaw
+        : "freigabe";
 
     if (!von || !bis) {
       return NextResponse.json({ error: "von und bis Parameter erforderlich" }, { status: 400 });
@@ -56,9 +63,24 @@ export async function GET(request: NextRequest) {
       .from("bestellungen")
       .select("id, bestellnummer, haendler_name, betrag, projekt_name, created_at, updated_at, bestellungsart, bestelldatum, faelligkeitsdatum")
       .eq("status", "freigegeben")
-      .gte("updated_at", `${von}T00:00:00`)
-      .lte("updated_at", `${bis}T23:59:59`)
       .order("updated_at", { ascending: true });
+
+    if (datumBasis === "faelligkeit") {
+      // Nur Bestellungen mit gesetztem Fälligkeitsdatum im Zeitraum
+      query = query
+        .gte("faelligkeitsdatum", von)
+        .lte("faelligkeitsdatum", bis)
+        .not("faelligkeitsdatum", "is", null);
+    } else if (datumBasis === "bestellung") {
+      query = query
+        .gte("bestelldatum", von)
+        .lte("bestelldatum", bis)
+        .not("bestelldatum", "is", null);
+    } else {
+      query = query
+        .gte("updated_at", `${von}T00:00:00`)
+        .lte("updated_at", `${bis}T23:59:59`);
+    }
 
     if (projektId) {
       query = query.eq("projekt_id", projektId);

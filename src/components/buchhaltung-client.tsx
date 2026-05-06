@@ -80,6 +80,8 @@ export function BuchhaltungClient({
   const [datevMandantenNr, setDatevMandantenNr] = useState("30086");
   const [datevGegenKonto, setDatevGegenKonto] = useState("4980");
   const [datevAufwandsKonto, setDatevAufwandsKonto] = useState("");
+  // 06.05.2026 — neuer Filter: nach welchem Datum wird der Zeitraum gemessen?
+  const [datevDatumBasis, setDatevDatumBasis] = useState<"freigabe" | "faelligkeit" | "bestellung">("freigabe");
   const [showErweitert, setShowErweitert] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -161,6 +163,7 @@ export function BuchhaltungClient({
       if (datevMandantenNr) params.set("mandanten_nr", datevMandantenNr);
       if (datevGegenKonto) params.set("gegen_konto", datevGegenKonto);
       if (datevAufwandsKonto) params.set("aufwands_konto", datevAufwandsKonto);
+      if (datevDatumBasis !== "freigabe") params.set("datum_basis", datevDatumBasis);
 
       const res = await fetch(`/api/export/datev?${params.toString()}`);
       if (!res.ok) {
@@ -361,6 +364,32 @@ export function BuchhaltungClient({
                     {btn.label}
                   </button>
                 ))}
+              </div>
+
+              {/* Datum-Basis */}
+              <div>
+                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">
+                  Zeitraum bezieht sich auf
+                </label>
+                <select
+                  value={datevDatumBasis}
+                  onChange={(e) => setDatevDatumBasis(e.target.value as "freigabe" | "faelligkeit" | "bestellung")}
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                >
+                  <option value="freigabe">Freigabe-Datum (Standard)</option>
+                  <option value="faelligkeit">Fälligkeitsdatum (nur Bestellungen mit Fälligkeit)</option>
+                  <option value="bestellung">Bestelldatum (nur Bestellungen mit Bestelldatum)</option>
+                </select>
+                {datevDatumBasis === "faelligkeit" && (
+                  <p className="text-[11px] text-foreground-subtle mt-1">
+                    Bestellungen ohne Fälligkeitsdatum werden ausgeschlossen.
+                  </p>
+                )}
+                {datevDatumBasis === "bestellung" && (
+                  <p className="text-[11px] text-foreground-subtle mt-1">
+                    Bestellungen ohne Bestelldatum werden ausgeschlossen.
+                  </p>
+                )}
               </div>
 
               {/* Projekt-Filter */}

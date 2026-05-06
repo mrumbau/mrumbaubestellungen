@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createTypedServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createTypedServerSupabaseClient();
     const { data, error } = await supabase
       .from("besteller_rules")
       .insert({

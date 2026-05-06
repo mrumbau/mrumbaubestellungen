@@ -8,6 +8,7 @@ import {
   IconTool,
   IconMail,
   IconShield,
+  IconKey,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,11 @@ export default async function SystemLayout({
       label: "Auto-Zuordnung",
       href: "/einstellungen/system/rules",
       icon: <IconShield />,
+    },
+    {
+      label: "OpenAI-Kosten",
+      href: "/einstellungen/system/openai-costs",
+      icon: <IconKey />,
     },
     {
       label: "Testdaten",

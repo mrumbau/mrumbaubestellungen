@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createTypedServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
@@ -36,7 +36,7 @@ export async function GET(
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createTypedServerSupabaseClient();
 
     // RLS filtert: besteller sieht nur eigene, admin alle.
     const { data: events, error } = await supabase

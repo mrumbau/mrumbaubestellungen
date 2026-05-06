@@ -36,6 +36,7 @@ import {
   IconTrash,
   IconAlertCircle,
   IconDownload,
+  IconClock,
 } from "@/components/ui/icons";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
@@ -88,6 +89,7 @@ export function BestellungenTabelle({
   projekte = [],
   aktiverProjektFilter,
   aktiverProjektName,
+  eventCountMap,
 }: {
   bestellungen: Bestellung[];
   currentPage: number;
@@ -97,6 +99,7 @@ export function BestellungenTabelle({
   aktiverProjektFilter?: string | null;
   aktiverProjektName?: string | null;
   isAdmin?: boolean;
+  eventCountMap?: Record<string, { count: number; lastAt: string | null }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -731,6 +734,34 @@ export function BestellungenTabelle({
         render: (b) => <BetragCell betrag={b.betrag} waehrung={b.waehrung} istNetto={b.betrag_ist_netto} />,
       },
       {
+        key: "audit",
+        label: "Audit",
+        align: "center",
+        hideBelow: "xl",
+        stopPropagation: true,
+        render: (b) => {
+          const audit = eventCountMap?.[b.id];
+          if (!audit || audit.count === 0) {
+            return <span className="text-line-strong text-[12px]">–</span>;
+          }
+          const tooltip = audit.lastAt
+            ? `${audit.count} Events · zuletzt ${formatDatum(audit.lastAt)}`
+            : `${audit.count} Events`;
+          return (
+            <Link
+              href={`/bestellungen/${b.id}#timeline`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 text-[12px] text-foreground-muted hover:text-brand transition-colors"
+              title={tooltip}
+              aria-label={`Audit-Trail öffnen: ${tooltip}`}
+            >
+              <IconClock className="w-3 h-3" />
+              <span className="font-mono-amount tabular-nums">{audit.count}</span>
+            </Link>
+          );
+        },
+      },
+      {
         key: "actions",
         label: "",
         stopPropagation: true,
@@ -760,7 +791,7 @@ export function BestellungenTabelle({
         },
       },
     ],
-    [projektFarbenMap, freigabeLoadingId, downloadingId],
+    [projektFarbenMap, freigabeLoadingId, downloadingId, eventCountMap],
   );
 
   return (

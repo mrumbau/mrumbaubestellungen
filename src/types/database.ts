@@ -1327,6 +1327,14 @@ export type Database = {
       }
     }
     Views: {
+      bestellung_event_summary: {
+        Row: {
+          bestellung_id: string | null
+          event_count: number | null
+          last_event_at: string | null
+        }
+        Relationships: []
+      }
       dashboard_kpis_global: {
         Row: {
           abweichung_count: number | null

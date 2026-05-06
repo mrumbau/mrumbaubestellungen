@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase";
+import { createTypedServiceClient } from "@/lib/supabase";
 import { logError, logInfo } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = createServiceClient();
+    const supabase = createTypedServiceClient();
     const url = new URL(request.url);
     const tageParam = url.searchParams.get("tage");
     const tage = tageParam ? Math.max(1, Math.min(90, parseInt(tageParam, 10))) : 7;
