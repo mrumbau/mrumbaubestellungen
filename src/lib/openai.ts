@@ -220,12 +220,20 @@ function modelDisallowsCustomTemperature(model: string): boolean {
 export async function chatCompletion(
   params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
 ): Promise<OpenAI.Chat.Completions.ChatCompletion> {
-  // Reasoning-Modelle (gpt-5*, o-Series) lehnen custom temperature ab.
-  // Mit json_schema strict ist temperature ohnehin nahezu wirkungslos.
-  if (params.temperature !== undefined && modelDisallowsCustomTemperature(params.model)) {
-    const { temperature: _ignore, ...rest } = params;
-    void _ignore;
-    return withRetry(() => openai.chat.completions.create(rest));
+  // Reasoning-Modelle (gpt-5*, o-Series) verlangen aktualisierte Param-Form:
+  //   - temperature → muss Default (1) sein, sonst 400-Reject
+  //   - max_tokens  → wurde zu `max_completion_tokens` umbenannt
+  // 07.05.2026 — Auto-Migration im Wrapper damit Caller mit alter Param-Form
+  // (max_tokens: 500) nicht crashen. Hat duplikat-check + bestellung-
+  // zusammenfassung im Detail-View 500-en lassen.
+  if (modelDisallowsCustomTemperature(params.model)) {
+    const { temperature: _t, max_tokens, ...rest } = params;
+    void _t;
+    const fixed: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
+      ...rest,
+      ...(max_tokens != null ? { max_completion_tokens: max_tokens } : {}),
+    };
+    return withRetry(() => openai.chat.completions.create(fixed));
   }
   return withRetry(() => openai.chat.completions.create(params));
 }
@@ -670,7 +678,10 @@ export async function analysiereDokument(
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
           ],
-          max_tokens: maxTokens,
+          // gpt-5/o-Modelle: max_completion_tokens. gpt-4*: max_tokens.
+          ...(modelDisallowsCustomTemperature(model)
+            ? { max_completion_tokens: maxTokens }
+            : { max_tokens: maxTokens }),
           response_format: zodResponseFormat(DokumentAnalyseSchema, "DokumentAnalyse"),
         }),
       );
@@ -763,6 +774,10 @@ export async function fuehreAbgleichDurch(
   rechnung: DokumentAnalyse | null
 ): Promise<AbgleichErgebnis> {
   try {
+    // chat.completions.parse hat dieselbe Param-Auto-Migration nötig wie .create:
+    // gpt-5/o-Modelle akzeptieren keine custom temperature und kein max_tokens.
+    // Wir konvertieren explizit (kein chatCompletion-Wrapper, weil parse mit
+    // zodResponseFormat einen anderen Return-Typ liefert).
     const completion = await withRetry(() =>
       openai.chat.completions.parse({
         model: "gpt-5.5",
@@ -770,23 +785,27 @@ export async function fuehreAbgleichDurch(
           {
             role: "system",
             content: `Du bist ein Prüfassistent für eine deutsche Baufirma.
-Vergleiche die folgenden Dokumente einer Bestellung und prüfe ob alles übereinstimmt.
+Vergleiche die vorliegenden Dokumente einer Bestellung und prüfe ob alles übereinstimmt.
+
+Pflicht-Dokumente sind Lieferschein und Rechnung.
+Bestellbestätigung ist OPTIONAL — wenn null, prüfe nur LS↔RG.
+Wenn alle drei vorhanden sind, prüfe alle drei gegenseitig.
 
 Gib das Ergebnis als JSON-Objekt zurück:
 - status: "ok" wenn keine Abweichungen, sonst "abweichung"
 - abweichungen: Liste der erkannten Diskrepanzen
-- zusammenfassung: kurze Beschreibung in Deutsch
+- zusammenfassung: kurze Beschreibung in Deutsch (nenne welche Dokumente verglichen wurden)
 
 In abweichungen[].erwartet und abweichungen[].gefunden gib Werte IMMER als String (auch Zahlen).`,
           },
           {
             role: "user",
-            content: `Bestellbestätigung: ${JSON.stringify(bestellbestaetigung)}
+            content: `Bestellbestätigung: ${bestellbestaetigung ? JSON.stringify(bestellbestaetigung) : "(nicht vorhanden)"}
 Lieferschein: ${JSON.stringify(lieferschein)}
 Rechnung: ${JSON.stringify(rechnung)}`,
           },
         ],
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
         response_format: zodResponseFormat(AbgleichErgebnisSchema, "AbgleichErgebnis"),
       }),
     );
@@ -857,7 +876,7 @@ ${bestellerHistorie.map((b) => `${b.kuerzel} (${b.name}): Bestellt oft: ${b.arti
 export async function generiereErinnerungsmail(
   bestellungen: { bestellnummer: string; haendler: string; besteller: string; tage_alt: number; betrag: number }[]
 ): Promise<string> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     // R2/F4.2: gpt-4o-mini ausreichend für simple Text-Generation; ~5x günstiger
     model: "gpt-5.5",
     messages: [
@@ -875,7 +894,7 @@ ${bestellungen.map((b) => `- ${b.bestellnummer} bei ${b.haendler} (${b.tage_alt}
       },
     ],
     max_tokens: 500,
-  }));
+  });
 
   return response.choices[0]?.message?.content || "";
 }
@@ -885,7 +904,7 @@ export async function pruefePreisanomalien(
   aktuelleArtikel: { name: string; einzelpreis: number; menge: number }[],
   historischePreise: { name: string; preise: number[] }[]
 ): Promise<PreisAnomalieErgebnis> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     // R2/F4.2: numerischer Vergleich, kein Reasoning nötig — gpt-4o-mini reicht
     model: "gpt-5.5",
     messages: [
@@ -922,7 +941,7 @@ ${historischePreise.map((h) => `${h.name}: ${h.preise.map((p) => p.toFixed(2) + 
       },
     ],
     max_tokens: 1000,
-  }));
+  });
 
   const text = response.choices[0]?.message?.content || "{}";
   return safeParseGptJson<PreisAnomalieErgebnis>(text, { hat_anomalie: false, warnungen: [], zusammenfassung: "Preisanalyse konnte nicht durchgeführt werden." });
@@ -934,7 +953,7 @@ export async function erkenneHaendlerAusEmail(
   emailBetreff: string,
   erkannterHaendlerName: string | null
 ): Promise<{ name: string; domain: string; email_muster: string } | null> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     // R2/F4.2: einfache Domain-/Namens-Extraktion — gpt-4o-mini ausreichend
     model: "gpt-5.5",
     messages: [
@@ -963,7 +982,7 @@ Falls du den Händler nicht erkennen kannst, gib null zurück.`,
       },
     ],
     max_tokens: 300,
-  }));
+  });
 
   const text = response.choices[0]?.message?.content || "null";
   if (text.trim() === "null") return null;
@@ -983,7 +1002,7 @@ export async function erkenneSubunternehmerAusEmail(
   erkannterName: string | null,
   dokumentText: string | null
 ): Promise<{ firma: string; gewerk: string | null; email_muster: string; steuer_nr: string | null; iban: string | null } | null> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     // R2/F4.2: Text-Matching für SU-Firmen-Erkennung — gpt-4o-mini ausreichend
     model: "gpt-5.5",
     messages: [
@@ -1022,7 +1041,7 @@ Falls du den Subunternehmer nicht erkennen kannst, gib null zurück.`,
       },
     ],
     max_tokens: 400,
-  }));
+  });
 
   const text = response.choices[0]?.message?.content || "null";
   if (text.trim() === "null") return null;
@@ -1049,7 +1068,7 @@ export async function generiereWochenzusammenfassung(
     abweichende_bestellungen: { bestellnummer: string; haendler: string; problem: string }[];
   }
 ): Promise<WochenzusammenfassungErgebnis> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     model: "gpt-5.5",
     messages: [
       {
@@ -1089,7 +1108,7 @@ ${stats.abweichende_bestellungen.length > 0
       },
     ],
     max_tokens: 800,
-  }));
+  });
 
   const text = response.choices[0]?.message?.content || "{}";
   return safeParseGptJson<WochenzusammenfassungErgebnis>(text, { zusammenfassung: "Zusammenfassung konnte nicht erstellt werden.", dringend: [], highlights: [] });
@@ -1111,8 +1130,9 @@ export async function pruefeDuplikat(
     return { ist_duplikat: false, konfidenz: 1, duplikat_von: null, begruendung: "Keine vergleichbaren Bestellungen vorhanden." };
   }
 
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     model: "gpt-5.5",
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
@@ -1142,8 +1162,8 @@ Existierende Bestellungen (letzte 7 Tage, gleicher Händler):
 ${existierendeBestellungen.map((b) => `- ${b.bestellnummer} (${b.datum}): ${b.betrag}€, Artikel: ${JSON.stringify(b.artikel)}`).join("\n")}`,
       },
     ],
-    max_tokens: 500,
-  }));
+    max_tokens: 800,
+  });
 
   const text = response.choices[0]?.message?.content || "{}";
   return safeParseGptJson<DuplikatErgebnis>(text, { ist_duplikat: false, konfidenz: 0, duplikat_von: null, begruendung: "Parsing fehlgeschlagen" });
@@ -1161,7 +1181,7 @@ export interface KategorisierungErgebnis {
 export async function kategorisiereArtikel(
   artikel: { name: string; menge: number; einzelpreis: number }[]
 ): Promise<KategorisierungErgebnis> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     // R2/F4.2: Whitelist-Kategorien-Zuordnung — gpt-4o-mini ausreichend
     model: "gpt-5.5",
     messages: [
@@ -1195,7 +1215,7 @@ Gib NUR ein JSON-Objekt zurück:
       },
     ],
     max_tokens: 1000,
-  }));
+  });
 
   const text = response.choices[0]?.message?.content || "{}";
   return safeParseGptJson<KategorisierungErgebnis>(text, { kategorien: [], zusammenfassung: {} });
@@ -1241,7 +1261,7 @@ export async function priorisiereBestellungen(
   const restCount = Math.max(0, bestellungen.length - top.length);
   const restSummary = restCount > 0 ? `\n\nWeitere ${restCount} offene Bestellungen (niedrigere Priorität, nicht im Detail).` : "";
 
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     model: "gpt-5.5",
     messages: [
       {
@@ -1279,7 +1299,7 @@ Sortiere nach Score absteigend. Maximal 10 Bestellungen.`,
       },
     ],
     max_tokens: 1500,
-  }));
+  });
 
   const text = response.choices[0]?.message?.content || "{}";
   return safeParseGptJson<PriorisierungErgebnis>(text, { bestellungen: [], zusammenfassung: "Priorisierung konnte nicht durchgeführt werden." });
@@ -1358,7 +1378,7 @@ export async function fasseBestellungZusammen(
   abweichungen: { feld: string; artikel?: string; erwartet: string | number; gefunden: string | number }[],
   kommentare: { autor: string; text: string; datum: string }[]
 ): Promise<string> {
-  const response = await withRetry(() => openai.chat.completions.create({
+  const response = await chatCompletion({
     model: "gpt-5.5",
     messages: [
       {
@@ -1384,8 +1404,8 @@ ${kommentare.length > 0
   : "Keine Kommentare"}`,
       },
     ],
-    max_tokens: 300,
-  }));
+    max_tokens: 600,
+  });
 
   return response.choices[0]?.message?.content || "Zusammenfassung konnte nicht erstellt werden.";
 }

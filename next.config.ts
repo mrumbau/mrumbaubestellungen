@@ -42,7 +42,9 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.openai.com https://graph.microsoft.com https://login.microsoftonline.com https://vision.googleapis.com https://app.das-programm.io",
+              // 07.05.2026 — wss:// für Supabase Realtime ergänzt (sonst blockt
+              // CSP die /realtime/v1/websocket-Verbindung).
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.supabase.in wss://*.supabase.in https://api.openai.com https://graph.microsoft.com https://login.microsoftonline.com https://vision.googleapis.com https://app.das-programm.io",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

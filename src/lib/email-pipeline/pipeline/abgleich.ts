@@ -1,19 +1,16 @@
 /**
- * R5c — KI-Abgleich (3-Wege)
+ * KI-Abgleich (Mindestens Lieferschein + Rechnung).
  *
- * Aus webhook/email/route.ts (Z. 1658-1718) extrahiert.
+ * 07.05.2026 — Pflicht-Doku reduziert auf Lieferschein + Rechnung. Die
+ * Bestellbestätigung ist optional (wird durchgereicht falls vorhanden, KI
+ * nutzt sie für Cross-Check). Vorher mussten alle 3 Dokus da sein, was bei
+ * vielen Lieferanten (kein BB-Mailversand) den Abgleich nie auslöste.
  *
- * Wenn alle 3 Dokumente (Bestellbestätigung + Lieferschein + Rechnung)
- * für eine Material-Bestellung vorhanden sind, ruft GPT-4o den Abgleich
- * auf. Bei Abweichung: Status auf 'abweichung' setzen + Audit-Kommentar.
- *
- * Idempotent: Wenn schon ein Abgleich für die Bestellung existiert,
- * wird kein neuer angelegt.
+ * Idempotent: Wenn schon ein Abgleich existiert, wird kein neuer angelegt.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fuehreAbgleichDurch, type DokumentAnalyse } from "@/lib/openai";
-import { safeUpdateStatus } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
 
 export async function tryAbgleich(
@@ -23,14 +20,12 @@ export async function tryAbgleich(
   try {
     const { data: aktuelle } = await supabase
       .from("bestellungen")
-      .select("hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, status")
+      .select("hat_lieferschein, hat_rechnung, status")
       .eq("id", bestellungId)
       .maybeSingle();
 
-    if (!aktuelle?.hat_bestellbestaetigung || !aktuelle?.hat_lieferschein || !aktuelle?.hat_rechnung) {
-      return { ranAbgleich: false };
-    }
-    if (aktuelle.status === "abweichung") {
+    // Mindestanforderung: Lieferschein UND Rechnung
+    if (!aktuelle?.hat_lieferschein || !aktuelle?.hat_rechnung) {
       return { ranAbgleich: false };
     }
 
@@ -49,11 +44,12 @@ export async function tryAbgleich(
       .eq("bestellung_id", bestellungId)
       .in("typ", ["bestellbestaetigung", "lieferschein", "rechnung"]);
 
+    // BB optional, LS + RG Pflicht
     const bb = dokumente?.find((d) => d.typ === "bestellbestaetigung")?.ki_roh_daten as DokumentAnalyse | null;
     const ls = dokumente?.find((d) => d.typ === "lieferschein")?.ki_roh_daten as DokumentAnalyse | null;
     const re = dokumente?.find((d) => d.typ === "rechnung")?.ki_roh_daten as DokumentAnalyse | null;
 
-    if (!bb || !ls || !re) return { ranAbgleich: false };
+    if (!ls || !re) return { ranAbgleich: false };
 
     const ergebnis = await fuehreAbgleichDurch(bb, ls, re);
     await supabase.from("abgleiche").insert({
@@ -64,7 +60,8 @@ export async function tryAbgleich(
     });
 
     if (ergebnis.status === "abweichung") {
-      await safeUpdateStatus(supabase, bestellungId, "abweichung", "abgleich/result");
+      // Status-Wechsel auf "abweichung" wurde 07.05.2026 entfernt — Information
+      // bleibt im abgleiche-Record + UI zeigt "Abweichungen erkannt"-Banner.
       await supabase.from("kommentare").insert({
         bestellung_id: bestellungId,
         autor_kuerzel: "SYSTEM",
@@ -73,11 +70,12 @@ export async function tryAbgleich(
       });
       logInfo("webhook/email/abgleich", "Abweichung erkannt", {
         bestellungId, anzahl: ergebnis.abweichungen.length,
+        bb_vorhanden: !!bb,
       });
       return { ranAbgleich: true, status: "abweichung" };
     }
 
-    logInfo("webhook/email/abgleich", "OK", { bestellungId });
+    logInfo("webhook/email/abgleich", "OK", { bestellungId, bb_vorhanden: !!bb });
     return { ranAbgleich: true, status: "ok" };
   } catch (e) {
     logError("webhook/email/abgleich", "fehlgeschlagen", e);
