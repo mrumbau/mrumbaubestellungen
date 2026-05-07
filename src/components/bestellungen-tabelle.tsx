@@ -98,9 +98,24 @@ export function BestellungenTabelle({
   // Bestellungen kommen vom Server vollständig (oder bis HARD_CAP).
   // Filter+Sort+Pagination laufen alle hier — damit funktionieren Filter
   // korrekt über die Gesamt-Menge und Sort-Reihenfolge ist global.
+  // 07.05.2026 (v2) — Page-State in URL ?page=N persistiert. Beim Browser-Back
+  // von der Bestelldetail-Seite landet der User damit automatisch auf seiner
+  // letzten Page (statt Page 1). Filter/Sort liegen weiterhin im React-State —
+  // beim Wechsel wird der page-Param aus der URL entfernt (Reset auf Page 1).
   const PAGE_SIZE = 20;
-  const [currentPage, setCurrentPage] = useState(1);
   const totalCount = bestellungen.length;
+  const pageParam = searchParams.get("page");
+  const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
+  const setPageInUrl = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      if (page <= 1) params.delete("page");
+      else params.set("page", String(page));
+      const qs = params.toString();
+      router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   // Filters
   const filters = useTableFilters({
@@ -324,10 +339,12 @@ export function BestellungenTabelle({
     return sorted.slice(from, from + PAGE_SIZE);
   }, [sorted, safeCurrentPage]);
 
-  // Filter/Sort-Wechsel → Page 1. Realtime-Refresh hält Page erhalten
-  // (Bestellungen-Array ändert sich, aber Filter nicht → kein Reset).
+  // Filter/Sort-Wechsel → Page 1 (Page-Param aus URL entfernen).
+  // Realtime-Refresh hält Page erhalten (Bestellungen-Array ändert sich,
+  // aber Filter nicht → kein Reset).
   useEffect(() => {
-    setCurrentPage(1);
+    if (pageParam && pageParam !== "1") setPageInUrl(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter, sort]);
 
   const artCounts = useMemo(() => {
@@ -345,7 +362,7 @@ export function BestellungenTabelle({
   );
 
   function goToPage(page: number) {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    setPageInUrl(Math.max(1, Math.min(page, totalPages)));
   }
 
   async function handleQuickFreigabe(bestellungId: string) {

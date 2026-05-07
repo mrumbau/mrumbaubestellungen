@@ -63,7 +63,6 @@ export function BuchhaltungClient({
   // Jetzt: rows enthält ALLE freigegebenen (bis HARD_CAP) → Filter+Pagination
   // arbeiten auf der Gesamt-Menge.
   const PAGE_SIZE = 20;
-  const [currentPage, setCurrentPage] = useState(1);
   const totalCount = rows.length;
   const [suche, setSuche] = useState("");
   const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
@@ -91,6 +90,18 @@ export function BuchhaltungClient({
   const [showErweitert, setShowErweitert] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // 07.05.2026 — Page-State in URL ?page=N persistiert (Browser-Back von Detail
+  // landet wieder auf zuletzt gewählter Page).
+  const pageParam = searchParams.get("page");
+  const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
+  const setPageInUrl = (page: number) => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (page <= 1) params.delete("page");
+    else params.set("page", String(page));
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  };
 
   const [localRows, setLocalRows] = useState(rows);
 
@@ -122,9 +133,10 @@ export function BuchhaltungClient({
     safeCurrentPage * PAGE_SIZE,
   );
 
-  // Filter/Tab-Wechsel → Page 1 zurücksetzen
+  // Filter/Tab-Wechsel → Page 1 (Page-Param aus URL entfernen)
   useEffect(() => {
-    setCurrentPage(1);
+    if (pageParam && pageParam !== "1") setPageInUrl(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suche, tab, artFilter]);
 
   const summeOffen = offeneRows.reduce((sum, r) => sum + (r.betrag || 0), 0);
@@ -143,7 +155,7 @@ export function BuchhaltungClient({
     .sort((a, b) => new Date(a.faelligkeitsdatum!).getTime() - new Date(b.faelligkeitsdatum!).getTime())[0];
 
   function goToPage(page: number) {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    setPageInUrl(Math.max(1, Math.min(page, totalPages)));
   }
 
   function exportCSV() {
