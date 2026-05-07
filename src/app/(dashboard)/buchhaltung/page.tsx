@@ -45,7 +45,10 @@ export default async function BuchhaltungPage() {
           .from("dokumente")
           .select("id, bestellung_id, gesamtbetrag, faelligkeitsdatum, bezahlt_am, bezahlt_von, archiviert_am, bestellnummer_erkannt, storage_pfad, created_at")
           .in("bestellung_id", bestellIds)
-          .eq("typ", "rechnung"),
+          .eq("typ", "rechnung")
+          // Archivierte Rechnungen gehören ins Archiv-View, nicht in Buchhaltung.
+          // Spart Wire-Bytes + Client-Filter-Cycles bei wachsendem Datenvolumen.
+          .is("archiviert_am", null),
       ])
     : [{ data: [] as never[] }, { data: [] as never[] }];
 

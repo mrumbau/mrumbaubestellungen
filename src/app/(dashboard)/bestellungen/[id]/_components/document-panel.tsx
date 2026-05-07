@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert } from "@/components/ui/alert";
@@ -77,11 +77,9 @@ export function DocumentPanel({
 
   // Bei Tab-Wechsel zurück auf erstes Dokument
   // (sonst zeigt z.B. "Rechnung 2/2" → Wechsel zu Lieferschein → out-of-range).
-  const prevTabRef = useRef(activeTab);
-  if (prevTabRef.current !== activeTab) {
-    prevTabRef.current = activeTab;
-    if (sectionIndex !== 0) setSectionIndex(0);
-  }
+  useEffect(() => {
+    setSectionIndex(0);
+  }, [activeTab]);
 
   return (
     <div className="flex-1 card flex flex-col overflow-hidden relative">
@@ -191,7 +189,7 @@ export function DocumentPanel({
           className="flex items-center gap-1 px-3 py-2 border-b border-line-subtle bg-canvas overflow-x-auto scrollbar-hide"
         >
           <span className="text-[11px] text-foreground-subtle uppercase tracking-wide font-mono-amount mr-2 shrink-0">
-            {aktiveDokumente.length} {dokTabs.find((t) => t.key === activeTab)?.label}en
+            {aktiveDokumente.length} {pluralLabel(activeTab, aktiveDokumente.length)}
           </span>
           {aktiveDokumente.map((d, i) => {
             const isActive = i === safeIndex;
@@ -329,6 +327,23 @@ function getDokTabs(bestellungsart: Bestellungsart | null) {
     vorhanden: d.flag,
     icon: DOK_ICON_MAP[d.typ] || RechnungIcon,
   }));
+}
+
+// 07.05.2026 — Korrektes deutsches Plural pro Doku-Typ. Naive "+en"-Suffix
+// erzeugt "Lieferscheinen" statt "Lieferscheine".
+const PLURAL_LABEL: Record<string, { singular: string; plural: string }> = {
+  bestellbestaetigung: { singular: "Bestätigung", plural: "Bestätigungen" },
+  lieferschein: { singular: "Lieferschein", plural: "Lieferscheine" },
+  rechnung: { singular: "Rechnung", plural: "Rechnungen" },
+  versandbestaetigung: { singular: "Versandbestätigung", plural: "Versandbestätigungen" },
+  aufmass: { singular: "Aufmaß", plural: "Aufmaße" },
+  leistungsnachweis: { singular: "Leistungsnachweis", plural: "Leistungsnachweise" },
+};
+
+function pluralLabel(typ: string, count: number): string {
+  const map = PLURAL_LABEL[typ];
+  if (!map) return count === 1 ? "Dokument" : "Dokumente";
+  return count === 1 ? map.singular : map.plural;
 }
 
 function EmptyDocument({
