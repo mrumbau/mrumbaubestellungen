@@ -36,9 +36,12 @@ export interface CostBucket {
 
 /** USD pro 1M Tokens. Stand 2026-05. Anpassen wenn OpenAI-Preise ändern. */
 export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> = {
-  // Aktuell genutzt (Migration auf GPT-5.5 am 2026-05-04)
+  // Email-Pipeline (Reasoning für Multi-Doc-Logik)
   "gpt-5.5": { input: 5.00, output: 30.00 },
   "gpt-5.5-pro": { input: 30.00, output: 180.00 },
+  // CardScan (kein Reasoning nötig, json_schema strict garantiert Struktur)
+  "gpt-5-mini": { input: 0.25, output: 2.00 },
+  "gpt-5-nano": { input: 0.05, output: 0.40 },
   // Legacy — bleiben für Cost-Calc historischer Mails (vor Migration verarbeitet)
   "gpt-4o": { input: 2.50, output: 10.00 },
   "gpt-4o-mini": { input: 0.15, output: 0.60 },
