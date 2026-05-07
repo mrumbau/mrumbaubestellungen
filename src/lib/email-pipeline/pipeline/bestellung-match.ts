@@ -376,6 +376,14 @@ export interface ErweiterterMatchInput {
   analyseTypen: string[];
   /** Erkannte Nummern (für Cross-Validation) */
   dokumentNummern: string[];
+  /**
+   * 07.05.2026 — Stabile Auftragsnummer aus dem Doku, falls vorhanden.
+   * Wird für Strict-Konflikt-Check genutzt: wenn die Kandidat-Bestellung
+   * eine ANDERE Auftragsnummer hat, ist es definitiv eine andere Bestellung
+   * (nicht nur ein neueres Doku zur gleichen). Verhindert Raab-Karcher-
+   * Cross-Auftrags-Mismatches.
+   */
+  dokumentAuftragsnummer?: string | null;
   /** Erkannter Betrag (für ±15%-Validation) */
   erkannterBetrag: number | null;
   ctx: MatchContext;
@@ -386,7 +394,7 @@ export async function findByErweiterterMatch(
   supabase: SupabaseClient,
   input: ErweiterterMatchInput,
 ): Promise<{ bestellungId: string; hauptTyp: string } | null> {
-  const { analyseTypen, dokumentNummern, erkannterBetrag, ctx, bestellerKuerzel } = input;
+  const { analyseTypen, dokumentNummern, dokumentAuftragsnummer, erkannterBetrag, ctx, bestellerKuerzel } = input;
   if (analyseTypen.length === 0) return null;
 
   const TYP_FLAG: Record<string, string> = {
@@ -428,6 +436,21 @@ export async function findByErweiterterMatch(
 
   const match = kandidaten.find((k) => {
     if ((k as Record<string, unknown>)[flag]) return false;
+
+    // 07.05.2026 — STRICT Auftragsnummer-Konflikt-Check (Hard-Skip).
+    // Wenn beide eine auftragsnummer haben und sie sind unterschiedlich,
+    // ist es definitiv eine ANDERE Bestellung — auch wenn Bestellnummern
+    // sich fuzzy ähneln. Verhindert den Raab-Karcher-Cross-Auftrags-Bug
+    // (Rechnung mit auftragsnr=2030393220 wurde an Bestellung mit
+    // auftragsnr=2030485657 angedockt).
+    if (dokumentAuftragsnummer && k.auftragsnummer && dokumentAuftragsnummer !== k.auftragsnummer) {
+      logInfo("webhook/email/match", "Match abgelehnt: Auftragsnummer-Konflikt", {
+        kandidat_id: k.id,
+        kandidat_auftragsnummer: k.auftragsnummer,
+        dokument_auftragsnummer: dokumentAuftragsnummer,
+      });
+      return false;
+    }
 
     // R5c: Cross-Number-Validation jetzt FUZZY (war exakt)
     const kandidatNummern = [k.bestellnummer, k.auftragsnummer].filter((n): n is string => !!n);

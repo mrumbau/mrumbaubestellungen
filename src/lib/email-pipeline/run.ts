@@ -672,6 +672,28 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     existierendeBestellung = await findByFuzzyNumber(supabase, suchNummern, matchCtx);
   }
 
+  // 07.05.2026 — Auftragsnummer-Konflikt-Veto (Defense-in-Depth).
+  // Egal welcher Match-Pfad oben gegriffen hat (existing_bestellung_id-Hint,
+  // findByExactNumber, findByFuzzyNumber): wenn das eingehende Doku eine
+  // KONKRETE Auftragsnummer hat und die Match-Bestellung eine ANDERE konkrete
+  // Auftragsnummer hat → es ist eine andere Bestellung. Match verwerfen,
+  // sodass weiter unten eine neue Bestellung angelegt wird.
+  if (existierendeBestellung) {
+    const dokuAuftragsnr = analyseErgebnisse
+      .map((e) => e.analyse.auftragsnummer)
+      .find((n): n is string => !!n);
+    const bestellungAuftragsnr = (existierendeBestellung as unknown as { auftragsnummer?: string | null }).auftragsnummer;
+    if (dokuAuftragsnr && bestellungAuftragsnr && dokuAuftragsnr !== bestellungAuftragsnr) {
+      logInfo("webhook/email", "Match-Veto: Auftragsnummer-Konflikt → neue Bestellung statt Doku-Andocken", {
+        match_bestellung_id: existierendeBestellung.id,
+        match_auftragsnummer: bestellungAuftragsnr,
+        doku_auftragsnummer: dokuAuftragsnr,
+        email_betreff,
+      });
+      existierendeBestellung = null;
+    }
+  }
+
   // Duplikat-Typ-Check (gleicher Dokumenttyp existiert schon).
   //
   // Drei Fälle:
@@ -780,9 +802,14 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     if (analyseTypen.length > 0) {
       const dokumentNummern = [erkannteBestellnummer, erkannteAuftragsnummer].filter((n): n is string => !!n);
       const erkannterBetrag = analyseErgebnisse.find((e) => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag || null;
+      // Stabile Auftragsnummer aus den Anhang-Analysen für Strict-Konflikt-Check
+      const dokumentAuftragsnummer = analyseErgebnisse
+        .map((e) => e.analyse.auftragsnummer)
+        .find((n): n is string => !!n) ?? erkannteAuftragsnummer ?? null;
       const result = await findByErweiterterMatch(supabase, {
         analyseTypen,
         dokumentNummern,
+        dokumentAuftragsnummer,
         erkannterBetrag,
         ctx: matchCtx,
         bestellerKuerzel: bestellerKuerzelMutable,
@@ -1876,17 +1903,31 @@ async function propagateAnalyseFields(
     updateFields[FLAG_MAP[analyse.typ]] = true;
   }
 
-  // ----- Identifikatoren — fill-if-empty außer bei VB -----
+  // ----- Identifikatoren — fill-if-empty (BEIDE Modi) -----
+  // 07.05.2026 — Vorher überschrieb der Doku-Modus bestellnummer/auftrags-/
+  // lieferscheinnummer mit jedem neuen Doku. Folge: die Bestellungs-Identität
+  // wechselte mit jedem PDF, und Match-Heuristiken konnten falsche Dokus
+  // andocken (Raab-Karcher-Cross-Auftrags-Bug 28.04.).
+  // Jetzt: fill-if-empty in beiden Modi. Wer als ERSTES schreibt gewinnt —
+  // typischerweise die Bestellbestätigung mit der echten Auftragsnummer.
+  // Plus: bei Konflikt (neue Auftragsnr ≠ vorhandene) → log warning für Audit.
   if (analyse.typ !== "versandbestaetigung") {
-    // Im Body-Mode immer fill-if-empty; im Doku-Mode überschreibt aus Doku
-    const fillOrOverwrite = (field: keyof ExistingRow, value: string | null | undefined) => {
+    const fillIfEmpty = (field: keyof ExistingRow, value: string | null | undefined) => {
       if (!value) return;
-      if (options.mode === "body" && existing[field]) return;
+      if (existing[field]) {
+        // Konflikt-Erkennung — ist das wirklich derselbe Vorgang?
+        if (existing[field] !== value) {
+          logInfo("webhook/email/propagate", `Konflikt ${field}: existing="${existing[field]}" vs neu="${value}" — bleibt existing`, {
+            bestellungId, doku_typ: analyse.typ,
+          });
+        }
+        return;
+      }
       updateFields[field] = value;
     };
-    fillOrOverwrite("bestellnummer", analyse.bestellnummer);
-    fillOrOverwrite("auftragsnummer", analyse.auftragsnummer);
-    fillOrOverwrite("lieferscheinnummer", analyse.lieferscheinnummer);
+    fillIfEmpty("bestellnummer", analyse.bestellnummer);
+    fillIfEmpty("auftragsnummer", analyse.auftragsnummer);
+    fillIfEmpty("lieferscheinnummer", analyse.lieferscheinnummer);
   }
 
   // ----- Betrag — RG überschreibt im Doku-Mode, sonst fill-if-empty -----
