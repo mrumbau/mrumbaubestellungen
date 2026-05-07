@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface NeuerHaendler {
   id: string;
@@ -18,6 +19,7 @@ export function DashboardNeueHaendler({
 }) {
   const [items, setItems] = useState(haendler);
   const [loading, setLoading] = useState<string | null>(null);
+  const [verwerfenId, setVerwerfenId] = useState<string | null>(null);
 
   if (items.length === 0) return null;
 
@@ -36,6 +38,23 @@ export function DashboardNeueHaendler({
       setLoading(null);
     }
   }
+
+  async function verwerfen(haendlerId: string) {
+    setLoading(haendlerId);
+    setVerwerfenId(null);
+    try {
+      const res = await fetch(`/api/haendler/${haendlerId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setItems((prev) => prev.filter((h) => h.id !== haendlerId));
+      }
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  const verwerfenItem = items.find((h) => h.id === verwerfenId);
 
   return (
     <div className="card p-5">
@@ -90,11 +109,36 @@ export function DashboardNeueHaendler({
                   </svg>
                   Bearbeiten
                 </Link>
+                <button
+                  onClick={() => setVerwerfenId(h.id)}
+                  disabled={loading === h.id}
+                  title="Diesen automatisch erkannten Händler verwerfen — er war keine echte Lieferanten-Mail"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error bg-error-bg border border-error-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Verwerfen
+                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!verwerfenId}
+        onCancel={() => setVerwerfenId(null)}
+        onConfirm={() => verwerfenId && verwerfen(verwerfenId)}
+        title="Händler-Erkennung verwerfen"
+        message={
+          verwerfenItem
+            ? `"${verwerfenItem.name}" (${verwerfenItem.domain}) wurde fälschlich als Händler erkannt — Eintrag löschen?`
+            : ""
+        }
+        confirmLabel="Verwerfen"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -1419,24 +1419,93 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   }
 
   // 17. Händler-Auto-Erkennung
+  // 07.05.2026 — Cross-Table-Fuzzy-Match VOR dem Insert eines neuen Händlers.
+  // Vorher wurde nur in `haendler` per exact-domain-match geprüft. Folge: ein
+  // bekannter Subunternehmer oder Abo-Anbieter (Hold & Spada, Microsoft etc.),
+  // der mit einer leicht abweichenden Absenderadresse mailt, wurde als neuer
+  // "Händler" angelegt — und die Bestellung rutschte in eine falsche Kategorie
+  // weil die Klassifikation pro Kontakt neu lief.
+  // Jetzt: prüfen wir gegen alle drei Anbieter-Tabellen (haendler / subunter-
+  // nehmer / abo_anbieter) auf Domain ODER Email-Adresse. Bei Match an die
+  // existierende Entity andocken (email_absender-Array updaten), KEIN Insert.
   if (!haendler && analyseErgebnisse.length > 0 && Date.now() - startTime < 50_000) {
     try {
       const erkannterHaendlerName = analyseErgebnisse.find((e) => e.analyse.haendler)?.analyse.haendler || null;
       const neuerHaendler = await erkenneHaendlerAusEmail(email_absender, email_betreff, erkannterHaendlerName);
       if (neuerHaendler) {
-        const { data: existing } = await supabase
-          .from("haendler").select("id").eq("domain", neuerHaendler.domain).limit(1);
-        if (!existing || existing.length === 0) {
+        const cleanDomain = neuerHaendler.domain.toLowerCase();
+        const cleanAbsender = absenderAdresse.toLowerCase();
+
+        // Cross-Table-Match: prüft Domain, exact-Adresse und *@domain-Wildcards
+        // in haendler, subunternehmer und abo_anbieter parallel.
+        const matchesEmailArray = (arr: string[] | null | undefined): boolean =>
+          (arr || []).some((entry) => {
+            const e = entry.toLowerCase().trim();
+            if (e.startsWith("*@")) return cleanAbsender.endsWith("@" + e.slice(2));
+            return e === cleanAbsender || e === cleanDomain;
+          });
+
+        const [haendlerCheck, suCheck, aboCheck] = await Promise.all([
+          supabase.from("haendler").select("id, name, domain, email_absender").eq("domain", cleanDomain).limit(5),
+          supabase.from("subunternehmer").select("id, firma, email_absender").limit(500),
+          supabase.from("abo_anbieter").select("id, name, domain, email_absender").limit(500),
+        ]);
+
+        const existingHaendler = (haendlerCheck.data || [])[0]
+          ?? (haendlerCheck.data || []).find((h) => matchesEmailArray(h.email_absender));
+        const existingSu = (suCheck.data || []).find((s) => matchesEmailArray(s.email_absender));
+        const existingAbo = (aboCheck.data || []).find((a) =>
+          a.domain?.toLowerCase() === cleanDomain || matchesEmailArray(a.email_absender)
+        );
+
+        if (existingSu) {
+          logInfo("webhook/email", `Cross-Match: bekannter Subunternehmer (${existingSu.firma}) — keine neue Händler-Anlage`, {
+            absender: cleanAbsender, domain: cleanDomain,
+          });
+          // bestellungsart auf SU korrigieren falls KI sie als material klassifiziert hat
+          await supabase.from("bestellungen")
+            .update({
+              bestellungsart: "subunternehmer",
+              subunternehmer_id: existingSu.id,
+              haendler_name: existingSu.firma,
+            })
+            .eq("id", bestellungId);
+          // Plus: neuen Absender in das email_absender-Array des SU mergen,
+          // damit künftige Mails sofort gematcht werden.
+          if (!matchesEmailArray(existingSu.email_absender)) {
+            const next = Array.from(new Set([...(existingSu.email_absender || []), cleanAbsender]));
+            await supabase.from("subunternehmer").update({ email_absender: next }).eq("id", existingSu.id);
+          }
+        } else if (existingAbo) {
+          logInfo("webhook/email", `Cross-Match: bekannter Abo-Anbieter (${existingAbo.name}) — keine neue Händler-Anlage`, {
+            absender: cleanAbsender, domain: cleanDomain,
+          });
+          await supabase.from("bestellungen")
+            .update({ bestellungsart: "abo", haendler_name: existingAbo.name })
+            .eq("id", bestellungId);
+          if (!matchesEmailArray(existingAbo.email_absender)) {
+            const next = Array.from(new Set([...(existingAbo.email_absender || []), cleanAbsender]));
+            await supabase.from("abo_anbieter").update({ email_absender: next }).eq("id", existingAbo.id);
+          }
+        } else if (existingHaendler) {
+          // Bekannter Händler — Absender ergänzen, kein neuer Insert
+          if (!matchesEmailArray(existingHaendler.email_absender)) {
+            const next = Array.from(new Set([...(existingHaendler.email_absender || []), cleanAbsender]));
+            await supabase.from("haendler").update({ email_absender: next }).eq("id", existingHaendler.id);
+            logInfo("webhook/email", `Existing Händler ${existingHaendler.name} um Absender ${cleanAbsender} ergänzt`, {});
+          }
+        } else {
+          // Wirklich neu — anlegen
           await supabase.from("haendler").insert({
             name: neuerHaendler.name,
-            domain: neuerHaendler.domain,
+            domain: cleanDomain,
             email_absender: [neuerHaendler.email_muster],
             url_muster: [],
           });
           await supabase.from("bestellungen")
             .update({ haendler_name: neuerHaendler.name })
             .eq("id", bestellungId);
-          logInfo("webhook/email", `Neuer Händler: ${neuerHaendler.name}`, { domain: neuerHaendler.domain });
+          logInfo("webhook/email", `Neuer Händler: ${neuerHaendler.name}`, { domain: cleanDomain });
         }
       }
     } catch (err) {

@@ -22,12 +22,14 @@ export default async function DashboardLayout({
       >
         Zum Hauptinhalt springen
       </a>
-      {/* h-dvh statt min-h-dvh: outer Container = exakte Viewport-Höhe, scrollt
-          selbst NICHT. main übernimmt das vertikale Scrollen, Sidebar bleibt
-          fix sichtbar (eigene flex-stretched Höhe = Viewport). */}
-      <div className="flex h-dvh overflow-hidden bg-canvas">
+      {/* min-h-dvh + sticky Sidebar: Outer-Page-Scroll bleibt erhalten (für
+          Pages mit `h-full`-Wrapper wie Bestelldetail), Sidebar bleibt aber
+          sichtbar weil sie sticky am Top hängt. Saubereres Pattern als
+          h-dvh+overflow-hidden, das Detail-Layouts mit eigener Scroll-Logic
+          zerschießt. */}
+      <div className="flex min-h-dvh bg-canvas">
         <Sidebar profil={profil} />
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto p-4 pt-16 md:p-8 md:pt-8 focus:outline-none">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 p-4 pt-16 md:p-8 md:pt-8 focus:outline-none">{children}</main>
       </div>
     </ToastProvider>
   );

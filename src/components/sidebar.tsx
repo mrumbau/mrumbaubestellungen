@@ -236,8 +236,10 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         </div>
       )}
 
-      {/* Desktop Sidebar — h-full + intern scrollbar falls Inhalt > Viewport */}
-      <aside className="hidden md:flex w-60 bg-sidebar text-white flex-col shrink-0 border-r border-white/[0.06] h-full overflow-y-auto">
+      {/* Desktop Sidebar — sticky am Top: Outer-Page scrollt normal, Sidebar
+          bleibt fix sichtbar. h-dvh garantiert volle Viewport-Höhe; intern
+          overflow-y-auto falls Nav-Liste > Viewport. */}
+      <aside className="hidden md:flex w-60 bg-sidebar text-white flex-col shrink-0 border-r border-white/[0.06] sticky top-0 h-dvh overflow-y-auto self-start">
         {sidebarContent}
       </aside>
     </>
