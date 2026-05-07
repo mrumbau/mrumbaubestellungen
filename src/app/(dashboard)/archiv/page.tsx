@@ -25,7 +25,7 @@ export default async function ArchivPage() {
   let materialQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
+      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
     )
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "material")
@@ -35,7 +35,7 @@ export default async function ArchivPage() {
   let suQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
+      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
     )
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "subunternehmer")
@@ -45,7 +45,7 @@ export default async function ArchivPage() {
   let aboQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
+      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, bezahlt_am, bezahlt_von, bestellungsart, projekt_id, projekt_name, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, subunternehmer_id, archiviert_am"
     )
     .not("archiviert_am", "is", null)
     .eq("bestellungsart", "abo")

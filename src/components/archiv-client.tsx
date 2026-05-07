@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
-import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
+import { DOKUMENT_CONFIG, displayBestellnummer } from "@/lib/bestellung-utils";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BulkToolbar, Button, EmptyState as UIEmptyState } from "@/components/ui";
 import { IconTrash, IconFolderOpen } from "@/components/ui/icons";
@@ -28,6 +28,8 @@ interface ArchivedProjekt {
 interface PaidBestellung {
   id: string;
   bestellnummer: string | null;
+  auftragsnummer?: string | null;
+  lieferscheinnummer?: string | null;
   haendler_name: string | null;
   besteller_kuerzel: string;
   besteller_name: string;
@@ -790,7 +792,7 @@ function ProjekteTab({
                             }`}
                           />
                           <span className="font-mono-amount text-xs font-semibold text-foreground group-hover/row:text-brand transition-colors">
-                            {o.bestellnummer || "Ohne Nr."}
+                            {displayBestellnummer(o)}
                           </span>
                           <span className="text-xs text-foreground-muted truncate">{o.haendler_name || o.subunternehmer_firma || ""}</span>
                           {o.bestellungsart === "subunternehmer" && (
@@ -995,7 +997,7 @@ function OrderRow({
         )}
         <td className="px-4 py-3.5">
           <span className="font-mono-amount font-semibold text-brand">
-            {order.bestellnummer || "–"}
+            {displayBestellnummer(order)}
           </span>
         </td>
         <td className="px-4 py-3.5 text-foreground">

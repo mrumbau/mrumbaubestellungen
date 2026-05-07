@@ -37,11 +37,13 @@ import {
 } from "@/components/ui/icons";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
-import type { Bestellungsart } from "@/lib/bestellung-utils";
+import { displayBestellnummer, type Bestellungsart } from "@/lib/bestellung-utils";
 
 interface Bestellung {
   id: string;
   bestellnummer: string | null;
+  auftragsnummer?: string | null;
+  lieferscheinnummer?: string | null;
   haendler_name: string | null;
   besteller_kuerzel: string;
   besteller_name: string;
@@ -306,8 +308,8 @@ export function BestellungenTabelle({
       let bv: string | number | null | undefined;
       switch (sort.key) {
         case "bestellnummer":
-          av = a.bestellnummer ?? "";
-          bv = b.bestellnummer ?? "";
+          av = displayBestellnummer(a);
+          bv = displayBestellnummer(b);
           break;
         case "haendler_name":
           av = (a.haendler_name || "").toLowerCase();
@@ -499,7 +501,7 @@ export function BestellungenTabelle({
             onClick={(e) => e.stopPropagation()}
             className="font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
           >
-            {b.bestellnummer || "–"}
+            {displayBestellnummer(b)}
             {b.mahnung_am && (
               <span
                 className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold"
@@ -752,7 +754,7 @@ export function BestellungenTabelle({
               }}
               disabled={isLoading}
               title="Rechnung freigeben"
-              aria-label={`Rechnung freigeben für ${b.bestellnummer || "Bestellung"}`}
+              aria-label={`Rechnung freigeben für ${displayBestellnummer(b)}`}
               className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground-muted hover:text-status-freigegeben hover:bg-success-bg transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <IconCheck className="w-4 h-4" />
@@ -948,7 +950,7 @@ export function BestellungenTabelle({
           selection={selectMode ? selected : undefined}
           onSelectionChange={selectMode ? setSelected : undefined}
           getSelectionAriaLabel={(b) =>
-            `Bestellung ${b.bestellnummer || "ohne Nummer"} auswählen`
+            `Bestellung ${displayBestellnummer(b)} auswählen`
           }
           sort={sort}
           onSortChange={setSort}

@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BuchhaltungClient } from "@/components/buchhaltung-client";
+import { displayBestellnummer } from "@/lib/bestellung-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function BuchhaltungPage() {
     supabase
       .from("bestellungen")
       .select(
-        "id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+        "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
       )
       .eq("status", "freigegeben")
       .order("updated_at", { ascending: false })
@@ -73,8 +74,10 @@ export default async function BuchhaltungPage() {
       id: r.id,
       // Backwards-Compat-Feld für den Client (war früher bestellung-id)
       bestellung_id: r.bestellung_id,
-      // Rechnungsnummer aus dem Doku, fällt zurück auf Bestellnr. der Bestellung
-      bestellnummer: r.bestellnummer_erkannt || b.bestellnummer,
+      // 08.05.2026 — Anzeige-Priorität pro Buchhaltungs-Zeile:
+      // Rechnungsnummer aus dem Doku (= Buchungsbeleg) > displayBestellnummer
+      // der Bestellung (Auftragsnr/Bestellnr, NIE LS-Nr).
+      bestellnummer: r.bestellnummer_erkannt || displayBestellnummer(b),
       haendler_name: b.haendler_name,
       // Betrag PER RECHNUNG (statt Sammel-Betrag der Bestellung)
       betrag: r.gesamtbetrag ?? b.betrag,

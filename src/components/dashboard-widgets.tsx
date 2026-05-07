@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { TimeRangePicker, type TimeRange } from "@/components/ui/time-range-picker";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
+import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
 import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
@@ -20,6 +21,8 @@ import { formatDatum, formatBetrag } from "@/lib/formatters";
 interface BestellungItem {
   id: string;
   bestellnummer: string | null;
+  auftragsnummer?: string | null;
+  lieferscheinnummer?: string | null;
   haendler_name: string | null;
   besteller_name: string;
   besteller_kuerzel: string;
@@ -877,7 +880,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                           <AktionIcon status={b.status} />
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
-                              <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
+                              <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                               <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                             </p>
                             <p className="text-[11px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
@@ -933,7 +936,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                       <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-all group">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
-                            <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
+                            <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                             <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                           </p>
                           <p className="text-[11px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
