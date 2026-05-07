@@ -89,6 +89,29 @@ export const GEWERKE = [
 
 export type Gewerk = (typeof GEWERKE)[number];
 
+/**
+ * Display-Priorität für die Bestellungs-Anzeige in der UI.
+ *
+ * 08.05.2026 — Reihenfolge: Auftragsnummer > Bestellnummer (sofern KEINE
+ * Lieferscheinnummer) > "Ohne Nr.". Lieferscheinnummern dürfen niemals als
+ * Hauptidentifikation angezeigt werden, weil eine Bestellung mehrere LS
+ * haben kann und die LS-Nr keine stabile Bestell-Identität ist.
+ *
+ * Defense-in-Depth gegen historische Daten in denen die Pipeline die LS-Nr
+ * fälschlich als bestellnummer gesetzt hat.
+ */
+export function displayBestellnummer(b: {
+  bestellnummer?: string | null;
+  auftragsnummer?: string | null;
+  lieferscheinnummer?: string | null;
+}): string {
+  if (b.auftragsnummer) return b.auftragsnummer;
+  if (b.bestellnummer && b.bestellnummer !== b.lieferscheinnummer) {
+    return b.bestellnummer;
+  }
+  return "Ohne Nr.";
+}
+
 // =====================================================================
 // Status-Berechnung (dynamisch nach Bestellungsart)
 // =====================================================================

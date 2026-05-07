@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getStatusConfig } from "@/lib/status-config";
-import { DOKUMENT_CONFIG, type Bestellungsart } from "@/lib/bestellung-utils";
+import { DOKUMENT_CONFIG, type Bestellungsart, displayBestellnummer } from "@/lib/bestellung-utils";
 import {
   IconArrowLeft,
   IconBuilding,
@@ -25,6 +25,8 @@ export function DetailHeader({
 }: {
   bestellung: Bestellung & {
     bestellnummer: string | null;
+    auftragsnummer?: string | null;
+    lieferscheinnummer?: string | null;
     haendler_name: string | null;
     besteller_name: string;
     betrag: number | null;
@@ -72,7 +74,7 @@ export function DetailHeader({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="font-headline text-[22px] md:text-[24px] tracking-tight text-foreground">
-                {bestellung.bestellnummer || "Ohne Nr."}
+                {displayBestellnummer(bestellung)}
               </h1>
               <span className={`status-tag ${statusConfig.bg} ${statusConfig.text}`}>
                 <span

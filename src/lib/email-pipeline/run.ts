@@ -926,10 +926,28 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         });
       }
 
+      // 08.05.2026 — Bestellnummer-Priorität: Auftragsnummer > Bestellnummer
+      // (aus Subject) > Rechnungsnummer (aus Doku). NIEMALS Lieferscheinnummer.
+      // Auftragsnummer ist die stabilste Identifikation einer Bestellung
+      // (bleibt über alle Doku-Typen gleich); Bestellnummer aus Subject kann
+      // bei Rechnungs-Mails auch eine Rechnungsnummer sein.
+      const dokuAuftragsnr = analyseErgebnisse
+        .map((e) => e.analyse.auftragsnummer)
+        .find((n): n is string => !!n);
+      const dokuRechnungsnr = analyseErgebnisse
+        .find((e) => e.analyse.typ === "rechnung")?.analyse.bestellnummer;
+      const initialeBestellnummer =
+        dokuAuftragsnr
+        ?? erkannteAuftragsnummer
+        ?? erkannteBestellnummer
+        ?? dokuRechnungsnr
+        ?? null;
+
       const { data: neue, error: insertError } = await supabase
         .from("bestellungen")
         .insert({
-          bestellnummer: erkannteBestellnummer,
+          bestellnummer: initialeBestellnummer,
+          auftragsnummer: dokuAuftragsnr ?? erkannteAuftragsnummer ?? null,
           haendler_id: haendler?.id || null,
           haendler_name: erkannterSubunternehmer?.firma || haendlerName,
           besteller_kuerzel: bestellerKuerzelMutable,
@@ -1903,19 +1921,18 @@ async function propagateAnalyseFields(
     updateFields[FLAG_MAP[analyse.typ]] = true;
   }
 
-  // ----- Identifikatoren — fill-if-empty (BEIDE Modi) -----
-  // 07.05.2026 — Vorher überschrieb der Doku-Modus bestellnummer/auftrags-/
-  // lieferscheinnummer mit jedem neuen Doku. Folge: die Bestellungs-Identität
-  // wechselte mit jedem PDF, und Match-Heuristiken konnten falsche Dokus
-  // andocken (Raab-Karcher-Cross-Auftrags-Bug 28.04.).
-  // Jetzt: fill-if-empty in beiden Modi. Wer als ERSTES schreibt gewinnt —
-  // typischerweise die Bestellbestätigung mit der echten Auftragsnummer.
-  // Plus: bei Konflikt (neue Auftragsnr ≠ vorhandene) → log warning für Audit.
+  // ----- Identifikatoren — fill-if-empty + LS-Upgrade-Logik -----
+  // 07./08.05.2026 — fill-if-empty in beiden Modi (Doku + Body). Plus:
+  // bestellnummer wird **upgegradet** wenn aktueller Wert eine Lieferschein-
+  // nummer ist (= identisch mit existing.lieferscheinnummer) und ein besserer
+  // Wert verfügbar ist (Auftrags-/Bestell-/Rechnungsnummer aus dem Doku).
+  // Begründung: Pipeline-Vorgänger setzte bei Lieferschein-Mails die LS-Nr
+  // als bestellnummer — semantisch falsch, weil eine Bestellung mehrere LS
+  // haben kann und die LS-Nr keine stabile Bestell-Identität ist.
   if (analyse.typ !== "versandbestaetigung") {
     const fillIfEmpty = (field: keyof ExistingRow, value: string | null | undefined) => {
       if (!value) return;
       if (existing[field]) {
-        // Konflikt-Erkennung — ist das wirklich derselbe Vorgang?
         if (existing[field] !== value) {
           logInfo("webhook/email/propagate", `Konflikt ${field}: existing="${existing[field]}" vs neu="${value}" — bleibt existing`, {
             bestellungId, doku_typ: analyse.typ,
@@ -1925,7 +1942,24 @@ async function propagateAnalyseFields(
       }
       updateFields[field] = value;
     };
-    fillIfEmpty("bestellnummer", analyse.bestellnummer);
+
+    // bestellnummer-Upgrade: wenn aktueller Wert die LS-Nr ist, eine bessere
+    // Identifikation einsetzen (Auftragsnummer > Bestellnr > Rechnungsnr).
+    const aktBestellnr = existing.bestellnummer;
+    const ls = existing.lieferscheinnummer;
+    const istBestellnummerLsNr = !!aktBestellnr && !!ls && aktBestellnr === ls;
+    if (istBestellnummerLsNr) {
+      const besserNr = analyse.auftragsnummer || analyse.bestellnummer;
+      if (besserNr && besserNr !== aktBestellnr) {
+        updateFields.bestellnummer = besserNr;
+        logInfo("webhook/email/propagate", `bestellnummer upgegradet: LS-Nr "${aktBestellnr}" → "${besserNr}"`, {
+          bestellungId, doku_typ: analyse.typ,
+        });
+      }
+    } else {
+      fillIfEmpty("bestellnummer", analyse.bestellnummer);
+    }
+
     fillIfEmpty("auftragsnummer", analyse.auftragsnummer);
     fillIfEmpty("lieferscheinnummer", analyse.lieferscheinnummer);
   }
