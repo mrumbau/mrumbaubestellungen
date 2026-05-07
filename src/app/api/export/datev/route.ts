@@ -58,72 +58,106 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Ungültige Projekt-ID" }, { status: 400 });
     }
 
-    // Freigegebene Bestellungen im Zeitraum laden
+    // 07.05.2026 — DATEV-Export pro RECHNUNGS-DOKUMENT statt pro Bestellung.
+    // Sammel-Aufträge mit Teil-Rechnungen erzeugen jetzt n DATEV-Buchungssätze
+    // (steuerlich korrekt: pro Rechnungsbeleg ein Buchungssatz mit eigener
+    // Rechnungsnummer / Fälligkeit / MwSt). Bisher war es 1 Sammel-Buchungssatz
+    // mit dem aggregierten bestellungen.betrag — falsch in DATEV.
     let query = supabase
-      .from("bestellungen")
-      .select("id, bestellnummer, haendler_name, betrag, projekt_name, created_at, updated_at, bestellungsart, bestelldatum, faelligkeitsdatum")
-      .eq("status", "freigegeben")
-      .order("updated_at", { ascending: true });
+      .from("dokumente")
+      .select(
+        "id, bestellung_id, gesamtbetrag, netto, mwst, faelligkeitsdatum, bestellnummer_erkannt, created_at, " +
+        "bestellung:bestellungen!inner(id, bestellnummer, haendler_name, projekt_name, projekt_id, betrag, created_at, updated_at, bestellungsart, bestelldatum, faelligkeitsdatum, status)",
+      )
+      .eq("typ", "rechnung")
+      .eq("bestellung.status", "freigegeben")
+      .order("created_at", { ascending: true });
 
     if (datumBasis === "faelligkeit") {
-      // Nur Bestellungen mit gesetztem Fälligkeitsdatum im Zeitraum
+      // Filter pro Doku-Fälligkeit (jede Rechnung hat ihre eigene)
       query = query
         .gte("faelligkeitsdatum", von)
         .lte("faelligkeitsdatum", bis)
         .not("faelligkeitsdatum", "is", null);
     } else if (datumBasis === "bestellung") {
       query = query
-        .gte("bestelldatum", von)
-        .lte("bestelldatum", bis)
-        .not("bestelldatum", "is", null);
+        .gte("bestellung.bestelldatum", von)
+        .lte("bestellung.bestelldatum", bis)
+        .not("bestellung.bestelldatum", "is", null);
     } else {
+      // freigabe = updated_at der Bestellung
       query = query
-        .gte("updated_at", `${von}T00:00:00`)
-        .lte("updated_at", `${bis}T23:59:59`);
+        .gte("bestellung.updated_at", `${von}T00:00:00`)
+        .lte("bestellung.updated_at", `${bis}T23:59:59`);
     }
 
     if (projektId) {
-      query = query.eq("projekt_id", projektId);
+      query = query.eq("bestellung.projekt_id", projektId);
     }
 
-    const { data: bestellungen, error } = await query;
+    const { data: rechnungsDokumente, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: "Datenbankfehler" }, { status: 500 });
     }
-
-    if (!bestellungen || bestellungen.length === 0) {
+    if (!rechnungsDokumente || rechnungsDokumente.length === 0) {
       return NextResponse.json({ error: "Keine Buchungen im gewählten Zeitraum" }, { status: 404 });
     }
 
-    // Rechnungs-Dokumente laden für Netto/MwSt Details
-    const bestellIds = bestellungen.map((b) => b.id);
-    const { data: rechnungen } = await supabase
-      .from("dokumente")
-      .select("bestellung_id, netto, mwst, gesamtbetrag")
-      .in("bestellung_id", bestellIds)
-      .eq("typ", "rechnung");
+    type RechnungsDoku = {
+      id: string;
+      bestellung_id: string;
+      gesamtbetrag: number | null;
+      netto: number | null;
+      mwst: number | null;
+      faelligkeitsdatum: string | null;
+      bestellnummer_erkannt: string | null;
+      created_at: string;
+      bestellung: {
+        id: string;
+        bestellnummer: string | null;
+        haendler_name: string | null;
+        projekt_name: string | null;
+        betrag: number | null;
+        created_at: string;
+        updated_at: string;
+        bestellungsart: string | null;
+        bestelldatum: string | null;
+        faelligkeitsdatum: string | null;
+      };
+    };
 
-    const rechnungMap = new Map(
-      (rechnungen || []).map((r) => [r.bestellung_id, r])
-    );
-
-    // Daten für Export aufbereiten
-    const exportDaten: FreigegebeneRechnung[] = bestellungen.map((b) => {
-      const rechnung = rechnungMap.get(b.id);
+    // Daten für Export aufbereiten — pro Rechnungs-Dokument ein Eintrag
+    const exportDaten: FreigegebeneRechnung[] = (rechnungsDokumente as unknown as RechnungsDoku[]).map((d) => {
+      const b = d.bestellung as unknown as {
+        id: string;
+        bestellnummer: string | null;
+        haendler_name: string | null;
+        projekt_name: string | null;
+        betrag: number | null;
+        created_at: string;
+        updated_at: string;
+        bestellungsart: string | null;
+        bestelldatum: string | null;
+        faelligkeitsdatum: string | null;
+      };
       return {
-        id: b.id,
-        bestellnummer: b.bestellnummer,
+        // id = Doku-id (eindeutig pro Buchungssatz)
+        id: d.id,
+        // Rechnungsnr aus dem Doku, fallback Bestellnr
+        bestellnummer: d.bestellnummer_erkannt || b.bestellnummer,
         haendler_name: b.haendler_name,
-        betrag: b.betrag,
+        // Betrag pro Rechnung
+        betrag: d.gesamtbetrag ?? b.betrag,
         projekt_name: b.projekt_name,
         created_at: b.created_at,
         updated_at: b.updated_at,
-        netto: rechnung?.netto || null,
-        mwst: rechnung?.mwst || null,
-        bestellungsart: b.bestellungsart || "material",
+        netto: d.netto ?? null,
+        mwst: d.mwst ?? null,
+        bestellungsart: (b.bestellungsart as "material" | "subunternehmer" | "abo") || "material",
         bestelldatum: b.bestelldatum,
-        faelligkeitsdatum: b.faelligkeitsdatum,
+        // Fälligkeit pro Rechnung (mit Fallback auf Bestellung)
+        faelligkeitsdatum: d.faelligkeitsdatum ?? b.faelligkeitsdatum,
       };
     });
 

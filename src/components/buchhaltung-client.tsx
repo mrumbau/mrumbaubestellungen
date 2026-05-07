@@ -6,7 +6,11 @@ import { formatDatum, formatBetrag } from "@/lib/formatters";
 import type { Rolle } from "@/lib/auth";
 
 interface BuchhaltungRow {
+  // 07.05.2026 — id ist jetzt die DOKUMENT-ID (Rechnungs-Beleg), nicht mehr
+  // die Bestellungs-ID. Eine Bestellung mit n Teil-Rechnungen erscheint als
+  // n Zeilen, jede mit eigener Doku-id.
   id: string;
+  bestellung_id: string;
   bestellnummer: string | null;
   haendler_name: string | null;
   betrag: number | null;
@@ -217,22 +221,21 @@ export function BuchhaltungClient({
 
   const kannBezahlen = rolle === "buchhaltung" || rolle === "admin";
 
-  async function toggleBezahlt(bestellungId: string, aktuellBezahlt: boolean) {
-    setBezahltLoading(bestellungId);
+  // 07.05.2026 — toggleBezahlt arbeitet jetzt auf DOKUMENT-Ebene (eine
+  // Bestellung kann mehrere Rechnungen haben, jede mit eigenem Bezahlt-Status).
+  // row.id ist die Doku-ID, der Endpoint /api/dokumente/[id]/bezahlt
+  // markiert die Rechnung; ein DB-Trigger synchronisiert bestellung.bezahlt_am.
+  async function toggleBezahlt(rowId: string, aktuellBezahlt: boolean) {
+    setBezahltLoading(rowId);
     setBezahltError(null);
 
-    // 06.05.2026 (Welle 4 Frontend) — echte Optimistic-UI.
-    // Vorher: setLocalRows nach Server-Response (=quasi-optimistic, aber 200-400ms Delay).
-    // Jetzt: setLocalRows VOR fetch, Rollback bei Error → 0ms perceived latency.
     const optimisticBezahltAm = !aktuellBezahlt ? new Date().toISOString() : null;
     setLocalRows((prev) =>
       prev.map((r) =>
-        r.id === bestellungId
+        r.id === rowId
           ? {
               ...r,
               bezahlt_am: optimisticBezahltAm,
-              // bezahlt_von wird vom Server gesetzt — bei optimistic nehmen wir
-              // einen Platzhalter oder leeren String, wird beim Erfolg korrigiert.
               bezahlt_von: !aktuellBezahlt ? (r.bezahlt_von ?? "…") : null,
             }
           : r,
@@ -240,16 +243,15 @@ export function BuchhaltungClient({
     );
 
     try {
-      const res = await fetch(`/api/bestellungen/${bestellungId}/bezahlt`, {
+      const res = await fetch(`/api/dokumente/${rowId}/bezahlt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bezahlt: !aktuellBezahlt }),
       });
       if (!res.ok) {
-        // ROLLBACK: optimistic state revertieren
         setLocalRows((prev) =>
           prev.map((r) =>
-            r.id === bestellungId
+            r.id === rowId
               ? {
                   ...r,
                   bezahlt_am: aktuellBezahlt ? r.bezahlt_am : null,
@@ -262,20 +264,18 @@ export function BuchhaltungClient({
         setBezahltError(data.error || "Fehler beim Aktualisieren des Zahlungsstatus");
         return;
       }
-      // Server-Authority: bezahlt_von echten Wert übernehmen
       const result = await res.json();
       setLocalRows((prev) =>
         prev.map((r) =>
-          r.id === bestellungId
+          r.id === rowId
             ? { ...r, bezahlt_von: result.bezahlt_von || null }
             : r,
         ),
       );
     } catch {
-      // Network-Fehler → Rollback
       setLocalRows((prev) =>
         prev.map((r) =>
-          r.id === bestellungId
+          r.id === rowId
             ? {
                 ...r,
                 bezahlt_am: aktuellBezahlt ? r.bezahlt_am : null,
@@ -311,7 +311,7 @@ export function BuchhaltungClient({
     setArchivLoading(true);
     setBezahltError(null);
     try {
-      const res = await fetch("/api/bestellungen/archivieren", {
+      const res = await fetch("/api/dokumente/archivieren", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),

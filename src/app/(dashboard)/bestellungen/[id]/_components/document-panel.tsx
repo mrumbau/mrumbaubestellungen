@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert } from "@/components/ui/alert";
@@ -56,10 +56,32 @@ export function DocumentPanel({
   onTabChange: (tab: string) => void;
 }) {
   const [artikelDrawerOpen, setArtikelDrawerOpen] = useState(false);
+  // 07.05.2026 — Sub-Selector-Index für Tabs mit mehreren Dokumenten desselben
+  // Typs (z.B. Raab-Karcher-Sammelbestellung mit 2 Teilrechnungen).
+  const [sectionIndex, setSectionIndex] = useState(0);
 
   const dokTabs = useMemo(() => getDokTabs(bestellung.bestellungsart), [bestellung.bestellungsart]);
-  const aktivesDokument = dokumente.find((d) => d.typ === activeTab);
+
+  // Alle Dokumente des aktuellen Typs — Liste statt First-Match. Sortiert nach
+  // created_at damit "Rechnung 1/2" stabil das ältere ist.
+  const aktiveDokumente = useMemo(
+    () =>
+      dokumente
+        .filter((d) => d.typ === activeTab)
+        .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? "")),
+    [dokumente, activeTab],
+  );
+  const safeIndex = Math.min(sectionIndex, Math.max(0, aktiveDokumente.length - 1));
+  const aktivesDokument = aktiveDokumente[safeIndex];
   const pdfCount = dokumente.filter((d) => d.storage_pfad).length;
+
+  // Bei Tab-Wechsel zurück auf erstes Dokument
+  // (sonst zeigt z.B. "Rechnung 2/2" → Wechsel zu Lieferschein → out-of-range).
+  const prevTabRef = useRef(activeTab);
+  if (prevTabRef.current !== activeTab) {
+    prevTabRef.current = activeTab;
+    if (sectionIndex !== 0) setSectionIndex(0);
+  }
 
   return (
     <div className="flex-1 card flex flex-col overflow-hidden relative">
@@ -160,6 +182,53 @@ export function DocumentPanel({
           </div>
         )}
       </div>
+
+      {/* Sub-Selector wenn mehrere Dokumente vom gleichen Typ existieren (z.B. mehrere Teilrechnungen) */}
+      {aktiveDokumente.length > 1 && (
+        <div
+          role="tablist"
+          aria-label={`${dokTabs.find((t) => t.key === activeTab)?.label ?? "Dokument"} — Auswahl`}
+          className="flex items-center gap-1 px-3 py-2 border-b border-line-subtle bg-canvas overflow-x-auto scrollbar-hide"
+        >
+          <span className="text-[11px] text-foreground-subtle uppercase tracking-wide font-mono-amount mr-2 shrink-0">
+            {aktiveDokumente.length} {dokTabs.find((t) => t.key === activeTab)?.label}en
+          </span>
+          {aktiveDokumente.map((d, i) => {
+            const isActive = i === safeIndex;
+            const nr = d.bestellnummer_erkannt
+              ?? `${i + 1}/${aktiveDokumente.length}`;
+            const betrag = d.gesamtbetrag != null
+              ? new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(d.gesamtbetrag)
+              : null;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setSectionIndex(i)}
+                className={cn(
+                  "shrink-0 inline-flex items-center gap-2 px-3 py-1.5 text-[12px] rounded-md transition-colors whitespace-nowrap",
+                  "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+                  isActive
+                    ? "bg-brand text-white font-medium"
+                    : "bg-surface text-foreground-muted hover:bg-surface-hover border border-line",
+                )}
+              >
+                <span className="font-mono-amount tabular-nums">{nr}</span>
+                {betrag && (
+                  <span className={cn(
+                    "text-[11px]",
+                    isActive ? "text-white/70" : "text-foreground-subtle",
+                  )}>
+                    {betrag}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Content */}
       <div

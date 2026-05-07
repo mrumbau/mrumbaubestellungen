@@ -5,11 +5,11 @@ import { BuchhaltungClient } from "@/components/buchhaltung-client";
 
 export const dynamic = "force-dynamic";
 
-// 07.05.2026 — Pagination komplett client-side (analog Bestellungen).
-// Vorher: server-side range(0,19) + client-side Tabs/Filter → Filter+Sort sahen
-// nur 20er-Slice, Bezahlt/Offen-Counts waren falsch über Pages, Suche traf
-// nicht alle Treffer. Bei freigegebenen Bestellungen reicht alles-laden bis
-// HARD_CAP. Darüber hinaus archivieren oder Server-Pagination.
+// 07.05.2026 (v2) — Buchhaltung pro RECHNUNGS-DOKUMENT statt pro Bestellung.
+// Eine Sammel-Bestellung mit Teilrechnungen (Raab Karcher etc.) erscheint
+// jetzt als n Zeilen, jede mit eigener Rechnungsnr / Betrag / Fälligkeit /
+// Bezahlt-Status. Für DATEV-Export, GoBD-konforme Buchung und Mahnung-
+// Tracking ist das die korrekte Granularität.
 const HARD_CAP = 500;
 
 export default async function BuchhaltungPage() {
@@ -18,12 +18,12 @@ export default async function BuchhaltungPage() {
 
   const supabase = await createServerSupabaseClient();
 
-  // Alle freigegebenen Bestellungen + Projekte parallel
+  // Schritt 1: Alle freigegebenen Bestellungen finden
   const [{ data: bestellungen }, { data: projekte }] = await Promise.all([
     supabase
       .from("bestellungen")
       .select(
-        "id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, bezahlt_am, bezahlt_von, archiviert_am, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+        "id, bestellnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
       )
       .eq("status", "freigegeben")
       .order("updated_at", { ascending: false })
@@ -35,47 +35,57 @@ export default async function BuchhaltungPage() {
       .order("name"),
   ]);
 
-  const total = bestellungen?.length ?? 0;
-  const reachedCap = total >= HARD_CAP;
-
-  // Phase 2: Freigaben parallel; faelligkeitsdatum kommt jetzt direkt aus
-  // bestellungen-Spalte (06.05.2026 — kein Doku-Join mehr nötig).
-  // Wir laden trotzdem rechnung_id für PDF-Download-Link (datev-modal etc.).
   const bestellIds = (bestellungen || []).map((b) => b.id);
+
+  // Schritt 2: Freigaben + Rechnungs-Dokumente parallel
   const [{ data: freigaben }, { data: rechnungen }] = bestellIds.length
     ? await Promise.all([
         supabase.from("freigaben").select("bestellung_id, freigegeben_von_name, freigegeben_am").in("bestellung_id", bestellIds),
-        // 07.05.2026 — Nur Rechnungen mit echtem PDF-File anzeigen.
-        // Body-only / Vendor-Parser-Extraktionen schreiben dokumente-Rows mit
-        // storage_pfad=NULL — der PDF-Link würde sonst 404 liefern.
-        supabase.from("dokumente").select("id, bestellung_id").in("bestellung_id", bestellIds).eq("typ", "rechnung").not("storage_pfad", "is", null),
+        supabase
+          .from("dokumente")
+          .select("id, bestellung_id, gesamtbetrag, faelligkeitsdatum, bezahlt_am, bezahlt_von, archiviert_am, bestellnummer_erkannt, storage_pfad, created_at")
+          .in("bestellung_id", bestellIds)
+          .eq("typ", "rechnung"),
       ])
     : [{ data: [] as never[] }, { data: [] as never[] }];
 
-  // Daten zusammenführen
   const freigabenMap = new Map(
     (freigaben || []).map((f) => [f.bestellung_id, f])
   );
-  const rechnungenMap = new Map(
-    (rechnungen || []).map((r) => [r.bestellung_id, r])
+  const bestellungenMap = new Map(
+    (bestellungen || []).map((b) => [b.id, b])
   );
 
-  const rows = (bestellungen || []).map((b) => {
-    const freigabe = freigabenMap.get(b.id);
-    const rechnung = rechnungenMap.get(b.id);
+  // Schritt 3: PRO Rechnungs-Dokument eine Row.
+  // Wenn eine Bestellung GAR KEIN Rechnungs-Dokument hat (Body-only-extrahierte
+  // Rechnungen ohne dokumente-Eintrag) → wir fallen NICHT zurück auf die
+  // Bestellung selbst, weil Buchhaltung sonst Phantome sieht. Solche Bestellungen
+  // erscheinen erst dann in Buchhaltung wenn ein Rechnungs-Doku angelegt wurde.
+  const rows = (rechnungen || []).map((r) => {
+    const b = bestellungenMap.get(r.bestellung_id);
+    const freigabe = freigabenMap.get(r.bestellung_id);
+    if (!b) return null;
     return {
-      id: b.id,
-      bestellnummer: b.bestellnummer,
+      // Eindeutige Row-ID = dokument-id (statt bestellung-id wie zuvor)
+      id: r.id,
+      // Backwards-Compat-Feld für den Client (war früher bestellung-id)
+      bestellung_id: r.bestellung_id,
+      // Rechnungsnummer aus dem Doku, fällt zurück auf Bestellnr. der Bestellung
+      bestellnummer: r.bestellnummer_erkannt || b.bestellnummer,
       haendler_name: b.haendler_name,
-      betrag: b.betrag,
+      // Betrag PER RECHNUNG (statt Sammel-Betrag der Bestellung)
+      betrag: r.gesamtbetrag ?? b.betrag,
       waehrung: b.waehrung || "EUR",
       freigegeben_von: freigabe?.freigegeben_von_name || "–",
       freigegeben_am: freigabe?.freigegeben_am || null,
-      faelligkeitsdatum: b.faelligkeitsdatum,
-      rechnung_id: rechnung?.id || null,
-      bezahlt_am: b.bezahlt_am || null,
-      bezahlt_von: b.bezahlt_von || null,
-      archiviert_am: b.archiviert_am || null,
+      // Fälligkeit PER RECHNUNG
+      faelligkeitsdatum: r.faelligkeitsdatum ?? b.faelligkeitsdatum,
+      // Doku-ID = rechnung_id (für PDF-Download-Link). Nur wenn PDF-File da.
+      rechnung_id: r.storage_pfad ? r.id : null,
+      // Bezahlt PER RECHNUNG
+      bezahlt_am: r.bezahlt_am || null,
+      bezahlt_von: r.bezahlt_von || null,
+      archiviert_am: r.archiviert_am || null,
       bestellungsart: b.bestellungsart || "material",
       hat_bestellbestaetigung: b.hat_bestellbestaetigung || false,
       hat_lieferschein: b.hat_lieferschein || false,
@@ -85,7 +95,15 @@ export default async function BuchhaltungPage() {
       kundennummer: b.kundennummer,
       projekt_referenz: b.projekt_referenz,
     };
-  });
+  }).filter((r): r is NonNullable<typeof r> => r !== null)
+    .sort((a, b) => {
+      const aDate = a.freigegeben_am ?? "";
+      const bDate = b.freigegeben_am ?? "";
+      return bDate.localeCompare(aDate);
+    });
+
+  const total = rows.length;
+  const reachedCap = total >= HARD_CAP;
 
   return (
     <BuchhaltungClient
