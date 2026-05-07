@@ -65,6 +65,8 @@ interface Bestellung {
   faelligkeitsdatum?: string | null;
   kundennummer?: string | null;
   projekt_referenz?: string | null;
+  // 07.05.2026 — Doku-Nummern für Such-Index (Rechnungs-/Lieferschein-/Auftragsnummern aus dokumente-Tabelle)
+  doku_nummern?: string[];
 }
 
 interface ProjektOption {
@@ -271,11 +273,16 @@ export function BestellungenTabelle({
   const gefiltert = useMemo(
     () =>
       bestellungen.filter((b) => {
+        const sucheLc = suche.toLowerCase();
         const suchMatch =
           !suche ||
-          b.bestellnummer?.toLowerCase().includes(suche.toLowerCase()) ||
-          b.haendler_name?.toLowerCase().includes(suche.toLowerCase()) ||
-          b.besteller_name?.toLowerCase().includes(suche.toLowerCase());
+          b.bestellnummer?.toLowerCase().includes(sucheLc) ||
+          b.haendler_name?.toLowerCase().includes(sucheLc) ||
+          b.besteller_name?.toLowerCase().includes(sucheLc) ||
+          // 07.05.2026 — auch Rechnungs-/Lieferschein-/Auftragsnummern aus
+          // dokumente durchsuchen (z.B. Raab-Karcher-Sammelbestellung mit
+          // mehreren Rechnungs-PDFs an einer Auftragsnr.)
+          (b.doku_nummern || []).some((n) => n.toLowerCase().includes(sucheLc));
 
         const statusMatch =
           !statusFilter ||

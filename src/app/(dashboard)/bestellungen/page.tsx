@@ -51,6 +51,31 @@ export default async function BestellungenPage({
       .order("name"),
   ]);
 
+  // 07.05.2026 — Doku-Nummern für Such-Index nachladen.
+  // Bei Raab Karcher u.ä. enthält eine einzelne Bestellung (Auftragsnr) mehrere
+  // Rechnungs- und Lieferschein-PDFs mit eigenen Nummern. Die User-Suche soll
+  // auch nach diesen Nummern finden — nicht nur nach b.bestellnummer.
+  const ids = (bestellungen || []).map((b) => b.id);
+  const dokuNummernMap: Record<string, string[]> = {};
+  if (ids.length > 0) {
+    const { data: docNums } = await supabase
+      .from("dokumente")
+      .select("bestellung_id, bestellnummer_erkannt, auftragsnummer, lieferscheinnummer")
+      .in("bestellung_id", ids);
+    for (const d of docNums || []) {
+      const arr = dokuNummernMap[d.bestellung_id] || [];
+      if (d.bestellnummer_erkannt) arr.push(d.bestellnummer_erkannt);
+      if (d.auftragsnummer) arr.push(d.auftragsnummer);
+      if (d.lieferscheinnummer) arr.push(d.lieferscheinnummer);
+      if (arr.length > 0) dokuNummernMap[d.bestellung_id] = arr;
+    }
+  }
+
+  const bestellungenAngereichert = (bestellungen || []).map((b) => ({
+    ...b,
+    doku_nummern: dokuNummernMap[b.id] || [],
+  }));
+
   const total = bestellungen?.length ?? 0;
   const reachedCap = total >= HARD_CAP;
 
@@ -100,7 +125,7 @@ export default async function BestellungenPage({
       )}
 
       <BestellungenTabelle
-        bestellungen={bestellungen || []}
+        bestellungen={bestellungenAngereichert}
         projekte={(projekte || []) as { id: string; name: string; farbe: string }[]}
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
