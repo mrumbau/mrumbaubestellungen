@@ -9,11 +9,14 @@ import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_JSON_SCHEMA } from "@/lib/cardscan
 import type { ExtractedContactData, ConfidenceScores } from "@/lib/cardscan/types";
 
 const ROUTE_TAG = "/lib/cardscan/openai-extract";
-// gpt-5-mini statt gpt-5.5: schneller (~50-70% weniger Latenz, p50 1.5-2s statt 4s)
-// und ~80% günstiger. Bei json_schema strict ist die Qualität für CardScan-
-// Extraktion praktisch identisch — Reasoning-Mode brauchen wir nicht.
+// gpt-4o-mini: non-reasoning, schnell (~1-2s), billig.
+// Wir hatten 2026-05-07 versucht auf gpt-5-mini umzusteigen — stellte sich als
+// Reasoning-Modell heraus, das mit Default-Settings 15-40s brauchte und massiv
+// Reasoning-Tokens produzierte. gpt-4o(-mini) hatte sich in der Praxis schon
+// bewährt; mini ist die schlankere Variante mit gleicher Output-Qualität bei
+// json_schema strict-Mode (Schema garantiert Struktur, kein Reasoning nötig).
 // Email-Pipeline behält gpt-5.5 (dort lohnt sich Reasoning für Multi-Doc-Logik).
-const MODEL = "gpt-5-mini";
+const MODEL = "gpt-4o-mini";
 
 interface ExtractionResult {
   data: ExtractedContactData;

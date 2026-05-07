@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // PWA-Manifest braucht den korrekten MIME-Type, sonst meckert Chrome
+        // mit "Manifest: Syntax error" obwohl die JSON valide ist.
+        source: "/cardscan-manifest.json",
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json; charset=utf-8" },
+        ],
+      },
+      {
         source: "/api/pdfs/:id*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
