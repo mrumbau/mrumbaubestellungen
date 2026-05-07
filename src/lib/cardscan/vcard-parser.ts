@@ -9,6 +9,8 @@ const ROUTE_TAG = "/lib/cardscan/vcard-parser";
 interface VcardParseResult {
   data: ExtractedContactData;
   confidence: ConfidenceScores;
+  /** CF12: Anzahl der vCards in der Datei. Wenn > 1, parsen wir die erste; Frontend kann warnen. */
+  totalCardsInFile: number;
 }
 
 /**
@@ -43,9 +45,19 @@ function splitVcardField(value: string): string[] {
 /**
  * Parst einen vCard-String (.vcf) direkt in ExtractedContactData.
  * Kein GPT-Call nötig – vCard hat ein festes Schema.
+ *
+ * CF12: Multi-Card-Detection — wenn die Datei mehrere `BEGIN:VCARD`-Blöcke
+ * enthält (z.B. Outlook-Export mit 5 Kontakten), parsen wir nur die erste.
+ * `totalCardsInFile` lässt das Frontend warnen.
  */
 export function parseVcard(vcfContent: string): VcardParseResult {
-  const lines = vcfContent.split(/\r?\n/);
+  // Anzahl Cards zählen (case-insensitive, RFC erlaubt CRLF)
+  const totalCardsInFile = (vcfContent.match(/BEGIN:VCARD/gi) || []).length;
+
+  // Nur erste Card extrahieren wenn es mehrere gibt
+  const firstCardMatch = vcfContent.match(/BEGIN:VCARD[\s\S]*?END:VCARD/i);
+  const cardContent = firstCardMatch ? firstCardMatch[0] : vcfContent;
+  const lines = cardContent.split(/\r?\n/);
   const fields: Record<string, string> = {};
 
   // Einfacher vCard-Parser (unterstützt v3.0 und v4.0)
@@ -186,7 +198,8 @@ export function parseVcard(vcfContent: string): VcardParseResult {
     hasName: !!(fields.firstName || fields.lastName),
     hasEmail: !!fields.email,
     hasAddress: !!(fields.street || fields.city),
+    totalCardsInFile,
   });
 
-  return { data, confidence };
+  return { data, confidence, totalCardsInFile };
 }

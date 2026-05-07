@@ -78,16 +78,20 @@ export async function extractContactFromText(
     throw new Error("GPT-4o returned invalid JSON");
   }
 
-  // Pflichtfelder validieren
-  if (!parsed.customer_type || !parsed.confidence) {
-    throw new Error("GPT-4o Response fehlt customer_type oder confidence");
+  // CF8: Defensive Validation — strict-Schema sollte das garantieren, aber wir
+  // sehen in der Praxis OpenAI-Bugs (refusals, partial responses).
+  if (!parsed.customer_type || typeof parsed.customer_type !== "string") {
+    throw new Error("GPT-Response fehlt customer_type");
+  }
+  if (!parsed.confidence || typeof parsed.confidence !== "object") {
+    throw new Error("GPT-Response fehlt confidence-Object");
   }
 
   const { confidence, ...contactFields } = parsed;
   const conf = confidence as ConfidenceScores;
 
-  // Sicherstellen dass overall existiert
-  if (typeof conf.overall !== "number") {
+  // Sicherstellen dass overall existiert (Fallback bei Schema-Drift)
+  if (typeof conf.overall !== "number" || isNaN(conf.overall)) {
     conf.overall = 0.5;
   }
 

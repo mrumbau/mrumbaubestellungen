@@ -6,14 +6,14 @@ import { BackLink } from "@/components/cardscan/BackLink";
 import type { CardScanCapture, ExtractedContactData } from "@/lib/cardscan/types";
 
 const STATUS_DOT: Record<string, string> = {
-  pending: "bg-slate-400",
-  extracting: "bg-blue-400",
-  review: "bg-warning",
-  writing: "bg-blue-400",
+  pending: "bg-cs-pending",
+  extracting: "bg-cs-extracting",
+  review: "bg-cs-partial",
+  writing: "bg-cs-writing",
   success: "bg-cs-success",
-  partial_success: "bg-warning-bg0",
-  failed: "bg-error",
-  discarded: "bg-slate-300",
+  partial_success: "bg-cs-partial",
+  failed: "bg-cs-failed",
+  discarded: "bg-cs-discarded",
 };
 
 const SOURCE_ICON: Record<string, string> = {
@@ -62,13 +62,54 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
+type StatusFilter = "all" | "open" | "success" | "failed";
+
+const PAGE_SIZE = 50;
+
+function matchesStatusFilter(status: string, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "open") return ["pending", "extracting", "review"].includes(status);
+  if (filter === "success") return ["success", "partial_success"].includes(status);
+  if (filter === "failed") return ["failed", "discarded"].includes(status);
+  return true;
+}
+
+function matchesSearch(c: CardScanCapture, q: string): boolean {
+  if (!q) return true;
+  const lower = q.toLowerCase();
+  const data = (c.extracted_data || c.final_data) as ExtractedContactData | null;
+  if (!data) return false;
+  const haystack = [
+    data.companyName,
+    data.firstName,
+    data.lastName,
+    data.email,
+    data.phone,
+    data.mobile,
+    data.contactPerson?.firstName,
+    data.contactPerson?.lastName,
+    data.contactPerson?.email,
+    data.address?.city,
+    data.address?.zip,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(lower);
+}
+
 export default function CardScanHistoryPage() {
   const router = useRouter();
   const [captures, setCaptures] = useState<CardScanCapture[]>([]);
   const [loading, setLoading] = useState(true);
+  // CU8: Search + Status-Filter + Load-More
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
-    fetch("/api/cardscan/captures?limit=30")
+    // 500-Item-Hard-Cap analog Bestellwesen — Frontend-Filter danach
+    fetch("/api/cardscan/captures?limit=500")
       .then((r) => r.json())
       .then((json) => setCaptures(json.data || []))
       .finally(() => setLoading(false));
@@ -95,11 +136,17 @@ export default function CardScanHistoryPage() {
     );
   }
 
+  // CU8: Filter + Suche + Pagination clientseitig (500-Hard-Cap)
+  const filtered = captures.filter(
+    (c) => matchesStatusFilter(c.status, statusFilter) && matchesSearch(c, search.trim())
+  );
+  const visible = filtered.slice(0, visibleCount);
+
   // Nach Zeitgruppen sortieren
   const groups: { label: string; items: CardScanCapture[] }[] = [];
   let currentGroup = "";
 
-  for (const c of captures) {
+  for (const c of visible) {
     const group = getTimeGroup(c.created_at);
     if (group !== currentGroup) {
       currentGroup = group;
@@ -108,12 +155,72 @@ export default function CardScanHistoryPage() {
     groups[groups.length - 1].items.push(c);
   }
 
+  const STATUS_TABS: { key: StatusFilter; label: string }[] = [
+    { key: "all", label: "Alle" },
+    { key: "open", label: "Offen" },
+    { key: "success", label: "Erfolg" },
+    { key: "failed", label: "Fehler" },
+  ];
+
   return (
     <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
       <BackLink />
-      <h1 className="font-headline text-xl text-foreground tracking-tight mb-5">
+      <h1 className="font-headline text-xl text-foreground tracking-tight mb-4">
         Letzte Scans
       </h1>
+
+      {captures.length > 0 && (
+        <>
+          {/* Suche */}
+          <div className="card p-1 mb-3">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setVisibleCount(PAGE_SIZE);
+              }}
+              placeholder="Suche nach Name, Firma, E-Mail …"
+              className="w-full py-2.5 px-3 rounded-md bg-bg-card text-foreground text-base placeholder:text-foreground-tertiary focus:outline-none border-0"
+              aria-label="Scans durchsuchen"
+            />
+          </div>
+
+          {/* Status-Filter-Tabs */}
+          <div className="flex gap-1.5 mb-4 overflow-x-auto -mx-1 px-1 pb-1">
+            {STATUS_TABS.map((tab) => {
+              const active = statusFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(tab.key);
+                    setVisibleCount(PAGE_SIZE);
+                  }}
+                  className={`shrink-0 text-xs font-medium px-3 py-1.5 rounded-md transition-colors min-h-[36px] ${
+                    active
+                      ? "bg-cs-accent-tint text-cs-accent-text border border-cs-accent/30"
+                      : "bg-input text-foreground-muted border border-line hover:bg-surface-hover"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Result-Count */}
+          {(search || statusFilter !== "all") && (
+            <p className="text-[11px] text-foreground-subtle mb-3 px-1">
+              {filtered.length === 0
+                ? "Keine Treffer"
+                : `${filtered.length} ${filtered.length === 1 ? "Treffer" : "Treffer"}`}
+            </p>
+          )}
+        </>
+      )}
 
       {captures.length === 0 && (
         <div className="card p-8 text-center">
@@ -124,6 +231,12 @@ export default function CardScanHistoryPage() {
           >
             Ersten Scan starten
           </button>
+        </div>
+      )}
+
+      {captures.length > 0 && filtered.length === 0 && (
+        <div className="card p-6 text-center">
+          <p className="text-sm text-foreground-subtle">Keine Scans entsprechen deiner Suche.</p>
         </div>
       )}
 
@@ -178,6 +291,18 @@ export default function CardScanHistoryPage() {
           </div>
         </div>
       ))}
+
+      {filtered.length > visibleCount && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+            className="py-2.5 px-5 rounded-md border border-line text-sm font-medium text-foreground-muted hover:bg-input transition-colors min-h-[44px]"
+          >
+            Weitere {Math.min(PAGE_SIZE, filtered.length - visibleCount)} laden
+          </button>
+        </div>
+      )}
     </div>
   );
 }

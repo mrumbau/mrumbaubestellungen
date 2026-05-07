@@ -101,6 +101,29 @@ const CONTACT_PATHS = [
 
 // ─── HTML → Text Extraktion ─────────────────────────────────────────
 
+/**
+ * CF14: Heuristik für SPA-Erkennung (React/Vue/Angular/Svelte mit leerem Body).
+ * Cheerio kann clientseitig gerendertes Markup nicht extrahieren — wir wollen
+ * dem User stattdessen einen klaren Hinweis geben, statt generischem
+ * "Zu wenig Text gefunden".
+ */
+function looksLikeSPA(html: string): boolean {
+  const lower = html.toLowerCase();
+  // Typische SPA-Mount-Points + leerer Body-Content
+  const hasSpaRoot =
+    /<div\s+id=["'](root|app|__next|app-mount|svelte)["']\s*>\s*<\/div>/i.test(html) ||
+    /id=["']app["']\s*data-v-app/i.test(html);
+  // Body-Inhalt sehr klein (nach Script/Style-Strip approximativ)
+  const stripped = lower
+    .replace(/<script[\s\S]*?<\/script>/g, "")
+    .replace(/<style[\s\S]*?<\/style>/g, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return hasSpaRoot && stripped.length < 300;
+}
+
 function extractTextFromHtml(html: string, url: string): string {
   const $ = cheerio.load(html);
 
@@ -245,6 +268,14 @@ export async function scrapeUrl(inputUrl: string): Promise<ScrapeResult> {
 
   // 1. Hauptseite laden
   const mainHtml = await fetchPage(url);
+
+  // CF14: SPA-Detection — bevor Cheerio ins Leere greift, klaren Hinweis geben
+  if (mainHtml && looksLikeSPA(mainHtml)) {
+    throw new Error(
+      "Diese Webseite verwendet JavaScript-Rendering (SPA) und kann nicht automatisch ausgelesen werden. Bitte öffne die Kontakt- oder Impressum-Seite, kopiere den Text und füge ihn unter 'Text einfügen' ein."
+    );
+  }
+
   if (!mainHtml) {
     throw new Error("Webseite konnte nicht geladen werden. Prüfe die URL.");
   }

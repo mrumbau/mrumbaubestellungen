@@ -29,6 +29,7 @@ export default function CardScanErrorsPage() {
   const [errors, setErrors] = useState<SyncError[]>([]);
   const [loading, setLoading] = useState(true);
   const [acknowledging, setAcknowledging] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function loadErrors() {
     try {
@@ -45,27 +46,54 @@ export default function CardScanErrorsPage() {
   }, []);
 
   async function handleAcknowledge(errorId: string) {
+    // CU9: Optimistic UI mit Rollback bei Server-Fehler
     setAcknowledging(true);
-    await fetch("/api/cardscan/errors", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error_id: errorId }),
-    });
+    setActionError(null);
+    const prevState = errors;
     setErrors((prev) =>
       prev.map((e) => (e.id === errorId ? { ...e, acknowledged: true } : e))
     );
-    setAcknowledging(false);
+    try {
+      const res = await fetch("/api/cardscan/errors", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error_id: errorId }),
+      });
+      if (!res.ok) {
+        setErrors(prevState);
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || `Fehler beim Bestätigen (Status ${res.status})`);
+      }
+    } catch {
+      setErrors(prevState);
+      setActionError("Verbindungsfehler. Bitte erneut versuchen.");
+    } finally {
+      setAcknowledging(false);
+    }
   }
 
   async function handleAcknowledgeAll() {
     setAcknowledging(true);
-    await fetch("/api/cardscan/errors", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ acknowledge_all: true }),
-    });
+    setActionError(null);
+    const prevState = errors;
     setErrors((prev) => prev.map((e) => ({ ...e, acknowledged: true })));
-    setAcknowledging(false);
+    try {
+      const res = await fetch("/api/cardscan/errors", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acknowledge_all: true }),
+      });
+      if (!res.ok) {
+        setErrors(prevState);
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || `Fehler beim Bestätigen (Status ${res.status})`);
+      }
+    } catch {
+      setErrors(prevState);
+      setActionError("Verbindungsfehler. Bitte erneut versuchen.");
+    } finally {
+      setAcknowledging(false);
+    }
   }
 
   const openErrors = errors.filter((e) => !e.acknowledged);
@@ -103,6 +131,12 @@ export default function CardScanErrorsPage() {
           <p className="text-sm text-foreground-subtle">
             Keine Sync-Fehler vorhanden.
           </p>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="mb-4 p-3 rounded-md bg-error-bg border border-error/30 text-error text-sm">
+          {actionError}
         </div>
       )}
 

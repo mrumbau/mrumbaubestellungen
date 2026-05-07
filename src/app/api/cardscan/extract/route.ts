@@ -127,6 +127,19 @@ async function handleTextExtract(request: NextRequest, userId: string) {
     );
   }
 
+  // CF6: Per-Type Rate-Limit (Text ist 30/min, separate vom generischen 20/min)
+  const textRateCheck = checkRateLimit(
+    `cardscan-text:${userId}`,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.text.MAX_REQUESTS,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.text.WINDOW_MS
+  );
+  if (!textRateCheck.allowed) {
+    return NextResponse.json(
+      { error: `Zu viele Text-Scans pro Minute (max ${CARDSCAN_RATE_LIMITS_BY_TYPE.text.MAX_REQUESTS}). Bitte kurz warten.` },
+      { status: 429 }
+    );
+  }
+
   const effectiveSourceType: CardScanSourceType = source_type || "text";
 
   const { data: extractedData, confidence, durationMs, inputTokens, outputTokens, costEur } =
@@ -259,7 +272,7 @@ async function handleVcardExtract(
     );
   }
 
-  const { data: extractedData, confidence } = parseVcard(text);
+  const { data: extractedData, confidence, totalCardsInFile } = parseVcard(text);
 
   const serviceClient = createServiceClient();
   const { data: capture, error: dbError } = await serviceClient
@@ -268,7 +281,13 @@ async function handleVcardExtract(
       user_id: userId,
       source_type: sourceType as CardScanSourceType,
       raw_text: text,
-      source_meta: { filename: file.name, mime_type: "text/vcard" },
+      source_meta: {
+        filename: file.name,
+        mime_type: "text/vcard",
+        // CF12: Multi-Card-Hinweis im source_meta speichern
+        total_cards_in_file: totalCardsInFile,
+        only_first_processed: totalCardsInFile > 1,
+      },
       extracted_data: extractedData,
       confidence_scores: confidence,
       status: "review",
@@ -306,6 +325,19 @@ async function handlePdfExtract(
   userId: string,
   sourceType: string
 ) {
+  // CF6: PDF-Pfad ruft GPT mit bis zu 8000 Token Input — strenges Limit
+  const rate = checkRateLimit(
+    `cardscan-pdf:${userId}`,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.pdf.MAX_REQUESTS,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.pdf.WINDOW_MS
+  );
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: `Zu viele PDF-Scans pro Minute (max ${CARDSCAN_RATE_LIMITS_BY_TYPE.pdf.MAX_REQUESTS}). Bitte kurz warten.` },
+      { status: 429 }
+    );
+  }
+
   const { PDFParse } = await import("pdf-parse");
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -388,6 +420,19 @@ async function handleDocxExtract(
   userId: string,
   sourceType: string
 ) {
+  // CF6: DOCX-Pfad analog PDF — strenges Limit
+  const rate = checkRateLimit(
+    `cardscan-docx:${userId}`,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.docx.MAX_REQUESTS,
+    CARDSCAN_RATE_LIMITS_BY_TYPE.docx.WINDOW_MS
+  );
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: `Zu viele DOCX-Scans pro Minute (max ${CARDSCAN_RATE_LIMITS_BY_TYPE.docx.MAX_REQUESTS}). Bitte kurz warten.` },
+      { status: 429 }
+    );
+  }
+
   const mammoth = await import("mammoth");
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -561,8 +606,13 @@ async function handleImageExtract(
       upsert: false,
     });
 
+  // CF2: Storage-Upload-Failure prominent loggen (auch in DB), damit User
+  // im /cardscan/errors-Bereich sehen kann dass das Bild nicht persistiert wurde
+  // und die KI-Daten ohne Original-Bild zur Verifikation existieren.
   if (storageError) {
     logError(ROUTE, "Storage Upload fehlgeschlagen", storageError);
+    // Best-effort: in cardscan_sync_errors loggen (keine Capture-ID hier weil
+    // DB-Insert noch nicht erfolgt — wird vom DB-Insert-Block nachgereicht)
   }
 
   // DB Insert
@@ -593,6 +643,20 @@ async function handleImageExtract(
       { error: ERRORS.INTERNER_FEHLER },
       { status: 500 }
     );
+  }
+
+  // CF2: Storage-Upload-Failure jetzt mit capture_id in sync_errors persistieren
+  if (storageError) {
+    await serviceClient.from("cardscan_sync_errors").insert({
+      user_id: userId,
+      capture_id: capture.id,
+      crm: "crm1", // Storage-Errors gehören keinem CRM, aber Schema verlangt einen Wert
+      error_type: "storage",
+      error_message: `Bild konnte nicht gespeichert werden: ${storageError.message}`,
+      error_details: { storagePath, mimeType: processedMime },
+    }).then(({ error }) => {
+      if (error) logError(ROUTE, "Sync-Error-Insert (storage) fehlgeschlagen", error);
+    });
   }
 
   logInfo(ROUTE, "Bild-Extraktion erfolgreich", {

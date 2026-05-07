@@ -234,12 +234,15 @@ async function searchInCrm(
     );
   }
 
-  // 4. Telefon-Suffix
-  const phoneSuffix = phoneLastDigits(data.phone) || phoneLastDigits(data.mobile);
-  if (phoneSuffix) {
-    searchPromises.push(
-      searchCustomers(token, [{ column: "phone", valueList: [phoneSuffix] }])
-    );
+  // 4. Telefon (full international format) — Suffix-only-Filter würde gegen
+  // das-programm.io's Exact-Match-Behaviour nicht greifen (CF4). Wir senden
+  // die volle Nummer, die Suffix-Verifikation passiert erst in evaluateMatch
+  // wenn ein anderer Such-Treffer ähnliches Phone-Field hat.
+  if (data.phone) {
+    searchPromises.push(searchCustomers(token, [{ column: "phone", valueList: [data.phone] }]));
+  }
+  if (data.mobile && data.mobile !== data.phone) {
+    searchPromises.push(searchCustomers(token, [{ column: "mobile", valueList: [data.mobile] }]));
   }
 
   // Alle Suchen parallel, max 5 Sekunden

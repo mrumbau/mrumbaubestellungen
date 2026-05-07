@@ -117,35 +117,31 @@ export default function CardScanUploadPage() {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CU11: Drag&Drop visuelles Feedback
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Zentrale File-Verarbeitung — wird sowohl von Input, Drag&Drop als auch Paste genutzt
+  async function processFile(file: File) {
     setError(null);
     setProcessing(null);
     setPreview(null);
     setFileLabel(null);
 
-    // Größen-Check
     if (file.size > MAX_FILE_SIZE * 2) {
       setError("Datei zu groß (maximal 20 MB vor Kompression).");
       return;
     }
 
-    // ─── Dokument-Typen (PDF, DOCX, vCard) → direkt übernehmen ─────
     if (isDocumentType(file.type, file.name)) {
       if (file.size > MAX_FILE_SIZE) {
         setError("Datei zu groß (maximal 10 MB).");
         return;
       }
-
       setSelectedFile(file);
       setFileLabel(getFileIcon(file.type, file.name));
       return;
     }
 
-    // ─── Bild-Typen → HEIC-Konvertierung + Kompression ─────────────
     if (!isImageType(file.type)) {
       setError(
         `Dateityp "${file.type || "unbekannt"}" nicht unterstützt. Erlaubt: JPEG, PNG, WebP, HEIC, PDF, DOCX, vCard (.vcf).`
@@ -183,6 +179,44 @@ export default function CardScanUploadPage() {
         err instanceof Error ? err.message : "Fehler bei der Bildverarbeitung"
       );
       setProcessing(null);
+    }
+  }
+
+  // Wrapper für Input-onChange
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  }
+
+  // CU11: Drag&Drop
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+  }
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) await processFile(file);
+  }
+
+  // CU11: onPaste — Bilder direkt aus Zwischenablage
+  async function handlePaste(e: React.ClipboardEvent) {
+    const items = Array.from(e.clipboardData?.items || []);
+    for (const item of items) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          await processFile(file);
+          return;
+        }
+      }
     }
   }
 
@@ -238,7 +272,26 @@ export default function CardScanUploadPage() {
   }
 
   return (
-    <div className="max-w-lg md:max-w-xl mx-auto animate-fade-in">
+    <div
+      className="max-w-lg md:max-w-xl mx-auto animate-fade-in"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onPaste={handlePaste}
+    >
+      {isDragOver && (
+        <div
+          className="fixed inset-0 z-50 bg-cs-accent-tint/40 backdrop-blur-sm pointer-events-none flex items-center justify-center"
+          aria-hidden="true"
+        >
+          <div className="card p-6 border-2 border-dashed border-cs-accent text-center">
+            <svg className="w-10 h-10 mx-auto mb-2 text-cs-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <p className="text-sm font-medium text-cs-accent-text">Datei hier ablegen</p>
+          </div>
+        </div>
+      )}
       <BackLink />
       <h1 className="font-headline text-xl text-foreground tracking-tight mb-1">
         Datei hochladen
@@ -322,7 +375,7 @@ export default function CardScanUploadPage() {
             </span>
             <button
               onClick={handleRemove}
-              className="text-error hover:text-error font-medium"
+              className="text-error hover:text-error/80 active:text-error/70 font-medium"
             >
               Entfernen
             </button>
@@ -347,7 +400,7 @@ export default function CardScanUploadPage() {
             </div>
             <button
               onClick={handleRemove}
-              className="text-error hover:text-error text-xs font-medium"
+              className="text-error hover:text-error/80 active:text-error/70 text-xs font-medium"
             >
               Entfernen
             </button>

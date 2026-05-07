@@ -1,17 +1,34 @@
 // CardScan Service Worker – Scope: /cardscan
-// Minimaler SW für PWA-Installation und Share Target.
-// Kein Caching (App braucht immer frische Daten von Supabase/APIs).
+// Minimaler SW für PWA-Installation, Share Target und Offline-Fallback.
 
-const SW_VERSION = "1.0.0";
+const SW_VERSION = "1.1.0";
+const OFFLINE_CACHE = "cardscan-offline-v1";
+const OFFLINE_PAGE = "/cardscan-offline.html";
 
 self.addEventListener("install", (event) => {
   console.log(`[CardScan SW ${SW_VERSION}] Install`);
+  // CU3: Offline-Fallback-Page beim Install vor-cachen
+  event.waitUntil(
+    caches.open(OFFLINE_CACHE).then((cache) => cache.add(OFFLINE_PAGE))
+  );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   console.log(`[CardScan SW ${SW_VERSION}] Activate`);
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    Promise.all([
+      // Alte Offline-Caches löschen
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k.startsWith("cardscan-offline-") && k !== OFFLINE_CACHE)
+            .map((k) => caches.delete(k))
+        )
+      ),
+      self.clients.claim(),
+    ])
+  );
 });
 
 // Share Target: POST-Requests von der Share-API abfangen
@@ -71,5 +88,22 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Alle anderen Requests: Network-first (kein Caching)
+  // CU3: Offline-Fallback nur für Navigation-Requests (HTML-Pages) auf /cardscan-Pfade
+  if (event.request.mode === "navigate" && url.pathname.startsWith("/cardscan")) {
+    event.respondWith(
+      (async () => {
+        try {
+          return await fetch(event.request);
+        } catch {
+          const cache = await caches.open(OFFLINE_CACHE);
+          const offline = await cache.match(OFFLINE_PAGE);
+          if (offline) return offline;
+          return new Response("Offline", { status: 503, statusText: "Offline" });
+        }
+      })()
+    );
+    return;
+  }
+
+  // Alle anderen Requests: Network-only (keine Caching-Interferenz)
 });

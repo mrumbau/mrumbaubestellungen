@@ -75,15 +75,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // F7.3: Bestehende CRM-Customer-IDs laden — bei Retry nach partial_success
-    // werden CRMs mit existierender ID übersprungen (kein Duplikat).
+    // F7.3: Bestehende CRM-Customer-IDs + final_data laden — bei Retry nach
+    // partial_success werden CRMs mit existierender ID übersprungen (kein Duplikat).
     const serviceClient = createServiceClient();
     const { data: existing } = await serviceClient
       .from("cardscan_captures")
-      .select("crm1_customer_id, crm2_customer_id, status")
+      .select("crm1_customer_id, crm2_customer_id, status, final_data")
       .eq("id", capture_id)
       .eq("user_id", user.id)
       .maybeSingle();
+
+    // CF3: Wenn CRM1 schon angelegt ist (partial_success-Retry), bleibt das
+    // ursprünglich an CRM1 gesendete final_data verbindlich. Sonst würden
+    // CRM1 und CRM2 mit unterschiedlichen Daten existieren.
+    const writeData =
+      existing?.status === "partial_success" && existing?.final_data
+        ? (existing.final_data as ExtractedContactData)
+        : final_data;
 
     // Capture auf 'writing' setzen – nur aus retry-fähigen Status:
     //   review          — Erstanlage nach Bestätigung
@@ -95,7 +103,7 @@ export async function POST(request: NextRequest) {
       .from("cardscan_captures")
       .update({
         status: "writing",
-        final_data,
+        final_data: writeData,
         duplicate_override: duplicate_override ?? false,
         updated_at: new Date().toISOString(),
       })
@@ -120,8 +128,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Dual-Write in beide CRMs (F7.3: mit Idempotenz-Skip bei vorhandenen IDs)
-    const result = await createInBothCRMs(final_data, {
+    // Dual-Write in beide CRMs (F7.3: mit Idempotenz-Skip bei vorhandenen IDs).
+    // CF3: writeData (= existing.final_data bei partial_success-Retry) wird
+    // benutzt, damit CRM1 und CRM2 garantiert mit identischen Daten beschickt sind.
+    const result = await createInBothCRMs(writeData, {
       existingCrm1CustomerId: existing?.crm1_customer_id ?? null,
       existingCrm2CustomerId: existing?.crm2_customer_id ?? null,
       captureId: capture_id,

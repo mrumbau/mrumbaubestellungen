@@ -53,13 +53,13 @@ export function DuplicateWarning({
             <div className="mt-3 flex gap-3">
               <button
                 onClick={() => onUpdate(bestMatch)}
-                className="text-xs font-medium px-4 py-2.5 rounded-md bg-warning text-white hover:bg-warning transition-colors min-h-[44px]"
+                className="text-xs font-medium px-4 py-3 rounded-md bg-warning text-white hover:bg-warning/90 active:bg-warning/80 transition-colors min-h-[44px]"
               >
                 Daten ergänzen
               </button>
               <button
                 onClick={onOverride}
-                className="text-xs font-medium text-warning hover:text-warning underline transition-colors min-h-[44px] flex items-center"
+                className="text-xs font-medium text-warning hover:text-warning/80 active:text-warning/70 underline transition-colors min-h-[44px] flex items-center"
               >
                 Trotzdem neu anlegen
               </button>

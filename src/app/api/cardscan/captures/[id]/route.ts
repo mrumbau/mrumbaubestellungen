@@ -109,8 +109,8 @@ export async function PATCH(
     const body = await request.json();
     const { final_data, status } = body;
 
-    // Erlaubte Status-Übergänge vom Client
-    const allowedStatuses = ["review", "writing", "discarded"];
+    // Erlaubte Status-Übergänge vom Client (Status-Drop nur "discarded")
+    const allowedStatuses = ["review", "discarded"];
     const updateFields: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
@@ -123,19 +123,31 @@ export async function PATCH(
       updateFields.status = status;
     }
 
-    // RLS filtert automatisch auf eigene Captures
+    // CF1: PATCH darf nur in editierbaren States schreiben — verhindert Race
+    // mit create-customer (writing/success/partial/failed-Status sind locked).
+    // RLS filtert zusätzlich auf eigene Captures.
     const { data: updated, error } = await supabase
       .from("cardscan_captures")
       .update(updateFields)
       .eq("id", id)
+      .in("status", ["pending", "extracting", "review"])
       .select("id, status, final_data, updated_at")
-      .single();
+      .maybeSingle();
 
-    if (error || !updated) {
+    if (error) {
       logError(ROUTE, "Update fehlgeschlagen", error);
       return NextResponse.json(
-        { error: ERRORS.NICHT_GEFUNDEN },
-        { status: 404 }
+        { error: ERRORS.INTERNER_FEHLER },
+        { status: 500 }
+      );
+    }
+
+    if (!updated) {
+      // Capture existiert nicht (404), gehört nicht zum User (RLS),
+      // oder Status erlaubt kein Update mehr (z.B. writing/success).
+      return NextResponse.json(
+        { error: "Capture wird gerade verarbeitet oder ist abgeschlossen — keine Änderungen möglich." },
+        { status: 409 }
       );
     }
 

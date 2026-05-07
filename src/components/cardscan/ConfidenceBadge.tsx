@@ -1,10 +1,10 @@
 "use client";
 
-import { IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
+import { IconAlertCircle, IconAlertTriangle, IconCheckCircle } from "@/components/ui/icons";
 
 interface ConfidenceBadgeProps {
   score: number | undefined;
-  /** Wenn true: Prozentwert wird inline angezeigt (für mobile/visible Kontexte). Default: nur Icon, Prozentwert nur per Tooltip/aria-label. */
+  /** Wenn false: nur Icon, Prozentwert per aria-label. Default: true (Touch-Geräte sehen Prozent inline). */
   showPercent?: boolean;
 }
 
@@ -15,8 +15,11 @@ interface ConfidenceBadgeProps {
  * - >= 0.8: kein Badge (Feld ist sicher)
  * - 0.5 – 0.79: Warning-Triangle (gelb, "unsicher")
  * - < 0.5: Alert-Circle (rot, "sehr unsicher")
+ *
+ * CU13: Default `showPercent=true` da `title=""` auf Touch-Geräten nicht aktivierbar ist
+ * und sehende User den Score sonst nicht abrufen können.
  */
-export function ConfidenceBadge({ score, showPercent = false }: ConfidenceBadgeProps) {
+export function ConfidenceBadge({ score, showPercent = true }: ConfidenceBadgeProps) {
   if (score === undefined || score >= 0.8) return null;
 
   const isLow = score < 0.5;
@@ -49,29 +52,28 @@ interface ConfidenceOverviewProps {
 
 /**
  * Gesamt-Confidence-Anzeige als Card-Element.
+ * CU14: Icon zusätzlich zur Farbe (color-blind-konform).
  */
 export function ConfidenceOverview({ overall }: ConfidenceOverviewProps) {
   const percent = Math.round(overall * 100);
-  const bgColor =
-    overall >= 0.8
-      ? "bg-cs-success"
-      : overall >= 0.5
-        ? "bg-warning"
-        : "bg-error";
-
+  const tier =
+    overall >= 0.8 ? "high" : overall >= 0.5 ? "mid" : "low";
+  const bgColor = tier === "high" ? "bg-cs-success" : tier === "mid" ? "bg-warning" : "bg-error";
+  const Icon = tier === "high" ? IconCheckCircle : tier === "mid" ? IconAlertTriangle : IconAlertCircle;
   const description =
-    overall >= 0.8
+    tier === "high"
       ? "Hohe Zuverlässigkeit"
-      : overall >= 0.5
+      : tier === "mid"
         ? "Einige Felder unsicher – bitte prüfen"
         : "Viele unsichere Felder – bitte sorgfältig prüfen";
 
   return (
     <div className="card p-3 mb-6 flex items-center gap-3" role="status" aria-label={`Gesamt-Konfidenz: ${percent} Prozent`}>
       <div
-        className={`w-10 h-10 rounded-md flex items-center justify-center text-white text-sm font-bold ${bgColor}`}
+        className={`w-10 h-10 rounded-md flex flex-col items-center justify-center text-white ${bgColor} relative`}
       >
-        {percent}%
+        <Icon className="w-3.5 h-3.5 absolute top-1 right-1 opacity-80" aria-hidden="true" />
+        <span className="text-sm font-bold leading-none">{percent}%</span>
       </div>
       <div>
         <p className="text-sm font-medium text-foreground">

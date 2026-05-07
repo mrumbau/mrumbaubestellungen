@@ -52,21 +52,23 @@ export default async function CardScanLayout({
         {/* Header */}
         <header className="sticky top-0 z-30 bg-sidebar border-b border-white/[0.06] safe-area-top">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a
+            <Link
               href="/"
               className="flex items-center gap-2.5 text-white/50 hover:text-white/80 transition-colors focus-ring rounded"
-              aria-label="Zurück zur Startseite"
+              aria-label="Zur Tool-Auswahl"
+              title="Zur Tool-Auswahl"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-              </svg>
               <Logo size={20} color="#ffffff" className="opacity-40" />
-            </a>
+            </Link>
 
-            <div className="flex items-center gap-2">
+            <Link
+              href="/cardscan"
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity focus-ring rounded px-1"
+              aria-label="CardScan-Übersicht"
+            >
               <span className="font-headline text-[13px] text-white/90 tracking-tight">Card</span>
               <span className="font-headline text-[13px] text-cs-accent/70 tracking-tight">Scan</span>
-            </div>
+            </Link>
 
             <div className="w-7 h-7 rounded-md bg-white/[0.07] flex items-center justify-center text-[10px] font-bold text-white/70 border border-white/[0.06]">
               {profil.kuerzel}

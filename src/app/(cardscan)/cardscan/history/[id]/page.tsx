@@ -21,7 +21,7 @@ function CrmBadge({ status, label }: { status: string | null; label: string }) {
   const config: Record<string, { bg: string; text: string; label: string }> = {
     success: { bg: "bg-cs-accent-tint", text: "text-cs-accent-text", label: "Erstellt" },
     failed: { bg: "bg-error-bg", text: "text-error", label: "Fehlgeschlagen" },
-    skipped: { bg: "bg-slate-50", text: "text-slate-600", label: "Dry-Run" },
+    skipped: { bg: "bg-cs-discarded-bg", text: "text-cs-discarded-text", label: "Dry-Run" },
     pending: { bg: "bg-warning-bg", text: "text-warning", label: "Ausstehend" },
   };
   const s = config[status || "pending"] || config.pending;

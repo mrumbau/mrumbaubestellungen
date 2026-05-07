@@ -35,9 +35,9 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 function ProjectCreateCard({
-  crm1CustomerId, crm2CustomerId, displayName,
+  captureId, displayName,
 }: {
-  crm1CustomerId: string | null; crm2CustomerId: string | null; displayName: string;
+  captureId: string; displayName: string;
 }) {
   const [projectName, setProjectName] = useState(displayName);
   const [creating, setCreating] = useState(false);
@@ -49,7 +49,7 @@ function ProjectCreateCard({
     try {
       const res = await fetch("/api/cardscan/create-project", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_name: projectName.trim(), crm1_customer_id: crm1CustomerId, crm2_customer_id: crm2CustomerId }),
+        body: JSON.stringify({ capture_id: captureId, project_name: projectName.trim() }),
       });
       setResult(res.ok ? "success" : "error");
     } catch { setResult("error"); } finally { setCreating(false); }
@@ -73,7 +73,7 @@ function ProjectCreateCard({
         <input
           type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
           placeholder="Projektname"
-          className="flex-1 py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-sm focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
+          className="flex-1 py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
         />
         <button
           onClick={handleCreate} disabled={creating || !projectName.trim()}
@@ -92,7 +92,7 @@ function CrmRow({ label, status, refNum, error: err }: { label: string; status: 
   const conf: Record<string, { dot: string; text: string }> = {
     success: { dot: "bg-cs-success", text: "Erstellt" },
     failed: { dot: "bg-error", text: "Fehler" },
-    skipped: { dot: "bg-slate-400", text: "Dry-Run" },
+    skipped: { dot: "bg-cs-discarded", text: "Dry-Run" },
     pending: { dot: "bg-warning", text: "Ausstehend" },
   };
   const c = conf[s] || conf.pending;
@@ -193,6 +193,9 @@ export default function CardScanSuccessPage() {
     : "Kontakt";
   const isFailed = capture?.status === "failed";
   const isPartial = capture?.status === "partial_success";
+  // CU18: Beide CRMs im Dry-Run-Modus → kein echter API-Write erfolgt.
+  const isBothDryRun =
+    capture?.crm1_status === "skipped" && capture?.crm2_status === "skipped";
 
   return (
     <div className="max-w-lg md:max-w-xl mx-auto py-8 animate-fade-in">
@@ -212,9 +215,34 @@ export default function CardScanSuccessPage() {
           {displayName}
         </h1>
         <p className="text-sm text-foreground-muted mt-1">
-          {isFailed ? "Konnte nicht angelegt werden" : isPartial ? "Teilweise angelegt" : "Erfolgreich angelegt"}
+          {isFailed
+            ? "Konnte nicht angelegt werden"
+            : isBothDryRun
+              ? "Dry-Run: Keine Anlage in CRM erfolgt"
+              : isPartial
+                ? "Teilweise angelegt"
+                : "Erfolgreich angelegt"}
         </p>
       </div>
+
+      {/* CU18: Banner bei beidseitigem Dry-Run — User muss wissen dass nichts persistiert wurde */}
+      {isBothDryRun && (
+        <div className="card p-4 mb-5 border-cs-partial/30 bg-cs-partial-bg">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-cs-partial shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="text-sm text-cs-partial-text">
+              <p className="font-medium mb-1">Dry-Run-Modus aktiv</p>
+              <p className="text-cs-partial-text/80">
+                Beide CRM-Tokens stehen auf Dry-Run — die Daten wurden nur lokal gespeichert,
+                aber nicht in das-programm.io angelegt. Admin kann die Tokens in den
+                Vercel-Settings konfigurieren (DAS_PROGRAMM_TOKEN_CRM1/CRM2).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── CRM-Status ───────────────────────────────────────────── */}
       <div className="card p-4 mb-5">
@@ -222,8 +250,9 @@ export default function CardScanSuccessPage() {
         <div className="border-t border-line-subtle my-1" />
         <CrmRow label={CRM_LABELS.crm2} status={capture?.crm2_status || null} refNum={capture?.crm2_reference_number || null} error={capture?.crm2_error || null} />
 
-        {/* Retry-Button bei Partial-Success: Backend ist idempotent (F7.3) */}
-        {(isPartial || isFailed) && capture?.status !== "writing" && (
+        {/* CF5: Retry-Button NUR bei echten Fehlern, nicht bei Dry-Run-Konfiguration.
+            partial_success mit beidseitigem skipped/dry_run ist KEIN Fehler. */}
+        {(isPartial || isFailed) && capture?.status !== "writing" && !isBothDryRun && (
           <div className="border-t border-line-subtle mt-2 pt-3">
             <button
               type="button"
@@ -258,8 +287,7 @@ export default function CardScanSuccessPage() {
       {/* ─── Projekt anlegen ──────────────────────────────────────── */}
       {!isFailed && (capture?.crm1_customer_id || capture?.crm2_customer_id) && (
         <ProjectCreateCard
-          crm1CustomerId={capture.crm1_customer_id}
-          crm2CustomerId={capture.crm2_customer_id}
+          captureId={capture.id}
           displayName={displayName}
         />
       )}

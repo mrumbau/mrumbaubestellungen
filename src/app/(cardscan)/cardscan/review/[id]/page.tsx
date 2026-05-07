@@ -152,7 +152,7 @@ export default function CardScanReviewPage() {
       try {
         const res = await fetch("/api/cardscan/update-customer", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ crm: updateTarget.crm, customer_id: updateTarget.customerId, final_data: formData }),
+          body: JSON.stringify({ capture_id: id, crm: updateTarget.crm, customer_id: updateTarget.customerId, final_data: formData }),
         });
         const json = await res.json();
         if (!res.ok) { setError(json.error || "Update fehlgeschlagen."); setSaving(false); return; }
@@ -288,16 +288,62 @@ export default function CardScanReviewPage() {
     );
   }
 
-  if (!formData) return null;
+  // CU19: Empty-State wenn KI keine verwertbaren Daten extrahiert hat
+  if (!formData) {
+    return (
+      <div className="max-w-lg md:max-w-xl mx-auto py-12 text-center animate-fade-in">
+        <div className="w-14 h-14 mx-auto mb-5 rounded-2xl flex items-center justify-center bg-cs-partial-bg">
+          <svg className="w-7 h-7 text-cs-partial" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h1 className="font-headline text-xl text-foreground tracking-tight mb-1">
+          Keine Daten extrahiert
+        </h1>
+        <p className="text-sm text-foreground-muted mb-6 px-4">
+          Die KI konnte aus deinem Input keine Kontaktdaten erkennen — vielleicht war
+          das Foto unscharf, der Text zu kurz, oder die URL liefert kein lesbares HTML.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 max-w-sm mx-auto">
+          <button
+            type="button"
+            onClick={() => router.push("/cardscan")}
+            className="flex-1 py-3.5 px-4 rounded-xl bg-cs-accent text-white text-sm font-medium hover:bg-cs-accent-light transition-colors min-h-[48px] active:scale-[0.98]"
+          >
+            Erneut scannen
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/cardscan/paste")}
+            className="flex-1 py-3.5 px-4 rounded-xl border border-line text-foreground-muted text-sm font-medium hover:bg-input transition-colors min-h-[48px] active:scale-[0.98]"
+          >
+            Manuell eingeben
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const isCompany = formData.customer_type === "company";
-  const canSubmit = duplicates.length === 0 || dupAction !== "none";
   const displayName = isCompany
     ? formData.companyName || [formData.firstName, formData.lastName].filter(Boolean).join(" ")
     : [formData.firstName, formData.lastName].filter(Boolean).join(" ");
   const hasAddress = formData.address && (formData.address.street || formData.address.city);
   // Felder die "sekundär" sind
   const hasSecondaryFields = !!(formData.fax || formData.website || formData.vatId || formData.letterSalutation);
+
+  // CU12: Pflichtfeld-Check — entweder companyName ODER lastName muss da sein
+  const hasMinimumName = !!(
+    (isCompany && formData.companyName?.trim()) ||
+    formData.lastName?.trim()
+  );
+  // Email-Format leichter Check (kein RFC-strict, nur "x@y.z")
+  const emailLooksValid =
+    !formData.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
+  const canSubmit =
+    hasMinimumName &&
+    emailLooksValid &&
+    (duplicates.length === 0 || dupAction !== "none");
 
   return (
     <div className="max-w-lg md:max-w-xl mx-auto pb-8 animate-fade-in">
@@ -469,11 +515,29 @@ export default function CardScanReviewPage() {
               {formData.notes !== undefined && (
                 <label className="block">
                   <span className="text-xs text-foreground-muted">Notizen</span>
-                  <input type="text" value={formData.notes || ""} onChange={(e) => updateField("notes", e.target.value)} className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]" />
+                  <textarea
+                    value={formData.notes || ""}
+                    onChange={(e) => updateField("notes", e.target.value)}
+                    rows={3}
+                    className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] resize-y min-h-[88px]"
+                  />
                 </label>
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* CU12: Pflichtfeld-Hint (sanft, blockiert nur Submit, kein Aggro-Pattern) */}
+      {!hasMinimumName && (
+        <div className="p-3 rounded-md bg-warning-bg border border-warning/30 text-warning-text text-sm mb-4" role="status">
+          <span className="font-medium">Mindestens nötig:</span>{" "}
+          {isCompany ? "Firmenname" : "Nachname"} — sonst kann der Kontakt nicht angelegt werden.
+        </div>
+      )}
+      {!emailLooksValid && (
+        <div className="p-3 rounded-md bg-warning-bg border border-warning/30 text-warning-text text-sm mb-4" role="status">
+          E-Mail-Adresse sieht ungültig aus — bitte prüfen.
         </div>
       )}
 

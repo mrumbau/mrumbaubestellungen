@@ -257,7 +257,14 @@ function safeParseGptJson<T>(text: string, fallback: T, context = "openai/safePa
 const DokumentAnalyseSchema = z.object({
   typ: z.enum([
     "bestellbestaetigung", "lieferschein", "rechnung",
-    "aufmass", "leistungsnachweis", "versandbestaetigung", "unbekannt",
+    "aufmass", "leistungsnachweis", "versandbestaetigung",
+    // 07.05.2026 — "anlage" für AGB / Widerrufsbelehrung / Datenschutzerklärung /
+    // Anschreiben / Bedienungsanleitung / Sicherheitsdatenblatt / Newsletter-PDFs.
+    // Strukturell verhindert das, dass KI gezwungen ist, einen Transaktions-Typ
+    // mit Konfidenz 0.9 zu erfinden für Dokumente, die gar keine Transaktion
+    // beschreiben. Pipeline-Code ignoriert "anlage" via BEKANNTE_TYPEN-Filter.
+    "anlage",
+    "unbekannt",
   ]),
   vermutete_bestellungsart: z.enum(["material", "subunternehmer", "abo"]).nullable(),
   bestellnummer: z.string().nullable(),
@@ -291,7 +298,7 @@ const DokumentAnalyseSchema = z.object({
 });
 
 export interface DokumentAnalyse {
-  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "versandbestaetigung" | "unbekannt";
+  typ: "bestellbestaetigung" | "lieferschein" | "rechnung" | "aufmass" | "leistungsnachweis" | "versandbestaetigung" | "anlage" | "unbekannt";
   vermutete_bestellungsart?: "material" | "subunternehmer" | "abo";
   bestellnummer: string | null;
   auftragsnummer: string | null;
@@ -359,7 +366,68 @@ export interface WochenzusammenfassungErgebnis {
 const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma (MR Umbau GmbH) analysiert.
 Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück. KEIN Markdown, KEINE Backticks, KEIN Text davor oder danach — nur rohes JSON.
 
-Erkenne den Dokumenttyp: bestellbestaetigung, lieferschein, rechnung, aufmass, leistungsnachweis, oder versandbestaetigung.
+═══════════════════════════════════════════════════════════════════════════
+TYP-ENTSCHEIDUNG — die WICHTIGSTE Aufgabe (alles andere hängt davon ab)
+═══════════════════════════════════════════════════════════════════════════
+
+Erlaubte Werte für "typ":
+  TRANSAKTIONS-TYPEN (erzeugen eine Bestellung in der DB):
+    - "bestellbestaetigung", "lieferschein", "rechnung",
+      "aufmass", "leistungsnachweis", "versandbestaetigung"
+  NICHT-TRANSAKTIONAL (werden ignoriert, KEINE Bestellung):
+    - "anlage" — AGB, Widerrufsbelehrung, Datenschutz, Anschreiben, Bedienung,
+      Sicherheitsdatenblatt, Werbung, Bewertungsaufforderung, generisches PDF
+    - "unbekannt" — wenn das Dokument unleserlich oder defekt ist
+
+🔒 PFLICHT-SELBSTCHECK BEVOR DU EINEN TRANSAKTIONS-TYP WÄHLST 🔒
+
+Ein Transaktions-Typ ist NUR dann zulässig, wenn das Dokument MINDESTENS EINE
+dieser konkreten Daten enthält:
+  ✓ eine Bestellnummer / Auftragsnummer / Rechnungsnummer / Lieferscheinnummer
+  ✓ einen Gesamtbetrag (Summe in Euro, größer als 0)
+  ✓ eine Artikel-/Positionsliste mit mindestens 1 Eintrag mit Name UND Preis
+
+Wenn KEINES dieser drei vorhanden ist → typ = "anlage" (NIEMALS "bestellbestaetigung"
+oder "rechnung" mit hoher Konfidenz erfinden!).
+
+Falsch-Klassifizierung als Transaktions-Typ ist VIEL SCHLIMMER als typ="anlage" —
+eine falsch angelegte Bestellung muss der User manuell verwerfen, eine Anlage
+wird einfach ignoriert.
+
+═══════════════════════════════════════════════════════════════════════════
+KONKRETE NEGATIV-BEISPIELE — diese Dokumente sind IMMER typ="anlage":
+═══════════════════════════════════════════════════════════════════════════
+
+❌ "Allgemeine Geschäftsbedingungen" / "AGB" / "Vertragsbedingungen für ..."
+❌ "Widerrufsbelehrung" / "Widerrufsrecht" / "Muster-Widerrufsformular"
+❌ "Datenschutzerklärung" / "Datenschutzhinweise" / "Privacy Policy"
+❌ "Sicherheitsdatenblatt" / "MSDS" / "Safety Data Sheet" (REACH-Anhänge)
+❌ "Bedienungsanleitung" / "Gebrauchsanweisung" / "Manual" / "User Guide"
+❌ "Konformitätserklärung" / "CE-Erklärung" / "Declaration of Conformity"
+❌ "Garantiebedingungen" / "Gewährleistung" / "Garantieurkunde"
+❌ "Newsletter" / "Produktinfo" / "Werbung" / "Angebotskatalog"
+❌ "Bewertung Sie uns" / "Wie zufrieden waren Sie?"
+❌ Begleitschreiben / Anschreiben OHNE Auftragsnummer und Betrag
+❌ Marketing-PDFs ("Neuheiten", "Aktion", "Sortiment 2026")
+❌ Schulungsunterlagen / Whitepapers / Studien
+
+🚨 KONFIDENZ-FALLE: Diese Dokumente wirken oft "professionell formatiert" und
+   stammen von echten Lieferanten. Lass dich nicht täuschen — Layout-Qualität
+   ist KEIN Signal für transaktionalen Inhalt. Nur die drei Konkretheits-
+   Kriterien (Bestellnr. / Betrag / Artikelliste) zählen.
+
+═══════════════════════════════════════════════════════════════════════════
+KONFIDENZ-WERT — mathematisch, nicht subjektiv
+═══════════════════════════════════════════════════════════════════════════
+
+konfidenz = Anteil der Konkretheits-Signale die du extrahieren konntest:
+  - 0.0 = typ="anlage" oder "unbekannt" (immer 0)
+  - 0.4 = nur 1 von 3 Konkretheits-Signalen (z.B. nur Betrag, keine Nummer/Artikel)
+  - 0.7 = 2 von 3 Konkretheits-Signalen
+  - 0.95 = alle 3 + Datum + Händler erkannt
+
+Setze NIEMALS konfidenz > 0.5 wenn du nicht mindestens 2 Konkretheits-Signale
+hast. Modell-"Selbstvertrauen" ist irrelevant — was zählt sind extrahierte Daten.
 
 Hinweise zur Typ-Erkennung:
 - "lieferschein" vs "rechnung" — WICHTIG: Viele Baustoffhändler (Raab Karcher, Bauhaus etc.) verwenden ähnliche Layouts für beide Dokumenttypen. Unterscheide anhand:
@@ -495,7 +563,30 @@ HALLUZINATIONS-SCHUTZ — typische deutsche Mail-Fallen (aus Real-World-Daten):
    "Mahnung", "Zahlungserinnerung", "Mahngebühr" — typ="rechnung" ist OK,
    aber gesamtbetrag nur wenn echter Betrag im Mahn-Text genannt ist.
 
-═══════════════════════════════════════════════════════════════════════════`;
+═══════════════════════════════════════════════════════════════════════════
+🛑 FINAL-CHECK BEVOR DU JSON ZURÜCKGIBST
+═══════════════════════════════════════════════════════════════════════════
+
+Bevor du antwortest, prüfe in dieser Reihenfolge:
+
+  1. Ist typ ∈ {bestellbestaetigung, lieferschein, rechnung, aufmass,
+     leistungsnachweis, versandbestaetigung}?
+     → JA: weiter zu Schritt 2
+     → NEIN (anlage/unbekannt): konfidenz=0, weiter zu JSON
+
+  2. Ist mindestens EINES gefüllt:
+     bestellnummer / auftragsnummer / lieferscheinnummer / gesamtbetrag (>0)
+     / artikel.length ≥ 1 (mit Name+Preis)?
+     → JA: gut, JSON zurückgeben
+     → NEIN: ÄNDERE typ auf "anlage" und konfidenz auf 0. Niemals Transaktions-
+        Typ mit hoher Konfidenz erfinden.
+
+  3. Stimmt konfidenz mit Anzahl extrahierter Konkretheits-Signale überein?
+     - 1 von 3 Signalen → konfidenz ≤ 0.5
+     - 2 von 3 → konfidenz ≤ 0.75
+     - 3 von 3 → konfidenz bis 0.95
+
+Antworte NUR mit dem JSON. Kein Kommentar, keine Begründung außerhalb.`;
 
 /** Document-Hint-Map: vom Outlook-Folder gelieferter weicher Hinweis auf den Dokumenttyp. */
 const HINT_LABELS: Record<string, string> = {

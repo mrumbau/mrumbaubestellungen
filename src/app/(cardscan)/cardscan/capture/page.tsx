@@ -21,11 +21,20 @@ export default function CardScanCapturePage() {
   const [error, setError] = useState<string | null>(null);
 
   const startingRef = useRef(false);
+  // CU15: Mirror für cameraState im visibilitychange-Listener (Closure-Stale-Schutz)
+  const cameraStateRef = useRef<CameraState>("requesting");
 
   const startCamera = useCallback(async () => {
     // Guard: verhindert parallele getUserMedia-Calls
     if (startingRef.current) return;
     startingRef.current = true;
+
+    // CF7: Falls noch ein alter Stream lebt (StrictMode-Doppel-Mount, Browser-Back),
+    // sauber abräumen bevor wir einen neuen anfordern. Sonst zwei aktive Tracks.
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
 
     setCameraState("requesting");
 
@@ -81,8 +90,35 @@ export default function CardScanCapturePage() {
   }, []);
 
   useEffect(() => {
+    cameraStateRef.current = cameraState;
+  }, [cameraState]);
+
+  useEffect(() => {
     startCamera();
     return () => stopCamera();
+  }, [startCamera, stopCamera]);
+
+  // CU15+CF7: Bei Tab-Switch / Browser-Hide Kamera pausieren — Battery + LED.
+  // Beim Zurückkehren wird die Kamera nur dann automatisch wieder gestartet,
+  // wenn vorher kein Foto aufgenommen war (cameraState !== "captured").
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopCamera();
+        return;
+      }
+      // Wieder sichtbar: nur restarten wenn vorher aktiv war (nicht captured/denied)
+      if (
+        !document.hidden &&
+        !streamRef.current &&
+        !startingRef.current &&
+        (cameraStateRef.current === "active" || cameraStateRef.current === "requesting")
+      ) {
+        startCamera();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [startCamera, stopCamera]);
 
   // Video liefert Frames → Kamera ist aktiv

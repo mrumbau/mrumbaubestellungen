@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Offline · CardScan</title>
+  <style>
+    :root {
+      --bg-main: #f5f4f2;
+      --bg-card: #ffffff;
+      --text-primary: #141414;
+      --text-tertiary: #6b6863;
+      --line: #e5e3df;
+      --cs-accent: #10b981;
+      --cs-accent-light: #34d399;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-primary);
+    }
+    body { display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+    .wrap { max-width: 28rem; text-align: center; }
+    .icon-box {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 1.25rem;
+      border-radius: 16px;
+      background: rgba(16, 185, 129, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    h1 {
+      font-family: "Barlow Condensed", sans-serif;
+      font-weight: 600;
+      font-size: 1.5rem;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    p { font-size: 0.875rem; color: var(--text-tertiary); margin: 0 0 1.5rem; }
+    button {
+      font: inherit;
+      border: 0;
+      cursor: pointer;
+      padding: 0.875rem 1.5rem;
+      border-radius: 12px;
+      background: var(--cs-accent);
+      color: #fff;
+      font-weight: 500;
+      font-size: 0.875rem;
+      min-height: 48px;
+      transition: background 150ms;
+    }
+    button:hover { background: var(--cs-accent-light); }
+    button:active { transform: scale(0.98); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="icon-box">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l22 22"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 015.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0122.58 9"/>
+        <path d="M1.42 9a15.91 15.91 0 014.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 016.95 0"/>
+        <line x1="12" y1="20" x2="12.01" y2="20"/>
+      </svg>
+    </div>
+    <h1>Keine Verbindung</h1>
+    <p>CardScan braucht eine Internetverbindung. Sobald du wieder online bist, kann's weitergehen.</p>
+    <button type="button" onclick="window.location.reload()">Erneut versuchen</button>
+  </div>
+</body>
+</html>

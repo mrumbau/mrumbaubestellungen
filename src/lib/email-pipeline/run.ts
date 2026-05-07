@@ -830,6 +830,49 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         throw new Error("pseudo_bestellung_kein_anhang_keine_bn: Mail wird als 'failed' markiert");
       }
 
+      // 07.05.2026 (Strukturelles Evidence-Gate): Bevor eine NEUE Bestellung
+      // angelegt wird, muss mindestens eine konkrete Daten-Spur vorliegen —
+      // Betrag, Bestellnummer/Auftragsnummer/Lieferscheinnummer ODER eine
+      // nicht-leere Artikel-Liste. Sonst ist die Mail keine echte Transaktion,
+      // sondern Korrespondenz / AGB-Update / Vertrags-Anlage / Newsletter.
+      //
+      // Realer Auslöser: EnBW Ladekarten-Bestellbestätigung mit drei PDF-
+      // Anhängen (AGB, Widerrufsbelehrung, Widerrufsformular). Die KI
+      // klassifizierte alle drei mit Konfidenz 0.5–0.9 als 'bestellbestaetigung',
+      // aber jeder Anhang hatte gesamtbetrag=null, bestellnummer=null,
+      // artikel=[]. Eine leere Bestellung "Ohne Nr. – EnBW – Material" landete
+      // in der UI; nur durch noch eine Black-List-Regel (AGB-Filter) wäre der
+      // Edge-Case nicht zu schließen — strukturell gehören solche Mails ohne
+      // konkrete Transaktions-Daten gar nicht erst in die Bestellungs-Tabelle.
+      //
+      // 'irrelevant'-Skip statt 'failed': Retry bringt strukturell nichts —
+      // das Modell wird beim nächsten Versuch identisch antworten. Die Mail
+      // landet im email_processing_log als 'irrelevant: keine_konkreten_daten'
+      // und der Retry-Cron lässt sie in Ruhe. False-Negatives kann der User
+      // im Email-Sync-Monitor manuell zur Bestellung hochstufen.
+      const hatKonkreteDatenInAnhang = analyseErgebnisse.some((e) => {
+        const a = e.analyse;
+        const hatBetrag = typeof a.gesamtbetrag === "number" && a.gesamtbetrag > 0;
+        const hatNummer = !!(a.bestellnummer || a.auftragsnummer || a.lieferscheinnummer);
+        const hatArtikel = Array.isArray(a.artikel) && a.artikel.length > 0;
+        return hatBetrag || hatNummer || hatArtikel;
+      });
+      if (!hatKonkreteDatenInAnhang && !erkannteBestellnummer && !erkannteAuftragsnummer) {
+        logInfo("webhook/email", "Pseudo-Bestellung verhindert: keine konkreten Daten in Mail oder Anhängen", {
+          email_betreff,
+          email_absender,
+          haendlerName,
+          anhang_count: analyseErgebnisse.length,
+          typen: analyseErgebnisse.map((e) => e.analyse.typ),
+          konfidenzen: analyseErgebnisse.map((e) => e.analyse.konfidenz),
+        });
+        return {
+          success: true,
+          skipped: true,
+          reason: "keine_konkreten_daten",
+        };
+      }
+
       // Neue Bestellung anlegen
       if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
         const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
@@ -945,6 +988,18 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         subject: email_betreff,
       });
       analyse.typ = "versandbestaetigung";
+    }
+
+    // 07.05.2026 — typ="anlage" ist KI-EXPLIZIT (AGB/Widerruf/Datenschutz/etc.)
+    // und darf NICHT durch Subject-Fallback umetikettiert werden. Sonst würde
+    // eine "Bestellbestätigung: EnBW Ladekarte"-Mail die mitgeschickte AGB-PDF
+    // als Bestellbestätigung persistieren — genau der Bug, den wir abstellen.
+    if (analyse.typ === "anlage") {
+      logInfo("webhook/email", `Anhang übersprungen: typ="anlage" (Begleit-Dokument, keine Transaktion)`, {
+        datei: dateiName,
+        subject: (email_betreff ?? "").slice(0, 80),
+      });
+      continue;
     }
 
     // F5.X Fix: Vision-Fallback. Wenn KI den Typ nicht erkennt (parse_fehler ODER
