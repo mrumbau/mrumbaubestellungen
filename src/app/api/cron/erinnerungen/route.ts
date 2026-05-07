@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       .eq("hat_lieferschein", false)
       .neq("bestellungsart", "subunternehmer")
       .neq("bestellungsart", "abo")
-      .in("status", ["offen", "ls_fehlt"])
+      .eq("status", "offen")
       .lt("created_at", schwelleDatum)
       .or(`mahnung_am.is.null,mahnung_am.lt.${dedupSchwelle}`)
       .order("created_at", { ascending: true });
@@ -81,25 +81,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Status auf ls_fehlt setzen wo nötig (für sichtbares UI-Signal)
-    const lsFehltIds = bestellungen
-      .filter((b) => b.besteller_kuerzel !== "UNBEKANNT")
-      .map((b) => b.id);
-
-    // F5.1: Status-Machine — Batch-Update validieren wir nicht via safeUpdateStatus
-    // (wäre n+1 Round-Trips). Stattdessen nur Bestellungen wechseln deren aktueller
-    // Status den Übergang erlaubt (offen/vollstaendig/abweichung → ls_fehlt).
-    // Niemals freigegebene Bestellungen treffen.
-    if (lsFehltIds.length > 0) {
-      const { error: updateError } = await supabase
-        .from("bestellungen")
-        .update({ status: "ls_fehlt", updated_at: new Date().toISOString() })
-        .in("id", lsFehltIds)
-        .neq("status", "freigegeben");
-      if (updateError) {
-        logError("/api/cron/erinnerungen", "Batch-Update ls_fehlt fehlgeschlagen", updateError);
-      }
-    }
+    // 07.05.2026 — Status="ls_fehlt" entfernt. Mahnung-Tracking läuft jetzt
+    // ausschließlich über `mahnung_am` + `mahnung_count` — sichtbar in UI als
+    // Badge auf der Bestellung. Status bleibt "offen", die Erinnerungs-Mail
+    // (unten) ist die eigentliche Aktion.
 
     // Gruppiere nach Besteller
     const bestellerGruppen = new Map<string, typeof bestellungen>();

@@ -83,11 +83,13 @@ export function getStatusConfig(status: string) {
  * Single source of truth: bei einem neuen Status muss nur STATUS_CONFIG
  * (oben) ergänzt werden plus dieser Eintrag.
  */
+// 07.05.2026 — "abweichung" und "ls_fehlt" entfernt: redundant zu Mahnungs-
+// Tracking + abgleiche-Tabelle, im Workflow nicht mehr genutzt. STATUS_CONFIG
+// bleibt für Render-Backwards-Compat, falls historische Bestellungen sie noch
+// hätten — aktuell keine.
 export const STATUS_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Alle Status" },
   { value: "offen", label: "Offen" },
   { value: "vollstaendig", label: "Vollständig" },
-  { value: "abweichung", label: "Abweichung" },
-  { value: "ls_fehlt", label: "LS fehlt" },
   { value: "freigegeben", label: "Freigegeben" },
 ];

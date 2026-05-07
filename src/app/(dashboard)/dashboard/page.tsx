@@ -66,7 +66,7 @@ export default async function DashboardPage({
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     kpiQuery,
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").order("created_at", { ascending: false }).limit(5)),
-    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").in("status", ["abweichung", "ls_fehlt", "vollstaendig"]).order("created_at", { ascending: false }).limit(10)),
+    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("status", "vollstaendig").order("created_at", { ascending: false }).limit(10)),
     supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("besteller_kuerzel", "UNBEKANNT").not("bestellungsart", "in", "(abo,subunternehmer)").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
@@ -123,8 +123,6 @@ export default async function DashboardPage({
   };
   const kpi = (kpiRow as KpiRow | null) ?? null;
   const offen = kpi?.offen_count ?? 0;
-  const abweichungen = kpi?.abweichung_count ?? 0;
-  const lsFehlt = kpi?.ls_fehlt_count ?? 0;
   const freigegeben = kpi?.freigegeben_count ?? 0;
   const erwartet = 0; // nicht mehr verwendet
   const vollstaendig = kpi?.vollstaendig_count ?? 0;
@@ -215,7 +213,7 @@ export default async function DashboardPage({
     if (!b.projekt_id) continue;
     const s = projektStatsMap.get(b.projekt_id) || { gesamt: 0, offen: 0, volumen: 0 };
     s.gesamt++;
-    if (["offen", "erwartet", "abweichung", "ls_fehlt", "vollstaendig"].includes(b.status)) s.offen++;
+    if (["offen", "erwartet", "vollstaendig"].includes(b.status)) s.offen++;
     s.volumen += Number(b.betrag) || 0;
     projektStatsMap.set(b.projekt_id, s);
   }
@@ -285,8 +283,6 @@ export default async function DashboardPage({
     alert?: boolean; volumen?: number;
   }> = [
     { id: "offen", label: "Offen", value: offen, color: "var(--status-offen)", row: 1 },
-    { id: "abweichungen", label: "Abweichungen", value: abweichungen, color: "var(--status-abweichung)", alert: abweichungen > 0, row: 1 },
-    { id: "ls_fehlt", label: "LS fehlt", value: lsFehlt, color: "var(--status-ls-fehlt)", row: 1 },
     { id: "freigegeben", label: "Freigegeben", value: freigegeben, color: "var(--status-freigegeben)", row: 1 },
     { id: "vollstaendig", label: "Vollständig", value: vollstaendig, color: "var(--status-vollstaendig)", row: 2 },
     { id: "gesamt", label: "Gesamt", value: gesamtAnzahl, color: "var(--mr-red)", row: 2 },

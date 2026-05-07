@@ -314,13 +314,14 @@ export async function POST(request: NextRequest) {
           ki_zusammenfassung: abgleich.zusammenfassung,
         });
 
-        const neuerStatus =
-          abgleich.status === "ok" ? "vollstaendig" : "abweichung";
-        // Nur Status setzen wenn nicht bereits freigegeben
-        if (bestellung?.status !== "freigegeben") {
+        // 07.05.2026 — Status="abweichung" entfernt (Workflow-vereinfachung).
+        // Bei OK-Abgleich auf vollstaendig setzen, bei Abweichung Status NICHT
+        // ändern — die Abweichungen-Info bleibt im `abgleiche`-Record erhalten,
+        // sichtbar in der UI über Abgleich-Panel.
+        if (abgleich.status === "ok" && bestellung?.status !== "freigegeben") {
           await supabase
             .from("bestellungen")
-            .update({ status: neuerStatus })
+            .update({ status: "vollstaendig" })
             .eq("id", bestellung_id);
         }
       } catch (err) {
