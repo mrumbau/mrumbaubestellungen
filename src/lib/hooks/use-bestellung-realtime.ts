@@ -65,6 +65,12 @@ export function useBestellungRealtime(
  * router.refresh() (= Server-Component lädt neue Daten). Mit Debounce damit
  * bei Backfill-Bursts (cron-getriggerte Massen-Updates) die UI nicht im
  * Sekunden-Takt rerendert.
+ *
+ * 11.05.2026 — zusätzlich events INSERT (entity_type='bestellung'). Damit die
+ * Audit-Trail-Spalte (event_count) live aktualisiert wird auch wenn das Event
+ * nichts auf bestellungen ändert (z.B. Kommentare, Doku-Adds). Beide Subscriptions
+ * teilen denselben Debounce — ein Burst aus bestellungs-UPDATE + zugehörigem
+ * event-INSERT triggert nur ein Refresh.
  */
 export function useBestellungenListRealtime(options?: {
   debounceMs?: number;
@@ -90,6 +96,16 @@ export function useBestellungenListRealtime(options?: {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bestellungen" },
+        triggerRefresh,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "events",
+          filter: "entity_type=eq.bestellung",
+        },
         triggerRefresh,
       )
       .subscribe();

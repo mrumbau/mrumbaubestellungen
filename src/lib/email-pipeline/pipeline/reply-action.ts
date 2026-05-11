@@ -23,11 +23,11 @@ import { logError, logInfo } from "@/lib/logger";
 
 const ROUTE = "pipeline/reply-action";
 
-const TOKEN_RE = /\[REF:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i;
+export const TOKEN_RE = /\[REF:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i;
 
 export type ReplyActionType = "freigeben" | "bezahlt" | "ablehnen";
 
-const ACTION_KEYWORDS: Record<ReplyActionType, RegExp[]> = {
+export const ACTION_KEYWORDS: Record<ReplyActionType, RegExp[]> = {
   // Match nur am Anfang einer Zeile (gestrippter Reply-Header) für Quote-Resistance
   freigeben: [
     /^\s*(freigeben|freigabe|freigegeben|ja|ok|bestätig(e|t|ung)|bestaetig(e|t|ung)|approved?)\b/im,
@@ -76,18 +76,9 @@ export async function detectReplyAction(
   // Body ohne Quote-Block prüfen (alles vor der ersten Reply-Header-Zeile,
   // typische Marker: "Am ...", "On ...", "> ", "----- Original-Nachricht -----")
   const cleanBody = stripQuotedReply(body);
-
-  for (const [action, patterns] of Object.entries(ACTION_KEYWORDS)) {
-    for (const pattern of patterns) {
-      const m = cleanBody.match(pattern);
-      if (m) {
-        return {
-          bestellungId: bestellung.id,
-          action: action as ReplyActionType,
-          matchedKeyword: m[1] ?? m[0],
-        };
-      }
-    }
+  const action = findActionKeyword(cleanBody);
+  if (action) {
+    return { bestellungId: bestellung.id, ...action };
   }
 
   logInfo(ROUTE, "Reply-Token erkannt aber kein Action-Keyword gefunden", {
@@ -97,12 +88,34 @@ export async function detectReplyAction(
 }
 
 /**
+ * Pure-Helper: findet das erste Action-Keyword in einem (bereits gestrippten)
+ * Body. Exportiert für Vitest-Tests.
+ */
+export function findActionKeyword(
+  cleanBody: string,
+): { action: ReplyActionType; matchedKeyword: string } | null {
+  for (const [action, patterns] of Object.entries(ACTION_KEYWORDS)) {
+    for (const pattern of patterns) {
+      const m = cleanBody.match(pattern);
+      if (m) {
+        return {
+          action: action as ReplyActionType,
+          matchedKeyword: m[1] ?? m[0],
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Entfernt den zitierten Original-Mail-Body aus einem Reply, damit Action-
  * Keywords im ursprünglichen Mail-Footer nicht fälschlich getriggert werden.
  *
  * Heuristisch — funktioniert für Outlook + Apple Mail + Gmail-Format.
+ * Exportiert für Vitest-Tests.
  */
-function stripQuotedReply(body: string): string {
+export function stripQuotedReply(body: string): string {
   // Common reply markers (insensitive zum Whitespace, Multi-Line-Anker)
   const markers: RegExp[] = [
     /\n\s*-{2,}\s*Original-Nachricht\s*-{2,}/i,
