@@ -248,6 +248,8 @@ export function BestellungenTabelle({
   // Async UI state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showFreigebenDialog, setShowFreigebenDialog] = useState(false);
+  const [bulkFreigebenLoading, setBulkFreigebenLoading] = useState(false);
   const [freigabeLoadingId, setFreigabeLoadingId] = useState<string | null>(null);
   const [freigabeConfirmId, setFreigabeConfirmId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -483,6 +485,58 @@ export function BestellungenTabelle({
       });
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  // 11.05.2026 — Bulk-Freigabe: nutzt /api/bestellungen/bulk-freigeben.
+  // Server skippt bereits-freigegebene/no-rechnung/no-permission und liefert
+  // Summary zurück. Wir zeigen einen aussagekräftigen Toast statt stillem Erfolg.
+  async function handleBulkFreigeben() {
+    setBulkFreigebenLoading(true);
+    try {
+      const res = await fetch("/api/bestellungen/bulk-freigeben", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selected) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error("Bulk-Freigabe fehlgeschlagen", {
+          description: data.error || "Bitte erneut versuchen.",
+        });
+        return;
+      }
+      const freigegebenN = (data.freigegeben ?? []).length;
+      const alreadyN = (data.already_freigegeben ?? []).length;
+      const noRechnungN = (data.no_rechnung ?? []).length;
+      const noPermissionN = (data.no_permission ?? []).length;
+      const errorsN = (data.errors ?? []).length;
+      const parts: string[] = [];
+      if (freigegebenN > 0) parts.push(`${freigegebenN} freigegeben`);
+      if (alreadyN > 0) parts.push(`${alreadyN} bereits freigegeben`);
+      if (noRechnungN > 0) parts.push(`${noRechnungN} ohne Rechnung`);
+      if (noPermissionN > 0) parts.push(`${noPermissionN} ohne Berechtigung`);
+      if (errorsN > 0) parts.push(`${errorsN} Fehler`);
+
+      setShowFreigebenDialog(false);
+      setSelected(new Set());
+      router.refresh();
+
+      if (errorsN > 0 || noRechnungN > 0 || noPermissionN > 0) {
+        toast.warning("Bulk-Freigabe teilweise erfolgreich", {
+          description: parts.join(" · "),
+        });
+      } else if (freigegebenN > 0) {
+        toast.success(parts.join(" · "));
+      } else {
+        toast.info("Keine Bestellung freigegeben", { description: parts.join(" · ") });
+      }
+    } catch {
+      toast.error("Netzwerkfehler", {
+        description: "Bulk-Freigabe konnte nicht ausgeführt werden.",
+      });
+    } finally {
+      setBulkFreigebenLoading(false);
     }
   }
 
@@ -927,6 +981,28 @@ export function BestellungenTabelle({
           onClear={() => setSelected(new Set())}
           totalHint={`von ${sorted.length} sichtbar`}
         >
+          {(() => {
+            const freigabeFaehig = bestellungen.filter(
+              (b) => selected.has(b.id) && b.hat_rechnung && b.status !== "freigegeben",
+            ).length;
+            return (
+              <Button
+                size="sm"
+                variant="primary"
+                iconLeft={<IconCheck />}
+                onClick={() => setShowFreigebenDialog(true)}
+                loading={bulkFreigebenLoading}
+                disabled={freigabeFaehig === 0}
+                title={
+                  freigabeFaehig === 0
+                    ? "Keine der ausgewählten Bestellungen ist freigabe-fähig (Rechnung fehlt oder bereits freigegeben)"
+                    : `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben`
+                }
+              >
+                Freigeben{freigabeFaehig > 0 ? ` (${freigabeFaehig})` : ""}
+              </Button>
+            );
+          })()}
           <Button
             size="sm"
             variant="destructive"
@@ -1089,6 +1165,33 @@ export function BestellungenTabelle({
         confirmLabel="Freigeben"
         variant="default"
       />
+
+      {/* Bulk-Freigabe Bestätigung */}
+      {(() => {
+        const freigabeFaehig = bestellungen.filter(
+          (b) => selected.has(b.id) && b.hat_rechnung && b.status !== "freigegeben",
+        ).length;
+        const skipped = selected.size - freigabeFaehig;
+        return (
+          <ConfirmDialog
+            open={showFreigebenDialog}
+            onCancel={() => {
+              setShowFreigebenDialog(false);
+              setBulkFreigebenLoading(false);
+            }}
+            onConfirm={handleBulkFreigeben}
+            title="Bestellungen freigeben"
+            message={
+              skipped > 0
+                ? `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben und an die Buchhaltung übermitteln. ${skipped} ausgewählte werden übersprungen (keine Rechnung oder bereits freigegeben).`
+                : `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben und an die Buchhaltung übermitteln?`
+            }
+            confirmLabel={bulkFreigebenLoading ? "Gebe frei..." : "Freigeben"}
+            variant="default"
+            loading={bulkFreigebenLoading}
+          />
+        );
+      })()}
 
       {/* PDF-Vorschau Modal */}
       {previewId && (

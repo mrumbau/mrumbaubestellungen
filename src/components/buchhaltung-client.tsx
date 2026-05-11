@@ -75,6 +75,7 @@ export function BuchhaltungClient({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [archivLoading, setArchivLoading] = useState(false);
+  const [bulkBezahltLoading, setBulkBezahltLoading] = useState(false);
   const [showDatev, setShowDatev] = useState(false);
   const [datevLoading, setDatevLoading] = useState(false);
   const [datevError, setDatevError] = useState<string | null>(null);
@@ -321,7 +322,6 @@ export function BuchhaltungClient({
         setBezahltError(data.error || "Archivieren fehlgeschlagen");
         return;
       }
-      const result = await res.json();
       // Update local state — mark as archived
       setLocalRows((prev) =>
         prev.map((r) =>
@@ -336,6 +336,58 @@ export function BuchhaltungClient({
       setBezahltError("Netzwerkfehler beim Archivieren");
     } finally {
       setArchivLoading(false);
+    }
+  }
+
+  /**
+   * 11.05.2026 — Bulk-Bezahlt-Markieren via /api/dokumente/bulk-bezahlt.
+   * Server skippt schon bezahlte / nicht freigegebene und liefert Summary
+   * { marked, already_paid, skipped, errors }. Wir updaten Local-State nur
+   * für die `marked`-IDs (skipped bleiben unangetastet).
+   */
+  async function bulkBezahltMarkieren(ids: string[]) {
+    if (ids.length === 0) return;
+    setBulkBezahltLoading(true);
+    setBezahltError(null);
+    try {
+      const res = await fetch("/api/dokumente/bulk-bezahlt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBezahltError(data.error || "Bulk-Bezahlt fehlgeschlagen");
+        return;
+      }
+      const marked: string[] = data.marked ?? [];
+      const alreadyPaid: string[] = data.already_paid ?? [];
+      const skipped: { id: string; reason: string }[] = data.skipped ?? [];
+      const errors: { id: string; reason: string }[] = data.errors ?? [];
+      const successIds = new Set([...marked, ...alreadyPaid]);
+      const nowIso = new Date().toISOString();
+      setLocalRows((prev) =>
+        prev.map((r) =>
+          successIds.has(r.id) && !r.bezahlt_am
+            ? { ...r, bezahlt_am: nowIso, bezahlt_von: r.bezahlt_von ?? "…" }
+            : r,
+        ),
+      );
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      // Sichtbare Zusammenfassung statt stiller Erfolg
+      if (skipped.length > 0 || errors.length > 0) {
+        const parts: string[] = [];
+        if (marked.length > 0) parts.push(`${marked.length} bezahlt`);
+        if (alreadyPaid.length > 0) parts.push(`${alreadyPaid.length} schon bezahlt`);
+        if (skipped.length > 0) parts.push(`${skipped.length} übersprungen`);
+        if (errors.length > 0) parts.push(`${errors.length} Fehler`);
+        setBezahltError(parts.join(" · "));
+      }
+    } catch {
+      setBezahltError("Netzwerkfehler beim Bulk-Bezahlt");
+    } finally {
+      setBulkBezahltLoading(false);
     }
   }
 
@@ -623,12 +675,12 @@ export function BuchhaltungClient({
               className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
             />
           </div>
-          {tab === "bezahlt" && !selectionMode && (
+          {!selectionMode && (
             <button
               type="button"
               onClick={() => setSelectionMode(true)}
               className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] rounded-lg border border-line transition-colors shrink-0"
-              title="Auswahl-Modus"
+              title={tab === "offen" ? "Auswahl-Modus (Bulk-Bezahlt)" : "Auswahl-Modus (Archivieren)"}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -841,7 +893,21 @@ export function BuchhaltungClient({
               >
                 Abbrechen
               </button>
-              {selectedIds.size > 0 && (
+              {selectedIds.size > 0 && tab === "offen" && (
+                <button
+                  type="button"
+                  onClick={() => bulkBezahltMarkieren(Array.from(selectedIds))}
+                  disabled={bulkBezahltLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-success hover:bg-success/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={`${selectedIds.size} ausgewählte Rechnung${selectedIds.size === 1 ? "" : "en"} als bezahlt markieren — startet DATEV-Versand pro Rechnung im Hintergrund`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {bulkBezahltLoading ? "Markiere..." : `Als bezahlt (${selectedIds.size})`}
+                </button>
+              )}
+              {selectedIds.size > 0 && tab === "bezahlt" && (
                 <button
                   type="button"
                   onClick={() => archivieren(Array.from(selectedIds))}
