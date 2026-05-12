@@ -383,7 +383,8 @@ function MobileSectionTabs({
           aria-selected={active === tab.key}
           onClick={() => onChange(tab.key)}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 px-4 py-3 text-[12px] font-medium relative transition-colors",
+            // 12.05.2026 (UI-Audit F1.12): min-h-[44px] für WCAG-Touch-Target.
+            "flex-1 flex items-center justify-center gap-1.5 px-4 py-3 min-h-[44px] text-[12px] font-medium relative transition-colors",
             "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
             active === tab.key ? "text-brand" : "text-foreground-muted",
           )}

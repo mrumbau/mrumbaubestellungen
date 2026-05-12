@@ -3,6 +3,11 @@ import { createServerSupabaseClient } from "./supabase-server";
 
 export type Rolle = "besteller" | "buchhaltung" | "admin";
 
+// PASSWORD_MIN_LENGTH ist nach src/lib/auth-config.ts ausgelagert (Client-safe),
+// weil dieses Modul via supabase-server.ts → next/headers Server-only ist.
+// Re-Export für Server-Code-Komfort.
+export { PASSWORD_MIN_LENGTH } from "./auth-config";
+
 export interface BenutzerProfil {
   id: string;
   user_id: string;

@@ -48,6 +48,12 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  /* 12.05.2026 (UI-Audit F1.8) — `rounded-2xl` (24px) wird in 13 Stellen
+     genutzt (vor allem CardScan-Icon-Container, Hero-Cards). Tailwind v4
+     mapped `rounded-2xl`-Klassen automatisch auf diesen Token sobald er
+     im :root steht. Damit ist die Skala konsistent und ein Brand-Refresh
+     trifft alle Stellen über die Token-Stufe. */
+  --radius-2xl: 24px;
 
   /* Status — three-part color system per workflow state:
    *   main = left color-bar / dot / accent

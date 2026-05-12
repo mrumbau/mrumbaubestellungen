@@ -4,44 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import type { Rolle } from "@/lib/auth";
+import { DatevExportModal } from "@/components/buchhaltung/datev-export-modal";
+import { BuchhaltungSummaryCards } from "@/components/buchhaltung/summary-cards";
+import { BuchhaltungTable } from "@/components/buchhaltung/buchhaltung-table";
+import type { BuchhaltungRow } from "@/components/buchhaltung/types";
 
-interface BuchhaltungRow {
-  // 07.05.2026 — id ist jetzt die DOKUMENT-ID (Rechnungs-Beleg), nicht mehr
-  // die Bestellungs-ID. Eine Bestellung mit n Teil-Rechnungen erscheint als
-  // n Zeilen, jede mit eigener Doku-id.
-  id: string;
-  bestellung_id: string;
-  bestellnummer: string | null;
-  haendler_name: string | null;
-  betrag: number | null;
-  waehrung: string;
-  freigegeben_von: string;
-  freigegeben_am: string | null;
-  faelligkeitsdatum: string | null;
-  rechnung_id: string | null;
-  bezahlt_am: string | null;
-  bezahlt_von: string | null;
-  archiviert_am: string | null;
-  bestellungsart?: "material" | "subunternehmer" | "abo" | null;
-  hat_bestellbestaetigung?: boolean;
-  hat_lieferschein?: boolean;
-  mahnung_am?: string | null;
-  mahnung_count?: number;
-  bestelldatum?: string | null;
-  kundennummer?: string | null;
-  projekt_referenz?: string | null;
-}
-
-function isFaelligBald(datum: string | null) {
-  if (!datum) return false;
-  const diff = new Date(datum).getTime() - Date.now();
-  return diff > 0 && diff < 7 * 24 * 60 * 60 * 1000;
-}
-
-function isUeberfaellig(datum: string | null) {
-  if (!datum) return false;
-  return new Date(datum).getTime() < Date.now();
-}
+// BuchhaltungRow + isFaelligBald + isUeberfaellig sind nach
+// src/components/buchhaltung/types.ts ausgelagert.
 
 interface ProjektOption {
   id: string;
@@ -77,22 +46,6 @@ export function BuchhaltungClient({
   const [archivLoading, setArchivLoading] = useState(false);
   const [bulkBezahltLoading, setBulkBezahltLoading] = useState(false);
   const [showDatev, setShowDatev] = useState(false);
-  const [datevLoading, setDatevLoading] = useState(false);
-  const [datevError, setDatevError] = useState<string | null>(null);
-  const [datevVon, setDatevVon] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d.toISOString().slice(0, 10);
-  });
-  const [datevBis, setDatevBis] = useState(() => new Date().toISOString().slice(0, 10));
-  const [datevProjekt, setDatevProjekt] = useState("");
-  const [datevBeraterNr, setDatevBeraterNr] = useState("231925");
-  const [datevMandantenNr, setDatevMandantenNr] = useState("30086");
-  const [datevGegenKonto, setDatevGegenKonto] = useState("4980");
-  const [datevAufwandsKonto, setDatevAufwandsKonto] = useState("");
-  // 06.05.2026 — neuer Filter: nach welchem Datum wird der Zeitraum gemessen?
-  const [datevDatumBasis, setDatevDatumBasis] = useState<"freigabe" | "faelligkeit" | "bestellung">("freigabe");
-  const [showErweitert, setShowErweitert] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -186,38 +139,6 @@ export function BuchhaltungClient({
     a.download = `buchhaltung_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }
-
-  async function exportDatev() {
-    setDatevLoading(true);
-    setDatevError(null);
-    try {
-      const params = new URLSearchParams({ von: datevVon, bis: datevBis });
-      if (datevProjekt) params.set("projekt_id", datevProjekt);
-      if (datevBeraterNr) params.set("berater_nr", datevBeraterNr);
-      if (datevMandantenNr) params.set("mandanten_nr", datevMandantenNr);
-      if (datevGegenKonto) params.set("gegen_konto", datevGegenKonto);
-      if (datevAufwandsKonto) params.set("aufwands_konto", datevAufwandsKonto);
-      if (datevDatumBasis !== "freigabe") params.set("datum_basis", datevDatumBasis);
-
-      const res = await fetch(`/api/export/datev?${params.toString()}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Export fehlgeschlagen");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `EXTF_Buchungsstapel_${datevVon}_${datevBis}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setShowDatev(false);
-    } catch (e) {
-      setDatevError(e instanceof Error ? e.message : "Unbekannter Fehler");
-    } finally {
-      setDatevLoading(false);
-    }
   }
 
   const kannBezahlen = rolle === "buchhaltung" || rolle === "admin";
@@ -402,156 +323,13 @@ export function BuchhaltungClient({
           </button>
         </div>
       )}
-      {/* DATEV Export Modal */}
-      {showDatev && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDatev(false)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-line">
-              <div className="flex items-center justify-between">
-                <h2 className="font-headline text-lg text-foreground tracking-tight">DATEV Export</h2>
-                <button onClick={() => setShowDatev(false)} className="p-1 text-foreground-subtle hover:text-foreground transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-sm text-foreground-subtle mt-1">Buchungsstapel im DATEV-Format exportieren</p>
-            </div>
-            <div className="p-6 space-y-4">
-              {/* Zeitraum */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Von</label>
-                  <input type="date" value={datevVon} onChange={(e) => setDatevVon(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Bis</label>
-                  <input type="date" value={datevBis} onChange={(e) => setDatevBis(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
-                </div>
-              </div>
 
-              {/* Quick-Date Buttons */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { label: "Akt. Monat", fn: () => { const n = new Date(); setDatevVon(new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10)); setDatevBis(n.toISOString().slice(0, 10)); } },
-                  { label: "Letzter Monat", fn: () => { const n = new Date(); const v = new Date(n.getFullYear(), n.getMonth() - 1, 1); const b = new Date(n.getFullYear(), n.getMonth(), 0); setDatevVon(v.toISOString().slice(0, 10)); setDatevBis(b.toISOString().slice(0, 10)); } },
-                  { label: "Letztes Quartal", fn: () => { const n = new Date(); const q = Math.floor(n.getMonth() / 3); const v = new Date(n.getFullYear(), (q - 1) * 3, 1); const b = new Date(n.getFullYear(), q * 3, 0); setDatevVon(v.toISOString().slice(0, 10)); setDatevBis(b.toISOString().slice(0, 10)); } },
-                  { label: "Letztes Jahr", fn: () => { const y = new Date().getFullYear() - 1; setDatevVon(`${y}-01-01`); setDatevBis(`${y}-12-31`); } },
-                ].map((btn) => (
-                  <button key={btn.label} type="button" onClick={btn.fn}
-                    // eslint-disable-next-line no-restricted-syntax -- DATEV quick-range hover darker than canvas, no matching token; revisit when these buttons migrate to <Button variant="secondary">.
-                    className="px-2.5 py-1 text-[11px] font-medium text-foreground-muted bg-canvas border border-line rounded-md hover:bg-input hover:text-foreground transition-colors">
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Datum-Basis */}
-              <div>
-                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">
-                  Zeitraum bezieht sich auf
-                </label>
-                <select
-                  value={datevDatumBasis}
-                  onChange={(e) => setDatevDatumBasis(e.target.value as "freigabe" | "faelligkeit" | "bestellung")}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
-                >
-                  <option value="freigabe">Freigabe-Datum (Standard)</option>
-                  <option value="faelligkeit">Fälligkeitsdatum (nur Bestellungen mit Fälligkeit)</option>
-                  <option value="bestellung">Bestelldatum (nur Bestellungen mit Bestelldatum)</option>
-                </select>
-                {datevDatumBasis === "faelligkeit" && (
-                  <p className="text-[11px] text-foreground-subtle mt-1">
-                    Bestellungen ohne Fälligkeitsdatum werden ausgeschlossen.
-                  </p>
-                )}
-                {datevDatumBasis === "bestellung" && (
-                  <p className="text-[11px] text-foreground-subtle mt-1">
-                    Bestellungen ohne Bestelldatum werden ausgeschlossen.
-                  </p>
-                )}
-              </div>
-
-              {/* Projekt-Filter */}
-              {projekte.length > 0 && (
-                <div>
-                  <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Projekt (optional)</label>
-                  <select value={datevProjekt} onChange={(e) => setDatevProjekt(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]">
-                    <option value="">Alle Projekte</option>
-                    {projekte.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {/* DATEV Info-Box */}
-              <div className="p-3 bg-info-bg border border-info-border rounded-lg">
-                <p className="text-[11px] text-info leading-relaxed">
-                  <span className="font-semibold">DATEV Format:</span> EXTF Version 700, Buchungsstapel. Kreditorenkonten werden automatisch pro Händler vergeben (70001+). Projekte werden als KOST1 exportiert.
-                </p>
-              </div>
-
-              {/* Erweiterte Optionen (Collapsible) */}
-              <div className="border border-line rounded-lg overflow-hidden">
-                <button type="button" onClick={() => setShowErweitert(!showErweitert)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-foreground-muted hover:bg-input transition-colors">
-                  <span>Erweiterte Optionen</span>
-                  <svg className={`w-3.5 h-3.5 transition-transform ${showErweitert ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showErweitert && (
-                  <div className="px-3 pb-3 space-y-3 border-t border-line">
-                    <div className="grid grid-cols-2 gap-3 pt-3">
-                      <div>
-                        <label className="block text-[11px] text-foreground-muted mb-1">Berater-Nr.</label>
-                        <input type="text" value={datevBeraterNr} onChange={(e) => setDatevBeraterNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
-                          maxLength={7} placeholder="231925"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-foreground-muted mb-1">Mandanten-Nr.</label>
-                        <input type="text" value={datevMandantenNr} onChange={(e) => setDatevMandantenNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
-                          maxLength={7} placeholder="30086"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] text-foreground-muted mb-1">Gegenkonto</label>
-                        <input type="text" value={datevGegenKonto} onChange={(e) => setDatevGegenKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                          maxLength={4} placeholder="4980"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-foreground-muted mb-1">Aufwandskonto</label>
-                        <input type="text" value={datevAufwandsKonto} onChange={(e) => setDatevAufwandsKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                          maxLength={4} placeholder="Optional"
-                          className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {datevError && (
-                <div className="p-3 bg-error-bg border border-error-border rounded-lg text-sm text-error">{datevError}</div>
-              )}
-            </div>
-            <div className="p-6 border-t border-line flex justify-end gap-3">
-              <button onClick={() => setShowDatev(false)} className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors">
-                Abbrechen
-              </button>
-              <button onClick={exportDatev} disabled={datevLoading || !datevVon || !datevBis}
-                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-                {datevLoading ? "Exportiere..." : "DATEV Export starten"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* DATEV Export Modal — eigene Komponente mit eigenem State */}
+      <DatevExportModal
+        open={showDatev}
+        onClose={() => setShowDatev(false)}
+        projekte={projekte}
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -585,33 +363,15 @@ export function BuchhaltungClient({
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #570006" }}>
-          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #570006, transparent)" }} />
-          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Offene Rechnungen</p>
-          <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
-            {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeOffen)}
-          </p>
-          <p className="text-[11px] text-foreground-subtle mt-1 relative">{offeneRows.length} Rechnung{offeneRows.length !== 1 ? "en" : ""}</p>
-        </div>
-        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #059669" }}>
-          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #059669, transparent)" }} />
-          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Bezahlt</p>
-          <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
-            {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeBezahlt)}
-          </p>
-          <p className="text-[11px] text-foreground-subtle mt-1 relative">{bezahlteRows.length} Rechnung{bezahlteRows.length !== 1 ? "en" : ""}</p>
-        </div>
-        <div className="card card-hover p-5 relative overflow-hidden" style={{ borderTop: "3px solid #d97706" }}>
-          <div className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]" style={{ background: "linear-gradient(180deg, #d97706, transparent)" }} />
-          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">Nächste Fällig</p>
-          <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
-            {naechsteFaellig ? formatDatum(naechsteFaellig.faelligkeitsdatum) : "–"}
-          </p>
-          <p className="text-[11px] text-foreground-subtle mt-1 relative">Diesen Monat: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(summeMonat)}</p>
-        </div>
-      </div>
+      {/* Summary Cards — eigene Komponente */}
+      <BuchhaltungSummaryCards
+        summeOffen={summeOffen}
+        offeneCount={offeneRows.length}
+        summeBezahlt={summeBezahlt}
+        bezahlteCount={bezahlteRows.length}
+        naechsteFaelligDatum={naechsteFaellig?.faelligkeitsdatum ?? null}
+        summeMonat={summeMonat}
+      />
 
       {/* Tabs + Suche */}
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -690,191 +450,22 @@ export function BuchhaltungClient({
         </div>
       </div>
 
-      {/* Tabelle */}
-      <div className="mt-4 card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-input border-b border-line sticky top-0 z-10">
-              {selectionMode && (
-                <th className="px-3 py-3.5 w-10">
-                  <input
-                    type="checkbox"
-                    checked={gefiltert.length > 0 && selectedIds.size === gefiltert.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
-                  />
-                </th>
-              )}
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Bestellnr.</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Händler / SU</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Best.</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">LS</th>
-              <th className="px-4 py-3.5 text-right font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Betrag</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Freigegeben von</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Freigegeben am</th>
-              <th className="px-4 py-3.5 text-left font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">Fällig</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">{tab === "offen" ? "Bezahlt" : "Bezahlt am"}</th>
-              <th className="px-4 py-3.5 text-center font-semibold text-[10px] text-foreground-subtle tracking-widest uppercase">PDF</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedRows.length === 0 ? (
-              <tr>
-                <td colSpan={selectionMode ? 11 : 10} className="px-4 py-12 text-center text-foreground-subtle">
-                  {aktiveRows.length === 0
-                    ? tab === "offen"
-                      ? "Keine offenen Rechnungen."
-                      : "Noch keine bezahlten Rechnungen."
-                    : "Keine Rechnungen gefunden."}
-                </td>
-              </tr>
-            ) : (
-              paginatedRows.map((r, i) => (
-                <tr key={r.id} className={`table-row-hover border-b border-line-subtle ${i % 2 === 1 ? "bg-zebra" : ""} ${selectedIds.has(r.id) ? "bg-brand/[0.03]" : ""}`}>
-                  {selectionMode && (
-                    <td className="px-3 py-3.5">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(r.id)}
-                        onChange={() => toggleSelect(r.id)}
-                        className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
-                      />
-                    </td>
-                  )}
-                  <td className="px-4 py-3.5">
-                    <span className="font-mono-amount font-semibold text-brand">
-                      {r.bestellnummer || "–"}
-                      {r.mahnung_am && (
-                        <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold" title={`Mahnung eingegangen am ${new Date(r.mahnung_am).toLocaleDateString("de-DE")}`}>
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" /></svg>
-                          {r.mahnung_count && r.mahnung_count > 1 ? `${r.mahnung_count}. Mahnung` : "Mahnung"}
-                        </span>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-foreground">
-                    <span className="flex items-center gap-1.5">
-                      {r.haendler_name || "–"}
-                      {r.bestellungsart === "subunternehmer" && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-bestellungsart-subunternehmer-bg text-bestellungsart-subunternehmer-text rounded">SUB</span>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {r.bestellungsart === "subunternehmer" ? (
-                      <span className="text-line-strong text-xs">–</span>
-                    ) : r.hat_bestellbestaetigung ? (
-                      <svg className="w-4 h-4 text-success mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {r.bestellungsart === "subunternehmer" ? (
-                      <span className="text-line-strong text-xs">–</span>
-                    ) : r.hat_lieferschein ? (
-                      <svg className="w-4 h-4 text-success mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-line-strong mx-auto" />
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <span className="font-mono-amount font-semibold text-foreground">
-                      {formatBetrag(r.betrag, r.waehrung)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-foreground-muted">{r.freigegeben_von}</td>
-                  <td className="px-4 py-3.5 text-foreground-subtle text-xs">{formatDatum(r.freigegeben_am)}</td>
-                  <td className="px-4 py-3.5">
-                    <span
-                      className={
-                        isUeberfaellig(r.faelligkeitsdatum)
-                          ? "text-error font-semibold font-mono-amount text-xs pulse-urgent"
-                          : isFaelligBald(r.faelligkeitsdatum)
-                          ? "text-warning font-semibold font-mono-amount text-xs"
-                          : "text-foreground-subtle text-xs"
-                      }
-                    >
-                      {formatDatum(r.faelligkeitsdatum)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {tab === "bezahlt" ? (
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[11px] text-success font-medium">{formatDatum(r.bezahlt_am)}</span>
-                        <span className="text-[10px] text-foreground-subtle">{r.bezahlt_von}</span>
-                        {kannBezahlen && (
-                          <div className="flex items-center justify-center gap-1.5 mt-1">
-                            <button
-                              type="button"
-                              onClick={() => archivieren([r.id])}
-                              disabled={archivLoading}
-                              className="p-1 rounded text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] transition-colors"
-                              title="Ins Archiv verschieben"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleBezahlt(r.id, true)}
-                              disabled={bezahltLoading === r.id}
-                              className="p-1 rounded text-line-strong hover:text-error hover:bg-error-bg transition-colors"
-                              title="Zahlung zurücksetzen"
-                            >
-                              {bezahltLoading === r.id ? (
-                                <span className="text-[10px]">...</span>
-                              ) : (
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : kannBezahlen ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleBezahlt(r.id, false)}
-                        disabled={bezahltLoading === r.id}
-                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-line-strong hover:border-success text-transparent hover:text-success ${
-                          bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"
-                        }`}
-                        title="Als bezahlt markieren"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center justify-center w-6 h-6 text-line-strong">–</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-center">
-                    {r.rechnung_id ? (
-                      <a
-                        href={`/api/pdfs/${r.rechnung_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center text-brand hover:text-brand-light transition-colors"
-                        title="PDF herunterladen"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M6 20h12a2 2 0 002-2V8l-6-6H6a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                      </a>
-                    ) : (
-                      <span className="text-line-strong">–</span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Tabelle — eigene Komponente */}
+      <BuchhaltungTable
+        paginatedRows={paginatedRows}
+        aktiveRows={aktiveRows}
+        tab={tab}
+        selectionMode={selectionMode}
+        selectedIds={selectedIds}
+        gefiltert={gefiltert}
+        onToggleSelectAll={toggleSelectAll}
+        onToggleSelect={toggleSelect}
+        kannBezahlen={kannBezahlen}
+        bezahltLoading={bezahltLoading}
+        archivLoading={archivLoading}
+        onToggleBezahlt={toggleBezahlt}
+        onArchivieren={archivieren}
+      />
 
       {/* Bulk Action Bar — sticky bottom */}
       {selectionMode && (

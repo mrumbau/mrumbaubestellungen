@@ -1,5 +1,22 @@
 "use client";
 
+/**
+ * 12.05.2026 (UI-Audit F6.11) — Projekte haben bewusst kein
+ * `confirmed_at`-Pattern wie kunden-client. Begründung:
+ *
+ *   - Kunden werden vom Email-Pipeline AUTOMATISCH aus Briefkopf + Absender
+ *     erkannt (haendler/su-Tabellen). Auto-erkannte Kunden brauchen Bestätigung
+ *     durch einen User damit sie produktiv für Bestellungs-Zuordnung genutzt
+ *     werden.
+ *   - Projekte werden AUSSCHLIESSLICH manuell vom Admin im UI angelegt
+ *     (siehe ProjektFormModal). Es gibt keinen auto-erkannten Projekt-Typ —
+ *     allenfalls `projekt_vorschlag_id` auf bestellungen für die KI-Zuordnung,
+ *     aber das Projekt selbst ist immer vom User explizit erstellt.
+ *
+ * Wenn das einmal anders wird (z.B. KI legt Projekt-Vorschläge in projekte-
+ * Tabelle ab), wäre ein confirmed_at-Pattern hier konsistent zu kunden-client.
+ */
+
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -22,6 +39,12 @@ import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
 import { IconEdit, IconPlus, IconFolderOpen } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import {
+  StatusIcon,
+  getStatusCfg,
+} from "@/components/projekte/status-dropdown";
+import { ProjektFormModal } from "@/components/projekte/projekt-form-modal";
+import { ProjektCard } from "@/components/projekte/projekt-card";
 
 type ViewMode = "grid" | "table";
 
@@ -48,133 +71,7 @@ interface ProjektStats {
   volumen: number;
 }
 
-const FARBEN = [
-  { hex: "#570006", label: "Rot" },
-  { hex: "#2563eb", label: "Blau" },
-  { hex: "#059669", label: "Grün" },
-  { hex: "#d97706", label: "Amber" },
-  { hex: "#7c3aed", label: "Violett" },
-  { hex: "#0891b2", label: "Cyan" },
-];
-
-const STATUS_OPTIONS = [
-  { value: "aktiv", label: "Aktiv", icon: "circle", color: "#059669", bg: "bg-success-bg", text: "text-success", border: "border-success-border" },
-  { value: "pausiert", label: "Pausiert", icon: "pause", color: "#d97706", bg: "bg-warning-bg", text: "text-warning", border: "border-warning-border" },
-  { value: "abgeschlossen", label: "Abgeschlossen", icon: "check", color: "#6b7280", bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
-  { value: "archiviert", label: "Archivieren", icon: "archive", color: "#dc2626", bg: "bg-error-bg", text: "text-error", border: "border-error-border" },
-];
-
-function getStatusCfg(status: string) {
-  return STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
-}
-
-function StatusIcon({ type, className }: { type: string; className?: string }) {
-  const cls = className || "w-3 h-3";
-  switch (type) {
-    case "circle":
-      return (
-        <svg className={cls} viewBox="0 0 12 12" fill="currentColor">
-          <circle cx="6" cy="6" r="4" />
-        </svg>
-      );
-    case "pause":
-      return (
-        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
-        </svg>
-      );
-    case "check":
-      return (
-        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      );
-    case "archive":
-      return (
-        <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
-
-function StatusDropdown({
-  currentStatus,
-  onSelect,
-  disabled,
-}: {
-  currentStatus: string;
-  onSelect: (status: string) => void;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const cfg = getStatusCfg(currentStatus);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        disabled={disabled}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border transition-all ${cfg.bg} ${cfg.text} ${cfg.border} ${disabled ? "opacity-50 cursor-not-allowed" : "hover:shadow-sm cursor-pointer"}`}
-      >
-        <StatusIcon type={cfg.icon} className="w-2.5 h-2.5" />
-        {cfg.value === "archiviert" ? "Archiviert" : cfg.label}
-        {!disabled && (
-          <svg className={`w-2.5 h-2.5 ml-0.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg shadow-lg border border-line py-1 min-w-[160px]">
-          {STATUS_OPTIONS.map((opt) => {
-            const isActive = opt.value === currentStatus;
-            return (
-              <button
-                key={opt.value}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                  if (!isActive) onSelect(opt.value);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${
-                  isActive
-                    ? "bg-input font-semibold text-foreground"
-                    : opt.value === "archiviert"
-                      ? "text-error hover:bg-error-bg"
-                      : "text-foreground-muted hover:bg-input"
-                }`}
-              >
-                <span style={{ color: opt.color }}>
-                  <StatusIcon type={opt.icon} className="w-3.5 h-3.5" />
-                </span>
-                <span>{opt.value === "archiviert" ? "Archivieren" : opt.label}</span>
-                {isActive && (
-                  <svg className="w-3 h-3 ml-auto text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// FARBEN-Palette wandert nach ProjektFormModal — wird nur dort zum Farbpicker genutzt.
 
 export function ProjekteClient({
   projekte: initialProjekte,
@@ -685,113 +582,26 @@ export function ProjekteClient({
         </div>
       )}
 
-      {/* Form Modal — no status field, status is managed via card dropdown */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-line">
-              <div className="flex items-center justify-between">
-                <h2 className="font-headline text-lg text-foreground tracking-tight">{editId ? "Projekt bearbeiten" : "Neues Projekt"}</h2>
-                <button onClick={resetForm} className="p-1 text-foreground-subtle hover:text-foreground transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Name *</label>
-                <input
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
-                  placeholder="z.B. Umbau Müller Garage"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Beschreibung</label>
-                <textarea
-                  value={formBeschreibung}
-                  onChange={(e) => setFormBeschreibung(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
-                  placeholder="Optionale Beschreibung..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Farbe</label>
-                <div className="flex gap-2">
-                  {FARBEN.map((f) => (
-                    <button
-                      key={f.hex}
-                      type="button"
-                      onClick={() => setFormFarbe(f.hex)}
-                      className={`w-8 h-8 rounded-lg transition-all ${
-                        formFarbe === f.hex ? "ring-2 ring-offset-2" : "hover:scale-110"
-                      }`}
-                      style={{
-                        background: f.hex,
-                        ...(formFarbe === f.hex ? { ["--tw-ring-color" as string]: f.hex } : {}),
-                      }}
-                      title={f.label}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Kunde</label>
-                <select
-                  value={formKundenId || ""}
-                  onChange={(e) => setFormKundenId(e.target.value || null)}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
-                >
-                  <option value="">Kein Kunde zugeordnet</option>
-                  {kunden.map((k) => (
-                    <option key={k.id} value={k.id}>{k.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Budget (EUR)</label>
-                <input
-                  type="number"
-                  value={formBudget}
-                  onChange={(e) => setFormBudget(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
-                  placeholder="Optional"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-
-              {error && <p className="text-error text-sm">{error}</p>}
-            </div>
-
-            <div className="p-6 border-t border-line flex justify-end gap-3">
-              <button
-                onClick={resetForm}
-                className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? "Speichert..." : editId ? "Änderungen speichern" : "Projekt anlegen"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Form Modal — eigene Komponente */}
+      <ProjektFormModal
+        open={showForm}
+        editMode={!!editId}
+        formName={formName}
+        setFormName={setFormName}
+        formBeschreibung={formBeschreibung}
+        setFormBeschreibung={setFormBeschreibung}
+        formFarbe={formFarbe}
+        setFormFarbe={setFormFarbe}
+        formKundenId={formKundenId}
+        setFormKundenId={setFormKundenId}
+        formBudget={formBudget}
+        setFormBudget={setFormBudget}
+        kunden={kunden}
+        error={error}
+        saving={saving}
+        onSave={handleSave}
+        onCancel={resetForm}
+      />
 
       {/* Projekt-Grid */}
       {aktive.length === 0 ? (
@@ -837,119 +647,18 @@ export function ProjekteClient({
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {aktive.map((p) => {
-            const s = stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 };
-            const budgetPercent = getBudgetPercent(p.id, p.budget);
-
-            return (
-              <div
-                key={p.id}
-                className="card card-hover relative overflow-hidden"
-                style={{ borderLeft: `4px solid ${p.farbe}` }}
-              >
-                {/* Gradient overlay */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-20 opacity-[0.04] pointer-events-none"
-                  style={{ background: `linear-gradient(180deg, ${p.farbe}, transparent)` }}
-                />
-
-                <div className="p-5 relative">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-headline text-base text-foreground truncate">{p.name}</h3>
-                    </div>
-                    <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                      {istAdmin ? (
-                        <>
-                          <StatusDropdown
-                            currentStatus={p.status}
-                            onSelect={(s) => handleStatusChange(p.id, s)}
-                            disabled={statusUpdating === p.id}
-                          />
-                          <button
-                            onClick={() => openEdit(p)}
-                            className="p-1 rounded hover:bg-canvas transition-colors text-foreground-faint hover:text-brand"
-                            title="Bearbeiten"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        </>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border ${getStatusCfg(p.status).bg} ${getStatusCfg(p.status).text} ${getStatusCfg(p.status).border}`}>
-                          <StatusIcon type={getStatusCfg(p.status).icon} className="w-2.5 h-2.5" />
-                          {getStatusCfg(p.status).label}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Kunde */}
-                  {p.kunde && (
-                    <p className="text-[11px] text-foreground-subtle mt-0.5 truncate">{p.kunde}</p>
-                  )}
-
-                  {/* Description */}
-                  {p.beschreibung && (
-                    <p className="text-xs text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
-                  )}
-
-                  {/* Stats — structured grid */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-input rounded-lg border border-line-subtle">
-                    <div>
-                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Bestell.</p>
-                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.gesamt}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Volumen</p>
-                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{formatBetrag(s.volumen)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Offen</p>
-                      <p className={`font-mono-amount text-sm font-semibold mt-0.5 ${s.offen > 0 ? "text-brand" : "text-foreground-faint"}`}>
-                        {s.offen}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Budget Bar */}
-                  {budgetPercent !== null && p.budget && (
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="text-foreground-subtle uppercase tracking-wider font-semibold">Budget</span>
-                        <span className="font-mono-amount text-foreground-muted">{formatBetrag(s.volumen)} / {formatBetrag(p.budget)}</span>
-                      </div>
-                      <div className="h-1.5 bg-line rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{
-                            width: `${budgetPercent}%`,
-                            background: getBudgetColor(budgetPercent),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Footer */}
-                  <div className="mt-4 pt-3 border-t border-line-subtle flex items-center justify-between">
-                    <span className="text-[10px] text-foreground-faint">{formatDatum(p.created_at)}</span>
-                    <Link
-                      href={`/bestellungen?projekt_id=${p.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-light font-medium transition-colors group/link"
-                    >
-                      Bestellungen
-                      <svg className="w-3 h-3 transition-transform group-hover/link:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {aktive.map((p) => (
+            <ProjektCard
+              key={p.id}
+              projekt={p}
+              stats={stats[p.id] || { gesamt: 0, offen: 0, volumen: 0 }}
+              budgetPercent={getBudgetPercent(p.id, p.budget)}
+              istAdmin={istAdmin}
+              statusUpdating={statusUpdating}
+              onStatusChange={handleStatusChange}
+              onEdit={openEdit}
+            />
+          ))}
         </div>
       )}
 

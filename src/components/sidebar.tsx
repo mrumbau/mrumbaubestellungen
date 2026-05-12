@@ -129,7 +129,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 sidebar-scroll overflow-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 md:space-y-0.5 sidebar-scroll overflow-auto">
         {items.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
@@ -137,7 +137,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all ${
+              className={`relative flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[13px] transition-all ${
                 active
                   ? "bg-white/[0.07] text-white font-medium"
                   : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
@@ -159,7 +159,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         <Link
           href="/cardscan"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all ${
+          className={`flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[13px] transition-all ${
             pathname.startsWith("/cardscan")
               ? "bg-cs-accent/10 text-cs-accent-light font-medium"
               : "text-white/40 hover:bg-white/[0.04] hover:text-white/70"

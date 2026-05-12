@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { PasswordInput, Button, Alert, useToast } from "@/components/ui";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth-config";
 
 export function PasswortAendern() {
   const { toast } = useToast();
@@ -18,16 +19,16 @@ export function PasswortAendern() {
       ? "Passwörter stimmen nicht überein."
       : null;
   const lengthError =
-    neuesPasswort.length > 0 && neuesPasswort.length < 8
-      ? "Mindestens 8 Zeichen."
+    neuesPasswort.length > 0 && neuesPasswort.length < PASSWORD_MIN_LENGTH
+      ? `Mindestens ${PASSWORD_MIN_LENGTH} Zeichen.`
       : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
 
-    if (neuesPasswort.length < 8) {
-      setSubmitError("Passwort muss mindestens 8 Zeichen lang sein.");
+    if (neuesPasswort.length < PASSWORD_MIN_LENGTH) {
+      setSubmitError(`Passwort muss mindestens ${PASSWORD_MIN_LENGTH} Zeichen lang sein.`);
       return;
     }
     if (neuesPasswort !== bestaetigung) {
@@ -60,7 +61,7 @@ export function PasswortAendern() {
         Passwort ändern
       </h2>
       <p className="text-[13px] text-foreground-muted mb-5">
-        Geben Sie ein neues Passwort ein (mindestens 8 Zeichen).
+        Geben Sie ein neues Passwort ein (mindestens {PASSWORD_MIN_LENGTH} Zeichen).
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">

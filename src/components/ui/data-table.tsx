@@ -191,6 +191,11 @@ export function DataTable<TRow>({
   className,
   tableClassName,
 }: DataTableProps<TRow>) {
+  // 12.05.2026 (UI-Audit F3.2): auf Mobile Compact-Density auto auf comfortable
+  // anheben — bei <44×44px Touch-Area sind Checkboxes + Action-Triggers nicht
+  // sicher tappbar (WCAG 2.5.5 Target Size). Persistierte User-Wahl bleibt
+  // erhalten, nur das Rendering wird gehoben.
+  const effectiveDensity = useEffectiveDensity(density);
   const selectionEnabled = selection !== undefined;
   const allSelectableIds = React.useMemo(() => data.map((r) => getRowId(r)), [data, getRowId]);
   const allSelected =
@@ -387,7 +392,7 @@ export function DataTable<TRow>({
           <thead className="sticky top-0 z-10 bg-input">
             <tr className="border-b border-line">
               {selectionEnabled && (
-                <th scope="col" className={cn(headerCellVariants({ density }), "w-10")}>
+                <th scope="col" className={cn(headerCellVariants({ density: effectiveDensity }), "w-10")}>
                   <CheckboxCell
                     checked={allSelected}
                     indeterminate={someSelected}
@@ -430,7 +435,7 @@ export function DataTable<TRow>({
                     aria-sort={ariaSort}
                     style={col.width ? { width: col.width } : undefined}
                     className={cn(
-                      headerCellVariants({ density, align: col.align }),
+                      headerCellVariants({ density: effectiveDensity, align: col.align }),
                       col.hideBelow && hideBelowMap[col.hideBelow],
                       col.headerClassName,
                     )}
@@ -461,7 +466,7 @@ export function DataTable<TRow>({
             {loading ? (
               <SkeletonBody
                 rowCount={skeletonRows}
-                density={density}
+                density={effectiveDensity}
                 selectionEnabled={selectionEnabled}
                 columns={columns}
               />
@@ -509,7 +514,7 @@ export function DataTable<TRow>({
                   >
                     {selectionEnabled && (
                       <td
-                        className={cn(bodyCellVariants({ density }), "w-10")}
+                        className={cn(bodyCellVariants({ density: effectiveDensity }), "w-10")}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <CheckboxCell
@@ -531,7 +536,7 @@ export function DataTable<TRow>({
                           key={col.key}
                           onClick={col.stopPropagation ? (e) => e.stopPropagation() : undefined}
                           className={cn(
-                            bodyCellVariants({ density, align: col.align }),
+                            bodyCellVariants({ density: effectiveDensity, align: col.align }),
                             col.hideBelow && hideBelowMap[col.hideBelow],
                             col.className,
                           )}
@@ -696,6 +701,31 @@ function SkeletonBody<TRow>({
       ))}
     </>
   );
+}
+
+// ─── Mobile density override ────────────────────────────────────────────
+
+/**
+ * Auf Mobile-Viewport (<768px) ist Compact-Density (~32px Zeilenhöhe)
+ * unter der WCAG-2.5.5-Mindest-Touch-Area von 44×44px für Checkboxes/
+ * Action-Triggers in den Zeilen. Der Hook liftet effektive Density auf
+ * "comfortable" — die persistierte User-Wahl bleibt, nur das Rendering
+ * ist mobile-safe. Spacious bleibt unverändert.
+ *
+ * 12.05.2026 (UI-Audit F3.2).
+ */
+function useEffectiveDensity(density: Density): Density {
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  if (isMobile && density === "compact") return "comfortable";
+  return density;
 }
 
 // ─── Density toggle + persistence hook ──────────────────────────────────

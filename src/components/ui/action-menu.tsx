@@ -171,7 +171,9 @@ export function ActionMenu({
         }}
         onKeyDown={handleTriggerKey}
         className={cn(
-          "inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors",
+          // 12.05.2026 (UI-Audit F1.12 + F3.2): auf Mobile 44×44 für WCAG 2.5.5
+          // Target Size — auf Desktop bleibt 28×28 für Tabellen-Density.
+          "inline-flex items-center justify-center h-11 w-11 md:h-7 md:w-7 rounded-md transition-colors",
           "text-foreground-subtle hover:text-foreground hover:bg-canvas",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",

@@ -98,6 +98,8 @@ export interface StatCardData {
   color: string;
   alert?: boolean;
   row: number;
+  /** Optionales Geld-Volumen für „Überfällig"/„Diese Woche fällig" — wird in der Hero-Card als Sekundär-Wert sichtbar. */
+  volumen?: number;
 }
 
 interface DashboardConfig {
@@ -418,6 +420,84 @@ function StatCard({
       <div className={`flex items-end justify-between ${valueSpacing} relative`}>
         <p className={`font-mono-amount ${valueSize} font-bold text-foreground ${alert ? "text-error" : ""}`}>{value}</p>
         {alert && value > 0 && <span className="pulse-urgent w-2 h-2 rounded-full bg-error mb-2" />}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 12.05.2026 (UI-Audit F4.5): Hero-Variante der StatCard — bewusst größer +
+ * visuell unterschiedlich als Stat-Cards. Bricht das „identical card grid"
+ * Anti-Pattern (impeccable: same-sized cards repeated endlessly).
+ *
+ * Verwendet doppelte Spalten-Breite, größeren Numerus, Sekundär-Volumen-Pill,
+ * und einen Industrial-Akzent (corner-marks). Bei `alert=true` wird der ganze
+ * Container in Error-Tönung gerendert um Dringlichkeit zu signalisieren.
+ */
+function HeroStatCard({
+  label,
+  value,
+  color,
+  alert,
+  volumen,
+  badge,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  alert?: boolean;
+  volumen?: number;
+  badge?: string;
+}) {
+  return (
+    <div
+      className={`card card-hover relative overflow-hidden md:col-span-2 ${alert ? "ring-1 ring-error/30" : ""}`}
+      style={{ borderTop: `3px solid ${color}` }}
+    >
+      <div
+        className="absolute top-0 left-0 right-0 h-16 opacity-[0.09] pointer-events-none"
+        style={{ background: `linear-gradient(180deg, ${color}, transparent)` }}
+      />
+      {/* corner-marks für industrielle Anmutung — bewusst nur am Hero, nicht an Standard-Cards */}
+      <span aria-hidden="true" className="absolute top-2 right-2 flex items-center gap-1">
+        <span className="block w-1.5 h-px bg-foreground-faint/40" />
+        <span className="block h-1.5 w-px bg-foreground-faint/40" />
+      </span>
+      <div className="p-5 sm:p-6 relative">
+        <div className="flex items-center gap-2 mb-2">
+          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase">
+            {label}
+          </p>
+          {badge && (
+            <span
+              className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: `${color}1a`, color }}
+            >
+              {badge}
+            </span>
+          )}
+        </div>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <p
+            className={`font-mono-amount text-5xl sm:text-6xl font-bold leading-none ${alert ? "text-error" : "text-foreground"}`}
+          >
+            {value}
+          </p>
+          <div className="flex flex-col items-end gap-1.5">
+            {volumen !== undefined && volumen > 0 && (
+              <span className="font-mono-amount text-sm font-semibold text-foreground-muted tabular-nums">
+                {new Intl.NumberFormat("de-DE", {
+                  style: "currency",
+                  currency: "EUR",
+                  maximumFractionDigits: 0,
+                }).format(volumen)}
+              </span>
+            )}
+            {alert && value > 0 && (
+              <span className="pulse-urgent w-2.5 h-2.5 rounded-full bg-error" aria-label="Dringend" />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -745,6 +825,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
 
   const row1Stats = statCards.filter((s) => s.row === 1 && isStatVisible(s.id));
   const row2Stats = statCards.filter((s) => s.row === 2 && isStatVisible(s.id));
+  // 06.05.2026 — row 3 für Fälligkeit-KPIs (überfällig, diese-Woche-fällig).
+  const row3Stats = statCards.filter((s) => s.row === 3 && isStatVisible(s.id));
 
   // "Zu prüfen"-Section: aggregierter Count über alle gerenderten Confirm-Widgets.
   // Role-dependent: Admin sieht Unzugeordnet (System-Op), Besteller nicht. Das ergibt
@@ -972,30 +1054,49 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* --- ÜBERSICHT-Cluster: wie steht's? --- */}
-
-      {/* Stat Cards Row 1 — responsive grid */}
-      {row1Stats.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          {row1Stats.map((s) => (
-            <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} density={density} />
-          ))}
-        </div>
-      )}
-
-      {/* Industrial line — only if both rows have cards */}
-      {row1Stats.length > 0 && row2Stats.length > 0 && (
-        <div className="industrial-line mb-4" />
-      )}
-
-      {/* Stat Cards Row 2 — responsive grid */}
-      {row2Stats.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {row2Stats.map((s) => (
-            <StatCard key={s.id} label={s.label} value={s.value} color={s.color} alert={s.alert} density={density} />
-          ))}
-        </div>
-      )}
+      {/* --- ÜBERSICHT-Cluster: wie steht's? ---
+          12.05.2026 (UI-Audit F4.5): Bento-Layout statt zwei identische Cards-Reihen.
+          Hero-Card (2-col) zeigt die wichtigste KPI je nach Kontext:
+            - Wenn überfällig > 0 → Überfällig als Hero (alert, mit Volumen-Pill)
+            - Sonst → Gesamt (für Besteller "Aktive Bestellungen")
+          Die restlichen StatCards laufen in einem Standard-4-col-Grid darunter. */}
+      {(() => {
+        const allStats = [...row1Stats, ...row2Stats, ...row3Stats];
+        if (allStats.length === 0) return null;
+        // Hero-Auswahl: Alert hat Priorität, sonst gesamt, sonst erste Card.
+        const heroIdx = (() => {
+          const alertIdx = allStats.findIndex((s) => s.alert && s.value > 0);
+          if (alertIdx >= 0) return alertIdx;
+          const gesamtIdx = allStats.findIndex((s) => s.id === "gesamt");
+          if (gesamtIdx >= 0) return gesamtIdx;
+          return 0;
+        })();
+        const hero = allStats[heroIdx];
+        const rest = allStats.filter((_, i) => i !== heroIdx);
+        const heroBadge = hero.alert ? "Dringend" : hero.id === "gesamt" ? undefined : undefined;
+        return (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <HeroStatCard
+              label={hero.label}
+              value={hero.value}
+              color={hero.color}
+              alert={hero.alert}
+              volumen={hero.volumen}
+              badge={heroBadge}
+            />
+            {rest.map((s) => (
+              <StatCard
+                key={s.id}
+                label={s.label}
+                value={s.value}
+                color={s.color}
+                alert={s.alert}
+                density={density}
+              />
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Volumen-Übersicht — Range-scoped: Werte, Sparkline, Delta beziehen sich auf aktuellen Zeitraum.
           Farbigkeit disziplinär: Freigegeben = Status-Grün, Gesamt = Brand-Rot. */}
