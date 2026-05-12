@@ -19,9 +19,17 @@ import { useToast } from "@/components/ui";
 export function useBestellungenActions({
   selected,
   setSelected,
+  onAffectedRows,
 }: {
   selected: Set<string>;
   setSelected: (next: Set<string>) => void;
+  /**
+   * 12.05.2026 (Continuity-Patch): wird mit den effektiv erfolgreichen IDs
+   * gerufen, BEVOR der Refresh startet. Caller kann Bulk-Success-Flash
+   * setzen. Refresh wird dann 1100ms verzögert damit die Flash-Animation
+   * im Sichtfeld bleibt bevor die Rows ggf. aus der "offen"-Liste fallen.
+   */
+  onAffectedRows?: (ids: string[]) => void;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -42,7 +50,15 @@ export function useBestellungenActions({
         headers: { "Content-Type": "application/json" },
       });
       if (res.ok) {
-        router.refresh();
+        // 12.05.2026 (Continuity-Patch): Single-Row-Freigabe bekommt auch
+        // den Success-Flash damit der "ich hab's geklickt → es ist passiert"
+        // Moment visuell verbunden ist.
+        onAffectedRows?.([bestellungId]);
+        if (onAffectedRows) {
+          setTimeout(() => router.refresh(), 1100);
+        } else {
+          router.refresh();
+        }
         toast.success("Bestellung freigegeben");
         return;
       }
@@ -124,7 +140,20 @@ export function useBestellungenActions({
 
       setShowFreigebenDialog(false);
       setSelected(new Set());
-      router.refresh();
+
+      // 12.05.2026 (Continuity-Patch): wenn Caller einen Flash-Receiver
+      // bereitgestellt hat, emit affected IDs und delay refresh damit die
+      // Rows kurz Success-Green aufleuchten bevor sie aus der Liste fallen.
+      const freigegebenIds: string[] = (data.freigegeben ?? []).map(
+        (x: { id?: string } | string) =>
+          typeof x === "string" ? x : (x.id ?? ""),
+      ).filter(Boolean);
+      if (onAffectedRows && freigegebenIds.length > 0) {
+        onAffectedRows(freigegebenIds);
+        setTimeout(() => router.refresh(), 1100);
+      } else {
+        router.refresh();
+      }
 
       if (errorsN > 0 || noRechnungN > 0 || noPermissionN > 0) {
         toast.warning("Bulk-Freigabe teilweise erfolgreich", {

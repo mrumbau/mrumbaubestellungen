@@ -625,6 +625,130 @@ body {
 }
 
 /* ============================================
+   Preview-Linkage (Spatial-Continuity)
+   12.05.2026 — User-Feedback: nach Schließen der PDF-Vorschau verlor man
+   den visuellen Anker zur Trigger-Row. Lösung: Row bekommt persistent
+   Brand-Highlight während Modal offen ist (gleiche Optik wie
+   `.table-row-hover:hover`), und 2.2s afterglow nach Schließen, der über
+   CSS-Animation ausfadet. User-Auge findet die Position sofort wieder.
+   ============================================ */
+
+.row-preview-active {
+  background-color: oklch(0.96 0.012 25) !important;
+  box-shadow:
+    inset 3px 0 0 0 var(--mr-red),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes row-afterglow {
+  0% {
+    background-color: oklch(0.96 0.012 25);
+    box-shadow:
+      inset 3px 0 0 0 var(--mr-red),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow:
+      inset 0 0 0 0 transparent,
+      0 0 0 0 transparent;
+  }
+}
+
+.row-preview-afterglow {
+  position: relative;
+  z-index: 1;
+  animation: row-afterglow 2.2s var(--ease-out-quart) forwards;
+}
+
+/* Return-from-Detail-Afterglow — gleiche Optik wie preview-afterglow,
+   aber längere Duration (3.5s) weil User beim Page-Return länger braucht,
+   um Spatial-Anchor zu reinitialisieren. */
+.row-return-afterglow {
+  position: relative;
+  z-index: 1;
+  animation: row-afterglow 3.5s var(--ease-out-quart) forwards;
+}
+
+/* Pagination-Pulse: kurzer Brand-Tint-Blink auf der ersten Row nach
+   Seitenwechsel. User-Auge findet sofort den "Anfang" der neuen Seite.
+   1.5s, deutlich kürzer als Afterglow weil intentions andere sind. */
+@keyframes row-page-pulse {
+  0% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 0 transparent;
+  }
+  25% {
+    background-color: oklch(0.96 0.012 25);
+    box-shadow: inset 3px 0 0 0 var(--mr-red);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 0 transparent;
+  }
+}
+
+.row-page-pulse {
+  position: relative;
+  z-index: 1;
+  animation: row-page-pulse 1.5s var(--ease-out-quart) forwards;
+}
+
+/* Bulk-Action-Success-Flash: Success-Green statt MR-Red, kurze 1.2s
+   damit die Animation noch im Sichtfeld liegt bevor refresh die Row
+   eventuell aus der "offen"-Liste entfernt. */
+@keyframes row-bulk-success {
+  0% {
+    background-color: var(--status-freigegeben-bg);
+    box-shadow:
+      inset 3px 0 0 0 var(--status-freigegeben),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow:
+      inset 0 0 0 0 transparent,
+      0 0 0 0 transparent;
+  }
+}
+
+.row-bulk-success-flash {
+  position: relative;
+  z-index: 1;
+  animation: row-bulk-success 1.2s var(--ease-out-quart) forwards;
+}
+
+/* Timeline-New-Event-Flash: kurze Brand-Tint-Aufmerksamkeit für gerade
+   hinzugekommene Events (Realtime neu / eigener Kommentar gesendet).
+   Lange genug (1.6s) damit User registriert WAS dazukam. */
+@keyframes timeline-item-enter {
+  0% {
+    background-color: oklch(0.96 0.012 25);
+    box-shadow: inset 2px 0 0 0 var(--mr-red);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+.timeline-item-new {
+  animation: timeline-item-enter 1.6s var(--ease-out-quart) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-preview-afterglow,
+  .row-return-afterglow,
+  .row-page-pulse,
+  .row-bulk-success-flash,
+  .timeline-item-new {
+    animation: none;
+  }
+}
+
+/* ============================================
    Gradients
    ============================================ */
 

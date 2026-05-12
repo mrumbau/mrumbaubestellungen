@@ -45,6 +45,10 @@ export function BuchhaltungClient({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [archivLoading, setArchivLoading] = useState(false);
   const [bulkBezahltLoading, setBulkBezahltLoading] = useState(false);
+  // 12.05.2026 (Continuity-Patch): IDs der gerade bezahlt-markierten Rows
+  // bekommen 1.2s Success-Green-Flash bevor das Tab-Filter sie ggf. nach
+  // "Bezahlt" verschiebt.
+  const [successFlashIds, setSuccessFlashIds] = useState<Set<string>>(new Set());
   const [showDatev, setShowDatev] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -287,6 +291,12 @@ export function BuchhaltungClient({
       const errors: { id: string; reason: string }[] = data.errors ?? [];
       const successIds = new Set([...marked, ...alreadyPaid]);
       const nowIso = new Date().toISOString();
+      // Success-Flash zuerst — bevor localRows-Update das tab-Filter neu
+      // evaluiert (potenziell Row aus "offen" entfernt).
+      if (marked.length > 0) {
+        setSuccessFlashIds(new Set(marked));
+        setTimeout(() => setSuccessFlashIds(new Set()), 1300);
+      }
       setLocalRows((prev) =>
         prev.map((r) =>
           successIds.has(r.id) && !r.bezahlt_am
@@ -469,6 +479,7 @@ export function BuchhaltungClient({
         archivLoading={archivLoading}
         onToggleBezahlt={toggleBezahlt}
         onArchivieren={archivieren}
+        successFlashIds={successFlashIds}
       />
 
       {/* Bulk Action Bar — sticky bottom */}

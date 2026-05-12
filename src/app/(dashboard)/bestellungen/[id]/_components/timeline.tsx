@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CollapsibleWidget } from "./collapsible-widget";
 import { timelineColor } from "@/lib/timeline-config";
 import type { Abgleich, AuditEvent, Dokument, Freigabe, Kommentar, WidgetId } from "./types";
@@ -79,6 +79,42 @@ export function Timeline({
   }, [events, dokumente, abgleich, freigabe, kommentare]);
 
   const [filter, setFilter] = useState<Category>("alle");
+
+  // 12.05.2026 (Continuity-Patch): neue Timeline-Einträge bekommen kurze
+  // Brand-Tint-Animation, damit User sieht WAS gerade dazu kam (neuer
+  // Kommentar, neues Doc, Status-Change via Realtime).
+  // Erste-Mount-Items werden als "schon gesehen" markiert → kein Flash beim
+  // initialen Page-Load.
+  const seenKeysRef = useRef<Set<string> | null>(null);
+  const [newKeys, setNewKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const itemKey = (t: TimelineItem) => `${t.zeit}|${t.typ}|${t.label}`;
+    const current = new Set(items.map(itemKey));
+    if (seenKeysRef.current === null) {
+      seenKeysRef.current = current;
+      return;
+    }
+    const fresh = new Set<string>();
+    for (const k of current) {
+      if (!seenKeysRef.current.has(k)) fresh.add(k);
+    }
+    seenKeysRef.current = current;
+    if (fresh.size === 0) return;
+    setNewKeys((prev) => {
+      const next = new Set(prev);
+      for (const k of fresh) next.add(k);
+      return next;
+    });
+    const timer = setTimeout(() => {
+      setNewKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of fresh) next.delete(k);
+        return next;
+      });
+    }, 1600);
+    return () => clearTimeout(timer);
+  }, [items]);
 
   const filtered = useMemo(() => {
     if (filter === "alle") return items;
@@ -172,21 +208,30 @@ export function Timeline({
             className="absolute left-[7px] top-2 bottom-2 w-px bg-line"
           />
           <ol className="space-y-3">
-            {filtered.map((t, i) => (
-              <li key={i} className="flex items-start gap-3 relative">
-                <span
-                  aria-hidden="true"
-                  className="w-[15px] h-[15px] rounded-full border-2 border-surface shrink-0 z-10"
-                  style={{ background: t.farbe }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] text-foreground leading-relaxed">{t.label}</p>
-                  <p className="text-[10px] text-foreground-subtle font-mono-amount">
-                    {new Date(t.zeit).toLocaleString("de-DE")}
-                  </p>
-                </div>
-              </li>
-            ))}
+            {filtered.map((t, i) => {
+              const k = `${t.zeit}|${t.typ}|${t.label}`;
+              const isNew = newKeys.has(k);
+              return (
+                <li
+                  key={k || i}
+                  className={`flex items-start gap-3 relative px-2 -mx-2 py-1 -my-1 rounded-md ${
+                    isNew ? "timeline-item-new" : ""
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="w-[15px] h-[15px] rounded-full border-2 border-surface shrink-0 z-10 mt-0.5"
+                    style={{ background: t.farbe }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] text-foreground leading-relaxed">{t.label}</p>
+                    <p className="text-[10px] text-foreground-subtle font-mono-amount">
+                      {new Date(t.zeit).toLocaleString("de-DE")}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         </div>
       )}

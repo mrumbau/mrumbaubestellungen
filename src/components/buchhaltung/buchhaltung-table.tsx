@@ -25,6 +25,12 @@ export interface BuchhaltungTableProps {
   archivLoading: boolean;
   onToggleBezahlt: (id: string, aktuellBezahlt: boolean) => void;
   onArchivieren: (ids: string[]) => void;
+  /**
+   * 12.05.2026 (Continuity-Patch): Set der gerade bulk-bezahlten IDs.
+   * Rows bekommen 1.2s Success-Green-Flash bevor der Refresh sie ggf.
+   * aus der "offen"-Liste in "bezahlt" verschiebt.
+   */
+  successFlashIds?: Set<string>;
 }
 
 export function BuchhaltungTable({
@@ -41,6 +47,7 @@ export function BuchhaltungTable({
   archivLoading,
   onToggleBezahlt,
   onArchivieren,
+  successFlashIds,
 }: BuchhaltungTableProps) {
   return (
     <div className="mt-4 card overflow-hidden">
@@ -107,7 +114,8 @@ export function BuchhaltungTable({
             paginatedRows.map((r, i) => (
               <tr
                 key={r.id}
-                className={`table-row-hover border-b border-line-subtle ${i % 2 === 1 ? "bg-zebra" : ""} ${selectedIds.has(r.id) ? "bg-brand/[0.03]" : ""}`}
+                data-row-id={r.id}
+                className={`table-row-hover border-b border-line-subtle ${i % 2 === 1 ? "bg-zebra" : ""} ${selectedIds.has(r.id) ? "bg-brand/[0.03]" : ""} ${successFlashIds?.has(r.id) ? "row-bulk-success-flash" : ""}`}
               >
                 {selectionMode && (
                   <td className="px-3 py-3.5">

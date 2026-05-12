@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArtTabs } from "@/components/ui/art-tabs";
 import { useTableFilters, matchesFaelligkeitsFilter } from "@/lib/use-table-filters";
 import { useBestellungenListRealtime } from "@/lib/hooks/use-bestellung-realtime";
+import {
+  recordRowVisit,
+  useRowReturnFlash,
+} from "@/lib/hooks/use-row-return-flash";
 import { FilterBar } from "@/components/ui/filter-bar";
 import { STATUS_FILTER_OPTIONS } from "@/lib/status-config";
 import {
@@ -102,6 +106,17 @@ export function BestellungenTabelle({
   // dann die neue Page neu — inkl. der gerade angekommenen Mail.
   useBestellungenListRealtime();
 
+  // Spatial-Continuity (12.05.2026, Continuity-Patch-Sprint):
+  // - Detail-Back-Flash: nach `Back` vom Detail-Page leuchtet die Row, von der
+  //   man kam, für 3.5s mit Brand-Tint + scroll-into-view.
+  // - Pagination-Pulse: bei Seitenwechsel erste Row der neuen Seite pulsiert
+  //   kurz, damit das Auge sofort den Anfang findet.
+  // - Bulk-Success-Flash: Set der gerade-bulk-aktualisierten IDs blitzt
+  //   Success-Green bevor sie aus der "offen"-Liste verschwinden.
+  const returnFlashId = useRowReturnFlash("bestellungen");
+  const [pagePulseId, setPagePulseId] = useState<string | null>(null);
+  const [bulkSuccessIds, setBulkSuccessIds] = useState<Set<string>>(new Set());
+
   // Table state
   const [density, setDensity] = useTableDensity("bestellungen.density");
   const [sort, setSort] = useState<SortState>({ key: "created_at", direction: "desc" });
@@ -132,7 +147,17 @@ export function BestellungenTabelle({
   });
 
   // Async UI state — Hooks aus src/components/bestellungen/
-  const actions = useBestellungenActions({ selected, setSelected });
+  const actions = useBestellungenActions({
+    selected,
+    setSelected,
+    onAffectedRows: (ids) => {
+      // 12.05.2026 (Continuity-Patch): die gerade freigegebenen IDs für 1.2s
+      // grün-aufleuchten lassen bevor der Refresh sie aus der "offen"-Liste
+      // entfernt. Auto-Clear nach Animation-Dauer.
+      setBulkSuccessIds(new Set(ids));
+      setTimeout(() => setBulkSuccessIds(new Set()), 1300);
+    },
+  });
   const {
     showDeleteDialog,
     setShowDeleteDialog,
@@ -148,7 +173,14 @@ export function BestellungenTabelle({
     handleQuickFreigabe,
   } = actions;
   const preview = useBestellungPreview();
-  const { previewId, previewUrl, preloadPreview, handlePreview, closePreview } = preview;
+  const {
+    previewId,
+    previewUrl,
+    recentlyClosedId,
+    preloadPreview,
+    handlePreview,
+    closePreview,
+  } = preview;
 
   // Search input focus (/ shortcut)
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -252,6 +284,23 @@ export function BestellungenTabelle({
     if (pageParam && pageParam !== "1") setPageInUrl(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suche, statusFilter, artFilter, projektFilter, faelligkeitsFilter, sort]);
+
+  // Pagination-Pulse — bei jedem Page-Change die erste Row auf der neuen
+  // Page 1.5s brand-tinted pulsen lassen (Continuity-Patch-Sprint).
+  // Skip auf Page 1 beim allerersten Mount (kein "Wechsel" passiert).
+  const firstRowId = paginatedRows[0]?.id ?? null;
+  const lastPagePulseRef = useRef<{ page: number; rowId: string | null }>({
+    page: safeCurrentPage,
+    rowId: firstRowId,
+  });
+  useEffect(() => {
+    if (lastPagePulseRef.current.page === safeCurrentPage) return;
+    lastPagePulseRef.current = { page: safeCurrentPage, rowId: firstRowId };
+    if (!firstRowId) return;
+    setPagePulseId(firstRowId);
+    const t = setTimeout(() => setPagePulseId(null), 1500);
+    return () => clearTimeout(t);
+  }, [safeCurrentPage, firstRowId]);
 
   const artCounts = useMemo(() => {
     const counts = { material: 0, subunternehmer: 0, abo: 0 };
@@ -514,7 +563,27 @@ export function BestellungenTabelle({
           }
           sort={sort}
           onSortChange={setSort}
-          onRowClick={(b) => router.push(`/bestellungen/${b.id}`)}
+          onRowClick={(b) => {
+            // 12.05.2026 (Continuity-Patch): Detail-Back-Flash — den
+            // navigations-Trigger merken damit beim Back die Row geflasht
+            // werden kann. Vor der eigentlichen Navigation aufgerufen.
+            recordRowVisit("bestellungen", b.id);
+            router.push(`/bestellungen/${b.id}`);
+          }}
+          getRowClassName={(b) => {
+            // Spatial-Continuity-Highlight — Priorisierung von oben nach unten:
+            //   1. Bulk-Success (kurzer Green-Flash, dann verschwindet Row evtl.)
+            //   2. PDF-Modal offen (persistent brand-tint)
+            //   3. PDF-Modal gerade geschlossen (2.2s afterglow)
+            //   4. Zurück vom Detail-Page (3.5s afterglow)
+            //   5. Erste Row nach Page-Wechsel (1.5s pulse)
+            if (bulkSuccessIds.has(b.id)) return "row-bulk-success-flash";
+            if (b.id === previewId) return "row-preview-active";
+            if (b.id === recentlyClosedId) return "row-preview-afterglow";
+            if (b.id === returnFlashId) return "row-return-afterglow";
+            if (b.id === pagePulseId) return "row-page-pulse";
+            return "";
+          }}
           emptyState={
             <BestellungenEmptyState
               totalCount={bestellungen.length}
