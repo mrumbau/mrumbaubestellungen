@@ -133,7 +133,7 @@ export function PipelineQualityClient({ rows }: { rows: PipelineQualityRow[] }) 
                     <IconAlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="text-[12px] text-foreground-subtle">{formatDate(a.date)}</div>
-                      <div className="text-[13.5px] text-foreground">{a.reason}</div>
+                      <div className="text-[14px] text-foreground">{a.reason}</div>
                     </div>
                   </li>
                 ))}
@@ -166,9 +166,9 @@ export function PipelineQualityClient({ rows }: { rows: PipelineQualityRow[] }) 
           {/* Tagesreihe */}
           <SectionCard title="Tagesreihe" padding="none" headerBorder>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full text-[14px]">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-foreground-subtle border-b border-line-subtle">
+                  <tr className="text-[12px] uppercase tracking-wide text-foreground-subtle border-b border-line-subtle">
                     <th className="px-5 py-2 text-left font-medium">Datum</th>
                     <th className="px-5 py-2 text-right font-medium">Mails</th>
                     <th className="px-5 py-2 text-right font-medium">OK</th>
@@ -232,8 +232,8 @@ function KpiCard({ label, value, tone }: { label: string; value: string; tone?: 
     "text-foreground";
   return (
     <div className="rounded-md border border-line-subtle bg-surface px-4 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-foreground-subtle">{label}</div>
-      <div className={`mt-1 text-[20px] font-headline font-semibold tabular-nums font-mono-amount ${valueClass}`}>
+      <div className="text-[12px] uppercase tracking-wide text-foreground-subtle">{label}</div>
+      <div className={`mt-1 text-[18px] font-headline font-semibold tabular-nums font-mono-amount ${valueClass}`}>
         {value}
       </div>
     </div>
@@ -257,7 +257,7 @@ function TrendCard({
   const display = fmt ? fmt(last) : last.toFixed(1);
   return (
     <SectionCard title={label} padding="md">
-      <div className="text-[20px] font-headline font-semibold text-foreground font-mono-amount tabular-nums mb-2">
+      <div className="text-[18px] font-headline font-semibold text-foreground font-mono-amount tabular-nums mb-2">
         {display}{suffix ?? ""}
       </div>
       <Sparkline

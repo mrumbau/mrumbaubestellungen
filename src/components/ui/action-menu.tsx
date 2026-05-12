@@ -212,7 +212,7 @@ export function ActionMenu({
               }}
               onKeyDown={(e) => handleItemKey(e, i)}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-1.5 text-[12.5px] text-left",
+                "w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left",
                 "transition-colors",
                 "focus-visible:outline-none",
                 item.disabled

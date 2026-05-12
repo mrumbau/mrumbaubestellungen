@@ -90,12 +90,12 @@ export function SectionCard({
         >
           <div className="min-w-0 flex-1">
             {title && (
-              <h2 className="font-headline text-[15px] tracking-tight text-foreground">
+              <h2 className="font-headline text-[16px] tracking-tight text-foreground">
                 {title}
               </h2>
             )}
             {description && (
-              <p className="mt-0.5 text-[12.5px] leading-relaxed text-foreground-muted">
+              <p className="mt-0.5 text-[12px] leading-relaxed text-foreground-muted">
                 {description}
               </p>
             )}

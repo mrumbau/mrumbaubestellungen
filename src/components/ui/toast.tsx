@@ -247,7 +247,7 @@ function ToastViewport({
               {icons[item.tone]}
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold text-foreground leading-snug">
+              <div className="text-[14px] font-semibold text-foreground leading-snug">
                 {item.title}
               </div>
               {item.description && (

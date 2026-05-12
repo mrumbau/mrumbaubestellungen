@@ -64,7 +64,7 @@ export function TestdatenClient({
             komplett entfernt werden und sind in der Produktion nicht sichtbar.
           </Alert>
 
-          <ul className="space-y-1.5 text-[13px] text-foreground-muted list-disc pl-5">
+          <ul className="space-y-1.5 text-[14px] text-foreground-muted list-disc pl-5">
             <li>Material- &amp; Subunternehmer-Bestellungen in allen Status-Varianten</li>
             <li>Versandstatus mit Tracking-Links</li>
             <li>Projekte, Kunden und unzugeordnete Einträge</li>

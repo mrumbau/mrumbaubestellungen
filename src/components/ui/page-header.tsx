@@ -90,15 +90,15 @@ export function PageHeader({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {eyebrow && (
-            <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-foreground-subtle mb-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground-subtle mb-1">
               {eyebrow}
             </div>
           )}
-          <h1 className="font-headline text-[26px] leading-tight tracking-tight text-foreground md:text-[28px]">
+          <h1 className="font-headline text-[28px] leading-tight tracking-tight text-foreground md:text-[28px]">
             {title}
           </h1>
           {description && (
-            <p className="mt-1.5 max-w-2xl text-[13.5px] leading-relaxed text-foreground-muted">
+            <p className="mt-1.5 max-w-2xl text-[14px] leading-relaxed text-foreground-muted">
               {description}
             </p>
           )}

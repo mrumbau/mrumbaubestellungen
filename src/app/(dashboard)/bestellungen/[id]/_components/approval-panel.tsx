@@ -75,14 +75,14 @@ export function ApprovalPanel({
         <Card padding="md" className="bg-success-bg border-success-border">
           <div className="flex items-center gap-2">
             <IconCheck className="h-4 w-4 text-success" />
-            <p className="font-headline text-[13px] text-success">Freigegeben</p>
+            <p className="font-headline text-[14px] text-success">Freigegeben</p>
           </div>
-          <p className="text-[11.5px] text-success/80 mt-1.5 ml-6">
+          <p className="text-[12px] text-success/80 mt-1.5 ml-6">
             Von {freigabe.freigegeben_von_name} am{" "}
             {new Date(freigabe.freigegeben_am).toLocaleString("de-DE")}
           </p>
           {freigabe.kommentar && (
-            <p className="text-[11.5px] text-success/80 mt-1 ml-6 italic">
+            <p className="text-[12px] text-success/80 mt-1 ml-6 italic">
               {freigabe.kommentar}
             </p>
           )}

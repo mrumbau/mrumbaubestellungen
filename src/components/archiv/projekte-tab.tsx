@@ -101,7 +101,7 @@ export function ProjekteTab({
                       Budget
                     </span>
                     <span
-                      className={`font-mono-amount text-[11px] font-medium ${
+                      className={`font-mono-amount text-[12px] font-medium ${
                         budgetPercent > 100
                           ? "text-error"
                           : budgetPercent > 80
@@ -179,7 +179,7 @@ export function ProjekteTab({
                             {o.haendler_name || o.subunternehmer_firma || ""}
                           </span>
                           {o.bestellungsart === "subunternehmer" && (
-                            <span className="hidden sm:inline px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-warning-bg text-warning rounded">
+                            <span className="hidden sm:inline px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-warning-bg text-warning rounded">
                               SU
                             </span>
                           )}

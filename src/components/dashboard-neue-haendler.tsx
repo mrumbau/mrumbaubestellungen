@@ -81,7 +81,7 @@ export function DashboardNeueHaendler({
                 <p className="text-sm font-medium text-foreground">
                   {h.name}
                 </p>
-                <p className="text-[11px] text-foreground-faint truncate">
+                <p className="text-[12px] text-foreground-faint truncate">
                   {h.domain}
                   {h.email_absender?.length > 0 && (
                     <> · {h.email_absender.join(", ")}</>

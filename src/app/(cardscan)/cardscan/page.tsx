@@ -13,7 +13,7 @@ export default async function CardScanPage() {
     <div className="max-w-lg md:max-w-xl mx-auto flex flex-col animate-fade-in min-h-[calc(100dvh-120px)]">
       {/* ─── Hero ─────────────────────────────────────────────────── */}
       <div className="pt-4 pb-6">
-        <h1 className="font-headline text-[22px] text-foreground tracking-tight">
+        <h1 className="font-headline text-[24px] text-foreground tracking-tight">
           Hi {firstName}
         </h1>
         <p className="text-sm text-foreground-subtle mt-1">
@@ -34,7 +34,7 @@ export default async function CardScanPage() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-[15px]">Visitenkarte scannen</p>
+            <p className="text-white font-medium text-[16px]">Visitenkarte scannen</p>
             <p className="text-white/35 text-xs mt-0.5">Kamera oder Foto aus Galerie</p>
           </div>
           <svg className="w-4 h-4 text-white/20 shrink-0 group-hover:text-white/40 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -82,7 +82,7 @@ export default async function CardScanPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">{item.label}</p>
-              <p className="text-[11px] text-foreground-subtle mt-0.5">{item.sub}</p>
+              <p className="text-[12px] text-foreground-subtle mt-0.5">{item.sub}</p>
             </div>
             <svg className="w-4 h-4 text-foreground-subtle opacity-30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />

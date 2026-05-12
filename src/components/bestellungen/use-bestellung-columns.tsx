@@ -89,7 +89,7 @@ export function useBestellungColumns({
                 )}
               </div>
               {b.projekt_name && (
-                <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[11px] text-foreground-muted">
+                <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[12px] text-foreground-muted">
                   <span
                     className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{

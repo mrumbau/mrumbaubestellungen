@@ -379,8 +379,8 @@ function AboRow({
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13.5px] font-semibold text-foreground">{abo.name}</span>
-            <span className="text-[11px] font-mono-amount text-foreground-subtle">
+            <span className="text-[14px] font-semibold text-foreground">{abo.name}</span>
+            <span className="text-[12px] font-mono-amount text-foreground-subtle">
               {abo.domain}
             </span>
             <Badge tone="neutral" size="sm">
@@ -395,7 +395,7 @@ function AboRow({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-3 mt-1 flex-wrap text-[11.5px]">
+          <div className="flex items-center gap-3 mt-1 flex-wrap text-[12px]">
             {abo.naechste_rechnung && (
               <span
                 className={
@@ -425,7 +425,7 @@ function AboRow({
               {abo.email_absender.map((ea, i) => (
                 <span
                   key={i}
-                  className="text-[10.5px] font-mono-amount px-1.5 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                  className="text-[10px] font-mono-amount px-1.5 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
                 >
                   {ea}
                 </span>

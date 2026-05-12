@@ -213,7 +213,7 @@ export default function CardScanHistoryPage() {
 
           {/* Result-Count */}
           {(search || statusFilter !== "all") && (
-            <p className="text-[11px] text-foreground-subtle mb-3 px-1">
+            <p className="text-[12px] text-foreground-subtle mb-3 px-1">
               {filtered.length === 0
                 ? "Keine Treffer"
                 : `${filtered.length} ${filtered.length === 1 ? "Treffer" : "Treffer"}`}
@@ -277,7 +277,7 @@ export default function CardScanHistoryPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{name}</p>
                     {subtitle && (
-                      <p className="text-[11px] text-foreground-subtle truncate mt-0.5">{subtitle}</p>
+                      <p className="text-[12px] text-foreground-subtle truncate mt-0.5">{subtitle}</p>
                     )}
                   </div>
 

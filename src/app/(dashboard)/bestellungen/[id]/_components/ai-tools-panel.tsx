@@ -101,7 +101,7 @@ export function AiToolsPanel({
             size="sm"
             onClick={onKiZusammenfassung}
             loading={kiLoading}
-            className="h-6 text-[11px] px-2 py-0 bg-brand/5 text-brand border-0 hover:bg-brand/10"
+            className="h-6 text-[12px] px-2 py-0 bg-brand/5 text-brand border-0 hover:bg-brand/10"
           >
             Generieren
           </Button>
@@ -201,7 +201,7 @@ function AbgleichBlock({
   if (!abgleich) {
     return (
       <div className="mb-3">
-        <p className="text-[11px] text-foreground-subtle mb-2">
+        <p className="text-[12px] text-foreground-subtle mb-2">
           Abgleich startet sobald alle Dokumente vorliegen.
         </p>
         <div className="flex gap-1.5 flex-wrap">
@@ -274,7 +274,7 @@ function AbgleichBlock({
                 aria-expanded={!!openAbweichungen[i]}
                 className={cn(
                   "w-full flex items-center justify-between px-2.5 py-1.5 rounded",
-                  "bg-error-bg/70 hover:bg-error-bg transition-colors text-[11px]",
+                  "bg-error-bg/70 hover:bg-error-bg transition-colors text-[12px]",
                   "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 )}
               >
@@ -320,7 +320,7 @@ function AbgleichBlock({
         </ul>
       )}
       {abgleich.ki_zusammenfassung && (
-        <p className="text-[11px] text-foreground-muted mt-2 leading-relaxed">
+        <p className="text-[12px] text-foreground-muted mt-2 leading-relaxed">
           {abgleich.ki_zusammenfassung}
         </p>
       )}

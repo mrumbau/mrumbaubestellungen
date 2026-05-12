@@ -238,7 +238,7 @@ export function ProjekteClient({
         return (
           <span
             className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide border",
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] font-semibold uppercase tracking-wide border",
               cfg.bg,
               cfg.text,
               cfg.border,
@@ -263,7 +263,7 @@ export function ProjekteClient({
           <span>
             {s.gesamt}
             {s.offen > 0 && (
-              <span className="ml-1 text-[11px] text-warning">
+              <span className="ml-1 text-[12px] text-warning">
                 · {s.offen} offen
               </span>
             )}
@@ -482,7 +482,7 @@ export function ProjekteClient({
               onClick={() => setViewMode("grid")}
               title="Karten-Ansicht"
               className={cn(
-                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "px-2 h-7 text-[12px] font-semibold rounded transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 viewMode === "grid"
                   ? "bg-surface text-foreground shadow-card"
@@ -503,7 +503,7 @@ export function ProjekteClient({
               onClick={() => setViewMode("table")}
               title="Tabellen-Ansicht"
               className={cn(
-                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "px-2 h-7 text-[12px] font-semibold rounded transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 viewMode === "table"
                   ? "bg-surface text-foreground shadow-card"
@@ -541,7 +541,7 @@ export function ProjekteClient({
             onClick={handleCsvExport}
             disabled={tableRows.length === 0}
             title="Projekte als CSV exportieren"
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               viewBox="0 0 16 16"

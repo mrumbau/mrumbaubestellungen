@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IconPlus, IconEdit, IconTrash, IconCheck, IconX } from "@/components/ui/icons";
 
@@ -128,7 +129,7 @@ export function RulesClient({
       )}
 
       <div className="flex items-center justify-between">
-        <p className="text-[13px] text-foreground-muted">
+        <p className="text-[14px] text-foreground-muted">
           {rules.length === 0
             ? "Noch keine Regeln definiert. Pipeline nutzt die 5-Stufen-Standard-Logik."
             : `${rules.length} Regel${rules.length === 1 ? "" : "n"} aktiv. Pipeline-Auswertung nach Priorität (niedrigster Wert zuerst).`}
@@ -138,18 +139,31 @@ export function RulesClient({
         </Button>
       </div>
 
+      {rules.length === 0 && (
+        <EmptyState
+          icon={<IconPlus className="h-5 w-5" />}
+          title="Keine Regeln aktiv"
+          description="Regeln greifen vor der Standard-Pipeline und überschreiben Besteller-Zuordnungen z.B. nach Händler-Domain oder Absender-Pattern. Ohne Regeln läuft die 5-Stufen-Heuristik (Whitelist → Signal → Erwartet → Bestätigt → KI)."
+          primaryAction={
+            <Button onClick={() => setShowAdd(true)} iconLeft={<IconPlus />} size="sm">
+              Erste Regel anlegen
+            </Button>
+          }
+        />
+      )}
+
       {rules.length > 0 && (
         <Card padding="none" className="overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[14px]">
             <thead className="bg-canvas border-b border-line">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">Aktiv</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">Prio</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">Bedingung</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">→ Besteller</th>
-                <th className="px-4 py-3 text-right font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">Trefferzahl</th>
-                <th className="px-4 py-3 text-right font-semibold text-foreground-muted text-[11px] uppercase tracking-wider">Aktion</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">Aktiv</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">Prio</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">Bedingung</th>
+                <th className="px-4 py-3 text-left font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">→ Besteller</th>
+                <th className="px-4 py-3 text-right font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">Trefferzahl</th>
+                <th className="px-4 py-3 text-right font-semibold text-foreground-muted text-[12px] uppercase tracking-wider">Aktion</th>
               </tr>
             </thead>
             <tbody>
@@ -294,7 +308,7 @@ function RuleForm({
     <Card padding="md" className="border-2 border-brand/30">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-headline text-[15px] text-foreground">
+          <h3 className="font-headline text-[16px] text-foreground">
             {rule ? "Regel bearbeiten" : "Neue Regel"}
           </h3>
           <button
@@ -309,7 +323,7 @@ function RuleForm({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               Name
             </label>
             <input
@@ -318,11 +332,11 @@ function RuleForm({
               onChange={(e) => setName(e.target.value)}
               required
               placeholder="z.B. RK → MT"
-              className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+              className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               Priorität (niedrigster Wert zuerst)
             </label>
             <input
@@ -331,19 +345,19 @@ function RuleForm({
               onChange={(e) => setPriority(parseInt(e.target.value, 10) || 100)}
               min={0}
               max={9999}
-              className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+              className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
             Bedingungs-Typ
           </label>
           <select
             value={conditionType}
             onChange={(e) => setConditionType(e.target.value)}
-            className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+            className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
           >
             {CONDITION_TYPES.map((c) => (
               <option key={c.value} value={c.value}>
@@ -354,7 +368,7 @@ function RuleForm({
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
             Bedingungs-Wert
           </label>
           <input
@@ -363,20 +377,20 @@ function RuleForm({
             onChange={(e) => setConditionValue(e.target.value)}
             required
             placeholder={selectedConditionType?.example ?? ""}
-            className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+            className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               → Besteller
             </label>
             <select
               value={targetKuerzel}
               onChange={(e) => setTargetKuerzel(e.target.value)}
               required
-              className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+              className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             >
               <option value="">— wählen —</option>
               {bestellerListe.map((b) => (
@@ -387,7 +401,7 @@ function RuleForm({
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               Konfidenz (0.0 – 1.0)
             </label>
             <input
@@ -397,13 +411,13 @@ function RuleForm({
               step={0.05}
               min={0}
               max={1}
-              className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+              className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
             Notizen (optional)
           </label>
           <textarea
@@ -411,7 +425,7 @@ function RuleForm({
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
             placeholder="z.B. 'MT bestellt fast nur bei RK seit Jan 2026'"
-            className="w-full px-3 py-2 text-[13px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+            className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
           />
         </div>
 

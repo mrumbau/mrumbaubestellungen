@@ -254,25 +254,25 @@ function HaendlerRow({
     <li className="group flex items-start justify-between gap-3 px-5 py-3.5 hover:bg-surface-hover transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[13.5px] font-semibold text-foreground">{haendler.name}</span>
-          <span className="text-[11px] font-mono-amount text-foreground-muted bg-canvas border border-line-subtle rounded px-1.5 py-0.5">
+          <span className="text-[14px] font-semibold text-foreground">{haendler.name}</span>
+          <span className="text-[12px] font-mono-amount text-foreground-muted bg-canvas border border-line-subtle rounded px-1.5 py-0.5">
             {haendler.domain}
           </span>
         </div>
         {haendler.url_muster.length > 0 && (
-          <p className="text-[11.5px] text-foreground-subtle mt-1 truncate">
+          <p className="text-[12px] text-foreground-subtle mt-1 truncate">
             <span className="text-foreground-muted">URLs:</span>{" "}
             {haendler.url_muster.join(", ")}
           </p>
         )}
         {haendler.email_absender.length > 0 && (
-          <p className="text-[11.5px] text-foreground-subtle truncate">
+          <p className="text-[12px] text-foreground-subtle truncate">
             <span className="text-foreground-muted">E-Mails:</span>{" "}
             {haendler.email_absender.join(", ")}
           </p>
         )}
         {stat && (
-          <div className="flex items-center gap-3 mt-1.5 text-[11px]">
+          <div className="flex items-center gap-3 mt-1.5 text-[12px]">
             <span className="text-foreground-muted">
               <span className="font-mono-amount font-semibold text-foreground">
                 {stat.gesamt}

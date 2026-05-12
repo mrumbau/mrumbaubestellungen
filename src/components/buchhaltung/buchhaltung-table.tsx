@@ -156,7 +156,7 @@ export function BuchhaltungTable({
                   <span className="flex items-center gap-1.5">
                     {r.haendler_name || "–"}
                     {r.bestellungsart === "subunternehmer" && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-bestellungsart-subunternehmer-bg text-bestellungsart-subunternehmer-text rounded">
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wide bg-bestellungsart-subunternehmer-bg text-bestellungsart-subunternehmer-text rounded">
                         SUB
                       </span>
                     )}
@@ -221,7 +221,7 @@ export function BuchhaltungTable({
                 <td className="px-4 py-3.5 text-center">
                   {tab === "bezahlt" ? (
                     <div className="flex flex-col items-center gap-0.5">
-                      <span className="text-[11px] text-success font-medium">
+                      <span className="text-[12px] text-success font-medium">
                         {formatDatum(r.bezahlt_am)}
                       </span>
                       <span className="text-[10px] text-foreground-subtle">{r.bezahlt_von}</span>

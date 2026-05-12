@@ -1,12 +1,16 @@
 /**
- * 4 Summary-Cards (Projekte / Material / SU / Volumen).
- * Aus archiv-client.tsx extrahiert (11.05.2026).
+ * 4 Summary-Cards (Projekte / Material / SU / Volumen) — Bento-Layout.
+ *
+ * "Gesamtvolumen" ist die geschäftlich relevanteste Zahl (Brand-Color,
+ * Currency, größer als Sub-Counts) → als Hero (md:col-span-2). Projekte /
+ * Material / SU als Standard-Kacheln daneben (DESIGN-Critique #3).
  *
  * Magic-Hex-Colors auf CSS-Custom-Properties migriert (UI-Audit F1.4 fix —
- * "var(--mr-red)" für Brand, übrige bleiben semantisch differenzierend).
+ * "var(--mr-red)" für Brand, übrige semantisch differenzierend).
  */
 
 import { formatBetrag } from "@/lib/formatters";
+import { HeroStatCard } from "@/components/ui/hero-stat-card";
 
 export interface ArchivStatsSummary {
   totalProjekte: number;
@@ -15,17 +19,26 @@ export interface ArchivStatsSummary {
   totalVolumen: number;
 }
 
-const CARDS = [
-  { label: "Projekte", key: "totalProjekte" as const, color: "#7c3aed", isCurrency: false },
-  { label: "Material", key: "totalMaterial" as const, color: "#2563eb", isCurrency: false },
-  { label: "Subunternehmer", key: "totalSU" as const, color: "#d97706", isCurrency: false },
-  { label: "Gesamtvolumen", key: "totalVolumen" as const, color: "var(--mr-red)", isCurrency: true },
+const STANDARD_CARDS = [
+  { label: "Projekte", key: "totalProjekte" as const, color: "var(--archiv-projekte)" },
+  { label: "Material", key: "totalMaterial" as const, color: "var(--archiv-material)" },
+  { label: "Subunternehmer", key: "totalSU" as const, color: "var(--archiv-su)" },
 ];
 
 export function ArchivStatsCards({ summary }: { summary: ArchivStatsSummary }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {CARDS.map((card) => {
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <HeroStatCard
+        label="Gesamtvolumen"
+        value={formatBetrag(summary.totalVolumen)}
+        color="var(--mr-red)"
+        footer={
+          <p className="text-[12px] text-foreground-subtle">
+            Über {summary.totalProjekte} Projekte und {summary.totalMaterial + summary.totalSU} Aufträge
+          </p>
+        }
+      />
+      {STANDARD_CARDS.map((card) => {
         const value = summary[card.key];
         return (
           <div
@@ -43,7 +56,7 @@ export function ArchivStatsCards({ summary }: { summary: ArchivStatsSummary }) {
               {card.label}
             </p>
             <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
-              {card.isCurrency ? formatBetrag(value) : value}
+              {value}
             </p>
           </div>
         );

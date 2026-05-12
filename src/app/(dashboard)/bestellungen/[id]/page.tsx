@@ -40,10 +40,10 @@ export default async function BestellungDetailPage({
   if (!bestellung) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
-        <p className="text-foreground-subtle text-[15px]">Bestellung nicht gefunden.</p>
+        <p className="text-foreground-subtle text-[16px]">Bestellung nicht gefunden.</p>
         <Link
           href="/bestellungen"
-          className="mt-4 text-brand hover:text-brand-light text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
+          className="mt-4 text-brand hover:text-brand-light text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
         >
           Zurück zu Bestellungen
         </Link>

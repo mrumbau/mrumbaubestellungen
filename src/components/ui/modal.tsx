@@ -19,13 +19,14 @@ import { cn } from "@/lib/cn";
  * - Size variants aligned with the layout grid
  */
 
-type ModalSize = "sm" | "md" | "lg" | "xl";
+type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl";
 
 const sizeClasses: Record<ModalSize, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-2xl",
+  "2xl": "max-w-4xl",
 };
 
 export function Modal({
@@ -40,6 +41,7 @@ export function Modal({
   footer,
   className,
   contentClassName,
+  bodyClassName,
   labelledBy,
   describedBy,
 }: {
@@ -54,6 +56,8 @@ export function Modal({
   footer?: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  /** Override body container classes; use to enable full-bleed iframes/images. */
+  bodyClassName?: string;
   labelledBy?: string;
   describedBy?: string;
 }) {
@@ -128,7 +132,7 @@ export function Modal({
                 </h2>
               )}
               {description && (
-                <p id={descId} className="mt-1 text-[13px] leading-relaxed text-foreground-muted">
+                <p id={descId} className="mt-1 text-[14px] leading-relaxed text-foreground-muted">
                   {description}
                 </p>
               )}
@@ -151,7 +155,7 @@ export function Modal({
             )}
           </div>
         )}
-        <div className="flex-1 overflow-y-auto px-5 pb-5">{children}</div>
+        <div className={cn("flex-1 overflow-y-auto px-5 pb-5", bodyClassName)}>{children}</div>
         {footer && (
           <div className="shrink-0 border-t border-line-subtle bg-canvas px-5 py-3 flex items-center justify-end gap-2">
             {footer}

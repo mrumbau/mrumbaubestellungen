@@ -10,7 +10,7 @@ export function Label({
   return (
     <label
       className={cn(
-        "inline-flex items-center gap-1 text-[13px] font-medium text-foreground-muted leading-none",
+        "inline-flex items-center gap-1 text-[14px] font-medium text-foreground-muted leading-none",
         className,
       )}
       {...rest}

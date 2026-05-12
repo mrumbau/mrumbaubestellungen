@@ -83,7 +83,7 @@ export default async function SystemLayout({
       <div
         role="note"
         aria-label="Admin-Bereich"
-        className="inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-md bg-canvas border border-line text-[11px] text-foreground-muted"
+        className="inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-md bg-canvas border border-line text-[12px] text-foreground-muted"
       >
         <svg
           className="w-3.5 h-3.5 text-foreground-subtle"

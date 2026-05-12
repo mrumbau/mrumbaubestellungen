@@ -27,7 +27,7 @@ export function ErrorBadgeLink({ isAdmin = false }: { isAdmin?: boolean }) {
           href="/cardscan/errors"
           className="flex items-center gap-1.5 text-xs text-error hover:text-error/80 active:text-error/70 transition-colors py-2"
         >
-          <span className="rounded-full bg-error text-white text-[9px] font-bold flex items-center justify-center leading-none" style={{ width: 18, height: 18 }}>
+          <span className="rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center leading-none" style={{ width: 18, height: 18 }}>
             {errorCount}
           </span>
           Fehler

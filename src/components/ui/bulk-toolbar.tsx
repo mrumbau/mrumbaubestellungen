@@ -81,13 +81,13 @@ export function BulkToolbar({
           <p
             aria-live="polite"
             aria-atomic="true"
-            className="text-[13px] font-semibold text-foreground-inverse leading-tight"
+            className="text-[14px] font-semibold text-foreground-inverse leading-tight"
           >
             <span className="font-mono-amount">{count}</span>{" "}
             {count === 1 ? label.replace(/en$/, "") : label} ausgewählt
           </p>
           {totalHint && (
-            <p className="text-[11px] text-foreground-inverse/60 leading-tight mt-0.5">
+            <p className="text-[12px] text-foreground-inverse/60 leading-tight mt-0.5">
               {totalHint}
             </p>
           )}

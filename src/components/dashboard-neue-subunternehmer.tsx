@@ -61,7 +61,7 @@ export function DashboardNeueSubunternehmer({
                 <p className="text-sm font-medium text-foreground">
                   {s.firma}
                 </p>
-                <p className="text-[11px] text-foreground-faint truncate">
+                <p className="text-[12px] text-foreground-faint truncate">
                   {s.gewerk && <>{s.gewerk} · </>}
                   {s.email_absender?.length > 0 && (
                     <>{s.email_absender.join(", ")}</>

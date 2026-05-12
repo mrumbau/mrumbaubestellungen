@@ -57,10 +57,10 @@ export function PasswortAendern() {
 
   return (
     <div className="card p-6">
-      <h2 className="font-headline text-[15px] tracking-tight text-foreground mb-1">
+      <h2 className="font-headline text-[16px] tracking-tight text-foreground mb-1">
         Passwort ändern
       </h2>
-      <p className="text-[13px] text-foreground-muted mb-5">
+      <p className="text-[14px] text-foreground-muted mb-5">
         Geben Sie ein neues Passwort ein (mindestens {PASSWORD_MIN_LENGTH} Zeichen).
       </p>
 

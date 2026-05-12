@@ -151,7 +151,7 @@ export function DashboardPriorisierung({
             <time
               dateTime={generatedAt}
               className={cn(
-                "text-[11px] font-mono-amount",
+                "text-[12px] font-mono-amount",
                 stale ? "text-warning" : "text-foreground-subtle",
               )}
             >
@@ -169,7 +169,7 @@ export function DashboardPriorisierung({
       </div>
 
       {error && (
-        <p className="text-[11px] text-error mb-2">{error}</p>
+        <p className="text-[12px] text-error mb-2">{error}</p>
       )}
 
       <p className="text-xs text-foreground-muted mb-4 leading-relaxed">{data.zusammenfassung}</p>
@@ -186,8 +186,8 @@ export function DashboardPriorisierung({
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-foreground">Alles im grünen Bereich</p>
-            <p className="text-[11px] text-foreground-muted mt-0.5">
+            <p className="text-[14px] font-semibold text-foreground">Alles im grünen Bereich</p>
+            <p className="text-[12px] text-foreground-muted mt-0.5">
               Die KI sieht aktuell keine dringend zu priorisierenden Bestellungen — keine Aktion nötig.
             </p>
           </div>

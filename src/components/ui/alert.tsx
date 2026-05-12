@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
  * For transient feedback use <Toast> via useToast() instead.
  */
 export const alertVariants = cva(
-  "flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[13px] leading-relaxed",
+  "flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[14px] leading-relaxed",
   {
     variants: {
       tone: {

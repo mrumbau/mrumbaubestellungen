@@ -213,7 +213,7 @@ function Stat({
 }) {
   return (
     <div className="rounded-lg border border-line-subtle bg-card p-4">
-      <div className="text-[11px] text-foreground-subtle uppercase tracking-wider mb-2">
+      <div className="text-[12px] text-foreground-subtle uppercase tracking-wider mb-2">
         {label}
       </div>
       <div

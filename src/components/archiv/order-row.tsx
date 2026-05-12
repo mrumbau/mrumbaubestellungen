@@ -61,7 +61,7 @@ export function OrderRow({
               ? order.subunternehmer_firma || order.haendler_name || "–"
               : order.haendler_name || "–"}
             {type === "subunternehmer" && order.subunternehmer_gewerk && (
-              <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wide bg-warning-bg text-warning rounded uppercase">
+              <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wide bg-warning-bg text-warning rounded uppercase">
                 {order.subunternehmer_gewerk}
               </span>
             )}
@@ -94,7 +94,7 @@ export function OrderRow({
         </td>
         <td className="px-4 py-3.5">
           <div className="flex flex-col">
-            <span className="text-[11px] text-foreground-muted">{formatDatum(order.bezahlt_am)}</span>
+            <span className="text-[12px] text-foreground-muted">{formatDatum(order.bezahlt_am)}</span>
             {order.bezahlt_von && (
               <span className="text-[10px] text-foreground-faint">{order.bezahlt_von}</span>
             )}
@@ -146,7 +146,7 @@ export function OrderRow({
                           </svg>
                           <span className="text-xs font-medium text-foreground capitalize">{dok.typ}</span>
                           {dok.gesamtbetrag != null && (
-                            <span className="font-mono-amount text-[11px] text-foreground-muted">
+                            <span className="font-mono-amount text-[12px] text-foreground-muted">
                               {formatBetrag(dok.gesamtbetrag)}
                             </span>
                           )}

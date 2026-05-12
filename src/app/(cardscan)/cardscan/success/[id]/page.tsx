@@ -275,7 +275,7 @@ export default function CardScanSuccessPage() {
               )}
             </button>
             {retryError && (
-              <p className="mt-2 text-[11px] text-error" role="alert">{retryError}</p>
+              <p className="mt-2 text-[12px] text-error" role="alert">{retryError}</p>
             )}
             <p className="mt-1.5 text-[10px] text-foreground-subtle leading-relaxed">
               Bereits angelegte Kunden werden nicht doppelt erstellt — nur fehlgeschlagene CRMs werden erneut angesprochen.

@@ -189,14 +189,14 @@ export function SidebarMetadata({
               type="button"
               onClick={() => setShowProjektSelect(true)}
               className={cn(
-                "text-[11px] font-semibold text-brand hover:text-brand-light transition-colors",
+                "text-[12px] font-semibold text-brand hover:text-brand-light transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded px-1",
               )}
             >
               Zuordnen
             </button>
           ) : (
-            <span className="text-[11px] text-foreground-subtle">–</span>
+            <span className="text-[12px] text-foreground-subtle">–</span>
           )}
         </div>
 
@@ -226,25 +226,25 @@ export function SidebarMetadata({
               Subunternehmer
             </span>
           </div>
-          <p className="text-[13px] font-medium text-foreground">{subunternehmer.firma}</p>
+          <p className="text-[14px] font-medium text-foreground">{subunternehmer.firma}</p>
           {subunternehmer.gewerk && (
             <Badge tone="neutral" size="sm" className="mt-1">
               {subunternehmer.gewerk}
             </Badge>
           )}
           {subunternehmer.ansprechpartner && (
-            <p className="text-[11px] text-foreground-muted mt-1.5">
+            <p className="text-[12px] text-foreground-muted mt-1.5">
               {subunternehmer.ansprechpartner}
             </p>
           )}
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
             {subunternehmer.telefon && (
-              <p className="text-[11px] text-foreground-subtle font-mono-amount">
+              <p className="text-[12px] text-foreground-subtle font-mono-amount">
                 {subunternehmer.telefon}
               </p>
             )}
             {subunternehmer.email && (
-              <p className="text-[11px] text-foreground-subtle font-mono-amount">
+              <p className="text-[12px] text-foreground-subtle font-mono-amount">
                 {subunternehmer.email}
               </p>
             )}
@@ -267,7 +267,7 @@ export function SidebarMetadata({
             </span>
           </div>
           {bestellung.versanddienstleister && (
-            <p className="text-[13px] font-medium text-foreground">
+            <p className="text-[14px] font-medium text-foreground">
               {bestellung.versanddienstleister}
             </p>
           )}

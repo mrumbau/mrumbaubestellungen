@@ -53,7 +53,7 @@ export function DetailHeader({
     <>
       <Link
         href="/bestellungen"
-        className="inline-flex items-center gap-1.5 w-fit mb-4 text-[13px] text-foreground-muted hover:text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
+        className="inline-flex items-center gap-1.5 w-fit mb-4 text-[14px] text-foreground-muted hover:text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
       >
         <IconArrowLeft className="h-3.5 w-3.5" />
         Bestellungen
@@ -73,7 +73,7 @@ export function DetailHeader({
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 relative">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="font-headline text-[22px] md:text-[24px] tracking-tight text-foreground">
+              <h1 className="font-headline text-[24px] md:text-[24px] tracking-tight text-foreground">
                 {displayBestellnummer(bestellung)}
               </h1>
               <span className={`status-tag ${statusConfig.bg} ${statusConfig.text}`}>
@@ -88,7 +88,7 @@ export function DetailHeader({
               </span>
               {bestellung.mahnung_am && (
                 <span
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-error-bg border border-error-border text-error text-[11px] font-semibold"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-error-bg border border-error-border text-error text-[12px] font-semibold"
                   title={`Mahnung eingegangen am ${new Date(bestellung.mahnung_am).toLocaleDateString("de-DE")}`}
                 >
                   <IconAlertCircle className="h-3.5 w-3.5" />
@@ -113,7 +113,7 @@ export function DetailHeader({
               <span className="inline-flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className="inline-flex h-5 w-5 items-center justify-center rounded bg-brand text-white text-[9px] font-bold font-mono-amount"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded bg-brand text-white text-[10px] font-bold font-mono-amount"
                 >
                   {bestellung.besteller_kuerzel}
                 </span>
@@ -199,7 +199,7 @@ export function DetailHeader({
                 Projekt-Referenz, Fälligkeit. Werden nur angezeigt wenn die KI
                 tatsächlich was extrahiert hat — sonst leise im UI. */}
             {(bestellung.kundennummer || bestellung.projekt_referenz || bestellung.faelligkeitsdatum) && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[11px]">
+              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[12px]">
                 {bestellung.kundennummer && (
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
@@ -249,7 +249,7 @@ export function DetailHeader({
             <p className="text-[10px] font-semibold tracking-widest uppercase text-foreground-subtle">
               Betrag{bestellung.betrag_ist_netto ? " (netto)" : ""}
             </p>
-            <p className="text-[26px] font-bold font-mono-amount text-foreground mt-0.5 leading-none">
+            <p className="text-[28px] font-bold font-mono-amount text-foreground mt-0.5 leading-none">
               {bestellung.betrag
                 ? `${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
                 : "–"}

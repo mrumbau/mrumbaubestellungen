@@ -305,7 +305,7 @@ export default function CardScanCapturePage() {
             </div>
             <div>
               <h2 className="font-headline text-base text-foreground">Kamera-Zugriff verweigert</h2>
-              <p className="text-[11.5px] text-foreground-subtle mt-0.5">
+              <p className="text-[12px] text-foreground-subtle mt-0.5">
                 {isIOS ? "iPhone/iPad" : isAndroid ? "Android" : "Desktop-Browser"}
               </p>
             </div>

@@ -167,7 +167,7 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
                       log.status === "error" ? "bg-error-bg/40" : "",
                     )}
                   >
-                    <td className="px-5 py-2.5 font-mono-amount text-[11.5px] text-foreground-muted whitespace-nowrap">
+                    <td className="px-5 py-2.5 font-mono-amount text-[12px] text-foreground-muted whitespace-nowrap">
                       {new Date(log.created_at).toLocaleString("de-DE", {
                         day: "2-digit",
                         month: "2-digit",
@@ -184,10 +184,10 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
                     <td className="px-3 py-2.5">
                       <StatusPill status={log.status} />
                     </td>
-                    <td className="px-3 py-2.5 font-mono-amount text-[11.5px] text-foreground">
+                    <td className="px-3 py-2.5 font-mono-amount text-[12px] text-foreground">
                       {log.bestellnummer || "–"}
                     </td>
-                    <td className="px-5 py-2.5 text-[11.5px] text-foreground-subtle max-w-[360px]">
+                    <td className="px-5 py-2.5 text-[12px] text-foreground-subtle max-w-[360px]">
                       <span className="line-clamp-2 break-words" title={log.fehler_text ?? undefined}>
                         {log.fehler_text || "–"}
                       </span>
@@ -206,7 +206,7 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
 function StatusPill({ status }: { status: string }) {
   if (status === "success") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-status-freigegeben">
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-status-freigegeben">
         <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-status-freigegeben" />
         OK
       </span>
@@ -214,14 +214,14 @@ function StatusPill({ status }: { status: string }) {
   }
   if (status === "error") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-error">
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-error">
         <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-error" />
         Fehler
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-foreground-muted">
+    <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-foreground-muted">
       <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-foreground-muted" />
       {status.toUpperCase()}
     </span>
@@ -246,7 +246,7 @@ function FilterTab({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "px-2.5 py-1 text-[11.5px] font-semibold rounded transition-colors",
+        "px-2.5 py-1 text-[12px] font-semibold rounded transition-colors",
         "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
         active
           ? tone === "error"

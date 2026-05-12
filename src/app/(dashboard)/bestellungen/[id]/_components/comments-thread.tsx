@@ -49,14 +49,14 @@ export function CommentsThread({
               <div className="flex items-center gap-2">
                 <div
                   aria-hidden="true"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-white text-[9px] font-bold font-mono-amount"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand text-white text-[10px] font-bold font-mono-amount"
                 >
                   {k.autor_kuerzel}
                 </div>
                 <span className="text-[12px] font-semibold text-foreground">
                   {k.autor_name}
                 </span>
-                <span className="text-[11px] text-foreground-subtle font-mono-amount">
+                <span className="text-[12px] text-foreground-subtle font-mono-amount">
                   {new Date(k.erstellt_am).toLocaleDateString("de-DE")}
                 </span>
               </div>
@@ -95,7 +95,7 @@ export function CommentsThread({
   if (mode === "always-open") {
     return (
       <div className="card p-4">
-        <h3 className="font-headline text-[13px] tracking-tight text-foreground mb-2">
+        <h3 className="font-headline text-[14px] tracking-tight text-foreground mb-2">
           Kommentare
         </h3>
         {body}

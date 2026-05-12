@@ -212,7 +212,7 @@ function DensityToggle({ density, onToggle }: { density: Density; onToggle: () =
       onClick={onToggle}
       aria-label={isCompact ? "Komfortable Ansicht" : "Kompakte Ansicht"}
       title={isCompact ? "Komfortable Ansicht" : "Kompakte Ansicht"}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg transition-colors text-foreground-subtle bg-input border border-line hover:bg-line-subtle hover:text-foreground-muted"
+      className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors text-foreground-subtle bg-input border border-line hover:bg-line-subtle hover:text-foreground-muted"
     >
       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         {isCompact ? (
@@ -313,7 +313,7 @@ function WidgetSettings({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${
           open
             ? "text-brand bg-brand/5 border border-brand/20"
             : "text-foreground-subtle bg-input border border-line hover:bg-line-subtle hover:text-foreground-muted"
@@ -386,7 +386,7 @@ function ToggleRow({ label, active, onToggle, badge }: { label: string; active: 
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${active ? "left-3.5" : "left-0.5"}`} />
       </div>
       <span className={`text-xs flex-1 ${active ? "text-foreground font-medium" : "text-foreground-subtle"}`}>{label}</span>
-      {badge && <span className="text-[9px] text-foreground-faint bg-canvas px-1.5 py-0.5 rounded">{badge}</span>}
+      {badge && <span className="text-[10px] text-foreground-faint bg-canvas px-1.5 py-0.5 rounded">{badge}</span>}
     </button>
   );
 }
@@ -470,7 +470,7 @@ function HeroStatCard({
           </p>
           {badge && (
             <span
-              className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+              className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
               style={{ backgroundColor: `${color}1a`, color }}
             >
               {badge}
@@ -578,7 +578,7 @@ function VolumenCard({
             <span />
           )}
           {hasDelta && (
-            <span className="text-[11px] font-mono-amount text-foreground-muted whitespace-nowrap">
+            <span className="text-[12px] font-mono-amount text-foreground-muted whitespace-nowrap">
               <span aria-hidden="true">{pfeil}</span> {prozentText}
               <span className="text-foreground-subtle ml-1">{comparisonLabel}</span>
             </span>
@@ -687,7 +687,7 @@ function RefreshIndicator({ lastRefresh, onRefresh }: { lastRefresh: Date; onRef
   return (
     <button
       onClick={onRefresh}
-      className="flex items-center gap-1.5 text-[11px] text-foreground-faint hover:text-foreground-subtle transition-colors"
+      className="flex items-center gap-1.5 text-[12px] text-foreground-faint hover:text-foreground-subtle transition-colors"
       title="Jetzt aktualisieren"
     >
       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -894,12 +894,12 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
           <div className="flex items-baseline justify-between mb-3">
             <h2
               id="zu-pruefen-heading"
-              className="font-headline text-[11px] uppercase tracking-[0.14em] text-foreground-subtle"
+              className="font-headline text-[12px] uppercase tracking-[0.14em] text-foreground-subtle"
             >
               Zu prüfen
             </h2>
             <span
-              className="font-mono-amount text-[11px] text-foreground-muted"
+              className="font-mono-amount text-[12px] text-foreground-muted"
               aria-label={`${confirmCount} ${confirmCount === 1 ? "Eintrag" : "Einträge"} zur Prüfung`}
             >
               {confirmCount}
@@ -965,7 +965,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                               <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                               <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                             </p>
-                            <p className="text-[11px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
+                            <p className="text-[12px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -1021,7 +1021,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                             <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                             <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                           </p>
-                          <p className="text-[11px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
+                          <p className="text-[12px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
                           {b.betrag && (
@@ -1098,6 +1098,12 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         );
       })()}
 
+      {/* Industrial-Line zwischen Status-Snapshot (KPIs) und Volumen-Detail.
+          12.05.2026 (DESIGN-Critique #6) — markiert den Section-Wechsel. */}
+      {isWidgetVisible("volumen") && (
+        <div className="industrial-line mb-6" aria-hidden="true" />
+      )}
+
       {/* Volumen-Übersicht — Range-scoped: Werte, Sparkline, Delta beziehen sich auf aktuellen Zeitraum.
           Farbigkeit disziplinär: Freigegeben = Status-Grün, Gesamt = Brand-Rot. */}
       {isWidgetVisible("volumen") && (
@@ -1166,7 +1172,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
                       <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-foreground-subtle">
+                    <div className="flex items-center gap-3 text-[12px] text-foreground-subtle">
                       <span><span className="font-mono-amount font-bold text-foreground">{p.stats.gesamt}</span> Best.</span>
                       {p.stats.offen > 0 && <span><span className="font-mono-amount font-bold text-warning">{p.stats.offen}</span> offen</span>}
                       <span className="font-mono-amount font-bold text-foreground">{formatBetrag(p.stats.volumen)}</span>
@@ -1228,9 +1234,9 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                     <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-error" : "bg-warning"}`} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium text-foreground">{h.name}</span>
-                      <span className={`text-[11px] ml-2 ${h.dringend ? "text-error" : "text-warning"}`}>{h.detail}</span>
+                      <span className={`text-[12px] ml-2 ${h.dringend ? "text-error" : "text-warning"}`}>{h.detail}</span>
                     </div>
-                    <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                       h.typ === "ueberfaellig" ? "bg-error-bg text-error" :
                       h.typ === "kuendigung" ? "bg-warning-bg text-warning" :
                       "bg-canvas text-foreground-muted"

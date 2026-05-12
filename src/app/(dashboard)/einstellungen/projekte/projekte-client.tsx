@@ -343,7 +343,7 @@ export function ProjekteClient({
           <summary
             className={cn(
               "inline-flex items-center gap-2 cursor-pointer select-none",
-              "text-[12.5px] font-medium text-foreground-muted hover:text-foreground transition-colors",
+              "text-[12px] font-medium text-foreground-muted hover:text-foreground transition-colors",
               "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded px-1",
             )}
           >
@@ -360,7 +360,7 @@ export function ProjekteClient({
                   className="w-2.5 h-2.5 rounded-full shrink-0 opacity-60"
                   style={{ background: p.farbe }}
                 />
-                <span className="text-[13px]">{p.name}</span>
+                <span className="text-[14px]">{p.name}</span>
                 <Badge tone="muted" size="sm">
                   {p.status}
                 </Badge>
@@ -397,7 +397,7 @@ function FarbePicker({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-medium text-foreground-muted leading-none">Farbe</span>
+      <span className="text-[14px] font-medium text-foreground-muted leading-none">Farbe</span>
       <div
         role="radiogroup"
         aria-label="Projekt-Farbe auswählen"
@@ -450,20 +450,20 @@ function ProjektRow({
         />
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13.5px] font-semibold text-foreground">{projekt.name}</span>
+            <span className="text-[14px] font-semibold text-foreground">{projekt.name}</span>
             {projekt.status === "pausiert" && (
               <Badge tone="warning" size="sm">
                 Pausiert
               </Badge>
             )}
             {projekt.kunde && (
-              <span className="text-[11.5px] text-foreground-subtle">· {projekt.kunde}</span>
+              <span className="text-[12px] text-foreground-subtle">· {projekt.kunde}</span>
             )}
           </div>
           {projekt.beschreibung && (
-            <p className="text-[11.5px] text-foreground-subtle mt-0.5">{projekt.beschreibung}</p>
+            <p className="text-[12px] text-foreground-subtle mt-0.5">{projekt.beschreibung}</p>
           )}
-          <div className="flex items-center gap-3 mt-0.5 text-[11.5px]">
+          <div className="flex items-center gap-3 mt-0.5 text-[12px]">
             {projekt.adresse && (
               <span className="text-foreground-muted truncate">{projekt.adresse}</span>
             )}

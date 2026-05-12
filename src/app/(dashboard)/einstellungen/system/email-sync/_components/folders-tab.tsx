@@ -94,7 +94,7 @@ function HealthCard() {
           </span>
         </div>
         {es.last_processed_at && (
-          <span className="text-[11px] text-foreground-subtle font-mono-amount">
+          <span className="text-[12px] text-foreground-subtle font-mono-amount">
             zuletzt {relativeTime(es.last_processed_at)}
           </span>
         )}
@@ -109,7 +109,7 @@ function HealthCard() {
         </ul>
       )}
       {es.mismatch_rate_7d > 0 && (
-        <div className="text-[11px] text-foreground-subtle">
+        <div className="text-[12px] text-foreground-subtle">
           Folder-Mismatch-Rate (7d): {(es.mismatch_rate_7d * 100).toFixed(1)} %
         </div>
       )}
@@ -269,13 +269,13 @@ function SubscriptionCard({
       </div>
 
       {data?.notification_url && (
-        <div className="text-[11px] text-foreground-subtle font-mono-amount break-all">
+        <div className="text-[12px] text-foreground-subtle font-mono-amount break-all">
           Webhook: {data.notification_url}
         </div>
       )}
 
       {subs.length > 0 && (
-        <ul className="text-[11px] space-y-0.5 mt-1">
+        <ul className="text-[12px] space-y-0.5 mt-1">
           {subs.map((s) => {
             const expired = new Date(s.expiration_at).getTime() <= Date.now();
             const broken = s.consecutive_failures >= 2;
@@ -435,19 +435,19 @@ export function FoldersTab({
           <table className="w-full text-sm">
             <thead className="bg-canvas border-b border-line-subtle">
               <tr>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold tracking-wider uppercase text-foreground-subtle">
+                <th className="text-left px-4 py-2.5 text-[12px] font-semibold tracking-wider uppercase text-foreground-subtle">
                   Folder
                 </th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold tracking-wider uppercase text-foreground-subtle">
+                <th className="text-left px-4 py-2.5 text-[12px] font-semibold tracking-wider uppercase text-foreground-subtle">
                   Hint
                 </th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold tracking-wider uppercase text-foreground-subtle">
+                <th className="text-left px-4 py-2.5 text-[12px] font-semibold tracking-wider uppercase text-foreground-subtle">
                   Letzter Sync
                 </th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold tracking-wider uppercase text-foreground-subtle">
+                <th className="text-left px-4 py-2.5 text-[12px] font-semibold tracking-wider uppercase text-foreground-subtle">
                   Status
                 </th>
-                <th className="text-right px-4 py-2.5 text-[11px] font-semibold tracking-wider uppercase text-foreground-subtle">
+                <th className="text-right px-4 py-2.5 text-[12px] font-semibold tracking-wider uppercase text-foreground-subtle">
                   Aktion
                 </th>
               </tr>
@@ -457,7 +457,7 @@ export function FoldersTab({
                 <tr key={f.id} className="border-b border-line-subtle last:border-0">
                   <td className="px-4 py-3">
                     <div className="font-medium">{f.folder_name}</div>
-                    <div className="text-[11px] text-foreground-subtle">{f.folder_path}</div>
+                    <div className="text-[12px] text-foreground-subtle">{f.folder_path}</div>
                   </td>
                   <td className="px-4 py-3">
                     <Select
@@ -475,7 +475,7 @@ export function FoldersTab({
                   <td className="px-4 py-3 text-foreground-muted">
                     <div>{relativeTime(f.last_sync_at)}</div>
                     {f.last_sync_count !== null && f.last_sync_count > 0 && (
-                      <div className="text-[11px] text-foreground-subtle font-mono-amount">
+                      <div className="text-[12px] text-foreground-subtle font-mono-amount">
                         {f.last_sync_count} Mails
                       </div>
                     )}
@@ -647,7 +647,7 @@ function FolderAddModal({
                 )}
               >
                 <div className="font-medium">{gf.path}</div>
-                <div className="text-[11px] text-foreground-subtle font-mono-amount">
+                <div className="text-[12px] text-foreground-subtle font-mono-amount">
                   {gf.totalItemCount} Mails · {gf.unreadItemCount} ungelesen
                 </div>
               </button>
@@ -665,7 +665,7 @@ function FolderAddModal({
               <option value="bestellbestaetigung">Bestellbestätigung</option>
               <option value="versand">Versand/Zustellung</option>
             </Select>
-            <p className="text-[11px] text-foreground-subtle mt-2">
+            <p className="text-[12px] text-foreground-subtle mt-2">
               Hint sagt der KI, welcher Dokument-Typ erwartet wird. KI darf widersprechen.
             </p>
           </div>

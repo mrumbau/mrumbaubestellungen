@@ -47,7 +47,7 @@ export function TimeRangePicker({
             aria-label={opt.ariaLabel}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "px-2.5 h-6 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap",
+              "px-2.5 h-6 text-[12px] font-medium rounded-md transition-colors whitespace-nowrap",
               "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
               active
                 ? "bg-surface text-foreground shadow-card"

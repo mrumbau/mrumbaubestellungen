@@ -230,7 +230,7 @@ export function BlacklistClient({ initialListe }: { initialListe: BlacklistEntry
         <summary
           className={cn(
             "inline-flex items-center gap-2 cursor-pointer select-none",
-            "text-[12.5px] font-medium text-foreground-muted hover:text-foreground transition-colors",
+            "text-[12px] font-medium text-foreground-muted hover:text-foreground transition-colors",
             "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded px-1",
           )}
         >
@@ -240,14 +240,14 @@ export function BlacklistClient({ initialListe }: { initialListe: BlacklistEntry
         </summary>
         <div className="mt-3 space-y-4">
           <div>
-            <p className="text-[11px] uppercase tracking-wider font-semibold text-foreground-subtle mb-2">
+            <p className="text-[12px] uppercase tracking-wider font-semibold text-foreground-subtle mb-2">
               Irrelevant (Freemail, Marketing, Social Media)
             </p>
             <div className="flex flex-wrap gap-1.5">
               {IRRELEVANT_DOMAINS.map((d) => (
                 <span
                   key={d}
-                  className="text-[11px] font-mono-amount px-2 py-1 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                  className="text-[12px] font-mono-amount px-2 py-1 rounded bg-canvas border border-line-subtle text-foreground-muted"
                 >
                   {d}
                 </span>
@@ -255,14 +255,14 @@ export function BlacklistClient({ initialListe }: { initialListe: BlacklistEntry
             </div>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wider font-semibold text-foreground-subtle mb-2">
+            <p className="text-[12px] uppercase tracking-wider font-semibold text-foreground-subtle mb-2">
               Versand (DHL, DPD, Hermes — werden als Versandbenachrichtigung verarbeitet)
             </p>
             <div className="flex flex-wrap gap-1.5">
               {VERSAND_DOMAINS.map((d) => (
                 <span
                   key={d}
-                  className="text-[11px] font-mono-amount px-2 py-1 rounded bg-info-bg border border-info-border text-info"
+                  className="text-[12px] font-mono-amount px-2 py-1 rounded bg-info-bg border border-info-border text-info"
                 >
                   {d}
                 </span>
@@ -308,7 +308,7 @@ function BlacklistRow({
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] font-mono-amount font-semibold text-foreground">
+            <span className="text-[14px] font-mono-amount font-semibold text-foreground">
               {entry.muster}
             </span>
             <Badge tone={entry.typ === "domain" ? "error" : "warning"} size="sm">
@@ -316,7 +316,7 @@ function BlacklistRow({
             </Badge>
           </div>
           {entry.grund && (
-            <p className="text-[11.5px] text-foreground-subtle mt-0.5">{entry.grund}</p>
+            <p className="text-[12px] text-foreground-subtle mt-0.5">{entry.grund}</p>
           )}
         </div>
       </div>

@@ -127,13 +127,13 @@ function Gruppe({
             <div className="flex items-center gap-3 min-w-0">
               <div
                 aria-hidden="true"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white font-semibold text-[11px] font-mono-amount"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white font-semibold text-[12px] font-mono-amount"
               >
                 {u.kuerzel}
               </div>
               <div className="min-w-0">
-                <p className="text-[13.5px] font-semibold text-foreground truncate">{u.name}</p>
-                <p className="text-[11.5px] text-foreground-subtle truncate font-mono-amount">
+                <p className="text-[14px] font-semibold text-foreground truncate">{u.name}</p>
+                <p className="text-[12px] text-foreground-subtle truncate font-mono-amount">
                   {u.email}
                 </p>
               </div>
@@ -144,7 +144,7 @@ function Gruppe({
                 <button
                   type="button"
                   onClick={() => onErasureRequest(u)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-foreground-subtle hover:text-error hover:bg-error-bg transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] text-foreground-subtle hover:text-error hover:bg-error-bg transition-colors"
                   title="DSGVO Right-to-Erasure ausführen"
                   aria-label={`DSGVO-Erasure für ${u.name}`}
                 >
@@ -275,7 +275,7 @@ function DsgvoErasureModal({
     >
       <div className="flex flex-col gap-4">
         <Alert tone="error" title="Diese Aktion ist irreversibel">
-          <ul className="list-disc pl-5 text-[13px] space-y-1 mt-1">
+          <ul className="list-disc pl-5 text-[14px] space-y-1 mt-1">
             <li>Personenbezug wird auf <code className="font-mono-amount">[anonymisiert]</code> gesetzt</li>
             <li>Alle Kommentare des Bestellers werden gelöscht</li>
             <li>Belege (Bestellungen, Dokumente, Freigaben) bleiben erhalten — GoBD §147</li>

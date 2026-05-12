@@ -107,13 +107,13 @@ export function ClipboardButton() {
       >
         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-cs-success opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
         <div className="flex items-center gap-4 px-5 py-4">
-          <span className="font-mono-amount text-[11px] text-foreground-subtle w-6 shrink-0">05</span>
+          <span className="font-mono-amount text-[12px] text-foreground-subtle w-6 shrink-0">05</span>
           <div className="w-px h-8 bg-[var(--border-subtle)]" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground group-hover:text-cs-accent-text transition-colors">
               {state === "reading" ? "Lese Zwischenablage…" : state === "processing" ? "Analysiere…" : "Aus Zwischenablage"}
             </p>
-            <p className="text-[11px] text-foreground-subtle mt-0.5">
+            <p className="text-[12px] text-foreground-subtle mt-0.5">
               Text · Bild · URL automatisch erkennen
             </p>
           </div>

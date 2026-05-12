@@ -20,7 +20,7 @@ export default function NotFound() {
 
         <div className="industrial-line mt-6 mb-6" aria-hidden="true" />
 
-        <p className="text-foreground-muted text-[15px] leading-relaxed">
+        <p className="text-foreground-muted text-[16px] leading-relaxed">
           Die angeforderte Seite existiert nicht oder wurde verschoben.
           Möglicherweise wurde die Bestellung archiviert oder gelöscht.
         </p>

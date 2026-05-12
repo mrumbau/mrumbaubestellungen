@@ -162,7 +162,7 @@ export function DocumentPanel({
               size="sm"
               onClick={onZipDownload}
               title={pdfCount === 1 ? "PDF herunterladen" : `Alle ${pdfCount} PDFs herunterladen`}
-              className="text-[11px]"
+              className="text-[12px]"
             >
               <svg
                 viewBox="0 0 16 16"
@@ -188,7 +188,7 @@ export function DocumentPanel({
           aria-label={`${dokTabs.find((t) => t.key === activeTab)?.label ?? "Dokument"} — Auswahl`}
           className="flex items-center gap-1 px-3 py-2 border-b border-line-subtle bg-canvas overflow-x-auto scrollbar-hide"
         >
-          <span className="text-[11px] text-foreground-subtle uppercase tracking-wide font-mono-amount mr-2 shrink-0">
+          <span className="text-[12px] text-foreground-subtle uppercase tracking-wide font-mono-amount mr-2 shrink-0">
             {aktiveDokumente.length} {pluralLabel(activeTab, aktiveDokumente.length)}
           </span>
           {aktiveDokumente.map((d, i) => {
@@ -216,7 +216,7 @@ export function DocumentPanel({
                 <span className="font-mono-amount tabular-nums">{nr}</span>
                 {betrag && (
                   <span className={cn(
-                    "text-[11px]",
+                    "text-[12px]",
                     isActive ? "text-white/70" : "text-foreground-subtle",
                   )}>
                     {betrag}
@@ -369,8 +369,8 @@ function EmptyDocument({
           />
         </svg>
       </div>
-      <p className="text-[13px] font-medium text-foreground-muted">Kein Dokument vorhanden</p>
-      <p className="text-[11px] text-foreground-subtle mt-1 mb-4">
+      <p className="text-[14px] font-medium text-foreground-muted">Kein Dokument vorhanden</p>
+      <p className="text-[12px] text-foreground-subtle mt-1 mb-4">
         Wird automatisch angezeigt sobald ein Dokument per E-Mail eingeht.
       </p>
       <div className="flex gap-2 justify-center">

@@ -64,7 +64,7 @@ export function EmptyState({
         <h3
           className={cn(
             "font-semibold text-foreground",
-            compact ? "text-sm" : "text-[15px]",
+            compact ? "text-sm" : "text-[16px]",
           )}
         >
           {title}
@@ -73,7 +73,7 @@ export function EmptyState({
           <p
             className={cn(
               "mt-1 text-foreground-muted",
-              compact ? "text-[12px]" : "text-[13px] leading-relaxed",
+              compact ? "text-[12px]" : "text-[14px] leading-relaxed",
             )}
           >
             {description}

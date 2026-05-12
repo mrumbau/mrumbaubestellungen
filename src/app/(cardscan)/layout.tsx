@@ -66,8 +66,8 @@ export default async function CardScanLayout({
               className="flex items-center gap-2 hover:opacity-80 transition-opacity focus-ring rounded px-1"
               aria-label="CardScan-Übersicht"
             >
-              <span className="font-headline text-[13px] text-white/90 tracking-tight">Card</span>
-              <span className="font-headline text-[13px] text-cs-accent/70 tracking-tight">Scan</span>
+              <span className="font-headline text-[14px] text-white/90 tracking-tight">Card</span>
+              <span className="font-headline text-[14px] text-cs-accent/70 tracking-tight">Scan</span>
             </Link>
 
             <div className="w-7 h-7 rounded-md bg-white/[0.07] flex items-center justify-center text-[10px] font-bold text-white/70 border border-white/[0.06]">
@@ -82,7 +82,7 @@ export default async function CardScanLayout({
         <div className="px-4 pb-4 safe-area-bottom">
           <div className="max-w-2xl mx-auto">
             <div className="h-px bg-gradient-to-r from-transparent via-line-subtle to-transparent" />
-            <p className="text-center text-[9px] text-foreground-subtle tracking-[0.15em] uppercase font-mono-amount mt-3 opacity-50">
+            <p className="text-center text-[10px] text-foreground-subtle tracking-[0.15em] uppercase font-mono-amount mt-3 opacity-50">
               cloud.mrumbau.de
             </p>
           </div>

@@ -219,7 +219,7 @@ export function SystemOverviewClient({
         description="Signale pro Besteller. Die Extension meldet jede Bestellung automatisch an die API."
       >
         {besteller.length === 0 ? (
-          <p className="text-[13px] text-foreground-subtle py-2">Keine Besteller vorhanden.</p>
+          <p className="text-[14px] text-foreground-subtle py-2">Keine Besteller vorhanden.</p>
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {besteller.map((b) => {
@@ -232,13 +232,13 @@ export function SystemOverviewClient({
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       aria-hidden="true"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white font-semibold text-[11px] font-mono-amount"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white font-semibold text-[12px] font-mono-amount"
                     >
                       {b.kuerzel}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-foreground truncate">{b.name}</p>
-                      <p className={cn("text-[11.5px]", ext.colorClass)}>{ext.label}</p>
+                      <p className="text-[14px] font-semibold text-foreground truncate">{b.name}</p>
+                      <p className={cn("text-[12px]", ext.colorClass)}>{ext.label}</p>
                     </div>
                   </div>
                   <span
@@ -254,7 +254,7 @@ export function SystemOverviewClient({
             })}
           </ul>
         )}
-        <p className="mt-3 text-[11.5px] text-foreground-subtle">
+        <p className="mt-3 text-[12px] text-foreground-subtle">
           Installieren unter{" "}
           <span className="font-mono-amount text-foreground-muted">chrome://extensions</span>{" "}
           (Entwicklermodus). Die Extension sendet bei jeder erkannten Händler-Bestellung ein Signal.
@@ -273,15 +273,15 @@ export function SystemOverviewClient({
                 key={d.content_hash}
                 className="flex items-start gap-3 p-3 rounded-md bg-warning-bg border border-warning-border"
               >
-                <span className="text-warning text-[11px] font-mono-amount mt-0.5">
+                <span className="text-warning text-[12px] font-mono-amount mt-0.5">
                   {d.content_hash.slice(0, 12)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] text-foreground">
+                  <p className="text-[12px] text-foreground">
                     <span className="font-semibold">{d.anzahl_dokus} Doku{d.anzahl_dokus === 1 ? "" : "s"}</span>
                     {" "}in {d.anzahl_bestellungen} verschiedenen Bestellungen — Typen: {d.typen.join(", ")}
                   </p>
-                  <p className="text-[10.5px] text-foreground-subtle font-mono-amount mt-0.5">
+                  <p className="text-[10px] text-foreground-subtle font-mono-amount mt-0.5">
                     {d.bestellung_ids.slice(0, 3).map((id) => (
                       <a
                         key={id}
@@ -300,7 +300,7 @@ export function SystemOverviewClient({
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11.5px] text-foreground-subtle">
+          <p className="mt-3 text-[12px] text-foreground-subtle">
             Diese View zeigt PDFs deren content_hash in &gt;1 Bestellung vorkommt.
             Häufig Symptom für falsch-getrennte Re-Backfill-Pseudo-Duplikate.
             Manuell prüfen + ggf. Bestellungen konsolidieren.

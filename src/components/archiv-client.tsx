@@ -241,6 +241,10 @@ export function ArchivClient({
       {/* Summary Stats */}
       <ArchivStatsCards summary={summary} />
 
+      {/* Industrial-Line zwischen Stats-Snapshot und Toolbar+Content.
+          12.05.2026 (DESIGN-Critique #6). */}
+      <div className="industrial-line mt-6" aria-hidden="true" />
+
       {/* Tabs + Search + Date + Selection-Mode + CSV */}
       <ArchivToolbar
         activeTab={activeTab}

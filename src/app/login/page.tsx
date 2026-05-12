@@ -175,7 +175,7 @@ function LoginForm() {
                 {["Foto & Kamera", "Text & Clipboard", "URL & Dateien", "Dual-CRM Write"].map((label, i) => (
                   <div key={label} className="flex items-center gap-3">
                     <div className="w-5 h-5 border border-cs-accent/15 rounded flex items-center justify-center">
-                      <span className="font-mono-amount text-[9px] text-cs-accent/40">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="font-mono-amount text-[10px] text-cs-accent/40">{String(i + 1).padStart(2, "0")}</span>
                     </div>
                     <span className="text-white/35 text-xs tracking-wide">{label}</span>
                     <div className="flex-1 h-px bg-white/[0.06]" />
@@ -208,7 +208,7 @@ function LoginForm() {
                 {["Bestellbestätigung", "Lieferschein", "Rechnung"].map((label, i) => (
                   <div key={label} className="flex items-center gap-3">
                     <div className="w-5 h-5 border border-white/20 rounded flex items-center justify-center">
-                      <span className="font-mono-amount text-[9px] text-white/50">{String(i + 1).padStart(2, "0")}</span>
+                      <span className="font-mono-amount text-[10px] text-white/50">{String(i + 1).padStart(2, "0")}</span>
                     </div>
                     <span className="text-white/40 text-xs tracking-wide">{label}</span>
                     <div className="flex-1 h-px bg-white/[0.06]" />
@@ -321,7 +321,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-4 rounded-xl text-[15px] font-semibold text-white disabled:opacity-50 active:scale-[0.98] transition-all min-h-[52px] ${
+              className={`w-full py-4 rounded-xl text-[16px] font-semibold text-white disabled:opacity-50 active:scale-[0.98] transition-all min-h-[52px] ${
                 isCardScan
                   ? "bg-sidebar hover:bg-sidebar-hover"
                   : "btn-primary"

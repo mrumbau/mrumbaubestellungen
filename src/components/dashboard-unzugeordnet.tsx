@@ -155,7 +155,7 @@ export function DashboardUnzugeordnet({
                   <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
                   <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "Unbekannt"}</span>
                 </p>
-                <p className="text-[11px] text-foreground-faint">
+                <p className="text-[12px] text-foreground-faint">
                   {formatDatum(b.created_at)}
                   {b.betrag ? ` · ${formatBetrag(b.betrag, b.waehrung || "EUR")}` : ""}
                 </p>

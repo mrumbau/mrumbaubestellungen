@@ -93,7 +93,7 @@ export function ProjektCard({
 
         {/* Kunde */}
         {p.kunde && (
-          <p className="text-[11px] text-foreground-subtle mt-0.5 truncate">{p.kunde}</p>
+          <p className="text-[12px] text-foreground-subtle mt-0.5 truncate">{p.kunde}</p>
         )}
 
         {/* Description */}

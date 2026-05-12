@@ -323,7 +323,7 @@ export function KundenClient({
           />
           <span className="font-medium text-foreground truncate">{k.name}</span>
           {k.kuerzel && (
-            <span className="text-[11px] font-mono-amount text-foreground-subtle">
+            <span className="text-[12px] font-mono-amount text-foreground-subtle">
               {k.kuerzel}
             </span>
           )}
@@ -383,7 +383,7 @@ export function KundenClient({
               </Badge>
             ))}
             {k.keywords.length > 3 && (
-              <span className="text-[11px] text-foreground-subtle">
+              <span className="text-[12px] text-foreground-subtle">
                 +{k.keywords.length - 3}
               </span>
             )}
@@ -444,7 +444,7 @@ export function KundenClient({
               onClick={() => setViewMode("grid")}
               title="Karten-Ansicht"
               className={cn(
-                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "px-2 h-7 text-[12px] font-semibold rounded transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 viewMode === "grid"
                   ? "bg-surface text-foreground shadow-card"
@@ -465,7 +465,7 @@ export function KundenClient({
               onClick={() => setViewMode("table")}
               title="Tabellen-Ansicht"
               className={cn(
-                "px-2 h-7 text-[11px] font-semibold rounded transition-colors",
+                "px-2 h-7 text-[12px] font-semibold rounded transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 viewMode === "table"
                   ? "bg-surface text-foreground shadow-card"
@@ -503,7 +503,7 @@ export function KundenClient({
             onClick={handleCsvExport}
             disabled={bestaetigtSorted.length === 0}
             title="Kunden als CSV exportieren"
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               viewBox="0 0 16 16"
@@ -686,7 +686,7 @@ export function KundenClient({
                 <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Keywords (Enter zum Hinzufügen)</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {formKeywords.map((kw, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-info-bg text-info rounded text-[11px] font-medium">
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-info-bg text-info rounded text-[12px] font-medium">
                       {kw}
                       <button type="button" onClick={() => setFormKeywords((prev) => prev.filter((_, j) => j !== i))} className="text-blue-400 hover:text-info">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -842,7 +842,7 @@ export function KundenClient({
                     <p className="text-xs text-foreground-muted truncate mt-1">{k.adresse}</p>
                   )}
                   {(k.email || k.telefon) && (
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-foreground-subtle">
+                    <div className="flex items-center gap-3 mt-1.5 text-[12px] text-foreground-subtle">
                       {k.email && (
                         <span className="flex items-center gap-1 truncate" title={k.email}>
                           <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

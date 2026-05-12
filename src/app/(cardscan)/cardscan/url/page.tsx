@@ -142,10 +142,10 @@ export default function CardScanUrlPage() {
               "GPT-4o extrahiert Firma, Ansprechpartner, Adresse",
             ].map((step, i) => (
               <div key={step} className="flex items-start gap-2.5">
-                <span className="font-mono-amount text-[9px] text-foreground-subtle mt-0.5 shrink-0 w-4">
+                <span className="font-mono-amount text-[10px] text-foreground-subtle mt-0.5 shrink-0 w-4">
                   {String(i + 1).padStart(2, "0")}
                 </span>
-                <span className="text-[11px] text-foreground-subtle">{step}</span>
+                <span className="text-[12px] text-foreground-subtle">{step}</span>
               </div>
             ))}
           </div>

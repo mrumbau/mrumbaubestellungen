@@ -364,8 +364,8 @@ export function BestellungenTabelle({
             title={selectMode ? "Auswahl-Modus beenden" : "Mehrere Bestellungen auswählen"}
             className={
               selectMode
-                ? "inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-brand bg-brand/[0.08] text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-                : "inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                ? "inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-brand bg-brand/[0.08] text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                : "inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
             }
           >
             <svg
@@ -409,7 +409,7 @@ export function BestellungenTabelle({
                 ? `${selected.size} ausgewählte als CSV exportieren`
                 : "Alle sichtbaren als CSV exportieren"
             }
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
           >
             <svg
               viewBox="0 0 16 16"

@@ -99,7 +99,7 @@ export default async function EinstellungenIndexPage() {
         <section aria-labelledby="bereiche-heading" className="flex flex-col gap-3">
           <h2
             id="bereiche-heading"
-            className="font-headline text-[13px] uppercase tracking-[0.14em] text-foreground-subtle"
+            className="font-headline text-[14px] uppercase tracking-[0.14em] text-foreground-subtle"
           >
             Bereiche
           </h2>
@@ -156,7 +156,7 @@ export default async function EinstellungenIndexPage() {
         <section aria-labelledby="team-heading" className="flex flex-col gap-3">
           <h2
             id="team-heading"
-            className="font-headline text-[13px] uppercase tracking-[0.14em] text-foreground-subtle"
+            className="font-headline text-[14px] uppercase tracking-[0.14em] text-foreground-subtle"
           >
             Team
           </h2>
@@ -167,7 +167,7 @@ export default async function EinstellungenIndexPage() {
       <section aria-labelledby="konto-heading" className="max-w-md">
         <h2
           id="konto-heading"
-          className="font-headline text-[13px] uppercase tracking-[0.14em] text-foreground-subtle mb-3"
+          className="font-headline text-[14px] uppercase tracking-[0.14em] text-foreground-subtle mb-3"
         >
           Konto
         </h2>
@@ -212,7 +212,7 @@ function NavCard({
                 {title}
               </span>
               {(count !== undefined || subtitle) && (
-                <span className="text-[11.5px] text-foreground-subtle font-mono-amount">
+                <span className="text-[12px] text-foreground-subtle font-mono-amount">
                   {count !== undefined ? `${count} Einträge` : subtitle}
                 </span>
               )}
@@ -222,7 +222,7 @@ function NavCard({
             <IconArrowRight className="h-4 w-4" />
           </span>
         </div>
-        <p className="mt-2.5 text-[12.5px] leading-relaxed text-foreground-muted">
+        <p className="mt-2.5 text-[12px] leading-relaxed text-foreground-muted">
           {description}
         </p>
       </Card>

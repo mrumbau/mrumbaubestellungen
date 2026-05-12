@@ -132,7 +132,7 @@ const bodyCellVariants = cva("text-foreground align-middle", {
   variants: {
     density: {
       compact: "px-3 py-1.5 text-[12px]",
-      comfortable: "px-4 py-2.5 text-[13px]",
+      comfortable: "px-4 py-2.5 text-[14px]",
       spacious: "px-4 py-3.5 text-[14px]",
     },
     align: {
@@ -474,7 +474,7 @@ export function DataTable<TRow>({
               <tr>
                 <td colSpan={colSpanCount} className="px-4 py-16">
                   {emptyState ?? (
-                    <div className="text-center text-[13px] text-foreground-subtle">
+                    <div className="text-center text-[14px] text-foreground-subtle">
                       Keine Daten.
                     </div>
                   )}
@@ -735,7 +735,7 @@ const densityToggleVariants = cva(
 );
 
 const densityButtonVariants = cva(
-  "px-2 h-7 text-[11px] font-semibold rounded transition-colors " +
+  "px-2 h-7 text-[12px] font-semibold rounded transition-colors " +
     "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
   {
     variants: {

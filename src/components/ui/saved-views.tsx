@@ -249,7 +249,7 @@ export function SavedViewsMenu<TConfig>({
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line",
+          "inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-line",
           "bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors",
           "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
         )}
@@ -315,7 +315,7 @@ export function SavedViewsMenu<TConfig>({
                         setOpen(false);
                       }}
                       className={cn(
-                        "flex-1 min-w-0 text-left text-[13px]",
+                        "flex-1 min-w-0 text-left text-[14px]",
                         "focus-visible:outline-none rounded",
                       )}
                     >
@@ -325,7 +325,7 @@ export function SavedViewsMenu<TConfig>({
                           <span
                             aria-label="Standard-Ansicht"
                             title="Standard-Ansicht"
-                            className="text-warning text-[11px]"
+                            className="text-warning text-[12px]"
                           >
                             ★
                           </span>
@@ -392,7 +392,7 @@ export function SavedViewsMenu<TConfig>({
                   type="submit"
                   disabled={!saveName.trim()}
                   className={cn(
-                    "btn-primary h-7 px-2.5 text-[11px] rounded font-semibold",
+                    "btn-primary h-7 px-2.5 text-[12px] rounded font-semibold",
                     "disabled:opacity-50 disabled:cursor-not-allowed",
                   )}
                 >

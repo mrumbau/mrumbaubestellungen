@@ -66,7 +66,7 @@ export function CollapsibleWidget({
       >
         <div className="flex items-center gap-2 min-w-0">
           {icon}
-          <h3 className="font-headline text-[13px] tracking-tight text-foreground">{title}</h3>
+          <h3 className="font-headline text-[14px] tracking-tight text-foreground">{title}</h3>
           {badge}
         </div>
         <IconChevronDown

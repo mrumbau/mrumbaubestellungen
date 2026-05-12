@@ -85,7 +85,7 @@ export default async function Home() {
             {["Bestellbestätigung", "Lieferschein", "Rechnung"].map((label, i) => (
               <div key={label} className="flex items-center gap-3">
                 <div className="w-5 h-5 border border-white/15 rounded flex items-center justify-center">
-                  <span className="font-mono-amount text-[9px] text-white/40">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono-amount text-[10px] text-white/40">{String(i + 1).padStart(2, "0")}</span>
                 </div>
                 <span className="text-white/35 text-xs tracking-wide">{label}</span>
                 <div className="flex-1 h-px bg-white/[0.06]" />
@@ -175,7 +175,7 @@ export default async function Home() {
             {["Foto & Kamera", "Text & Clipboard", "URL & Dateien", "Dual-CRM Write"].map((label, i) => (
               <div key={label} className="flex items-center gap-3">
                 <div className="w-5 h-5 border border-cs-accent/15 rounded flex items-center justify-center">
-                  <span className="font-mono-amount text-[9px] text-cs-accent/40">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-mono-amount text-[10px] text-cs-accent/40">{String(i + 1).padStart(2, "0")}</span>
                 </div>
                 <span className="text-white/35 text-xs tracking-wide">{label}</span>
                 <div className="flex-1 h-px bg-white/[0.06]" />

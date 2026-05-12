@@ -13,28 +13,32 @@
   --mr-red-disabled: #8b6369; /* desaturated brand for primary disabled state */
   --mr-gray: #adadaf;
 
-  /* Surfaces */
-  --bg-main: #f5f4f2;
-  --bg-card: #ffffff;
+  /* Surfaces — OKLCH mit Brand-Tint (hue 25°, chroma 0.003-0.007).
+     12.05.2026 (DESIGN-Critique #1): Niemals pure #fff oder #000 (impeccable
+     shared design law). Alle Neutrals minimal warm getönt Richtung MR-Red,
+     damit Karten, Inputs und Hintergründe einen subtilen Brand-Zusammenhalt
+     bekommen statt klinischer Sterilität. */
+  --bg-main: oklch(0.965 0.005 30);
+  --bg-card: oklch(0.997 0.003 25);
   --bg-sidebar: #141414;
   --bg-sidebar-hover: #1f1f1f;
   --bg-sidebar-active: #1a1a1a;
-  --bg-input: #fafaf9;
-  --bg-input-hover: #f5f4f2;
-  --bg-hover: #faf9f7;
-  --bg-zebra: #fdfcfb; /* table zebra stripe — lighter than surface, darker than pure white */
+  --bg-input: oklch(0.982 0.004 25);
+  --bg-input-hover: oklch(0.965 0.005 30);
+  --bg-hover: oklch(0.981 0.005 25);
+  --bg-zebra: oklch(0.99 0.003 25); /* table zebra stripe — lighter than surface, darker than pure white */
 
-  /* Text */
-  --text-primary: #1a1a1a;
-  --text-secondary: #6b6b6b;
-  --text-tertiary: #9a9a9a;
-  --text-faint: #c4c2bf;
-  --text-inverse: #fafafa;
+  /* Text — OKLCH mit minimaler warmer Tönung (chroma 0.004-0.005). */
+  --text-primary: oklch(0.205 0.005 25);
+  --text-secondary: oklch(0.485 0.004 25);
+  --text-tertiary: oklch(0.677 0.004 25);
+  --text-faint: oklch(0.797 0.005 30);
+  --text-inverse: oklch(0.984 0.003 25);
 
-  /* Borders */
-  --border-default: #e8e6e3;
-  --border-subtle: #f0eeeb;
-  --border-strong: #d4d1cc;
+  /* Borders — minimal warm getönt, harmoniert mit den Surface-Hues. */
+  --border-default: oklch(0.925 0.005 30);
+  --border-subtle: oklch(0.943 0.005 30);
+  --border-strong: oklch(0.852 0.007 35);
 
   /* Shadows */
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -54,6 +58,36 @@
      im :root steht. Damit ist die Skala konsistent und ein Brand-Refresh
      trifft alle Stellen über die Token-Stufe. */
   --radius-2xl: 24px;
+
+  /* Type-Scale — 7 kanonische Stufen (DESIGN-Critique #2).
+     12.05.2026 — die alte Skala hatte 18 Werte (9,10,10.5,11,11.5,12,12.5,
+     13,13.5,14,15,16,17,20,22,24,26,28). Konsolidiert auf:
+       --text-eyebrow: 10px  — All-Caps Labels, Eyebrow-Pattern
+       --text-meta:    12px  — Pills, Captions, Helper-Text
+       --text-body-sm: 14px  — Default UI-Body, DataTable, Buttons
+       --text-body:    16px  — Reading-Body, Form-Inputs (Min für iOS-No-Zoom)
+       --text-lead:    18px  — Lead-Absätze, Section-Hooks
+       --text-h2:      24px  — Section-Titles
+       --text-h1:      28px  — Page-Titles (Barlow Condensed)
+     Bestandsverwendungen mit text-[Npx] werden über die Zeit auf semantische
+     Utility-Klassen (.text-eyebrow, .text-meta, etc.) migriert; neue Stellen
+     nutzen direkt diese Klassen. */
+  --text-eyebrow: 10px;
+  --text-meta: 12px;
+  --text-body-sm: 14px;
+  --text-body: 16px;
+  --text-lead: 18px;
+  --text-h2: 24px;
+  --text-h1: 28px;
+
+  /* 12.05.2026 (DESIGN-Critique #4) — Archiv-Stats-Card-Akzente.
+     Semantisch differenzierende Top-Border-Colors für die 4 Summary-Cards
+     im /archiv. Keine reinen Brand-Werte — sie codieren Kategorie (Projekt,
+     Material, Subunternehmer, Volumen) und sind als Token zentralisiert
+     damit ein Brand-Refresh sie systematisch trifft. */
+  --archiv-projekte: #7c3aed;     /* violet — strukturierende Einheit */
+  --archiv-material: #2563eb;     /* blue — physische Bestellungen */
+  --archiv-su: #d97706;           /* amber — externe Dienstleister */
 
   /* Status — three-part color system per workflow state:
    *   main = left color-bar / dot / accent
@@ -334,6 +368,22 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ============================================
+   Type-Scale Utilities (DESIGN-Critique #2, 12.05.2026)
+
+   Semantische Utility-Klassen statt arbitrary `text-[Npx]`. Tokens werden
+   in :root definiert — Brand-Refresh / Scale-Anpassung trifft alle Stellen
+   über die Variable.
+   ============================================ */
+
+.text-eyebrow { font-size: var(--text-eyebrow); line-height: 1.4; }
+.text-meta    { font-size: var(--text-meta);    line-height: 1.5; }
+.text-body-sm { font-size: var(--text-body-sm); line-height: 1.5; }
+.text-body    { font-size: var(--text-body);    line-height: 1.55; }
+.text-lead    { font-size: var(--text-lead);    line-height: 1.5; }
+.text-h2      { font-size: var(--text-h2);      line-height: 1.2; }
+.text-h1      { font-size: var(--text-h1);      line-height: 1.15; }
 
 /* ============================================
    Custom Scrollbar

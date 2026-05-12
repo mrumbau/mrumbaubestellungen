@@ -70,7 +70,7 @@ export function SubNav({
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     // 12.05.2026 (UI-Audit F1.12): Mobile-Tap-Target min 44px.
-                    "group relative inline-flex items-center gap-2 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 text-[13px] font-medium",
+                    "group relative inline-flex items-center gap-2 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 text-[14px] font-medium",
                     "transition-colors duration-150",
                     "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded-t",
                     active

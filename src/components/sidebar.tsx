@@ -111,7 +111,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
           <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <Logo size={32} className="text-white" />
             <div>
-              <p className="font-headline text-[15px] text-white tracking-tight leading-none">UMBAU</p>
+              <p className="font-headline text-[16px] text-white tracking-tight leading-none">UMBAU</p>
               <p className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Bestellungen</p>
             </div>
           </Link>
@@ -137,7 +137,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`relative flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[13px] transition-all ${
+              className={`relative flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-all ${
                 active
                   ? "bg-white/[0.07] text-white font-medium"
                   : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
@@ -154,15 +154,22 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         })}
       </nav>
 
-      {/* CardScan Quick-Access */}
+      {/* Andere Module — Separator + Eyebrow distancen CardScan visuell vom
+          Bestellwesen-Nav, damit der Emerald-Akzent nicht als Status-Indikator
+          missverstanden wird. */}
+      <div className="px-5 pt-2 pb-1.5 border-t border-white/[0.06]">
+        <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30">
+          Andere Module
+        </span>
+      </div>
       <div className="px-3 pb-3">
         <Link
           href="/cardscan"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[13px] transition-all ${
+          className={`flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-all ${
             pathname.startsWith("/cardscan")
               ? "bg-cs-accent/10 text-cs-accent-light font-medium"
-              : "text-white/40 hover:bg-white/[0.04] hover:text-white/70"
+              : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
           }`}
         >
           <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -179,11 +186,11 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       {/* User */}
       <div className="px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-[11px] font-bold text-white">
+          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-[12px] font-bold text-white">
             {profil.kuerzel}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-white/90 truncate">{profil.name}</p>
+            <p className="text-[14px] font-medium text-white/90 truncate">{profil.name}</p>
             <p className="text-[10px] text-white/30 capitalize tracking-wide">{profil.rolle}</p>
           </div>
           <button
@@ -202,7 +209,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
 
       {/* Branding footer */}
       <div className="px-5 py-3 border-t border-white/[0.06] safe-area-bottom">
-        <p className="text-[9px] text-white/15 tracking-[0.15em] uppercase font-mono-amount text-center">cloud.mrumbau.de</p>
+        <p className="text-[10px] text-white/15 tracking-[0.15em] uppercase font-mono-amount text-center">cloud.mrumbau.de</p>
       </div>
     </>
   );

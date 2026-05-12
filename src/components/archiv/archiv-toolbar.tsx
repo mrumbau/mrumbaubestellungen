@@ -179,7 +179,7 @@ export function ArchivToolbar({
                 ? `${selectedIds.size} ausgewählte als CSV exportieren`
                 : "Alle sichtbaren als CSV exportieren"
             }
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] shrink-0"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[14px] font-medium rounded-md border border-line bg-surface text-foreground hover:bg-surface-hover hover:border-line-strong transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] shrink-0"
           >
             <svg
               viewBox="0 0 16 16"

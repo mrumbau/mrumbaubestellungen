@@ -246,9 +246,9 @@ export default function CardScanReviewPage() {
                     )}
                   </div>
                   <span className={
-                    isActive ? "text-[11px] font-medium text-foreground"
-                      : isDone ? "text-[11px] text-cs-success-text"
-                        : "text-[11px] text-foreground-subtle"
+                    isActive ? "text-[12px] font-medium text-foreground"
+                      : isDone ? "text-[12px] text-cs-success-text"
+                        : "text-[12px] text-foreground-subtle"
                   }>
                     {step.label}
                   </span>
@@ -257,7 +257,7 @@ export default function CardScanReviewPage() {
               );
             })}
           </ol>
-          <p className="mt-4 text-[11px] text-foreground-subtle leading-relaxed">
+          <p className="mt-4 text-[12px] text-foreground-subtle leading-relaxed">
             Die KI-Analyse dauert in der Regel 5–15 Sekunden. Du kannst den Tab geöffnet lassen und in der Zwischenzeit eine andere Visitenkarte scannen.
           </p>
         </div>
@@ -357,10 +357,10 @@ export default function CardScanReviewPage() {
           <span
             className={
               autoSaveStatus === "saving"
-                ? "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-full bg-canvas border border-line text-foreground-subtle shadow-card"
+                ? "inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium rounded-full bg-canvas border border-line text-foreground-subtle shadow-card"
                 : autoSaveStatus === "saved"
-                  ? "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-full bg-success-bg border border-success-border text-success shadow-card"
-                  : "inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-full bg-error-bg border border-error-border text-error shadow-card"
+                  ? "inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium rounded-full bg-success-bg border border-success-border text-success shadow-card"
+                  : "inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium rounded-full bg-error-bg border border-error-border text-error shadow-card"
             }
           >
             {autoSaveStatus === "saving" && (

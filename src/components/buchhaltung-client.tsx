@@ -373,8 +373,12 @@ export function BuchhaltungClient({
         summeMonat={summeMonat}
       />
 
+      {/* Industrial-Line zwischen Summary-Snapshot und Tabs+Tabelle.
+          12.05.2026 (DESIGN-Critique #6) — markiert Section-Wechsel. */}
+      <div className="industrial-line mt-6" aria-hidden="true" />
+
       {/* Tabs + Suche */}
-      <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg">
           <button
             onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}

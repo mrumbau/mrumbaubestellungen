@@ -104,11 +104,11 @@ export function KiVorschlagBanner({
           className="w-2.5 h-2.5 rounded-full shrink-0"
           style={{ background: vorschlagProjekt?.farbe || "var(--mr-red)" }}
         />
-        <span className="text-[13px] font-medium text-foreground">
+        <span className="text-[14px] font-medium text-foreground">
           {vorschlagProjekt?.name || "Unbekanntes Projekt"}
         </span>
         {compact && (
-          <span className="font-mono-amount text-[11px] font-bold text-brand ml-auto">
+          <span className="font-mono-amount text-[12px] font-bold text-brand ml-auto">
             {konfidenz}%
           </span>
         )}
@@ -116,7 +116,7 @@ export function KiVorschlagBanner({
 
       {!compact && (
         <div className="flex items-center gap-2 mb-2">
-          <span className="font-mono-amount text-[11px] font-bold text-brand">
+          <span className="font-mono-amount text-[12px] font-bold text-brand">
             {konfidenz}%
           </span>
           <span className="text-[10px] text-foreground-subtle">
@@ -127,7 +127,7 @@ export function KiVorschlagBanner({
       )}
 
       {bestellung.projekt_vorschlag_begruendung && !compact && (
-        <p className="text-[11px] text-foreground-subtle italic mb-3">
+        <p className="text-[12px] text-foreground-subtle italic mb-3">
           &ldquo;{bestellung.projekt_vorschlag_begruendung}&rdquo;
         </p>
       )}
@@ -144,7 +144,7 @@ export function KiVorschlagBanner({
       {bestellung.kunden_name && !compact && (
         <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-canvas rounded-md">
           <IconUsers className="h-3 w-3 text-foreground-subtle" />
-          <span className="text-[11px] text-foreground-muted">
+          <span className="text-[12px] text-foreground-muted">
             Kunde: <span className="font-medium text-foreground">{bestellung.kunden_name}</span>
           </span>
         </div>
@@ -177,7 +177,7 @@ export function KiVorschlagBanner({
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-[11px] text-foreground-subtle">Korrektes Projekt auswählen:</p>
+          <p className="text-[12px] text-foreground-subtle">Korrektes Projekt auswählen:</p>
           <ul className="space-y-1">
             {projekte
               .filter((p) => p.id !== bestellung.projekt_vorschlag_id)
@@ -209,7 +209,7 @@ export function KiVorschlagBanner({
               onClick={() => onVorschlagAktion("ablehnen")}
               disabled={loading}
               className={cn(
-                "text-[11px] text-foreground-subtle hover:text-error transition-colors",
+                "text-[12px] text-foreground-subtle hover:text-error transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded px-1",
               )}
             >
@@ -219,7 +219,7 @@ export function KiVorschlagBanner({
               type="button"
               onClick={() => setShowKorrektur(false)}
               className={cn(
-                "text-[11px] text-foreground-subtle hover:text-foreground-muted transition-colors",
+                "text-[12px] text-foreground-subtle hover:text-foreground-muted transition-colors",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded px-1",
               )}
             >

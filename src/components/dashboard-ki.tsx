@@ -149,7 +149,7 @@ export function DashboardKIZusammenfassung({
             <time
               dateTime={generatedAt}
               className={cn(
-                "text-[11px] font-mono-amount",
+                "text-[12px] font-mono-amount",
                 stale ? "text-warning" : "text-foreground-subtle",
               )}
             >
@@ -167,7 +167,7 @@ export function DashboardKIZusammenfassung({
       </div>
 
       {error && (
-        <p className="text-[11px] text-error mb-2">{error}</p>
+        <p className="text-[12px] text-error mb-2">{error}</p>
       )}
 
       <p className="text-sm text-foreground-muted leading-relaxed mb-3">{data.zusammenfassung}</p>

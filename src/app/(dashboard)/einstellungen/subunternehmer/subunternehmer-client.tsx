@@ -412,7 +412,7 @@ function SuRow({
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13.5px] font-semibold text-foreground">{su.firma}</span>
+            <span className="text-[14px] font-semibold text-foreground">{su.firma}</span>
             {su.gewerk && (
               <Badge tone="neutral" size="sm">
                 {su.gewerk}
@@ -425,17 +425,17 @@ function SuRow({
             )}
           </div>
           {su.ansprechpartner && (
-            <p className="text-[11.5px] text-foreground-muted mt-0.5">{su.ansprechpartner}</p>
+            <p className="text-[12px] text-foreground-muted mt-0.5">{su.ansprechpartner}</p>
           )}
           {su.telefon && (
-            <p className="text-[11.5px] text-foreground-subtle font-mono-amount">{su.telefon}</p>
+            <p className="text-[12px] text-foreground-subtle font-mono-amount">{su.telefon}</p>
           )}
           {su.email_absender && su.email_absender.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {su.email_absender.map((ea, i) => (
                 <span
                   key={i}
-                  className="text-[10.5px] font-mono-amount px-1.5 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                  className="text-[10px] font-mono-amount px-1.5 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
                 >
                   {ea}
                 </span>

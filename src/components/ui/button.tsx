@@ -48,9 +48,9 @@ export const buttonVariants = cva(
           "disabled:opacity-50 disabled:cursor-not-allowed",
       },
       size: {
-        sm: "h-8 px-3 text-[13px] gap-1.5 rounded-md",
+        sm: "h-8 px-3 text-[14px] gap-1.5 rounded-md",
         md: "h-9 px-4 text-sm gap-2 rounded-md",
-        lg: "h-11 px-5 text-[15px] gap-2 rounded-lg font-semibold",
+        lg: "h-11 px-5 text-[16px] gap-2 rounded-lg font-semibold",
         "icon-sm": "h-8 w-8 rounded-md",
         "icon-md": "h-9 w-9 rounded-md",
       },

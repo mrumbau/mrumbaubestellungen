@@ -130,7 +130,7 @@ export default function HistoryDetailPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/cardscan/review/${capture.id}`)}
-                className="btn-primary px-4 py-2 rounded-md text-[13px] font-medium min-h-[44px] inline-flex items-center gap-1.5"
+                className="btn-primary px-4 py-2 rounded-md text-[14px] font-medium min-h-[44px] inline-flex items-center gap-1.5"
               >
                 Bearbeitung fortsetzen
                 <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -142,7 +142,7 @@ export default function HistoryDetailPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/cardscan/review/${capture.id}`)}
-                className="px-4 py-2 rounded-md border border-line text-foreground hover:bg-surface-hover text-[13px] font-medium min-h-[44px] inline-flex items-center gap-1.5"
+                className="px-4 py-2 rounded-md border border-line text-foreground hover:bg-surface-hover text-[14px] font-medium min-h-[44px] inline-flex items-center gap-1.5"
               >
                 Erneut prüfen
               </button>
@@ -152,7 +152,7 @@ export default function HistoryDetailPage() {
 
         {/* Hinweis: 30-Tage-Retention für Bilder */}
         {(canContinueReview || isFailed) && (
-          <p className="mt-2 text-[11px] text-foreground-subtle leading-relaxed">
+          <p className="mt-2 text-[12px] text-foreground-subtle leading-relaxed">
             Bilder werden nach 30 Tagen automatisch gelöscht — danach ist eine Re-Analyse nicht mehr möglich.
           </p>
         )}

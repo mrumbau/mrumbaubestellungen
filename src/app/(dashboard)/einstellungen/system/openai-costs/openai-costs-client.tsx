@@ -158,14 +158,14 @@ export function OpenAICostsClient({ rows, days }: { rows: CostRow[]; days: numbe
                   className="w-full"
                 />
               </div>
-              <div className="mt-3 flex items-center justify-between text-[11px] text-foreground-subtle font-mono-amount">
+              <div className="mt-3 flex items-center justify-between text-[12px] text-foreground-subtle font-mono-amount">
                 <span>{formatDate(aggregates.dateSeq[0]?.date ?? "")}</span>
                 <span>{formatDate(aggregates.dateSeq[aggregates.dateSeq.length - 1]?.date ?? "")}</span>
               </div>
             </SectionCard>
 
             <SectionCard title="Token-Volumen" description={`Letzte ${days} Tage`} padding="md">
-              <dl className="flex flex-col gap-2 text-[13px]">
+              <dl className="flex flex-col gap-2 text-[14px]">
                 <div className="flex items-center justify-between">
                   <dt className="text-foreground-subtle">Requests</dt>
                   <dd className="font-mono-amount font-semibold text-foreground">{formatNumber(aggregates.requests30d)}</dd>
@@ -198,7 +198,7 @@ export function OpenAICostsClient({ rows, days }: { rows: CostRow[]; days: numbe
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-foreground-subtle font-mono-amount tabular-nums">
+                      <span className="text-[12px] text-foreground-subtle font-mono-amount tabular-nums">
                         {share.toFixed(1)}%
                       </span>
                       <span className="font-mono-amount font-semibold text-foreground tabular-nums">
@@ -214,9 +214,9 @@ export function OpenAICostsClient({ rows, days }: { rows: CostRow[]; days: numbe
           {/* Detail-Tabelle */}
           <SectionCard title="Tagesreihe" padding="none" headerBorder>
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full text-[14px]">
                 <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-foreground-subtle">
+                  <tr className="text-[12px] uppercase tracking-wide text-foreground-subtle">
                     <th className="px-5 py-2 text-left font-medium">Datum</th>
                     <th className="px-5 py-2 text-left font-medium">Quelle</th>
                     <th className="px-5 py-2 text-right font-medium">Requests</th>
@@ -253,8 +253,8 @@ export function OpenAICostsClient({ rows, days }: { rows: CostRow[]; days: numbe
 function KpiCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-line-subtle bg-surface px-4 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-foreground-subtle">{label}</div>
-      <div className="mt-1 text-[20px] font-headline font-semibold text-foreground tabular-nums font-mono-amount">
+      <div className="text-[12px] uppercase tracking-wide text-foreground-subtle">{label}</div>
+      <div className="mt-1 text-[18px] font-headline font-semibold text-foreground tabular-nums font-mono-amount">
         {value}
       </div>
     </div>
