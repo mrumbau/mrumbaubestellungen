@@ -64,71 +64,100 @@ export function useRowReturnFlash(scope: string): string | null {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let raw: string | null = null;
-    try {
-      raw = sessionStorage.getItem(storageKey(scope));
-    } catch {
-      return;
-    }
-    if (!raw) return;
 
-    let rec: VisitRecord;
-    try {
-      rec = JSON.parse(raw) as VisitRecord;
-    } catch {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    function checkAndFlash() {
+      let raw: string | null = null;
       try {
-        sessionStorage.removeItem(storageKey(scope));
-      } catch {}
-      return;
-    }
-
-    if (!rec?.id || typeof rec.ts !== "number") {
-      try {
-        sessionStorage.removeItem(storageKey(scope));
-      } catch {}
-      return;
-    }
-
-    if (Date.now() - rec.ts > MAX_AGE_MS) {
-      try {
-        sessionStorage.removeItem(storageKey(scope));
-      } catch {}
-      return;
-    }
-
-    // One-shot: clear, set state, scroll
-    try {
-      sessionStorage.removeItem(storageKey(scope));
-    } catch {}
-
-    const targetId = rec.id;
-    setId(targetId);
-
-    // Scroll-into-view nach next frame — gibt React Zeit, die Row
-    // mit afterglow-class zu rendern.
-    requestAnimationFrame(() => {
-      const escaped =
-        typeof CSS !== "undefined" && "escape" in CSS
-          ? CSS.escape(targetId)
-          : targetId.replace(/"/g, '\\"');
-      const row = document.querySelector(`tr[data-row-id="${escaped}"]`);
-      if (row instanceof HTMLElement) {
-        const rect = row.getBoundingClientRect();
-        const inView = rect.top >= 80 && rect.bottom <= window.innerHeight - 80;
-        if (!inView) {
-          const reduceMotion = window.matchMedia(
-            "(prefers-reduced-motion: reduce)",
-          ).matches;
-          row.scrollIntoView({
-            block: "center",
-            behavior: reduceMotion ? "auto" : "smooth",
-          });
-        }
+        raw = sessionStorage.getItem(storageKey(scope));
+      } catch {
+        return;
       }
-    });
+      if (!raw) return;
 
-    const timer = setTimeout(() => setId(null), DURATION_MS);
-    return () => clearTimeout(timer);
+      let rec: VisitRecord;
+      try {
+        rec = JSON.parse(raw) as VisitRecord;
+      } catch {
+        try {
+          sessionStorage.removeItem(storageKey(scope));
+        } catch {}
+        return;
+      }
+
+      if (!rec?.id || typeof rec.ts !== "number") {
+        try {
+          sessionStorage.removeItem(storageKey(scope));
+        } catch {}
+        return;
+      }
+
+      if (Date.now() - rec.ts > MAX_AGE_MS) {
+        try {
+          sessionStorage.removeItem(storageKey(scope));
+        } catch {}
+        return;
+      }
+
+      // One-shot: clear, set state, scroll
+      try {
+        sessionStorage.removeItem(storageKey(scope));
+      } catch {}
+
+      const targetId = rec.id;
+      setId(targetId);
+
+      // Scroll-into-view nach next frame — gibt React Zeit, die Row
+      // mit afterglow-class zu rendern.
+      requestAnimationFrame(() => {
+        const escaped =
+          typeof CSS !== "undefined" && "escape" in CSS
+            ? CSS.escape(targetId)
+            : targetId.replace(/"/g, '\\"');
+        const row = document.querySelector(`tr[data-row-id="${escaped}"]`);
+        if (row instanceof HTMLElement) {
+          const rect = row.getBoundingClientRect();
+          const inView = rect.top >= 80 && rect.bottom <= window.innerHeight - 80;
+          if (!inView) {
+            const reduceMotion = window.matchMedia(
+              "(prefers-reduced-motion: reduce)",
+            ).matches;
+            row.scrollIntoView({
+              block: "center",
+              behavior: reduceMotion ? "auto" : "smooth",
+            });
+          }
+        }
+      });
+
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setId(null), DURATION_MS);
+    }
+
+    // 1. Initial Mount-Check.
+    checkAndFlash();
+
+    // 2. BFCache-Restore (Safari, Firefox) + pageshow auf normalem Load —
+    //    feuert auch beim Browser-Back-Button wenn Page aus BFCache kommt.
+    // 3. popstate — feuert bei jeder History-Navigation (Back/Forward).
+    //    Next.js App-Router intercepted, aber das Event kommt trotzdem
+    //    durch. Defensiv: bei popstate erneut prüfen.
+    // 4. visibilitychange + focus — falls Tab-Switch / Window-Refocus.
+    const handler = () => checkAndFlash();
+    const popstateHandler = () => {
+      // Tiny delay damit Next.js Routing/State-Update fertig ist bevor
+      // wir die DOM-Row suchen.
+      setTimeout(checkAndFlash, 40);
+    };
+    window.addEventListener("pageshow", handler);
+    window.addEventListener("popstate", popstateHandler);
+
+    return () => {
+      window.removeEventListener("pageshow", handler);
+      window.removeEventListener("popstate", popstateHandler);
+      if (timer) clearTimeout(timer);
+    };
   }, [scope]);
 
   return id;

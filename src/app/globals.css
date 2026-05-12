@@ -638,21 +638,26 @@ body {
    CSS-Animation ausfadet. User-Auge findet die Position sofort wieder.
    ============================================ */
 
+/* 12.05.2026 (User-Feedback): vorheriger Tint oklch(0.96 0.012 25) war
+   nahezu identisch zu bg-main / bg-zebra → unsichtbar. Tint deutlich
+   angehoben (L 0.93, C 0.06, H 20) → klar peachy auf cremem Background,
+   harmoniert mit MR-Red. !important auf bg + box-shadow defeat
+   Tailwind-Utility-Cascade (bg-zebra, bg-brand/[0.04] etc.). */
 .row-preview-active {
-  background-color: oklch(0.96 0.012 25) !important;
+  background-color: oklch(0.93 0.06 20) !important;
   box-shadow:
-    inset 3px 0 0 0 var(--mr-red),
-    0 2px 8px rgba(0, 0, 0, 0.06);
+    inset 4px 0 0 0 var(--mr-red),
+    0 2px 8px rgba(87, 0, 6, 0.08) !important;
   position: relative;
   z-index: 1;
 }
 
 @keyframes row-afterglow {
   0% {
-    background-color: oklch(0.96 0.012 25);
+    background-color: oklch(0.93 0.06 20);
     box-shadow:
-      inset 3px 0 0 0 var(--mr-red),
-      0 2px 8px rgba(0, 0, 0, 0.06);
+      inset 4px 0 0 0 var(--mr-red),
+      0 2px 8px rgba(87, 0, 6, 0.08);
   }
   100% {
     background-color: transparent;
@@ -668,30 +673,26 @@ body {
   animation: row-afterglow 2.2s var(--ease-out-quart) forwards;
 }
 
-/* Return-from-Detail-Afterglow — gleiche Optik wie preview-afterglow,
-   aber längere Duration (3.5s) weil User beim Page-Return länger braucht,
-   um Spatial-Anchor zu reinitialisieren. */
 .row-return-afterglow {
   position: relative;
   z-index: 1;
   animation: row-afterglow 3.5s var(--ease-out-quart) forwards;
 }
 
-/* Pagination-Pulse: kurzer Brand-Tint-Blink auf der ersten Row nach
-   Seitenwechsel. User-Auge findet sofort den "Anfang" der neuen Seite.
-   1.5s, deutlich kürzer als Afterglow weil intentions andere sind. */
+/* Pagination-Pulse: First-Row der neuen Seite pulsiert kurz. Stärkerer
+   Spike (25%) damit Eye-Catch funktioniert. */
 @keyframes row-page-pulse {
   0% {
     background-color: transparent;
-    box-shadow: inset 3px 0 0 0 transparent;
+    box-shadow: inset 4px 0 0 0 transparent;
   }
   25% {
-    background-color: oklch(0.96 0.012 25);
-    box-shadow: inset 3px 0 0 0 var(--mr-red);
+    background-color: oklch(0.93 0.06 20);
+    box-shadow: inset 4px 0 0 0 var(--mr-red);
   }
   100% {
     background-color: transparent;
-    box-shadow: inset 3px 0 0 0 transparent;
+    box-shadow: inset 4px 0 0 0 transparent;
   }
 }
 
@@ -706,10 +707,10 @@ body {
    eventuell aus der "offen"-Liste entfernt. */
 @keyframes row-bulk-success {
   0% {
-    background-color: var(--status-freigegeben-bg);
+    background-color: #d1fae5;  /* emerald-100 — kräftiger als emerald-50 */
     box-shadow:
-      inset 3px 0 0 0 var(--status-freigegeben),
-      0 2px 8px rgba(0, 0, 0, 0.06);
+      inset 4px 0 0 0 var(--status-freigegeben),
+      0 2px 8px rgba(5, 150, 105, 0.15);
   }
   100% {
     background-color: transparent;
@@ -730,8 +731,8 @@ body {
    Lange genug (1.6s) damit User registriert WAS dazukam. */
 @keyframes timeline-item-enter {
   0% {
-    background-color: oklch(0.96 0.012 25);
-    box-shadow: inset 2px 0 0 0 var(--mr-red);
+    background-color: oklch(0.93 0.06 20);
+    box-shadow: inset 3px 0 0 0 var(--mr-red);
   }
   100% {
     background-color: transparent;
