@@ -82,15 +82,28 @@ export async function POST(
     // F5.3: Audit-Kommentar in kommentare-Stream (zusätzlich zur freigaben-Tabelle).
     // Dadurch sehen User in der Bestelldetail-Ansicht WER WANN freigegeben hat,
     // ohne den freigaben-Tab öffnen zu müssen.
+    //
+    // 12.05.2026 (Freigabe-Bug-Wurzel): kommentare-INSERT war im Erfolgs-Pfad
+    // ungeschützt — wenn er throws (RLS, NOT-NULL, network), bubbled in den
+    // catch-Block und schickte 500 obwohl die Freigabe BEREITS committed war.
+    // User klickt erneut → 409. Genau das User-Symptom: "fehlschlägt". Jetzt:
+    // try/catch um den Audit-INSERT, Fehler nur loggen, success trotzdem.
     const auditText = body.kommentar
       ? `Bestellung freigegeben — Kommentar: ${String(body.kommentar).replace(/[<>"&']/g, "").slice(0, 500)}`
       : `Bestellung freigegeben`;
-    await supabase.from("kommentare").insert({
-      bestellung_id: id,
-      autor_kuerzel: profil.kuerzel,
-      autor_name: profil.name,
-      text: auditText,
-    });
+    try {
+      const { error: kommentarErr } = await supabase.from("kommentare").insert({
+        bestellung_id: id,
+        autor_kuerzel: profil.kuerzel,
+        autor_name: profil.name,
+        text: auditText,
+      });
+      if (kommentarErr) {
+        logError("/api/bestellungen/[id]/freigeben", "Audit-Kommentar fehlgeschlagen (Freigabe selbst OK)", kommentarErr);
+      }
+    } catch (kommentarErr) {
+      logError("/api/bestellungen/[id]/freigeben", "Audit-Kommentar throw (Freigabe selbst OK)", kommentarErr);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

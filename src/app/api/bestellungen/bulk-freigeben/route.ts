@@ -146,13 +146,24 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Audit-Kommentar (analog Single-Endpoint, F5.3)
-      await supabase.from("kommentare").insert({
-        bestellung_id: id,
-        autor_kuerzel: profil.kuerzel,
-        autor_name: profil.name,
-        text: auditText,
-      });
+      // Audit-Kommentar (analog Single-Endpoint, F5.3).
+      // 12.05.2026 (Freigabe-Bug-Wurzel): try/catch damit ein einzelner
+      // kommentar-INSERT-Fail nicht die ganze Bulk-Loop abbricht oder die
+      // Freigabe als "errored" markiert (Freigabe selbst ist via RPC schon
+      // committed). Fehler nur loggen, weiter zum nächsten ID.
+      try {
+        const { error: kommentarErr } = await supabase.from("kommentare").insert({
+          bestellung_id: id,
+          autor_kuerzel: profil.kuerzel,
+          autor_name: profil.name,
+          text: auditText,
+        });
+        if (kommentarErr) {
+          logError(ROUTE_TAG, `Audit-Kommentar fehlgeschlagen für ${id} (Freigabe selbst OK)`, kommentarErr);
+        }
+      } catch (kommentarErr) {
+        logError(ROUTE_TAG, `Audit-Kommentar throw für ${id} (Freigabe selbst OK)`, kommentarErr);
+      }
 
       result.freigegeben.push(id);
     }
