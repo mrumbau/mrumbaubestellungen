@@ -188,7 +188,11 @@ export function BestellungenTabelle({
   const preview = useBestellungPreview();
   const {
     previewId,
+    previewTyp,
     previewUrl,
+    previewDocs,
+    previewDocIndex,
+    goToDoc,
     recentlyClosedId,
     preloadPreview,
     handlePreview,
@@ -662,7 +666,15 @@ export function BestellungenTabelle({
         selected={selected}
       />
 
-      <PdfPreviewModal open={!!previewId} url={previewUrl} onClose={closePreview} />
+      <PdfPreviewModal
+        open={!!previewId}
+        url={previewUrl}
+        onClose={closePreview}
+        docs={previewDocs}
+        docIndex={previewDocIndex}
+        onGoTo={goToDoc}
+        typ={previewTyp}
+      />
     </>
   );
 }

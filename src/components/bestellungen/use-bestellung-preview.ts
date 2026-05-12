@@ -10,29 +10,48 @@
  *   - Hover-Preload via fetch() befüllt Browser-HTTP-Cache → iframe-Click rendert instant
  *   - preloadedSet verhindert doppelte Fetches bei mehreren Hovers
  *
- * Spatial-Continuity (12.05.2026, User-Feedback nach /emil-design-eng):
- *   - Während Modal offen: `previewId` markiert die Trigger-Row (persistent
- *     `.row-preview-active` Highlight in CSS).
- *   - Nach Schließen: `recentlyClosedId` bleibt 2.2s gesetzt → CSS-Animation
- *     `row-afterglow` fadet langsam zurück. User-Auge findet die Row sofort.
- *   - Plus: scroll-into-view falls Row nicht im Viewport (Modal verdeckt
- *     einen Großteil des Bildschirms — User scrollt manchmal IM Modal weg
- *     oder kommt von einer entfernten Row zurück).
- *   - prefers-reduced-motion respektiert (scroll-behavior + Animation).
+ * Multi-Document-Support (12.05.2026, User-Feedback "bei Einträgen die 2
+ * Rechnungen haben sollte man auch bei PDF-Vorschau das auch sehen"):
+ *   - handlePreview lädt parallel `/api/pdfs/list?bestellung_id=X&typ=Y` und
+ *     bekommt zurück alle Doc-IDs des Typs. Bei Multi-Doc-Bestellungen
+ *     (z.B. Raab-Karcher mit 2 Teilrechnungen) bekommt der User Prev/Next-
+ *     Navigation in der Modal.
+ *   - Erste Anzeige: Doc 1/N. Mit `goToDoc(index)` wechselbar.
+ *   - Wenn nur 1 Doc existiert → fallback zur Bestellung-ID-API (gleiches
+ *     Verhalten wie vorher).
+ *
+ * Spatial-Continuity:
+ *   - Während Modal offen: `previewId` markiert die Trigger-Row.
+ *   - Nach Schließen: `recentlyClosedId` bleibt 2.2s gesetzt für Afterglow.
+ *   - Scroll-into-view falls Row nicht sichtbar.
+ *   - prefers-reduced-motion respektiert.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const AFTERGLOW_MS = 2200;
 
+interface PreviewDoc {
+  id: string;
+  created_at: string | null;
+  gesamtbetrag: number | null;
+}
+
 export function useBestellungPreview() {
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewTyp, setPreviewTyp] = useState<string | null>(null);
+  const [previewDocs, setPreviewDocs] = useState<PreviewDoc[]>([]);
+  const [previewDocIndex, setPreviewDocIndex] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [recentlyClosedId, setRecentlyClosedId] = useState<string | null>(null);
   const afterglowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preloadedSet = useRef<Set<string>>(new Set());
 
-  const buildPreviewUrl = useCallback(
+  const buildPreviewUrlByDocId = useCallback(
+    (docId: string) => `/api/pdfs/${docId}`,
+    [],
+  );
+  const buildPreviewUrlByBestellung = useCallback(
     (bestellungId: string, typ: string) =>
       `/api/pdfs/${bestellungId}?typ=${encodeURIComponent(typ)}`,
     [],
@@ -43,45 +62,66 @@ export function useBestellungPreview() {
       const key = `${bestellungId}:${typ}`;
       if (preloadedSet.current.has(key)) return;
       preloadedSet.current.add(key);
-      void fetch(buildPreviewUrl(bestellungId, typ), {
+      void fetch(buildPreviewUrlByBestellung(bestellungId, typ), {
         credentials: "same-origin",
       }).catch(() => preloadedSet.current.delete(key));
     },
-    [buildPreviewUrl],
+    [buildPreviewUrlByBestellung],
   );
-
-  const clearAfterglow = useCallback(() => {
-    if (afterglowTimer.current) {
-      clearTimeout(afterglowTimer.current);
-      afterglowTimer.current = null;
-    }
-    setRecentlyClosedId(null);
-  }, []);
 
   const handlePreview = useCallback(
     (bestellungId: string, typ: string) => {
-      // A2.1 fix: zwei-stufige Bereinigung gegen Race wenn User schnell
-      // mehrere Previews nacheinander öffnet:
-      // 1. recentlyClosedId SOFORT clearen (state-sync, kein Render-Tick)
-      // 2. Timer-Handle löschen damit auch keine späteren Clear-Callbacks
-      //    den frischen previewId überschreiben.
-      // Resultat: maximal eine Row trägt zu jedem Zeitpunkt ein Highlight.
+      // Race-Bereinigung gegen schnelle Wechsel zwischen Previews.
       setRecentlyClosedId(null);
       if (afterglowTimer.current) {
         clearTimeout(afterglowTimer.current);
         afterglowTimer.current = null;
       }
       setPreviewId(bestellungId);
-      setPreviewUrl(buildPreviewUrl(bestellungId, typ));
+      setPreviewTyp(typ);
+      setPreviewDocIndex(0);
+      // Sofort den optimistischen URL setzen (per Bestellung-ID-Fallback —
+      // funktioniert immer für single-doc und für die "neueste" bei multi-doc).
+      // Parallel die Doc-Liste laden für Multi-Doc-Pagination.
+      setPreviewUrl(buildPreviewUrlByBestellung(bestellungId, typ));
+      setPreviewDocs([]);
+      void fetch(
+        `/api/pdfs/list?bestellung_id=${encodeURIComponent(bestellungId)}&typ=${encodeURIComponent(typ)}`,
+        { credentials: "same-origin" },
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { docs?: PreviewDoc[] } | null) => {
+          const docs = data?.docs ?? [];
+          if (docs.length > 1) {
+            // Multi-Doc: switch zu per-Doc-ID-URL damit Pagination stabil ist.
+            // Wenn nur 1 doc da ist, bleibt der Bestellung-Fallback-URL aktiv.
+            setPreviewDocs(docs);
+            setPreviewUrl(buildPreviewUrlByDocId(docs[0].id));
+          } else if (docs.length === 1) {
+            // Nur 1 Doc — kein Nav nötig, alte URL beibehalten.
+            setPreviewDocs(docs);
+          }
+        })
+        .catch(() => {
+          // Stille fail — alte URL funktioniert weiter.
+        });
     },
-    [buildPreviewUrl],
+    [buildPreviewUrlByBestellung, buildPreviewUrlByDocId],
+  );
+
+  const goToDoc = useCallback(
+    (index: number) => {
+      if (previewDocs.length <= 1) return;
+      const safe = Math.max(0, Math.min(index, previewDocs.length - 1));
+      setPreviewDocIndex(safe);
+      setPreviewUrl(buildPreviewUrlByDocId(previewDocs[safe].id));
+    },
+    [previewDocs, buildPreviewUrlByDocId],
   );
 
   const closePreview = useCallback(() => {
     setPreviewId((prevId) => {
       if (prevId && typeof window !== "undefined") {
-        // Afterglow starten — Row bekommt 2.2s das gleiche Highlight wie
-        // im Modal-offen-Zustand und fadet dann via CSS-Animation aus.
         setRecentlyClosedId(prevId);
         if (afterglowTimer.current) clearTimeout(afterglowTimer.current);
         afterglowTimer.current = setTimeout(() => {
@@ -89,14 +129,12 @@ export function useBestellungPreview() {
           afterglowTimer.current = null;
         }, AFTERGLOW_MS);
 
-        // Scroll into view falls Row nicht sichtbar (User scrollte im Modal
-        // weg oder kam von weit oben). nextFrame damit Modal-Close-Animation
-        // erst die layout transformiert.
         const idForScroll = prevId;
         requestAnimationFrame(() => {
-          const escaped = typeof CSS !== "undefined" && "escape" in CSS
-            ? CSS.escape(idForScroll)
-            : idForScroll.replace(/"/g, '\\"');
+          const escaped =
+            typeof CSS !== "undefined" && "escape" in CSS
+              ? CSS.escape(idForScroll)
+              : idForScroll.replace(/"/g, '\\"');
           const row = document.querySelector(`tr[data-row-id="${escaped}"]`);
           if (row instanceof HTMLElement) {
             const rect = row.getBoundingClientRect();
@@ -116,6 +154,9 @@ export function useBestellungPreview() {
       return null;
     });
     setPreviewUrl(null);
+    setPreviewTyp(null);
+    setPreviewDocs([]);
+    setPreviewDocIndex(0);
   }, []);
 
   useEffect(() => {
@@ -126,7 +167,11 @@ export function useBestellungPreview() {
 
   return {
     previewId,
+    previewTyp,
     previewUrl,
+    previewDocs,
+    previewDocIndex,
+    goToDoc,
     recentlyClosedId,
     preloadPreview,
     handlePreview,
