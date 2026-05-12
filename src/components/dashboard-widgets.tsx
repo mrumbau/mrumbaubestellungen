@@ -957,7 +957,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   {aktionenNoetig.slice(0, 10).map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
-                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-all group">
+                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <AktionIcon status={b.status} />
                           <div className="min-w-0">
@@ -1015,7 +1015,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   {letzte.map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
-                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-all group">
+                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                             <span className="font-mono-amount">{displayBestellnummer(b)}</span>
@@ -1167,7 +1167,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
                 const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
                 return (
-                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-all group">
+                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
                       <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
@@ -1180,7 +1180,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                     {p.budget && (
                       <div className="mt-2">
                         <div className="w-full h-1.5 bg-line-subtle rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
+                          <div className="h-full rounded-full transition-[width,background-color] duration-500 ease-out" style={{ width: `${budgetProzent}%`, background: budgetFarbe }} />
                         </div>
                         <p className="text-[10px] text-foreground-subtle mt-0.5 font-mono-amount">{budgetProzent.toFixed(0)}% von {formatBetrag(Number(p.budget))}</p>
                       </div>

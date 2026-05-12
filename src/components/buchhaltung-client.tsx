@@ -382,7 +382,7 @@ export function BuchhaltungClient({
         <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg">
           <button
             onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               tab === "offen"
                 ? "bg-white text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
@@ -399,7 +399,7 @@ export function BuchhaltungClient({
           </button>
           <button
             onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               tab === "bezahlt"
                 ? "bg-white text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"

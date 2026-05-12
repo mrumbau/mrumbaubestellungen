@@ -189,8 +189,14 @@ export function ActionMenu({
           role="menu"
           aria-label={label}
           onClick={(e) => e.stopPropagation()}
+          style={{
+            // 12.05.2026 (/emil-design-eng): origin-aware — Popover skaliert
+            // aus der Trigger-Ecke, nicht aus center. align="end" → top right,
+            // align="start" → top left.
+            transformOrigin: align === "end" ? "top right" : "top left",
+          }}
           className={cn(
-            "absolute top-full mt-1 z-40",
+            "absolute top-full mt-1 z-40 animate-popover-in",
             "min-w-[180px] py-1 rounded-md",
             "bg-surface border border-line shadow-[var(--shadow-elevated)]",
             align === "end" ? "right-0" : "left-0",

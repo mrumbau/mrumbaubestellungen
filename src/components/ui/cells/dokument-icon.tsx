@@ -27,7 +27,7 @@ export function DokumentIcon({ vorhanden, onClick, onMouseEnter, label }: Dokume
         type="button"
         onClick={onClick}
         onMouseEnter={onMouseEnter}
-        className="p-1 -m-1 rounded-md transition-all hover:bg-success-bg hover:scale-125 cursor-pointer group/dok"
+        className="p-1 -m-1 rounded-md transition-[background-color,transform] duration-150 ease-out hover:bg-success-bg hover:scale-110 cursor-pointer group/dok"
         title="Klicken für Vorschau"
         aria-label={label ? `${label} — Vorschau anzeigen` : "Vorschau anzeigen"}
       >

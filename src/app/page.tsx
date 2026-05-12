@@ -38,10 +38,10 @@ export default async function Home() {
       {/* ─── Modul 01: Bestellwesen ──────────────────────────────────────── */}
       <Link
         href={bestellwesenHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh transition-transform duration-700 ease-fluid hover:scale-[1.005] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh transition-transform duration-300 ease-fluid hover:scale-[1.005] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
       >
         {/* Layered industrial patterns (unverändert — Brand-Vocabulary bewahren) */}
-        <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-fluid" />
+        <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-fluid" />
         <div className="absolute inset-0 bg-grid-pattern" />
         <div className="absolute inset-0 bg-diagonal-lines" />
         <div className="absolute inset-0 bg-iso-grid" />
@@ -132,13 +132,13 @@ export default async function Home() {
 
         {/* CTA-Pille mit button-in-button trailing arrow */}
         <div className="relative z-10 reveal-up stagger-6">
-          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-white/10 backdrop-blur-2xl pl-5 pr-2 py-2 transition-all duration-700 ease-fluid group-hover:bg-white/[0.12] group-hover:border-white/20">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-white/10 backdrop-blur-2xl pl-5 pr-2 py-2 transition-[background-color,border-color] duration-200 ease-fluid group-hover:bg-white/[0.12] group-hover:border-white/20">
             <span className="text-foreground-inverse text-[14px] font-medium tracking-tight">
               Modul betreten
             </span>
             <span
               aria-hidden="true"
-              className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center transition-all duration-700 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-white/22"
+              className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center transition-[background-color,transform] duration-200 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-white/22"
             >
               <svg
                 className="w-4 h-4 text-foreground-inverse"
@@ -157,10 +157,10 @@ export default async function Home() {
       {/* ─── Modul 02: CardScan ─────────────────────────────────────── */}
       <Link
         href={cardscanHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh transition-transform duration-700 ease-fluid hover:scale-[1.005] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cs-accent/40"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh transition-transform duration-300 ease-fluid hover:scale-[1.005] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cs-accent/40"
       >
         {/* Hover overlay + dot grid (CardScan Sub-Brand bleibt unangetastet) */}
-        <div className="absolute inset-0 bg-cs-accent/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-700 ease-fluid" />
+        <div className="absolute inset-0 bg-cs-accent/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-fluid" />
         <div className="absolute inset-0 bg-dot-grid opacity-60" />
 
         {/* Emerald-Glow für ethereal Tiefe */}
@@ -245,13 +245,13 @@ export default async function Home() {
 
         {/* CTA-Pille */}
         <div className="relative z-10 reveal-up stagger-7">
-          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-cs-accent/15 backdrop-blur-2xl pl-5 pr-2 py-2 transition-all duration-700 ease-fluid group-hover:bg-cs-accent/[0.12] group-hover:border-cs-accent/30">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-cs-accent/15 backdrop-blur-2xl pl-5 pr-2 py-2 transition-[background-color,border-color] duration-200 ease-fluid group-hover:bg-cs-accent/[0.12] group-hover:border-cs-accent/30">
             <span className="text-foreground-inverse text-[14px] font-medium tracking-tight">
               Modul betreten
             </span>
             <span
               aria-hidden="true"
-              className="w-9 h-9 rounded-full bg-cs-accent/15 flex items-center justify-center transition-all duration-700 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-cs-accent/25"
+              className="w-9 h-9 rounded-full bg-cs-accent/15 flex items-center justify-center transition-[background-color,transform] duration-200 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-cs-accent/25"
             >
               <svg
                 className="w-4 h-4 text-cs-accent-light"

@@ -78,12 +78,12 @@ export default function NotFound() {
               {/* Primary CTA — Button-in-Button + Magnetic */}
               <Link
                 href="/dashboard"
-                className="group flex-1 relative overflow-hidden rounded-full pl-5 pr-2 py-2 bg-brand text-foreground-inverse font-medium text-sm flex items-center justify-between gap-3 transition-transform duration-500 ease-fluid active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
+                className="group flex-1 relative overflow-hidden rounded-full pl-5 pr-2 py-2 bg-brand text-foreground-inverse font-medium text-sm flex items-center justify-between gap-3 transition-transform duration-200 ease-fluid active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
               >
                 <span className="relative z-10">Zum Dashboard</span>
                 <span
                   aria-hidden="true"
-                  className="relative z-10 w-8 h-8 rounded-full bg-white/15 flex items-center justify-center transition-all duration-500 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-white/20"
+                  className="relative z-10 w-8 h-8 rounded-full bg-white/15 flex items-center justify-center transition-[background-color,transform,box-shadow] duration-200 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 group-hover:bg-white/20"
                 >
                   <svg
                     className="w-3.5 h-3.5 text-white"
@@ -98,19 +98,19 @@ export default function NotFound() {
                 {/* Sheen-Sweep on hover */}
                 <span
                   aria-hidden="true"
-                  className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[1100ms] ease-fluid bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                  className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[900ms] ease-fluid bg-gradient-to-r from-transparent via-white/15 to-transparent"
                 />
               </Link>
 
               {/* Secondary CTA */}
               <Link
                 href="/bestellungen"
-                className="group flex-1 relative overflow-hidden rounded-full px-5 py-2 bg-canvas text-foreground font-medium text-sm flex items-center justify-center gap-2 transition-all duration-500 ease-fluid hover:bg-surface-hover active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
+                className="group flex-1 relative overflow-hidden rounded-full px-5 py-2 bg-canvas text-foreground font-medium text-sm flex items-center justify-center gap-2 transition-[background-color,transform,box-shadow] duration-200 ease-fluid hover:bg-surface-hover active:scale-[0.98] focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[44px]"
               >
                 <span>Zu Bestellungen</span>
                 <svg
                   aria-hidden="true"
-                  className="w-3.5 h-3.5 text-foreground-subtle transition-transform duration-500 ease-fluid group-hover:translate-x-0.5"
+                  className="w-3.5 h-3.5 text-foreground-subtle transition-transform duration-200 ease-fluid group-hover:translate-x-0.5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

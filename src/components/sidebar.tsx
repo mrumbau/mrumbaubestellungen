@@ -137,7 +137,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`relative flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-all ${
+              className={`relative flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-colors duration-150 ${
                 active
                   ? "bg-white/[0.07] text-white font-medium"
                   : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
@@ -166,7 +166,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
         <Link
           href="/cardscan"
           onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-all ${
+          className={`flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-colors duration-150 ${
             pathname.startsWith("/cardscan")
               ? "bg-cs-accent/10 text-cs-accent-light font-medium"
               : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
@@ -196,7 +196,7 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
           <button
             type="button"
             onClick={handleLogout}
-            className="p-2.5 text-white/30 hover:text-white/70 hover:bg-white/[0.06] rounded-md transition-all"
+            className="p-2.5 text-white/30 hover:text-white/70 hover:bg-white/[0.06] rounded-md transition-colors duration-150"
             title="Abmelden"
             aria-label="Abmelden"
           >

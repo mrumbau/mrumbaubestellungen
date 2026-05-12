@@ -319,7 +319,7 @@ function LoginForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full px-4 py-3.5 bg-input border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-all duration-500 ease-fluid min-h-[48px]"
+                    className="w-full px-4 py-3.5 bg-input border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-[border-color,box-shadow] duration-200 ease-fluid min-h-[48px]"
                     placeholder="name@mrumbau.de"
                   />
                 </div>
@@ -336,7 +336,7 @@ function LoginForm() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       autoComplete="current-password"
-                      className="w-full pl-4 pr-14 py-3.5 bg-input border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-all duration-500 ease-fluid min-h-[48px]"
+                      className="w-full pl-4 pr-14 py-3.5 bg-input border border-line rounded-xl text-base text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-[border-color,box-shadow] duration-200 ease-fluid min-h-[48px]"
                       placeholder="Passwort eingeben"
                     />
                     <button
@@ -378,7 +378,7 @@ function LoginForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`group w-full relative overflow-hidden rounded-full pl-6 pr-2 py-2 text-[16px] font-semibold text-foreground-inverse flex items-center justify-between gap-3 transition-transform duration-500 ease-fluid active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[56px] ${
+                  className={`group w-full relative overflow-hidden rounded-full pl-6 pr-2 py-2 text-[16px] font-semibold text-foreground-inverse flex items-center justify-between gap-3 transition-[background-color,transform] duration-200 ease-fluid active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[56px] ${
                     isCardScan ? "bg-sidebar hover:bg-sidebar-hover" : "bg-brand hover:bg-brand-light"
                   }`}
                 >
@@ -390,7 +390,7 @@ function LoginForm() {
                   </span>
                   <span
                     aria-hidden="true"
-                    className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 ${
+                    className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-[background-color,transform] duration-200 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 ${
                       isCardScan ? "bg-cs-accent/15 group-hover:bg-cs-accent/25" : "bg-white/15 group-hover:bg-white/22"
                     }`}
                   >
@@ -407,7 +407,7 @@ function LoginForm() {
                   {/* Sheen-Sweep */}
                   <span
                     aria-hidden="true"
-                    className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[1100ms] ease-fluid bg-gradient-to-r from-transparent via-white/12 to-transparent"
+                    className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[900ms] ease-fluid bg-gradient-to-r from-transparent via-white/12 to-transparent"
                   />
                 </button>
               </form>
