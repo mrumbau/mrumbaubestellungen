@@ -862,7 +862,7 @@ export function KundenClient({
                   )}
 
                   {/* Stats */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-input rounded-lg border border-line-subtle">
+                  <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-input rounded-lg border border-line-subtle min-w-0">
                     <div>
                       <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Projekte</p>
                       <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.projekte}</p>

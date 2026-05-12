@@ -109,7 +109,7 @@ export function DatevExportModal({
     >
       <div className="space-y-4 pt-2">
         {/* Zeitraum */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">
               Von
@@ -229,7 +229,7 @@ export function DatevExportModal({
           </button>
           {showErweitert && (
             <div className="px-3 pb-3 space-y-3 border-t border-line">
-              <div className="grid grid-cols-2 gap-3 pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                 <div>
                   <label className="block text-[12px] text-foreground-muted mb-1">
                     Berater-Nr.
@@ -259,7 +259,7 @@ export function DatevExportModal({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] text-foreground-muted mb-1">
                     Gegenkonto

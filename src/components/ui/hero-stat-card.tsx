@@ -48,7 +48,7 @@ export function HeroStatCard({
 }: HeroStatCardProps) {
   return (
     <div
-      className={`card card-hover relative overflow-hidden md:col-span-2 ${alert ? "ring-1 ring-error/30" : ""} ${className ?? ""}`}
+      className={`card card-hover relative overflow-hidden col-span-2 md:col-span-2 ${alert ? "ring-1 ring-error/30" : ""} ${className ?? ""}`}
       style={{ borderTop: `3px solid ${color}` }}
     >
       <div

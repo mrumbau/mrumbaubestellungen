@@ -490,34 +490,10 @@ export function BestellungenTabelle({
         </FilterBar>
       </div>
 
-      {/* Mobile: Status + Projekt filter below */}
-      <div className="flex gap-3 mt-3 md:hidden">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="flex-1 px-3.5 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
-        >
-          {STATUS_FILTER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {projekte.length > 0 && (
-          <select
-            value={projektFilter}
-            onChange={(e) => setProjektFilter(e.target.value)}
-            className="flex-1 px-3.5 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
-          >
-            <option value="">Alle Projekte</option>
-            {projekte.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+      {/* 12.05.2026 (Mobile-Sweep): vorheriger md:hidden Fallback-Block
+          mit duplizierten Status- + Projekt-Selects entfernt. FilterBar
+          rendert sie jetzt selbst auf allen Viewports + stackt vertikal
+          unter dem Search-Input auf Mobile. */}
 
       {/* Bulk toolbar — sticky-top, Linear-Style */}
       <div className="mt-4">

@@ -105,7 +105,12 @@ export function Modal({
       aria-describedby={computedDescribedBy}
       className={cn(
         // Reset native dialog defaults, center via margin:auto
-        "m-auto w-full p-0 bg-transparent border-0",
+        "m-auto p-0 bg-transparent border-0",
+        // 12.05.2026 (Mobile-Sweep F-MOB-2): w-[calc(100%-1rem)] gibt Modal
+        // auf Mobile 8px Atemraum links/rechts. Auf größeren Viewports caps
+        // max-w-X dann auf die richtige Breite. Vorher `w-full` ließ Modal
+        // bündig an Viewport-Edges anstoßen.
+        "w-[calc(100%-1rem)] sm:w-full",
         // Prevent scroll lock from our side (dialog handles it)
         "max-h-[calc(100vh-2rem)] overflow-visible",
         sizeClasses[size],

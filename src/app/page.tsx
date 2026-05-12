@@ -38,7 +38,7 @@ export default async function Home() {
       {/* ─── Modul 01: Bestellwesen ──────────────────────────────────────── */}
       <Link
         href={bestellwesenHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        className="group relative flex-1 flex flex-col justify-between px-5 py-8 sm:p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
       >
         {/* Layered industrial patterns (unverändert — Brand-Vocabulary bewahren) */}
         <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-fluid" />
@@ -160,7 +160,7 @@ export default async function Home() {
       {/* ─── Modul 02: CardScan ─────────────────────────────────────── */}
       <Link
         href={cardscanHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cs-accent/40"
+        className="group relative flex-1 flex flex-col justify-between px-5 py-8 sm:p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cs-accent/40"
       >
         {/* Hover overlay + dot grid (CardScan Sub-Brand bleibt unangetastet) */}
         <div className="absolute inset-0 bg-cs-accent/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-fluid" />

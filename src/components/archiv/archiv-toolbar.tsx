@@ -108,8 +108,9 @@ export function ArchivToolbar({
         ))}
       </div>
 
-      {/* Search + Date + Aktionen */}
-      <div className="flex items-center gap-3 w-full sm:w-auto">
+      {/* Search + Date + Aktionen — 12.05.2026 (Mobile-Sweep): flex-col
+          auf Mobile damit Date-Inputs unter Search stacken. */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
         <div className="relative flex-1 min-w-0">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle"
@@ -133,14 +134,14 @@ export function ArchivToolbar({
           value={dateFrom}
           onChange={(e) => onDateFromChange(e.target.value)}
           title="Von"
-          className="hidden md:block px-3 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+          className="w-full sm:w-auto px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
         />
         <input
           type="date"
           value={dateTo}
           onChange={(e) => onDateToChange(e.target.value)}
           title="Bis"
-          className="hidden md:block px-3 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+          className="w-full sm:w-auto px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
         />
         {hasFilters && (
           <button

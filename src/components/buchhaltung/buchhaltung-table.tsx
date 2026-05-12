@@ -50,8 +50,8 @@ export function BuchhaltungTable({
   successFlashIds,
 }: BuchhaltungTableProps) {
   return (
-    <div className="mt-4 card overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="mt-4 card overflow-x-auto">
+      <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="bg-input border-b border-line sticky top-0 z-10">
             {selectionMode && (
