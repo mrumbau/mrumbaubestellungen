@@ -139,12 +139,12 @@ function LoginForm() {
         <div className="relative z-10">
           {isCardScan ? (
             <div className="flex items-center gap-3">
-              <Logo size={44} color="#ffffff" />
+              <Logo size={44} className="text-white" />
               <div className="h-5 w-px bg-white/10" />
               <span className="text-[10px] text-white/20 tracking-[0.15em] uppercase font-mono-amount">Scan</span>
             </div>
           ) : (
-            <Logo size={56} color="#ffffff" />
+            <Logo size={56} className="text-white" />
           )}
         </div>
 
@@ -235,7 +235,10 @@ function LoginForm() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="lg:hidden mb-12">
-            <Logo size={40} color={isCardScan ? "#141414" : "#570006"} />
+            <Logo
+              size={40}
+              className={isCardScan ? "text-sidebar" : "text-brand"}
+            />
           </div>
 
           <div>

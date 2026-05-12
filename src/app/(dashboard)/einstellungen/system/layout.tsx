@@ -80,6 +80,29 @@ export default async function SystemLayout({
 
   return (
     <div className="flex flex-col gap-6">
+      <div
+        role="note"
+        aria-label="Admin-Bereich"
+        className="inline-flex items-center gap-2 self-start px-3 py-1.5 rounded-md bg-canvas border border-line text-[11px] text-foreground-muted"
+      >
+        <svg
+          className="w-3.5 h-3.5 text-foreground-subtle"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+          />
+        </svg>
+        <span className="uppercase tracking-wider font-semibold text-[10px]">Admin-Bereich</span>
+        <span className="text-foreground-faint">·</span>
+        <span>Operationen hier wirken sich auf alle Benutzer aus.</span>
+      </div>
       <SubNav items={items} ariaLabel="System-Sektionen" />
       {children}
     </div>

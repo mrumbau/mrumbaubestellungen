@@ -1,20 +1,37 @@
 // MR Umbau GmbH – Corporate Logo Komponente
-// Exakte Pfade aus dem Original-SVG
+// Exakte Pfade aus dem Original-SVG.
+//
+// 12.05.2026 (UI-Audit F7.10 + F2.12): Logo nutzt jetzt currentColor by default.
+// Aufrufer steuern die Farbe über Tailwind-Klassen (text-white, text-brand, etc.)
+// statt Magic-Hex-Props. Der color-Prop bleibt für Backward-Compat erhalten —
+// wenn gesetzt, gewinnt er gegen currentColor.
 
 interface LogoProps {
   size?: number;
+  /**
+   * @deprecated Bevorzuge className mit Tailwind-Text-Color (z.B. "text-white",
+   * "text-brand"). Bei Bedarf eines Hex-Overrides hier setzen.
+   */
   color?: string;
   className?: string;
 }
 
-export function Logo({ size = 28, color = "#570006", className }: LogoProps) {
+export function Logo({ size = 28, color, className }: LogoProps) {
+  // Default zu text-brand wenn weder color noch eine text-* className gesetzt ist
+  // — verhindert, dass das Logo auf nackten Surfaces in der inherited Body-Color
+  // (Foreground-Dunkelgrau) verschwindet. Sobald className eine Tailwind-text-*
+  // Class enthält, gewinnt diese durch CSS-Cascade.
+  const hasTextClass = className?.includes("text-") ?? false;
+  const finalClassName = color || hasTextClass
+    ? className
+    : `${className ?? ""} text-brand`.trim();
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 1844 1705"
-      fill={color}
+      fill={color ?? "currentColor"}
       height={size}
-      className={className}
+      className={finalClassName}
       style={{ width: "auto", flexShrink: 0 }}
     >
       {/* Rahmen oben */}

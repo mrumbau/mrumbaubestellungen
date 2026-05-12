@@ -133,6 +133,7 @@ export function BestellungenTabelle({
     projektFilter, setProjektFilter,
     faelligkeitsFilter, setFaelligkeitsFilter,
     hasFilters,
+    reset: resetFilters,
   } = filters;
   useEffect(() => {
     setProjektFilter(aktiverProjektFilter || "");
@@ -1060,20 +1061,50 @@ export function BestellungenTabelle({
                 compact
                 icon={<IconSearch className="w-5 h-5" />}
                 title="Keine Treffer"
-                description="Keine Bestellungen passen zu den aktuellen Filtern."
+                description={
+                  hasFilters ? (
+                    <>
+                      <span>Keine Bestellungen passen zu den aktuellen Filtern.</span>
+                      <span className="mt-2 flex flex-wrap gap-1.5">
+                        {suche && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-canvas border border-line text-foreground-muted">
+                            Suche: <span className="font-mono-amount text-foreground">„{suche}"</span>
+                          </span>
+                        )}
+                        {statusFilter && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-canvas border border-line text-foreground-muted">
+                            Status: <span className="font-medium text-foreground">{statusFilter === "offen" ? "Offen (= alle außer freigegeben)" : statusFilter}</span>
+                          </span>
+                        )}
+                        {artFilter && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-canvas border border-line text-foreground-muted">
+                            Art: <span className="font-medium text-foreground">{artFilter}</span>
+                          </span>
+                        )}
+                        {projektFilter && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-canvas border border-line text-foreground-muted">
+                            Projekt: <span className="font-medium text-foreground">{projekte.find((p) => p.id === projektFilter)?.name ?? "—"}</span>
+                          </span>
+                        )}
+                        {faelligkeitsFilter && faelligkeitsFilter !== "alle" && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-canvas border border-line text-foreground-muted">
+                            Fälligkeit: <span className="font-medium text-foreground">{faelligkeitsFilter === "ueberfaellig" ? "Überfällig" : faelligkeitsFilter === "diese_woche" ? "Diese Woche" : faelligkeitsFilter}</span>
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  ) : (
+                    "Keine Bestellungen passen zu den aktuellen Filtern."
+                  )
+                }
                 primaryAction={
                   hasFilters ? (
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => {
-                        setSuche("");
-                        setStatusFilter("");
-                        setArtFilter("");
-                        setProjektFilter("");
-                      }}
+                      onClick={resetFilters}
                     >
-                      Filter zurücksetzen
+                      Alle Filter zurücksetzen
                     </Button>
                   ) : undefined
                 }

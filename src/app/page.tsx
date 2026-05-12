@@ -56,7 +56,7 @@ export default async function Home() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <Logo size={44} color="#ffffff" />
+          <Logo size={44} className="text-white" />
         </div>
 
         {/* Content */}
@@ -144,7 +144,7 @@ export default async function Home() {
 
         {/* Logo area */}
         <div className="relative z-10 flex items-center gap-3">
-          <Logo size={32} color="#ffffff" />
+          <Logo size={32} className="text-white" />
           <div className="h-5 w-px bg-white/10" />
           <span className="text-[10px] text-white/20 tracking-[0.15em] uppercase font-mono-amount">Scan</span>
         </div>

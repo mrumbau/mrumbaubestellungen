@@ -58,7 +58,7 @@ export default async function CardScanLayout({
               aria-label="Zur Tool-Auswahl"
               title="Zur Tool-Auswahl"
             >
-              <Logo size={20} color="#ffffff" className="opacity-40" />
+              <Logo size={20} className="opacity-40 text-white" />
             </Link>
 
             <Link
