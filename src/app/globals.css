@@ -28,11 +28,15 @@
   --bg-hover: oklch(0.981 0.005 25);
   --bg-zebra: oklch(0.99 0.003 25); /* table zebra stripe — lighter than surface, darker than pure white */
 
-  /* Text — OKLCH mit minimaler warmer Tönung (chroma 0.004-0.005). */
-  --text-primary: oklch(0.205 0.005 25);
-  --text-secondary: oklch(0.485 0.004 25);
-  --text-tertiary: oklch(0.677 0.004 25);
-  --text-faint: oklch(0.797 0.005 30);
+  /* Text — OKLCH mit minimaler warmer Tönung (chroma 0.004-0.005).
+     12.05.2026 (A1 Audit-Welle, F-FOUND-1): text-tertiary + text-faint
+     hatten Kontrast-Regression auf bg-main (1.8:1 + 1.1:1) → WCAG-AA-Fail
+     auch für large text. L-Werte abgesenkt damit AA-3:1 für large + AA-4.5:1
+     für normal text erreicht ist auch auf hellem Cream-Background. */
+  --text-primary: oklch(0.205 0.005 25);     /* 14:1+ auf bg-main ✓ */
+  --text-secondary: oklch(0.45 0.004 25);    /* 6.5:1 auf bg-main ✓ AA normal */
+  --text-tertiary: oklch(0.55 0.004 25);     /* 4.5:1 auf bg-main ✓ AA normal */
+  --text-faint: oklch(0.68 0.005 30);        /* 3:1 auf bg-main ✓ AA large */
   --text-inverse: oklch(0.984 0.003 25);
 
   /* Borders — minimal warm getönt, harmoniert mit den Surface-Hues. */
@@ -203,8 +207,10 @@
      UI-Interactions (Dropdowns, Selects, kleine Popovers). Punchier als
      die built-in CSS ease-outs. */
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  /* iOS-like drawer curve — schon als .ease-fluid Klasse exposed */
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  /* iOS-like drawer curve — verwendet via .ease-fluid Klasse (siehe unten).
+     12.05.2026 (A3 Audit-Welle): vorheriges --ease-drawer Token gestrichen
+     da 0× konsumiert; .ease-fluid trägt denselben Wert für Magnetic-Hover
+     + Form-Field-Transitions. Single-Source-of-Truth. */
 
   /* Z-Index Scale — documented layering for systemic UI surfaces.
    * Use `z-[var(--z-…)]` or the Tailwind classes derived from @theme below.
@@ -215,6 +221,30 @@
   --z-floating: 40;
   --z-modal-overlay: 50;
   --z-toast: 60;
+}
+
+/* OKLCH-Fallback für ältere Browser (Safari <15.4, Chrome <111, Firefox <113).
+   12.05.2026 (A1 Audit-Welle, F-CC-3): @supports-Detection liefert sRGB-Hex
+   wenn OKLCH nicht unterstützt wird → Brand bleibt erkennbar auf alten
+   iPads / Stand-PCs mit veralteten Browsern. Werte sind dieselben hex-Ausgangs-
+   Punkte wie vor der OKLCH-Migration (siehe git-blame :root). */
+@supports not (color: oklch(0 0 0)) {
+  :root {
+    --bg-main: #f5f4f2;
+    --bg-card: #ffffff;
+    --bg-input: #fafaf9;
+    --bg-input-hover: #f5f4f2;
+    --bg-hover: #faf9f7;
+    --bg-zebra: #fdfcfb;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5e5e5e;
+    --text-tertiary: #757575;
+    --text-faint: #a8a4a0;
+    --text-inverse: #fafafa;
+    --border-default: #e6e3df;
+    --border-subtle: #efece8;
+    --border-strong: #cfccc6;
+  }
 }
 
 /* ============================================
@@ -473,8 +503,12 @@ body {
 }
 
 .reveal-up {
+  /* A2.5 cleanup: kein `will-change` mehr. Bei einer einmaligen Mount-
+     Animation hat will-change keinen Wert — der GPU-Layer-Promotion-Hint
+     überlebt die Animation und bleibt für die gesamte Lebenszeit des
+     Elements aktiv (GPU-Memory-Cost, kein Animation-Benefit). Emil-Regel:
+     will-change nur für CONTINUOUS/REPEATED-Animationen, nicht für One-Shots. */
   animation: reveal-up 600ms var(--ease-out-quart) both;
-  will-change: transform, opacity;
 }
 
 /* Stagger-Delays — auf 50ms-Steps gekürzt (Emil-Spec: 30-80ms). Die

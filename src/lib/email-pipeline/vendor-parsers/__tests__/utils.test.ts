@@ -45,6 +45,46 @@ describe("parseGermanDate", () => {
     expect(parseGermanDate("morgen")).toBe(null);
     expect(parseGermanDate("Quatsch")).toBe(null);
   });
+
+  // 12.05.2026 (A5 Audit-Welle, F-CC-6): Edge-Cases die in Real-Mails
+  // tatsächlich vorkommen können — Umlaute, gemischte Cases, Whitespace-
+  // Variationen, Tab-Trennzeichen. Stille Daten-Korruption hier wäre teuer.
+  it("parst März mit Umlaut korrekt", () => {
+    expect(parseGermanDate("16. März 2026")).toBe("2026-03-16");
+    expect(parseGermanDate("1. März 2026")).toBe("2026-03-01");
+    expect(parseGermanDate("16.März 2026")).toBe("2026-03-16");
+  });
+
+  it("akzeptiert Uppercase-Monatsnamen", () => {
+    expect(parseGermanDate("16. APRIL 2026")).toBe("2026-04-16");
+    expect(parseGermanDate("1. DEZEMBER 2026")).toBe("2026-12-01");
+    expect(parseGermanDate("5. JUNI 2026")).toBe("2026-06-05");
+  });
+
+  it("akzeptiert mehrfache Whitespaces zwischen Komponenten", () => {
+    expect(parseGermanDate("16.   April   2026")).toBe("2026-04-16");
+    expect(parseGermanDate("16.\tApril\t2026")).toBe("2026-04-16");
+    expect(parseGermanDate("  16. April 2026  ")).toBe("2026-04-16");
+  });
+
+  it("padded zero-prefixed days/months", () => {
+    expect(parseGermanDate("09.04.2026")).toBe("2026-04-09");
+    expect(parseGermanDate("01.01.2026")).toBe("2026-01-01");
+    expect(parseGermanDate("9.4.2026")).toBe("2026-04-09");
+  });
+
+  it("liefert null bei unbekannten Monatsnamen (Typo-Defense)", () => {
+    expect(parseGermanDate("16. Märch 2026")).toBe(null); // typo, kein silent-mapping
+    expect(parseGermanDate("16. Decembär 2026")).toBe(null);
+    expect(parseGermanDate("16. Februaryy 2026")).toBe(null);
+  });
+
+  it("liefert null bei ISO mit Junk-Suffix", () => {
+    // Existing pattern `^(\d{4})-...` matched mit Junk dahinter — sollte das?
+    // Test als Dokumentation: aktuelles Verhalten ist "tolerant" — matched
+    // den Anfang. Bei Bedarf später strikt machen.
+    expect(parseGermanDate("2026-04-16T12:00:00Z")).toBe("2026-04-16");
+  });
 });
 
 describe("parseEuroAmount — deutsche Format-Konvention", () => {

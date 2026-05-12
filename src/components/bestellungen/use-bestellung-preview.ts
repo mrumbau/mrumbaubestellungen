@@ -60,13 +60,21 @@ export function useBestellungPreview() {
 
   const handlePreview = useCallback(
     (bestellungId: string, typ: string) => {
-      // Wenn User direkt von einer Afterglow-Row zur nächsten Preview springt,
-      // den Afterglow stoppen damit nur eine Row gleichzeitig markiert ist.
-      clearAfterglow();
+      // A2.1 fix: zwei-stufige Bereinigung gegen Race wenn User schnell
+      // mehrere Previews nacheinander öffnet:
+      // 1. recentlyClosedId SOFORT clearen (state-sync, kein Render-Tick)
+      // 2. Timer-Handle löschen damit auch keine späteren Clear-Callbacks
+      //    den frischen previewId überschreiben.
+      // Resultat: maximal eine Row trägt zu jedem Zeitpunkt ein Highlight.
+      setRecentlyClosedId(null);
+      if (afterglowTimer.current) {
+        clearTimeout(afterglowTimer.current);
+        afterglowTimer.current = null;
+      }
       setPreviewId(bestellungId);
       setPreviewUrl(buildPreviewUrl(bestellungId, typ));
     },
-    [buildPreviewUrl, clearAfterglow],
+    [buildPreviewUrl],
   );
 
   const closePreview = useCallback(() => {

@@ -108,11 +108,44 @@ Jeder Status hat 3-Part-Color + Icon (`status-config.ts`):
 
 ## Motion
 
-- **Easing:** `--ease-out-quart` (`cubic-bezier(0.25, 1, 0.5, 1)`) für Standard-Transitions, `--ease-out-expo` für Hero-Animations. Kein bounce, kein elastic.
-- **Duration:** 150-300ms für Micro-Interactions. Exit shorter than enter.
-- **prefers-reduced-motion:** global respektiert (`@media` in globals.css L488-499).
-- **Realtime-Updates:** via Supabase Realtime + 1.5s Debounce auf Bestellungen-Liste, instant auf Detail-Page.
-- **Optimistic UI:** Freigabe + Bezahlt-Toggle nutzen `useOptimistic` + `startTransition` → 0ms perceived latency, Rollback bei Error.
+**Easing-Tokens (in `:root`, exposiert via `--default-transition-timing-function`):**
+
+| Token | Bezier | Einsatz |
+|---|---|---|
+| `--ease-out-quart` | `cubic-bezier(0.25, 1, 0.5, 1)` | Default für alle Tailwind-Transitions, Popover-Entry, Mount-Reveals |
+| `--ease-out-expo` | `cubic-bezier(0.16, 1, 0.3, 1)` | Hero-Animations, dramatischere Reveals |
+| `--ease-out-circ` | `cubic-bezier(0, 0.55, 0.45, 1)` | Available für Sub-Brand-Variants |
+| `--ease-out-strong` | `cubic-bezier(0.23, 1, 0.32, 1)` | Button-Hover, btn-primary Transitions (Emils Canonical) |
+| `.ease-fluid` (class) | `cubic-bezier(0.32, 0.72, 0, 1)` | Magnetic-Button-Hover, Form-Field-Transitions (iOS-Drawer-Curve) |
+
+**Duration-Skala:**
+- Button-Press-Feedback: 100-160ms
+- Tooltips, kleine Popovers: 125-200ms
+- Dropdowns, Selects: 150-250ms
+- Modals: 220ms (animate-scale-in)
+- Brand-Surface Mount-Reveal: 600ms mit Stagger 50ms × 9 Steps
+
+**Motion-Utility-Klassen:**
+- `.reveal-up` + `.stagger-1..9` — Mount-Animation (translateY + opacity, KEIN filter:blur — Emil-Performance-Regel)
+- `.animate-scale-in` — Modal-Entry (220ms, native dialog)
+- `.animate-popover-in` — origin-aware Popover-Entry (180ms, ActionMenu)
+- `.animate-fade-in` — Page-Transitions (180ms)
+
+**Continuity-Patches (Spatial-Highlight-Familie):**
+- `.row-preview-active` — Persistent während PDF-Modal offen
+- `@keyframes row-afterglow` — 2.2s (preview-close) / 3.5s (detail-back) Fade-out
+- `@keyframes row-page-pulse` — 1.5s 25%-Spike für Pagination-First-Row
+- `@keyframes row-bulk-success` — 1.2s Emerald-Flash für Bulk-Success
+- `@keyframes timeline-item-enter` — 1.6s für neue Timeline-Events
+
+**Hard Rules:**
+- Kein `bounce`, kein `elastic`, kein `ease-in` (zu sluggish bei Hover-Feedback)
+- Animate nur `transform` + `opacity` + bei Bedarf `background-color`/`box-shadow` — keine Layout-Properties (`width`/`height`/`top`/`left`)
+- `prefers-reduced-motion` global respektiert (globals.css `@media reduce`-Block disabled alle Continuity + Mount-Animations)
+
+**State-Sync:**
+- Realtime-Updates: Supabase Realtime + 1.5s Debounce auf Bestellungen-Liste, instant auf Detail-Page
+- Optimistic UI: Freigabe + Bezahlt-Toggle nutzen `useOptimistic` + `startTransition` → 0ms perceived latency, Rollback bei Error
 
 ## Components Inventory
 

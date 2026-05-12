@@ -18,6 +18,7 @@ import {
   type SortState,
   type Density,
 } from "@/components/ui";
+import { Modal } from "@/components/ui/modal";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
 import { IconCheck, IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
@@ -598,22 +599,34 @@ export function KundenClient({
         </div>
       )}
 
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={resetForm}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-line">
-              <div className="flex items-center justify-between">
-                <h2 className="font-headline text-lg text-foreground tracking-tight">{editId ? "Kunde bearbeiten" : "Neuer Kunde"}</h2>
-                <button onClick={resetForm} className="p-1 text-foreground-subtle hover:text-foreground transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
+      {/* Form Modal — A2.3: migriert auf shared <Modal> (native dialog,
+          Focus-Trap, ESC, aria-labelledby, backdrop-click). 12.05.2026. */}
+      <Modal
+        open={showForm}
+        onClose={resetForm}
+        title={editId ? "Kunde bearbeiten" : "Neuer Kunde"}
+        size="lg"
+        dismissible={!saving}
+        footer={
+          <>
+            <button
+              onClick={resetForm}
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? "Speichert..." : editId ? "Änderungen speichern" : "Kunde anlegen"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4 pt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase mb-1.5">Name *</label>
@@ -724,27 +737,13 @@ export function KundenClient({
                 </div>
               </div>
 
-              {error && <p className="text-error text-sm">{error}</p>}
-            </div>
-
-            <div className="p-6 border-t border-line flex justify-end gap-3">
-              <button
-                onClick={resetForm}
-                className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? "Speichert..." : editId ? "Änderungen speichern" : "Kunde anlegen"}
-              </button>
-            </div>
-          </div>
+          {error && (
+            <p className="text-error text-sm" role="alert">
+              {error}
+            </p>
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* Kunden-Grid */}
       {bestaetigt.length === 0 && unbestaetigt.length === 0 ? (

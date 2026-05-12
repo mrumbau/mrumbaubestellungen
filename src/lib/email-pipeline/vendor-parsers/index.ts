@@ -196,12 +196,41 @@ import type { DokumentAnalyse } from "@/lib/openai";
  *   - `typ`: nur überschreiben wenn KI "unbekannt" ist
  *   - `konfidenz`, `volltext`, `parse_fehler`: NIE überschreiben (KI-Hoheit)
  */
+/**
+ * 12.05.2026 (A4 Audit-Welle, F-BE-3): Konfidenz-gewichtetes Override.
+ * Bei den critical-Extraction-Feldern (Bestellnr, Betrag, IBAN, Daten) gewinnt
+ * Vendor-Wert wenn:
+ *   - Vendor-Konfidenz >= 0.85 (sehr hoch — typisch Plancraft, Brillux, Amazon)
+ *   - KI-Konfidenz <= 0.80 (mittelmäßig — typisch bei verrauschten Templates)
+ * Damit überschreibt eine 0.92-Vendor-Bestellnr nicht mehr eine 0.65-KI-
+ * Halluzinierte. Bei Confidence-Tie oder beide-hoch: KI gewinnt (Default).
+ */
+const CRITICAL_OVERRIDE_FIELDS = new Set([
+  "bestellnummer",
+  "gesamtbetrag",
+  "netto",
+  "mwst",
+  "iban",
+  "faelligkeitsdatum",
+  "lieferdatum",
+  "bestelldatum",
+]);
+const VENDOR_OVERRIDE_MIN = 0.85;
+const KI_OVERRIDE_MAX = 0.8;
+
 export function mergeVendorIntoKi(
   ki: DokumentAnalyse,
   vendor: DokumentAnalyse,
 ): DokumentAnalyse {
   const merged: DokumentAnalyse = { ...ki };
   const NEVER_MERGE = new Set(["konfidenz", "volltext", "parse_fehler"]);
+
+  // Konfidenz-Werte lesen (default 0 wenn null) — entscheidet welche Felder
+  // ein Vendor-Override bekommen.
+  const vendorKonfidenz = typeof vendor.konfidenz === "number" ? vendor.konfidenz : 0;
+  const kiKonfidenz = typeof ki.konfidenz === "number" ? ki.konfidenz : 1;
+  const vendorWinsOnCriticalConflict =
+    vendorKonfidenz >= VENDOR_OVERRIDE_MIN && kiKonfidenz <= KI_OVERRIDE_MAX;
 
   for (const [key, vendorVal] of Object.entries(vendor)) {
     if (NEVER_MERGE.has(key)) continue;
@@ -225,8 +254,20 @@ export function mergeVendorIntoKi(
       continue;
     }
 
-    // Skalare: ki null/undefined/leer → übernimm Vendor-Wert
+    // Skalare: ki null/undefined/leer → übernimm Vendor-Wert (Default-Verhalten)
     if (kiVal === null || kiVal === undefined || kiVal === "") {
+      (merged as unknown as Record<string, unknown>)[key] = vendorVal;
+      continue;
+    }
+
+    // 12.05.2026 (F-BE-3): bei Konflikt auf Critical-Field + Vendor sehr
+    // sicher + KI unsicher → Vendor gewinnt. Verhindert KI-Halluzinationen
+    // im Bestellnr/Betrag-Pfad bei klar parsenden Vendoren.
+    if (
+      vendorWinsOnCriticalConflict &&
+      CRITICAL_OVERRIDE_FIELDS.has(key) &&
+      kiVal !== vendorVal
+    ) {
       (merged as unknown as Record<string, unknown>)[key] = vendorVal;
     }
   }

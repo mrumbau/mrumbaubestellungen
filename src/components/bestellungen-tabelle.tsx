@@ -18,12 +18,9 @@ import {
   BulkToolbar,
   Button,
   SavedViewsMenu,
-  EmptyState,
-  useToast,
   type SortState,
 } from "@/components/ui";
 import {
-  IconSearch,
   IconX,
   IconCheck,
   IconTrash,
@@ -57,7 +54,6 @@ export function BestellungenTabelle({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
 
   // 07.05.2026 — Client-side Pagination.
   // Bestellungen kommen vom Server vollständig (oder bis HARD_CAP).
@@ -92,7 +88,7 @@ export function BestellungenTabelle({
     statusFilter, setStatusFilter,
     artFilter, setArtFilter,
     projektFilter, setProjektFilter,
-    faelligkeitsFilter, setFaelligkeitsFilter,
+    faelligkeitsFilter,
     hasFilters,
     reset: resetFilters,
   } = filters;
@@ -116,6 +112,17 @@ export function BestellungenTabelle({
   const returnFlashId = useRowReturnFlash("bestellungen");
   const [pagePulseId, setPagePulseId] = useState<string | null>(null);
   const [bulkSuccessIds, setBulkSuccessIds] = useState<Set<string>>(new Set());
+  // A2.2 cleanup: Bulk-Flash-Timer-Handle für Unmount-Cleanup.
+  const bulkFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (bulkFlashTimerRef.current) {
+        clearTimeout(bulkFlashTimerRef.current);
+        bulkFlashTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   // Table state
   const [density, setDensity] = useTableDensity("bestellungen.density");
@@ -153,9 +160,15 @@ export function BestellungenTabelle({
     onAffectedRows: (ids) => {
       // 12.05.2026 (Continuity-Patch): die gerade freigegebenen IDs für 1.2s
       // grün-aufleuchten lassen bevor der Refresh sie aus der "offen"-Liste
-      // entfernt. Auto-Clear nach Animation-Dauer.
+      // entfernt. Auto-Clear nach Animation-Dauer. Timer-Ref damit Unmount
+      // während Animation den setBulkSuccessIds-Callback auf totem
+      // Component nicht ausführt (A2.2 cleanup, F-COMP-3 analog).
+      if (bulkFlashTimerRef.current) clearTimeout(bulkFlashTimerRef.current);
       setBulkSuccessIds(new Set(ids));
-      setTimeout(() => setBulkSuccessIds(new Set()), 1300);
+      bulkFlashTimerRef.current = setTimeout(() => {
+        setBulkSuccessIds(new Set());
+        bulkFlashTimerRef.current = null;
+      }, 1300);
     },
   });
   const {
