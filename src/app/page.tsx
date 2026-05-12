@@ -38,7 +38,7 @@ export default async function Home() {
       {/* ─── Modul 01: Bestellwesen ──────────────────────────────────────── */}
       <Link
         href={bestellwesenHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh transition-transform duration-300 ease-fluid hover:scale-[1.005] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-mr-gradient overflow-hidden min-h-[50dvh] lg:min-h-dvh focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
       >
         {/* Layered industrial patterns (unverändert — Brand-Vocabulary bewahren) */}
         <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-fluid" />
@@ -87,10 +87,12 @@ export default async function Home() {
           <Logo size={44} className="text-foreground-inverse" />
         </div>
 
-        {/* Floating Doppelrand-Content-Plakette */}
-        <div className="relative z-10 max-w-md reveal-up stagger-2">
-          <div className="bezel-shell-dark inline-block backdrop-blur-2xl">
-            <div className="bezel-core-dark p-7 md:p-8 max-w-md">
+        {/* Floating Doppelrand-Content-Plakette — zentriert für harmonische
+            Proportion (12.05.2026, User-Feedback). max-w-lg statt md damit
+            Card mehr Präsenz im weiten Panel hat. */}
+        <div className="relative z-10 w-full max-w-lg mx-auto reveal-up stagger-2">
+          <div className="bezel-shell-dark">
+            <div className="bezel-core-dark p-8 md:p-10">
               {/* Eyebrow */}
               <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1">
                 <span className="block w-1.5 h-1.5 rounded-full bg-white/60" aria-hidden="true" />
@@ -130,9 +132,10 @@ export default async function Home() {
           </div>
         </div>
 
-        {/* CTA-Pille mit button-in-button trailing arrow */}
-        <div className="relative z-10 reveal-up stagger-6">
-          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-white/10 backdrop-blur-2xl pl-5 pr-2 py-2 transition-[background-color,border-color] duration-200 ease-fluid group-hover:bg-white/[0.12] group-hover:border-white/20">
+        {/* CTA-Pille — zentriert unter der Card für klaren Stack-Composition.
+            backdrop-blur-2xl entfernt (User-Feedback Performance). */}
+        <div className="relative z-10 flex justify-center reveal-up stagger-6">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-white/10 pl-5 pr-2 py-2 transition-[background-color,border-color] duration-200 ease-fluid group-hover:bg-white/[0.12] group-hover:border-white/20">
             <span className="text-foreground-inverse text-[14px] font-medium tracking-tight">
               Modul betreten
             </span>
@@ -157,7 +160,7 @@ export default async function Home() {
       {/* ─── Modul 02: CardScan ─────────────────────────────────────── */}
       <Link
         href={cardscanHref}
-        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh transition-transform duration-300 ease-fluid hover:scale-[1.005] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cs-accent/40"
+        className="group relative flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 bg-sidebar overflow-hidden min-h-[50dvh] lg:min-h-dvh focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cs-accent/40"
       >
         {/* Hover overlay + dot grid (CardScan Sub-Brand bleibt unangetastet) */}
         <div className="absolute inset-0 bg-cs-accent/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-fluid" />
@@ -201,10 +204,10 @@ export default async function Home() {
           <span className="text-[10px] text-white/25 tracking-[0.2em] uppercase font-mono-amount">Scan</span>
         </div>
 
-        {/* Floating Doppelrand-Content-Plakette */}
-        <div className="relative z-10 max-w-md reveal-up stagger-3">
-          <div className="bezel-shell-dark inline-block backdrop-blur-2xl">
-            <div className="bezel-core-dark p-7 md:p-8 max-w-md">
+        {/* Floating Doppelrand-Content-Plakette — zentriert, max-w-lg (siehe Modul 01) */}
+        <div className="relative z-10 w-full max-w-lg mx-auto reveal-up stagger-3">
+          <div className="bezel-shell-dark">
+            <div className="bezel-core-dark p-8 md:p-10">
               <span className="inline-flex items-center gap-2 rounded-full border border-cs-accent/30 bg-cs-accent/[0.06] px-3 py-1">
                 <span className="block w-1.5 h-1.5 rounded-full bg-cs-accent" aria-hidden="true" />
                 <span className="text-[10px] text-cs-accent-light/75 tracking-[0.2em] uppercase font-mono-amount">
@@ -243,9 +246,9 @@ export default async function Home() {
           </div>
         </div>
 
-        {/* CTA-Pille */}
-        <div className="relative z-10 reveal-up stagger-7">
-          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-cs-accent/15 backdrop-blur-2xl pl-5 pr-2 py-2 transition-[background-color,border-color] duration-200 ease-fluid group-hover:bg-cs-accent/[0.12] group-hover:border-cs-accent/30">
+        {/* CTA-Pille — zentriert, ohne backdrop-blur */}
+        <div className="relative z-10 flex justify-center reveal-up stagger-7">
+          <div className="inline-flex items-center gap-3 rounded-full bg-white/[0.06] border border-cs-accent/15 pl-5 pr-2 py-2 transition-[background-color,border-color] duration-200 ease-fluid group-hover:bg-cs-accent/[0.12] group-hover:border-cs-accent/30">
             <span className="text-foreground-inverse text-[14px] font-medium tracking-tight">
               Modul betreten
             </span>
