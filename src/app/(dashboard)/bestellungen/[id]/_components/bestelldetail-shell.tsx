@@ -11,7 +11,6 @@ import { SidebarMetadata } from "./sidebar-metadata";
 import { KiVorschlagBanner } from "./ki-vorschlag-banner";
 import { AiToolsPanel } from "./ai-tools-panel";
 import { Timeline } from "./timeline";
-import { AuditTrailPanel } from "./audit-trail-panel";
 import { CommentsThread } from "./comments-thread";
 import { ApprovalPanel } from "./approval-panel";
 import type {
@@ -171,13 +170,6 @@ export function BestelldetailShell({
             onToggleWidget={toggleWidget}
           />
 
-          <AuditTrailPanel
-            events={events ?? []}
-            widgetId="audit-trail"
-            openWidgetId={openWidgetId}
-            onToggleWidget={toggleWidget}
-          />
-
           <AiToolsPanel
             abgleich={abgleich}
             bestellung={bestellung}
@@ -269,12 +261,6 @@ export function BestelldetailShell({
               kommentare={kommentare}
               events={events}
               widgetId="m-timeline"
-              openWidgetId={openWidgetId}
-              onToggleWidget={toggleWidget}
-            />
-            <AuditTrailPanel
-              events={events ?? []}
-              widgetId="m-audit-trail"
               openWidgetId={openWidgetId}
               onToggleWidget={toggleWidget}
             />

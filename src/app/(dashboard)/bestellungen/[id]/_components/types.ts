@@ -140,10 +140,8 @@ export type KatResult = {
  */
 export type WidgetId =
   | "timeline"
-  | "audit-trail"
   | "kommentare"
   | "ki-tools"
   | "m-timeline"
-  | "m-audit-trail"
   | "m-kommentare"
   | "m-ki-tools";

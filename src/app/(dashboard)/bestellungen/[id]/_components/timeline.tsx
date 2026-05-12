@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CollapsibleWidget } from "./collapsible-widget";
 import { timelineColor } from "@/lib/timeline-config";
 import type { Abgleich, AuditEvent, Dokument, Freigabe, Kommentar, WidgetId } from "./types";
@@ -13,10 +13,42 @@ import type { Abgleich, AuditEvent, Dokument, Freigabe, Kommentar, WidgetId } fr
  * fällt der Build auf abgeleitete Items aus dokumente/abgleich/freigabe/kommentare
  * zurück (backward-kompatibel).
  *
+ * 12.05.2026 — vorheriger doppelter „Audit-Trail"-Block (AuditTrailPanel) wurde
+ * gelöscht und seine Kategorie-Filter sind jetzt direkt hier integriert. Status /
+ * Dokumente / Kommentare / System filterbar via Pills oben.
+ *
  * `widgetId` prop lets the caller decide whether the widget belongs to the
  * desktop-sidebar accordion group or the mobile-details accordion group, so
  * opening one does not collapse the other.
  */
+
+type TimelineItemTyp = "dok" | "abgleich" | "freigabe" | "kommentar" | "status" | "info";
+
+interface TimelineItem {
+  zeit: string;
+  label: string;
+  typ: TimelineItemTyp;
+  farbe: string;
+}
+
+type Category = "alle" | "status" | "doku" | "kommentar" | "system";
+
+const CATEGORY_LABEL: Record<Category, string> = {
+  alle: "Alle",
+  status: "Status & Freigabe",
+  doku: "Dokumente",
+  kommentar: "Kommentare",
+  system: "System",
+};
+
+function categoryOf(typ: TimelineItemTyp): Exclude<Category, "alle"> {
+  // status_changed / freigabe / abgleich-Ergebnisse zählen alle als „Status & Freigabe"
+  if (typ === "status" || typ === "freigabe" || typ === "abgleich") return "status";
+  if (typ === "dok") return "doku";
+  if (typ === "kommentar") return "kommentar";
+  return "system"; // info = created / bezahlt / archiviert / mahnung / projekt_bestaetigt / bestellungsart_geaendert
+}
+
 export function Timeline({
   dokumente,
   abgleich,
@@ -36,7 +68,7 @@ export function Timeline({
   openWidgetId: string | null;
   onToggleWidget: (id: string) => void;
 }) {
-  const items = useMemo(() => {
+  const items = useMemo<TimelineItem[]>(() => {
     // Events-Tabelle ist die reichhaltigere Quelle (status_changed, bezahlt,
     // mahnung, archiviert + alle alten Events). Fallback auf derived nur wenn
     // events leer (z.B. RLS-Filter blockt).
@@ -45,6 +77,25 @@ export function Timeline({
     }
     return buildTimeline(dokumente, abgleich, freigabe, kommentare);
   }, [events, dokumente, abgleich, freigabe, kommentare]);
+
+  const [filter, setFilter] = useState<Category>("alle");
+
+  const filtered = useMemo(() => {
+    if (filter === "alle") return items;
+    return items.filter((t) => categoryOf(t.typ) === filter);
+  }, [items, filter]);
+
+  // Count pro Kategorie (für Filter-Pill-Badges)
+  const counts: Record<Category, number> = {
+    alle: items.length,
+    status: 0,
+    doku: 0,
+    kommentar: 0,
+    system: 0,
+  };
+  for (const t of items) {
+    counts[categoryOf(t.typ)] += 1;
+  }
 
   if (items.length === 0) return null;
 
@@ -71,29 +122,74 @@ export function Timeline({
       openWidgetId={openWidgetId}
       onToggleWidget={onToggleWidget}
     >
-      <div className="relative">
-        <div
-          aria-hidden="true"
-          className="absolute left-[7px] top-2 bottom-2 w-px bg-line"
-        />
-        <ol className="space-y-3">
-          {items.map((t, i) => (
-            <li key={i} className="flex items-start gap-3 relative">
+      {/* Filter-Pills (12.05.2026 — aus ehemaligem AuditTrailPanel migriert) */}
+      <div
+        className="flex flex-wrap gap-1.5 mb-3"
+        role="tablist"
+        aria-label="Aktivitätsverlauf-Filter"
+      >
+        {(Object.keys(CATEGORY_LABEL) as Category[]).map((cat) => {
+          const active = filter === cat;
+          const n = counts[cat];
+          const disabled = cat !== "alle" && n === 0;
+          return (
+            <button
+              key={cat}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              disabled={disabled}
+              onClick={() => setFilter(cat)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                active
+                  ? "bg-brand text-white"
+                  : disabled
+                    ? "text-foreground-faint cursor-not-allowed"
+                    : "bg-canvas text-foreground-muted hover:bg-line hover:text-foreground"
+              }`}
+            >
+              {CATEGORY_LABEL[cat]}
               <span
-                aria-hidden="true"
-                className="w-[15px] h-[15px] rounded-full border-2 border-surface shrink-0 z-10"
-                style={{ background: t.farbe }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] text-foreground leading-relaxed">{t.label}</p>
-                <p className="text-[10px] text-foreground-subtle font-mono-amount">
-                  {new Date(t.zeit).toLocaleString("de-DE")}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
+                className={`tabular-nums ${
+                  active ? "text-white/80" : "text-foreground-faint"
+                }`}
+              >
+                {n}
+              </span>
+            </button>
+          );
+        })}
       </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-[12px] text-foreground-subtle py-4 text-center">
+          Keine Einträge in dieser Kategorie.
+        </p>
+      ) : (
+        <div className="relative">
+          <div
+            aria-hidden="true"
+            className="absolute left-[7px] top-2 bottom-2 w-px bg-line"
+          />
+          <ol className="space-y-3">
+            {filtered.map((t, i) => (
+              <li key={i} className="flex items-start gap-3 relative">
+                <span
+                  aria-hidden="true"
+                  className="w-[15px] h-[15px] rounded-full border-2 border-surface shrink-0 z-10"
+                  style={{ background: t.farbe }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] text-foreground leading-relaxed">{t.label}</p>
+                  <p className="text-[10px] text-foreground-subtle font-mono-amount">
+                    {new Date(t.zeit).toLocaleString("de-DE")}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </CollapsibleWidget>
   );
 }
@@ -103,12 +199,7 @@ function buildTimeline(
   abgleich: Abgleich | null,
   freigabe: Freigabe | null,
   kommentare: Kommentar[],
-): {
-  zeit: string;
-  label: string;
-  typ: "dok" | "abgleich" | "freigabe" | "kommentar";
-  farbe: string;
-}[] {
+): TimelineItem[] {
   const typLabels: Record<string, string> = {
     bestellbestaetigung: "Bestellbestätigung",
     lieferschein: "Lieferschein",
@@ -118,12 +209,7 @@ function buildTimeline(
     versandbestaetigung: "Versandbestätigung",
   };
 
-  const items: {
-    zeit: string;
-    label: string;
-    typ: "dok" | "abgleich" | "freigabe" | "kommentar";
-    farbe: string;
-  }[] = [];
+  const items: TimelineItem[] = [];
 
   for (const d of dokumente) {
     items.push({
@@ -168,12 +254,7 @@ function buildTimeline(
  * Reichhaltiger als der derived buildTimeline: enthält status_changed,
  * bezahlt_markiert, mahnung_versendet, archiviert, projekt_bestaetigt etc.
  */
-function buildTimelineFromEvents(events: AuditEvent[]): {
-  zeit: string;
-  label: string;
-  typ: "dok" | "abgleich" | "freigabe" | "kommentar" | "status" | "info";
-  farbe: string;
-}[] {
+function buildTimelineFromEvents(events: AuditEvent[]): TimelineItem[] {
   const typLabels: Record<string, string> = {
     bestellbestaetigung: "Bestellbestätigung",
     lieferschein: "Lieferschein",
@@ -192,12 +273,7 @@ function buildTimelineFromEvents(events: AuditEvent[]): {
   };
 
   return events
-    .map<{
-      zeit: string;
-      label: string;
-      typ: "dok" | "abgleich" | "freigabe" | "kommentar" | "status" | "info";
-      farbe: string;
-    } | null>((e) => {
+    .map<TimelineItem | null>((e) => {
       // payload ist DB-Json (string | number | bool | obj | array). Per
       // Convention sind unsere Event-Payloads immer Objekte → cast für
       // bequeme Property-Lookup. Pro Event-Type sind die erwarteten Felder
