@@ -63,12 +63,33 @@ export function useBestellungenActions({
         return;
       }
       const data = await res.json().catch(() => null);
+
+      // 12.05.2026 (Freigabe-Bug-Härtung):
+      // - 409 "bereits freigegeben" ist KEIN Fehler — passiert wenn ein
+      //   anderer User (oder Tab) gerade freigegeben hat. Silent-Refresh
+      //   damit der UI-State frisch ist + info-Toast statt error-Toast.
+      // - 403 "Keine Berechtigung" mit klarerer Erklärung.
+      // - Sonstige Fehler bekommen den Server-Error-Text mit eingeblendet.
+      if (res.status === 409) {
+        router.refresh();
+        toast.info("Bereits freigegeben", {
+          description: "Diese Bestellung wurde inzwischen von einem anderen Tab oder User freigegeben.",
+        });
+        return;
+      }
+      if (res.status === 403) {
+        toast.error("Keine Berechtigung", {
+          description:
+            "Du kannst nur deine eigenen Material-Bestellungen freigeben (Subunternehmer + Abo dürfen alle).",
+        });
+        return;
+      }
       toast.error("Freigabe fehlgeschlagen", {
-        description: data?.error ?? "Bitte erneut versuchen.",
+        description: data?.error ?? `Server antwortete mit Status ${res.status}.`,
       });
     } catch {
       toast.error("Netzwerkfehler", {
-        description: "Freigabe konnte nicht gesendet werden.",
+        description: "Freigabe konnte nicht gesendet werden. Bitte Verbindung prüfen.",
       });
     } finally {
       setFreigabeLoadingId(null);
@@ -155,9 +176,30 @@ export function useBestellungenActions({
         router.refresh();
       }
 
-      if (errorsN > 0 || noRechnungN > 0 || noPermissionN > 0) {
+      // 12.05.2026 (Freigabe-Bug-Härtung): differenzierte Toast-Meldungen
+      // statt pauschal "teilweise erfolgreich". Wenn 0 freigegeben +
+      // alle als "bereits freigegeben" zurückkommen → kein Fehler-Gefühl
+      // sondern info-Toast (Race mit anderem Tab/User).
+      const problemsN = errorsN + noRechnungN + noPermissionN;
+      if (freigegebenN > 0 && problemsN > 0) {
         toast.warning("Bulk-Freigabe teilweise erfolgreich", {
           description: parts.join(" · "),
+        });
+      } else if (freigegebenN === 0 && alreadyN > 0 && problemsN === 0) {
+        toast.info("Bereits freigegeben", {
+          description: `Alle ${alreadyN} Bestellungen waren schon freigegeben (vermutlich von einem anderen Tab oder User).`,
+        });
+      } else if (freigegebenN === 0 && noPermissionN > 0) {
+        toast.error("Keine Berechtigung", {
+          description: `${noPermissionN} ${noPermissionN === 1 ? "Bestellung gehört" : "Bestellungen gehören"} einem anderen Besteller. Nur eigene Material-Bestellungen freigebbar (SU + Abo: alle).`,
+        });
+      } else if (freigegebenN === 0 && noRechnungN > 0) {
+        toast.error("Rechnung fehlt", {
+          description: `${noRechnungN} ${noRechnungN === 1 ? "Bestellung hat" : "Bestellungen haben"} noch keine Rechnung. Erst Rechnung-PDF zuordnen, dann freigeben.`,
+        });
+      } else if (freigegebenN === 0 && errorsN > 0) {
+        toast.error("Server-Fehler bei Freigabe", {
+          description: `${errorsN} Bestellung${errorsN === 1 ? "" : "en"} konnte${errorsN === 1 ? "" : "n"} nicht freigegeben werden. Logs prüfen.`,
         });
       } else if (freigegebenN > 0) {
         toast.success(parts.join(" · "));
