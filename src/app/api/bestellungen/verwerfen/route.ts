@@ -52,19 +52,32 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Besteller dürfen nur eigene Bestellungen verwerfen
+    // Besteller dürfen verwerfen:
+    //   - eigene Material-Bestellungen (besteller_kuerzel === profil.kuerzel)
+    //   - SU- und Abo-Bestellungen (besteller_kuerzel meist "UNBEKANNT",
+    //     gleiche Bypass-Regel wie bei Freigeben — jeder Besteller berechtigt)
+    // 12.05.2026: vorher waren nur eigene Material erlaubt → SU/Abo nicht
+    // verwerfbar als Besteller. Analog zu Freigabe-Bypass angeglichen.
     if (profil!.rolle === "besteller") {
-      const { data: eigene } = await supabase
+      const { data: rows } = await supabase
         .from("bestellungen")
-        .select("id")
-        .in("id", ids)
-        .eq("besteller_kuerzel", profil!.kuerzel);
-      const eigeneIds = new Set((eigene || []).map((b) => b.id));
-      const fremde = ids.filter((id) => !eigeneIds.has(id));
+        .select("id, besteller_kuerzel, bestellungsart")
+        .in("id", ids);
+      const erlaubteIds = new Set(
+        (rows ?? [])
+          .filter(
+            (r) =>
+              r.besteller_kuerzel === profil!.kuerzel ||
+              r.bestellungsart === "subunternehmer" ||
+              r.bestellungsart === "abo",
+          )
+          .map((r) => r.id),
+      );
+      const fremde = ids.filter((id) => !erlaubteIds.has(id));
       if (fremde.length > 0) {
         return NextResponse.json(
-          { error: "Keine Berechtigung für fremde Bestellungen" },
-          { status: 403 }
+          { error: "Keine Berechtigung für fremde Material-Bestellungen" },
+          { status: 403 },
         );
       }
     }
@@ -106,10 +119,14 @@ export async function POST(request: NextRequest) {
       await supabase.from("dokumente").delete().eq("bestellung_id", id);
     }
 
-    // Defense-in-depth: Besteller-Filter auch im DELETE (zusätzlich zum Check oben)
+    // Defense-in-depth: Besteller-Filter auch im DELETE.
+    // 12.05.2026: SU/Abo-Bypass eingebaut (analog Permission-Check oben).
     let deleteQuery = supabase.from("bestellungen").delete().in("id", ids);
     if (profil!.rolle === "besteller") {
-      deleteQuery = deleteQuery.eq("besteller_kuerzel", profil!.kuerzel);
+      // Or-Filter: entweder eigene Material ODER SU/Abo (jeder Besteller darf das)
+      deleteQuery = deleteQuery.or(
+        `besteller_kuerzel.eq.${profil!.kuerzel},bestellungsart.in.(subunternehmer,abo)`,
+      );
     }
     const { error: delError } = await deleteQuery;
     if (delError) {

@@ -18,7 +18,9 @@ import type { BenutzerProfil } from "@/lib/auth";
  *
  * Role-gating:
  *   - Freigabe: only visible when `kannFreigeben` is true (besteller, admin, or SU/Abo)
- *   - Verwerfen: admin-only
+ *   - Verwerfen: admin + Besteller für eigene Material UND SU/Abo (analog Freigabe).
+ *     Vorher admin-only — 12.05.2026 für Besteller geöffnet damit sie Spam +
+ *     irrtümlich angelegte Einträge selbst aufräumen können.
  *   - Mahnung-quittieren: visible to everyone who sees the order with an open Mahnung
  */
 export function ApprovalPanel({
@@ -133,8 +135,14 @@ export function ApprovalPanel({
         </button>
       )}
 
-      {/* Bestellung verwerfen — admin only */}
-      {profil.rolle === "admin" && (
+      {/* Bestellung verwerfen — admin + Besteller (eigene Material + SU/Abo).
+          Permission-Logik spiegelt API: jeder Besteller darf SU/Abo verwerfen
+          (analog Freigabe), Material nur die eigene. */}
+      {(profil.rolle === "admin" ||
+        (profil.rolle === "besteller" &&
+          (bestellung.besteller_kuerzel === profil.kuerzel ||
+            bestellung.bestellungsart === "subunternehmer" ||
+            bestellung.bestellungsart === "abo"))) && (
         <button
           type="button"
           onClick={onOpenVerwerfenDialog}
