@@ -589,7 +589,16 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     const betragPatterns: RegExp[] = [
       // "Bestellwert 547,95 €" / "Gesamtsumme: 1.234,56 EUR" / "Total: 199,00€"
       // "Gesamtkosten Brutto: 64,95 €" — DeubaXXL-Pattern + andere deutsche Shops
-      /(?:bestellwert|gesamtsumme|gesamtbetrag|gesamtkosten(?:[\s.]*brutto)?|total|rechnungsbetrag|endbetrag)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})\s*(?:€|eur|euro)/i,
+      // 15.05.2026 — Erweitert um Standard-Vokabular deutscher Shops:
+      //   • Zahlbetrag (Bernstein)
+      //   • Zu zahlen / Zu zahlender Betrag (PayPal-Style, viele Shops)
+      //   • Endsumme / Brutto-Endsumme
+      //   • Insgesamt (PayPal-Confirms, Amazon)
+      //   • Bestellbetrag / Auftragssumme
+      //   • Rechnungssumme (Wortvariante zu rechnungsbetrag)
+      // Reihenfolge: spezifische Brutto-Schlagwörter VOR generischem `summe`/`betrag`,
+      // damit "Warenwert"/"Zwischensumme" nicht fälschlich greifen.
+      /(?:zahlbetrag|zu[\s.-]*zahlen(?:der[\s.-]*betrag)?|brutto[\s.-]*endsumme|endsumme|insgesamt|bestellwert|gesamtsumme|gesamtbetrag|gesamtkosten(?:[\s.]*brutto)?|total|rechnungsbetrag|rechnungssumme|endbetrag|bestellbetrag|auftragssumme)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})\s*(?:€|eur|euro)/i,
       // "547,95 EUR" als Anker mit Schlüsselwort davor
       /(?:summe|betrag|brutto)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})/i,
     ];
@@ -601,6 +610,38 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         if (Number.isFinite(num) && num > 0 && num < 1_000_000) {
           bodyExtractedBetrag = num;
           logInfo("webhook/email", `Betrag-Body-Fallback gegriffen: ${num}€ aus "${m[0]}"`, {
+            email_betreff,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // 15.05.2026 — Kundennummer-Body-Fallback. Analog zu bodyExtractedBetrag:
+  // wenn keine KI-Analyse einen kundennummer-Wert geliefert hat, im Body nach
+  // Standard-Patterns suchen. Greift bei body-only Mails wo KI typ='unbekannt'
+  // oder Felder nicht extrahiert hat (z.B. Bernstein "Deine Kundennummer: 1380585").
+  let bodyExtractedKundennummer: string | null = null;
+  if (!analyseErgebnisse.find((e) => e.analyse.kundennummer)?.analyse.kundennummer) {
+    const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
+    const kundennrPatterns: RegExp[] = [
+      // "Kundennummer: 1380585" / "Kunden-Nr.: 12345" / "Kunden-ID: ABC-12345"
+      // "Customer ID: 98765" / "Customer No.: 12345"
+      // Format: 4-15 Zeichen alphanumerisch + Bindestriche, beginnend mit Ziffer
+      // oder Buchstabe (vermeidet false-positive auf "Kundennummer ist wichtig")
+      /(?:kunden(?:[-\s.])?(?:nummer|nr|id)|customer\s*(?:id|no|number|nr))[\s.:#-]*([A-Z0-9][A-Z0-9-]{3,14})\b/i,
+    ];
+    for (const re of kundennrPatterns) {
+      const m = body.match(re);
+      if (m && m[1]) {
+        const value = m[1].toUpperCase();
+        // Sanity: nicht reine Buchstaben (= eher kein Kundenidentifier)
+        // und nicht zu wenig Ziffern (>= 3 Ziffern für minimale Plausibilität)
+        const digitCount = (value.match(/\d/g) || []).length;
+        if (digitCount >= 3) {
+          bodyExtractedKundennummer = value;
+          logInfo("webhook/email", `Kundennummer-Body-Fallback gegriffen: "${value}" aus "${m[0]}"`, {
             email_betreff,
           });
           break;
@@ -1306,6 +1347,23 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         }
       }
 
+      // 15.05.2026 — Regex-Fallback `bodyExtractedBetrag` (Z. 586) ins KI-Result
+      // mergen. Vorher landete der Wert NUR in dokumente.gesamtbetrag (Z. 1346
+      // via `?? bodyExtractedBetrag`), aber NICHT in bestellungen.betrag, weil
+      // applyAnalyseToBestellung (Z. 1358) und ergaenzeFelder (Z. 1367/1385)
+      // nur bodyAnalyseLokal.gesamtbetrag lesen. Resultat: UI-Header zeigte "—"
+      // obwohl die Doku-Detailseite den Wert hatte (z.B. body-only Bernstein
+      // mit "Rechnungsbetrag: 89,45 €" → KI extrahierte gesamtbetrag nicht,
+      // Regex schon, Wert versickerte zwischen Doku und Bestellung).
+      if (bodyAnalyseLokal.gesamtbetrag == null && bodyExtractedBetrag != null) {
+        bodyAnalyseLokal.gesamtbetrag = bodyExtractedBetrag;
+      }
+      // Analog für Kundennummer (Bernstein: "Deine Kundennummer: 1380585" wird
+      // von der KI bei body-only HTML oft nicht extrahiert).
+      if (!bodyAnalyseLokal.kundennummer && bodyExtractedKundennummer) {
+        bodyAnalyseLokal.kundennummer = bodyExtractedKundennummer;
+      }
+
       // Outer-Variable für Fallback-Pfad zuweisen — auch bei typ=unbekannt,
       // weil die KI-Werte (Bestellnr, Betrag, Daten) im Fallback genutzt werden.
       bodyAnalyse = bodyAnalyseLokal;
@@ -1403,6 +1461,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       // Fallback sie ins neue Doku schreibt statt hardcoded NULLs. Vorher gingen
       // diese Werte verloren wenn die KI typ='unbekannt' lieferte.
       bodyAnalyse,
+      // 15.05.2026 — Regex-Werte auch hier durchreichen, falls Body-Block nicht
+      // lief (Cutoff bei 45s oder Body <100 chars) → bodyAnalyse=null aber
+      // bodyExtractedBetrag/Kundennummer können trotzdem gesetzt sein (regex
+      // läuft an Z. 586/Z. 612 unabhängig vom KI-Call).
+      bodyExtractedBetrag,
+      bodyExtractedKundennummer,
       haendlerName,
       absenderDomain,
     });
@@ -2073,6 +2137,19 @@ interface FallbackInput {
    * liefert aber Bestellnummer/Betrag erkannt hat.
    */
   bodyAnalyse?: DokumentAnalyse | null;
+  /**
+   * 15.05.2026 — Regex-Fallback aus Z. 586 (matcht "Rechnungsbetrag/Gesamtsumme/
+   * Endbetrag … X,XX €"). Greift wenn KI gesamtbetrag nicht extrahiert hat,
+   * z.B. bei body-only HTML-Tabellen-Mails ohne Vendor-Parser. Wird als
+   * letzte Stufe genutzt wenn auch bodyAnalyse null ist (Body-Block geskippt).
+   */
+  bodyExtractedBetrag?: number | null;
+  /**
+   * 15.05.2026 — Regex-Fallback aus Z. 612 (matcht "Kundennummer/Kunden-Nr/
+   * Customer ID: X"). Analog bodyExtractedBetrag — letzte Stufe wenn KI
+   * bodyAnalyse=null oder kundennummer-Feld nicht extrahiert hat.
+   */
+  bodyExtractedKundennummer?: string | null;
   haendlerName?: string | null;
   absenderDomain?: string | null;
 }
@@ -2091,7 +2168,8 @@ async function tryFallbackKeywordTyp(
   const {
     emailText, email_betreff, email_absender, email_datum,
     anhaenge_count, bestellungNeuErstellt,
-    bodyAnalyse, haendlerName, absenderDomain,
+    bodyAnalyse, bodyExtractedBetrag, bodyExtractedKundennummer,
+    haendlerName, absenderDomain,
   } = input;
 
   if (emailText && emailText.length > 20) {
@@ -2171,10 +2249,15 @@ async function tryFallbackKeywordTyp(
     // hardcoded NULLs. Selbst wenn die KI typ='unbekannt' lieferte (deshalb
     // sind wir im Fallback gelandet), hat sie oft trotzdem Bestellnr/Betrag/
     // Daten extrahiert — die wären sonst verloren gegangen.
+    // 15.05.2026 — Wenn weder KI noch ki.gesamtbetrag/kundennummer, aber Regex
+    // hat einen Wert erkannt (z.B. "Rechnungsbetrag: 89,45 €" oder
+    // "Kundennummer: 1380585"), nutzen wir den.
     const ki = bodyAnalyse ?? null;
+    const effektiverGesamtbetrag = ki?.gesamtbetrag ?? bodyExtractedBetrag ?? null;
+    const effektiveKundennummer = ki?.kundennummer || bodyExtractedKundennummer || null;
     const fallbackKiRoh: Record<string, unknown> = ki
       ? { ...(ki as unknown as Record<string, unknown>), fallback_typ: fallbackTyp, quelle: "email_body" }
-      : { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000) };
+      : { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000), gesamtbetrag: effektiverGesamtbetrag, kundennummer: effektiveKundennummer };
 
     // 06.05.2026 — Fallback-Insert via persist_dokument_atomic-RPC für
     // Re-Backfill-Idempotenz. content_hash = sha256(email_text) verhindert
@@ -2194,13 +2277,13 @@ async function tryFallbackKeywordTyp(
       p_auftragsnummer: ki?.auftragsnummer || null,
       p_lieferscheinnummer: ki?.lieferscheinnummer || null,
       p_artikel: (ki?.artikel ?? null) as unknown as Record<string, unknown>,
-      p_gesamtbetrag: ki?.gesamtbetrag ?? null,
+      p_gesamtbetrag: effektiverGesamtbetrag,
       p_netto: ki?.netto ?? null,
       p_mwst: ki?.mwst ?? null,
       p_faelligkeitsdatum: ki?.faelligkeitsdatum ?? null,
       p_lieferdatum: ki?.lieferdatum ?? null,
       p_iban: ki?.iban ?? null,
-      p_kundennummer: ki?.kundennummer || null,
+      p_kundennummer: effektiveKundennummer,
       p_besteller_im_dokument: ki?.besteller_im_dokument || null,
       p_projekt_referenz: ki?.projekt_referenz || null,
       p_bestelldatum: ki?.bestelldatum || null,
@@ -2209,6 +2292,20 @@ async function tryFallbackKeywordTyp(
     // bestellungen-Update: Flag setzen + KI-Werte (Betrag, Daten, BN) ergänzen
     // via applyAnalyseToBestellung damit Bestellnummer/betrag/faelligkeit/
     // bestelldatum/kundennummer in der UI sichtbar werden.
+    // 15.05.2026 — Wenn ki null aber Regex-Betrag erkannt: betrag fill-if-empty
+    // direkt setzen (applyAnalyseToBestellung wird nicht aufgerufen weil ki=null,
+    // sonst bliebe bestellungen.betrag NULL trotz Regex-Treffer). Existing-Check
+    // verhindert Überschreiben eines bereits gesetzten PDF-/Anhang-Betrags.
+    if (ki == null && (effektiverGesamtbetrag != null || effektiveKundennummer)) {
+      const { data: existingRow } = await supabase
+        .from("bestellungen").select("betrag, kundennummer").eq("id", bestellungId).maybeSingle();
+      if (effektiverGesamtbetrag != null && !existingRow?.betrag) {
+        bestellungUpdate.betrag = effektiverGesamtbetrag;
+      }
+      if (effektiveKundennummer && !existingRow?.kundennummer) {
+        bestellungUpdate.kundennummer = effektiveKundennummer;
+      }
+    }
     await supabase.from("bestellungen").update(bestellungUpdate).eq("id", bestellungId);
     if (ki) {
       await applyAnalyseToBestellung(supabase, bestellungId, ki, {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { IconActivity, IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
-import type { PipelineQualityRow } from "./page";
+import type { PipelineQualityRow, IncompleteBestellung } from "./page";
 
 function formatPct(n: number | null): string {
   if (n == null) return "—";
@@ -28,7 +29,26 @@ function formatDate(iso: string): string {
   return new Date(iso + "T00:00:00").toLocaleDateString("de-DE", { day: "2-digit", month: "short" });
 }
 
-export function PipelineQualityClient({ rows }: { rows: PipelineQualityRow[] }) {
+function formatRelative(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diffMin = Math.round((now - then) / 60000);
+  if (diffMin < 1) return "gerade eben";
+  if (diffMin < 60) return `vor ${diffMin} Min.`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `vor ${diffH} Std.`;
+  const diffD = Math.round(diffH / 24);
+  if (diffD < 14) return `vor ${diffD} Tag${diffD === 1 ? "" : "en"}`;
+  return new Date(iso).toLocaleDateString("de-DE", { day: "2-digit", month: "short" });
+}
+
+export function PipelineQualityClient({
+  rows,
+  incomplete,
+}: {
+  rows: PipelineQualityRow[];
+  incomplete: IncompleteBestellung[];
+}) {
   const aggregates = useMemo(() => {
     const last7 = rows.slice(0, 7);
     const sum7 = last7.reduce(
@@ -134,6 +154,44 @@ export function PipelineQualityClient({ rows }: { rows: PipelineQualityRow[] }) 
                     <div className="flex-1 min-w-0">
                       <div className="text-[12px] text-foreground-subtle">{formatDate(a.date)}</div>
                       <div className="text-[14px] text-foreground">{a.reason}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
+
+          {/* Unvollständige Extraktionen — konkrete Bestellungen, nicht aggregiert.
+              State-driven: Bestellungen mit Bestellnr+Händler aber ohne Betrag,
+              letzte 14 Tage. Hilft die "still verschluckten" Mails zu finden
+              ohne dass man die Liste manuell durchscrollen muss. */}
+          {incomplete.length > 0 && (
+            <SectionCard
+              title="Unvollständige Bestellungen"
+              description={`${incomplete.length} Bestellung${incomplete.length === 1 ? "" : "en"} mit Bestellnr + Händler aber ohne Betrag (letzte 14 Tage).`}
+              padding="none"
+              headerBorder
+            >
+              <ul className="divide-y divide-line-subtle">
+                {incomplete.map((b) => (
+                  <li key={b.id} className="flex items-center gap-3 px-5 py-2.5 hover:bg-canvas-hover">
+                    <IconAlertCircle className="w-4 h-4 text-warning shrink-0" />
+                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-1 sm:gap-3 sm:items-center">
+                      <Link
+                        href={`/bestellungen/${b.id}`}
+                        className="text-[14px] font-mono-amount text-foreground hover:text-brand truncate"
+                      >
+                        {b.bestellnummer || "—"}
+                      </Link>
+                      <div className="text-[13px] text-foreground-subtle truncate">
+                        {b.haendler_name}
+                        {b.besteller_name && <span className="text-foreground-faint"> · {b.besteller_name}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 text-[12px] text-foreground-subtle">
+                        <span className="hidden sm:inline">{formatRelative(b.created_at)}</span>
+                        {b.hat_rechnung && <Badge tone="info" size="sm">RG</Badge>}
+                        {b.hat_bestellbestaetigung && !b.hat_rechnung && <Badge tone="neutral" size="sm">BB</Badge>}
+                      </div>
                     </div>
                   </li>
                 ))}
