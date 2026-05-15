@@ -3,6 +3,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ArchivClient } from "@/components/archiv-client";
 
+// 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 // 07.05.2026 — Hard-Cap analog Bestellungen/Buchhaltung (vorher 100, jetzt 500).

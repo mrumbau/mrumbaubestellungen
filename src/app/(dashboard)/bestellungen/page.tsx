@@ -2,6 +2,8 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
 
+// 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 // 07.05.2026 — Pagination komplett client-side.

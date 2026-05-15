@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 import { DashboardWidgets } from "@/components/dashboard-widgets";
 import { parseTimeRange, computeRangeBounds, sparklineBuckets } from "@/lib/time-range";
 
+// 15.05.2026 (Cold-Start-Fix, Option 1):
+// Edge-Runtime → V8-Isolate statt Lambda-Container → ~0ms Cold-Start statt ~10s.
+// Server-Component-Imports sind alle Edge-safe (Supabase-SSR + cookies + react cache).
+// Falls Edge unerwartet kollidiert (z.B. Bundle-Limit), Zeile entfernen → fallback auf Node-Runtime.
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({

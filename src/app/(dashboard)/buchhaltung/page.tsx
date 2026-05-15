@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { BuchhaltungClient } from "@/components/buchhaltung-client";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 
+// 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
+export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 // 07.05.2026 (v2) — Buchhaltung pro RECHNUNGS-DOKUMENT statt pro Bestellung.
