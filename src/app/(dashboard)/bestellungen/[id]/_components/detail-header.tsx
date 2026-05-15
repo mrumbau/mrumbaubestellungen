@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getStatusConfig } from "@/lib/status-config";
 import { DOKUMENT_CONFIG, type Bestellungsart, displayBestellnummer } from "@/lib/bestellung-utils";
+import { bestellerDisplay } from "@/lib/besteller-display";
 import {
   IconArrowLeft,
   IconBuilding,
@@ -110,15 +111,29 @@ export function DetailHeader({
                 ·
               </span>
 
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="inline-flex h-5 w-5 items-center justify-center rounded bg-brand text-white text-[10px] font-bold font-mono-amount"
-                >
-                  {bestellung.besteller_kuerzel}
-                </span>
-                <span className="text-foreground-muted">{bestellung.besteller_name}</span>
-              </span>
+              {(() => {
+                const bd = bestellerDisplay(
+                  bestellung.besteller_kuerzel,
+                  bestellung.besteller_name,
+                  bestellung.bestellungsart,
+                );
+                return (
+                  <span
+                    className="inline-flex items-center gap-1.5"
+                    title={bd.isShared ? "Subunternehmer/Abo — alle Besteller dürfen freigeben" : undefined}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold font-mono-amount ${
+                        bd.isShared ? "bg-foreground-muted text-white" : "bg-brand text-white"
+                      }`}
+                    >
+                      {bd.kuerzel}
+                    </span>
+                    <span className="text-foreground-muted">{bd.name}</span>
+                  </span>
+                );
+              })()}
               <span aria-hidden="true" className="text-line-strong">
                 ·
               </span>

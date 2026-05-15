@@ -6,6 +6,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { TimeRangePicker, type TimeRange } from "@/components/ui/time-range-picker";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
+import { bestellerDisplay } from "@/lib/besteller-display";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
 import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
@@ -26,6 +27,7 @@ interface BestellungItem {
   haendler_name: string | null;
   besteller_name: string;
   besteller_kuerzel: string;
+  bestellungsart?: string | null;
   betrag: number | null;
   waehrung: string;
   status: string;
@@ -965,7 +967,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                               <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                               <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                             </p>
-                            <p className="text-[12px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
+                            <p className="text-[12px] text-foreground-faint">{bestellerDisplay(b.besteller_kuerzel, b.besteller_name, b.bestellungsart).name} · {formatDatum(b.created_at)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">

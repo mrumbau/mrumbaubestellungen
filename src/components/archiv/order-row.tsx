@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { DOKUMENT_CONFIG, displayBestellnummer } from "@/lib/bestellung-utils";
+import { bestellerDisplay } from "@/lib/besteller-display";
 import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import type { Dokument, PaidBestellung } from "./types";
 
@@ -68,7 +69,9 @@ export function OrderRow({
           </span>
         </td>
         {istAdmin && (
-          <td className="px-4 py-3.5 text-foreground-muted hidden lg:table-cell">{order.besteller_name}</td>
+          <td className="px-4 py-3.5 text-foreground-muted hidden lg:table-cell">
+            {bestellerDisplay(order.besteller_kuerzel, order.besteller_name, order.bestellungsart).name}
+          </td>
         )}
         <td className="px-4 py-3.5 hidden md:table-cell">
           {order.projekt_name ? (
