@@ -14,6 +14,17 @@ export type Dokument = {
   mwst: number | null;
   created_at: string;
   bestellnummer_erkannt: string | null;
+  // 17.05.2026 — Zusätzliche extrahierte Felder, die jetzt im body-only-Pfad
+  // (regex-Safety-Net + KI) gesammelt werden und im ExtractedDocument-Panel
+  // angezeigt werden. Vorher unsichtbar in ki_roh_daten verborgen.
+  auftragsnummer: string | null;
+  lieferscheinnummer: string | null;
+  faelligkeitsdatum: string | null;
+  lieferdatum: string | null;
+  bestelldatum: string | null;
+  kundennummer: string | null;
+  besteller_im_dokument: string | null;
+  projekt_referenz: string | null;
   iban: string | null;
   email_betreff: string | null;
   email_absender: string | null;

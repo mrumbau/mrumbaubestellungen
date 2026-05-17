@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/cn";
+import { formatDatum } from "@/lib/formatters";
 import {
   DOKUMENT_CONFIG,
   type Bestellungsart,
@@ -405,16 +406,31 @@ function ExtractedDocument({
 
         <dl className="bg-surface rounded-md border border-line divide-y divide-line-subtle">
           {dokument.bestellnummer_erkannt && (
-            <DataRow label="Bestellnummer" value={dokument.bestellnummer_erkannt} />
+            <DataRow label="Bestellnummer" value={dokument.bestellnummer_erkannt} mono />
           )}
-          {dokument.gesamtbetrag && (
+          {dokument.auftragsnummer && (
+            <DataRow label="Auftragsnummer" value={dokument.auftragsnummer} mono />
+          )}
+          {dokument.lieferscheinnummer && (
+            <DataRow label="Lieferscheinnummer" value={dokument.lieferscheinnummer} mono />
+          )}
+          {dokument.kundennummer && (
+            <DataRow label="Kundennummer" value={dokument.kundennummer} mono />
+          )}
+          {dokument.projekt_referenz && (
+            <DataRow label="Projekt-Referenz" value={dokument.projekt_referenz} subtle />
+          )}
+          {dokument.besteller_im_dokument && (
+            <DataRow label="Besteller laut Dokument" value={dokument.besteller_im_dokument} subtle />
+          )}
+          {dokument.gesamtbetrag != null && (
             <DataRow
               label="Gesamtbetrag"
               value={`${Number(dokument.gesamtbetrag).toFixed(2)} EUR`}
               mono
             />
           )}
-          {dokument.netto && (
+          {dokument.netto != null && (
             <DataRow
               label="Netto"
               value={`${Number(dokument.netto).toFixed(2)} EUR`}
@@ -422,13 +438,22 @@ function ExtractedDocument({
               subtle
             />
           )}
-          {dokument.mwst && (
+          {dokument.mwst != null && (
             <DataRow
               label="MwSt"
               value={`${Number(dokument.mwst).toFixed(2)} EUR`}
               mono
               subtle
             />
+          )}
+          {dokument.bestelldatum && (
+            <DataRow label="Bestelldatum" value={formatDatum(dokument.bestelldatum)} mono />
+          )}
+          {dokument.lieferdatum && (
+            <DataRow label="Lieferdatum" value={formatDatum(dokument.lieferdatum)} mono />
+          )}
+          {dokument.faelligkeitsdatum && (
+            <DataRow label="Fälligkeit" value={formatDatum(dokument.faelligkeitsdatum)} mono />
           )}
           {dokument.iban && <DataRow label="IBAN" value={dokument.iban} mono subtle />}
           {dokument.email_betreff && (
