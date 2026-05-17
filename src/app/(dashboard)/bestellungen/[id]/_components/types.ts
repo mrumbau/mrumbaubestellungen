@@ -28,6 +28,10 @@ export type Dokument = {
   iban: string | null;
   email_betreff: string | null;
   email_absender: string | null;
+  // 17.05.2026 — Gutschrift-Flag. Wird vom Pipeline-Regex erkannt (Keywords
+  // "Rückerstattungsbetrag", "Guthabenbetrag" etc.) oder manuell gesetzt.
+  // UI rendert dann mit Gutschrift-Badge statt Rechnungs-Badge.
+  ist_gutschrift: boolean | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ki_roh_daten: Record<string, any> | null;
 };
@@ -124,6 +128,10 @@ export type Bestellung = {
   faelligkeitsdatum?: string | null;
   kundennummer?: string | null;
   projekt_referenz?: string | null;
+  // 17.05.2026 — Gutschrift-Flag. true = Geld kommt zurück (z.B. Strom-
+  // Jahresabrechnung mit Überzahlung). UI: anderes Badge, keine Freigabe,
+  // direkt für Buchhaltung sichtbar.
+  ist_gutschrift?: boolean | null;
 };
 
 export type ProjektStats = {

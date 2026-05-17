@@ -70,10 +70,31 @@ export const STATUS_CONFIG: Record<
     text: "text-status-freigegeben-text",
     Icon: IconCheckCircle,
   },
+  // 17.05.2026 — Gutschrift (Rückerstattung): Rechnung mit Saldo zugunsten MRU.
+  // Eigene visuelle Identität (success-grün), damit User NIE eine Gutschrift
+  // mit einer zu zahlenden Rechnung verwechselt. Wird statt status angezeigt
+  // wenn bestellung.ist_gutschrift = true.
+  gutschrift: {
+    label: "Gutschrift",
+    color: "var(--status-freigegeben)",
+    bg: "bg-status-freigegeben-bg",
+    text: "text-status-freigegeben-text",
+    Icon: IconCheckCircle,
+  },
 };
 
 export function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] || STATUS_CONFIG.offen;
+}
+
+/**
+ * Effektiver Status-Key für UI-Display. Gutschrift überschreibt den
+ * regulären Status — User sieht "GUTSCHRIFT" statt "VOLLSTÄNDIG", weil
+ * die Freigabe-Semantik nicht zutrifft (Geld kommt zurück, nicht raus).
+ */
+export function getEffektiverStatus(status: string, istGutschrift?: boolean | null): string {
+  if (istGutschrift) return "gutschrift";
+  return status;
 }
 
 /**
