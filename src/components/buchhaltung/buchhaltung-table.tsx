@@ -168,6 +168,14 @@ export function BuchhaltungTable({
                         SUB
                       </span>
                     )}
+                    {r.ist_gutschrift && (
+                      <span
+                        className="px-1.5 py-0.5 text-[10px] font-bold tracking-wide bg-success-bg text-success rounded border border-success-border"
+                        title="Gutschrift / Rückerstattung — Geld kommt zurück an MR Umbau, kein Soll-Posten."
+                      >
+                        GUTSCHRIFT
+                      </span>
+                    )}
                   </span>
                 </td>
                 <td className="px-4 py-3.5 text-center">
@@ -205,7 +213,12 @@ export function BuchhaltungTable({
                   )}
                 </td>
                 <td className="px-4 py-3.5 text-right">
-                  <span className="font-mono-amount font-semibold text-foreground">
+                  <span
+                    className={`font-mono-amount font-semibold ${
+                      r.ist_gutschrift ? "text-success" : "text-foreground"
+                    }`}
+                  >
+                    {r.ist_gutschrift ? "+ " : ""}
                     {formatBetrag(r.betrag, r.waehrung)}
                   </span>
                 </td>

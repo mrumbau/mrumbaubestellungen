@@ -57,6 +57,17 @@ export async function POST(
       return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
     }
 
+    // 17.05.2026 — Gutschriften haben keinen Freigabe-Workflow. Sie sind
+    // Rückerstattungen und werden direkt der Buchhaltung sichtbar gemacht.
+    // Defense-in-Depth gegen versehentliche Direct-Calls (UI versteckt den
+    // Button schon, aber API-Layer darf darauf nicht vertrauen).
+    if (bestellung.ist_gutschrift === true) {
+      return NextResponse.json(
+        { error: "Gutschriften benötigen keine Freigabe — sind automatisch in der Buchhaltung sichtbar." },
+        { status: 400 },
+      );
+    }
+
     // Atomare Freigabe via RPC: Status-Update + Freigabe-Insert in einer Transaktion.
     // Unique Constraint auf freigaben(bestellung_id) verhindert Duplikate bei Doppelklick.
     const { data: rpcResult, error: rpcError } = await supabase.rpc("freigeben_bestellung", {

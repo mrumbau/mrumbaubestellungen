@@ -28,6 +28,10 @@ export interface BuchhaltungRow {
   bestelldatum?: string | null;
   kundennummer?: string | null;
   projekt_referenz?: string | null;
+  // 17.05.2026 — Gutschrift-Flag. Buchhaltung markiert die Zeile grün +
+  // Label „GUTSCHRIFT". Betrag-Vorzeichen-Anzeige (+ statt -) plus eigener
+  // Bezahlt-Sinn: bei Gutschrift = "Geld erhalten" statt "Geld überwiesen".
+  ist_gutschrift?: boolean;
 }
 
 export function isFaelligBald(datum: string | null) {

@@ -50,8 +50,14 @@ export function ApprovalPanel({
   onMahnungQuittieren: () => void;
   variant?: "sidebar" | "mobile" | "mobile-bar";
 }) {
+  // 17.05.2026 — Gutschriften brauchen KEINE Freigabe. Sie sind Rückerstattungen
+  // (Geld kommt zurück) und werden ohne Approval-Workflow direkt der Buchhaltung
+  // sichtbar gemacht. Freigabe-CTA wird unterdrückt + Hinweis-Banner gezeigt.
+  const istGutschrift = bestellung.ist_gutschrift === true;
+
   // Mobile bottom bar — only Freigabe CTA, no other controls
   if (variant === "mobile-bar") {
+    if (istGutschrift) return null;
     if (!kannFreigeben || freigabe || !hatRechnung) return null;
     return (
       <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-surface/95 backdrop-blur-sm border-t border-line z-50 safe-area-bottom">
@@ -72,8 +78,21 @@ export function ApprovalPanel({
 
   return (
     <>
+      {/* Gutschrift-Info-Banner — ersetzt den Freigabe-CTA */}
+      {istGutschrift && !freigabe && (
+        <Card padding="md" className="bg-success-bg border-success-border">
+          <div className="flex items-center gap-2">
+            <IconCheck className="h-4 w-4 text-success" />
+            <p className="font-headline text-[14px] text-success">Gutschrift</p>
+          </div>
+          <p className="text-[12px] text-success/80 mt-1.5 ml-6">
+            Rückerstattung — keine Freigabe nötig. Direkt in der Buchhaltung sichtbar.
+          </p>
+        </Card>
+      )}
+
       {/* Freigabe state */}
-      {freigabe ? (
+      {!istGutschrift && freigabe ? (
         <Card padding="md" className="bg-success-bg border-success-border">
           <div className="flex items-center gap-2">
             <IconCheck className="h-4 w-4 text-success" />
@@ -89,7 +108,7 @@ export function ApprovalPanel({
             </p>
           )}
         </Card>
-      ) : kannFreigeben ? (
+      ) : kannFreigeben && !istGutschrift ? (
         <Card padding={isMobile ? "none" : "md"} className={isMobile ? "p-0 bg-transparent border-0 shadow-none" : ""}>
           <Button
             size={isMobile ? "lg" : "md"}

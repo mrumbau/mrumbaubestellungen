@@ -35,6 +35,8 @@ export interface Bestellung {
   projekt_referenz?: string | null;
   // 07.05.2026 — Doku-Nummern für Such-Index
   doku_nummern?: string[];
+  // 17.05.2026 — Gutschrift-Flag (Rückerstattung, Geld kommt zurück)
+  ist_gutschrift?: boolean | null;
 }
 
 export interface ProjektOption {

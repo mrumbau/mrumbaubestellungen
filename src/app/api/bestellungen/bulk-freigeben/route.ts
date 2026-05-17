@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Alle Bestellungen in einem Round-Trip laden
     const { data: bestellungen, error: loadError } = await supabase
       .from("bestellungen")
-      .select("id, status, besteller_kuerzel, bestellungsart, hat_rechnung")
+      .select("id, status, besteller_kuerzel, bestellungsart, hat_rechnung, ist_gutschrift")
       .in("id", ids);
 
     if (loadError) {
@@ -112,6 +112,13 @@ export async function POST(request: NextRequest) {
       }
 
       if (b.status === "freigegeben") {
+        result.already_freigegeben.push(id);
+        continue;
+      }
+      // 17.05.2026 — Gutschriften skippen: keine Freigabe nötig, sind direkt
+      // in der Buchhaltung sichtbar. Werden als "already_freigegeben" gezählt
+      // damit Bulk-Result keine false-Error-Meldung gibt.
+      if (b.ist_gutschrift === true) {
         result.already_freigegeben.push(id);
         continue;
       }

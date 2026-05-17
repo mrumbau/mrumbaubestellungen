@@ -650,6 +650,38 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     }
   }
 
+  // 17.05.2026 — Gutschrift-Body-Fallback. Defense-in-Depth Layer parallel zur
+  // KI-Detection: scannt Subject + Body nach Trigger-Begriffen für Rückerstattung/
+  // Gutschrift. Greift wenn KI ist_gutschrift=false liefert obwohl das Dokument
+  // klare Gutschrift-Signale hat (z.B. Strom-Jahresabrechnung mit Saldo zugunsten
+  // Kunde). Wert wird in bodyAnalyseLokal.ist_gutschrift gemerged.
+  // Gefährlich falsche Positiv-Klassifikation als Zahlungsforderung kostet
+  // theoretisch 1000€+ → Defense-in-Depth lohnt sich.
+  let bodyExtractedIstGutschrift = false;
+  {
+    const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
+    const gutschriftPatterns: RegExp[] = [
+      /\br(?:ü|ue)ckerstattungsbetrag\b/i,
+      /\bguthabenbetrag\b/i,
+      /\bguthaben[\s.:]+in\s+h(?:ö|oe)he\s+von\b/i,
+      /\bauszahlung\s+(?:des\s+)?guthabens?\b/i,
+      /\berstattungsbetrag\b/i,
+      /\br(?:ü|ue)ckzahlungsbetrag\b/i,
+      /\bcredit\s+(?:note|memo)\b/i,
+      // "Gutschrift Nr." oder "Gutschrift vom ..." als Dokument-Header
+      /\bgutschrift(?:\s+(?:nr\.?|nummer|vom))/i,
+    ];
+    for (const re of gutschriftPatterns) {
+      if (re.test(body)) {
+        bodyExtractedIstGutschrift = true;
+        logInfo("webhook/email", `Gutschrift-Body-Fallback gegriffen via Pattern ${re.source}`, {
+          email_betreff,
+        });
+        break;
+      }
+    }
+  }
+
   const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer, ...subjectExtraNummern].filter((n): n is string => !!n);
 
   // GPT-Bestellnummer-Nachlauf für Besteller-Match
@@ -1202,6 +1234,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       p_besteller_im_dokument: analyse.besteller_im_dokument || null,
       p_projekt_referenz: analyse.projekt_referenz || null,
       p_bestelldatum: analyse.bestelldatum || null,
+      p_ist_gutschrift: analyse.ist_gutschrift ?? false,
     });
     if (insertError) {
       logError("webhook/email", "Dokument-Insert fehlgeschlagen", insertError);
@@ -1363,6 +1396,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       if (!bodyAnalyseLokal.kundennummer && bodyExtractedKundennummer) {
         bodyAnalyseLokal.kundennummer = bodyExtractedKundennummer;
       }
+      // 17.05.2026 — Gutschrift-Flag: bodyExtractedIstGutschrift überschreibt
+      // niemals true→false (KI hat möglicherweise Kontext den Regex nicht hat),
+      // aber kann false→true setzen wenn Regex eindeutiges Signal hat.
+      if (bodyExtractedIstGutschrift && !bodyAnalyseLokal.ist_gutschrift) {
+        bodyAnalyseLokal.ist_gutschrift = true;
+      }
 
       // Outer-Variable für Fallback-Pfad zuweisen — auch bei typ=unbekannt,
       // weil die KI-Werte (Bestellnr, Betrag, Daten) im Fallback genutzt werden.
@@ -1411,6 +1450,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
           p_besteller_im_dokument: bodyAnalyseLokal.besteller_im_dokument || null,
           p_projekt_referenz: bodyAnalyseLokal.projekt_referenz || null,
           p_bestelldatum: bodyAnalyseLokal.bestelldatum || null,
+          p_ist_gutschrift: bodyAnalyseLokal.ist_gutschrift ?? false,
         });
 
         const haendlerNameAfter = await applyAnalyseToBestellung(supabase, bestellungId, bodyAnalyseLokal, {
@@ -2077,6 +2117,15 @@ async function propagateAnalyseFields(
     updateFields.projekt_referenz = analyse.projekt_referenz;
   }
 
+  // ----- 17.05.2026 — Gutschrift-Flag — ODER-Logik, einmal true bleibt true.
+  // Wenn IRGENDEIN Doku der Bestellung eine Gutschrift ist, ist die ganze
+  // Bestellung eine Gutschrift (= keine Freigabe nötig, direkt in Buchhaltung).
+  // Wir lesen den existing-Wert nicht extra aus, weil es ODER ist: false→true
+  // schadet nicht, true→true ist No-Op. Andere Richtung verhindern via Skip.
+  if (analyse.ist_gutschrift === true) {
+    updateFields.ist_gutschrift = true;
+  }
+
   // ----- Händlername — fallback wenn Domain-Pseudo / leer -----
   let haendlerNameAfter: string | null = null;
   if (options.haendlerContext && analyse.haendler) {
@@ -2287,6 +2336,7 @@ async function tryFallbackKeywordTyp(
       p_besteller_im_dokument: ki?.besteller_im_dokument || null,
       p_projekt_referenz: ki?.projekt_referenz || null,
       p_bestelldatum: ki?.bestelldatum || null,
+      p_ist_gutschrift: ki?.ist_gutschrift ?? false,
     });
 
     // bestellungen-Update: Flag setzen + KI-Werte (Betrag, Daten, BN) ergänzen

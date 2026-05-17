@@ -306,6 +306,13 @@ const DokumentAnalyseSchema = z.object({
   besteller_im_dokument: z.string().nullable(),
   projekt_referenz: z.string().nullable(),
   bestelldatum: z.string().nullable(),
+  // 17.05.2026 — Gutschrift-Detection. true bedeutet: das Dokument ist eine
+  // RÜCKERSTATTUNG / GUTSCHRIFT (Geld kommt zurück an MR Umbau), keine
+  // Zahlungsforderung. Trigger-Begriffe: "Rückerstattungsbetrag",
+  // "Guthabenbetrag", "Auszahlung Guthaben", "Gutschrift", "Credit Note",
+  // negativer Endbetrag in Strom-/Gas-Abrechnungen.
+  // Wichtig für Buchhaltung: Soll/Haben-Tausch + keine Freigabe nötig.
+  ist_gutschrift: z.boolean(),
 });
 
 export interface DokumentAnalyse {
@@ -335,6 +342,9 @@ export interface DokumentAnalyse {
   besteller_im_dokument?: string | null;
   projekt_referenz?: string | null;
   bestelldatum?: string | null;
+  // 17.05.2026 — Siehe Schema-Kommentar oben. Default false (KI nullable
+  // erforderlich aber Default-Verhalten ist "keine Gutschrift").
+  ist_gutschrift?: boolean;
 }
 
 export interface AbgleichErgebnis {
@@ -498,7 +508,8 @@ Gib folgende Struktur zurück:
   "kundennummer": "35454475",
   "besteller_im_dokument": "Tschon,Marlon",
   "projekt_referenz": "BV: Glögler, Prinzenstr. 42",
-  "bestelldatum": "2026-04-16"
+  "bestelldatum": "2026-04-16",
+  "ist_gutschrift": false
 }
 
 Extrahiere auch:
@@ -512,6 +523,39 @@ Extrahiere auch:
 - "besteller_im_dokument": Name des Bestellers wie er im Dokument steht (z.B. "Besteller: Tschon,Marlon", "Besteller: Valon", "Auftraggeber: MR Umbau GmbH"). Nur den Personennamen, nicht die Firma.
 - "projekt_referenz": Projekt- oder Bauvorhabenreferenz (z.B. "BV: Glögler, Prinzenstr. 42", "Bes-Nr.: BV Klöggler", "Kommission: Dörning"). Der vollständige Text.
 - "bestelldatum": Datum der ursprünglichen Bestellung (z.B. "Bestelldatum: 16.04.2026"). Format "YYYY-MM-DD". Nicht verwechseln mit Rechnungsdatum oder Lieferdatum.
+
+═══════════════════════════════════════════════════════════════════════════
+🟢 GUTSCHRIFT-DETECTION — KRITISCH für Buchhaltung
+═══════════════════════════════════════════════════════════════════════════
+
+Setze "ist_gutschrift": true wenn das Dokument eine RÜCKERSTATTUNG / GUTSCHRIFT
+darstellt — also Geld kommt ZURÜCK an MR Umbau, KEINE Zahlungsforderung.
+
+Eindeutige Trigger-Signale (mindestens EINES davon → ist_gutschrift = true):
+  ✓ "Rückerstattungsbetrag" / "Erstattungsbetrag" / "Rückzahlungsbetrag"
+  ✓ "Guthabenbetrag" / "Guthaben in Höhe von" / "Auszahlung Guthaben"
+  ✓ "Gutschrift" als Dokumenttitel oder zentrale Summe (z.B. "Gutschrift Nr. ...")
+  ✓ "Credit Note" / "Credit Memo"
+  ✓ Strom-/Gas-/Telekommunikations-Jahresabrechnung mit Saldo zugunsten Kunde
+    (Beispiel-Pattern: "Rechnungsbetrag (brutto) 3.117,86 €" + "abzgl. geleisteter
+    Zahlungen 3.715,00 €" + "Rückerstattungsbetrag (brutto) 592,14 €")
+  ✓ Bitte um Bankverbindung für Auszahlung
+  ✓ Negativer Endbetrag (Brutto < 0 oder "-XXX,XX €" als Endsumme)
+  ✓ "Storno" / "Stornorechnung" für eine zuvor bezahlte Rechnung
+
+Wichtige Nicht-Signale (NICHT als Gutschrift markieren!):
+  ✗ "Zwischensumme/Versand/MwSt"-Position in einer normalen Rechnung
+  ✗ Ein einzelner Artikel mit Wert 0,00 € (z.B. Reklamations-Ersatzteil)
+  ✗ "Rabatt" oder "Nachlass" auf einer normalen positiven Rechnung
+  ✗ "Anzahlung verrechnet" in einer Schlussrechnung mit positivem Endbetrag
+
+Wenn ist_gutschrift = true:
+  • "gesamtbetrag" bleibt POSITIV (= Höhe der Erstattung in Euro)
+  • "typ" bleibt "rechnung" (Gutschrift IST formal eine Rechnung, nur mit Saldo-Tausch)
+  • "netto" / "mwst" als ABSOLUTwerte (nicht negativ)
+  • Die Soll/Haben-Logik macht die Buchhaltungs-Software, nicht du
+
+Default: ist_gutschrift = false. Setze nur true wenn EINDEUTIGES Signal vorhanden.
 
 Falls ein Feld nicht erkennbar ist, setze null.
 
@@ -749,6 +793,7 @@ function makeUnknownDokumentAnalyse(parseError: boolean): DokumentAnalyse {
     lieferadressen: [],
     volltext: "",
     parse_fehler: parseError,
+    ist_gutschrift: false,
   };
 }
 

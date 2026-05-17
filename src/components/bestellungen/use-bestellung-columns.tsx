@@ -272,7 +272,7 @@ export function useBestellungColumns({
         key: "status",
         label: "Status",
         sortable: true,
-        render: (b) => <StatusCell status={b.status} />,
+        render: (b) => <StatusCell status={b.status} istGutschrift={b.ist_gutschrift} />,
       },
       {
         key: "betrag",
@@ -280,7 +280,14 @@ export function useBestellungColumns({
         sortable: true,
         align: "right",
         className: "font-mono-amount font-semibold",
-        render: (b) => <BetragCell betrag={b.betrag} waehrung={b.waehrung} istNetto={b.betrag_ist_netto} />,
+        render: (b) => (
+          <BetragCell
+            betrag={b.betrag}
+            waehrung={b.waehrung}
+            istNetto={b.betrag_ist_netto}
+            istGutschrift={b.ist_gutschrift}
+          />
+        ),
       },
       {
         key: "actions",

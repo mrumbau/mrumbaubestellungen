@@ -22,13 +22,16 @@ export default async function BuchhaltungPage() {
   const supabase = await createServerSupabaseClient();
 
   // Schritt 1: Alle freigegebenen Bestellungen finden
+  // 17.05.2026 — Gutschriften kommen direkt rein (keine Freigabe nötig, weil
+  // Geld zurückkommt — kein Approval-Risk). Filter ist daher: status=freigegeben
+  // ODER ist_gutschrift=true (PostgREST or-Syntax).
   const [{ data: bestellungen }, { data: projekte }] = await Promise.all([
     supabase
       .from("bestellungen")
       .select(
-        "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+        "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, updated_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift",
       )
-      .eq("status", "freigegeben")
+      .or("status.eq.freigegeben,ist_gutschrift.eq.true")
       .order("updated_at", { ascending: false })
       .limit(HARD_CAP),
     supabase
@@ -102,6 +105,9 @@ export default async function BuchhaltungPage() {
       bestelldatum: b.bestelldatum,
       kundennummer: b.kundennummer,
       projekt_referenz: b.projekt_referenz,
+      // 17.05.2026 — Gutschrift-Flag für UI-Markierung (grünes Label, evtl.
+      // Soll/Haben-Tausch im DATEV-Export, Filter-Kategorie).
+      ist_gutschrift: b.ist_gutschrift || false,
     };
   }).filter((r): r is NonNullable<typeof r> => r !== null)
     .sort((a, b) => {

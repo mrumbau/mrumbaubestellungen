@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { getStatusConfig } from "@/lib/status-config";
+import { getEffektiverStatus, getStatusConfig } from "@/lib/status-config";
 import { DOKUMENT_CONFIG, type Bestellungsart, displayBestellnummer } from "@/lib/bestellung-utils";
 import { bestellerDisplay } from "@/lib/besteller-display";
 import {
@@ -39,7 +39,12 @@ export function DetailHeader({
   };
   projekte: ProjektOption[];
 }) {
-  const statusConfig = getStatusConfig(bestellung.status);
+  // 17.05.2026 — Gutschrift-Override: bei Rückerstattung wird statt
+  // "Vollständig"/"Offen" der Gutschrift-Badge angezeigt, damit User die
+  // Geld-Richtung sofort sehen (zurück zu MRU, nicht zu Vendor).
+  const statusConfig = getStatusConfig(
+    getEffektiverStatus(bestellung.status, bestellung.ist_gutschrift),
+  );
   const art: Bestellungsart = bestellung.bestellungsart || "material";
   const pflichtDoks = DOKUMENT_CONFIG[art].filter((d) => d.erforderlich);
   const dokCount = pflichtDoks.filter(
@@ -262,11 +267,17 @@ export function DetailHeader({
 
           <div className="flex flex-col items-end shrink-0">
             <p className="text-[10px] font-semibold tracking-widest uppercase text-foreground-subtle">
-              Betrag{bestellung.betrag_ist_netto ? " (netto)" : ""}
+              {bestellung.ist_gutschrift
+                ? "Guthaben"
+                : `Betrag${bestellung.betrag_ist_netto ? " (netto)" : ""}`}
             </p>
-            <p className="text-[28px] font-bold font-mono-amount text-foreground mt-0.5 leading-none">
+            <p
+              className={`text-[28px] font-bold font-mono-amount mt-0.5 leading-none ${
+                bestellung.ist_gutschrift ? "text-success" : "text-foreground"
+              }`}
+            >
               {bestellung.betrag
-                ? `${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
+                ? `${bestellung.ist_gutschrift ? "+ " : ""}${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
                 : "–"}
             </p>
             {bestellung.waehrung && bestellung.waehrung !== "EUR" && (

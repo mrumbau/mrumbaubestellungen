@@ -10,14 +10,20 @@
  * Farbenblinde / SW-Druck den Status auch erkennen können.
  */
 
-import { getStatusConfig } from "@/lib/status-config";
+import { getEffektiverStatus, getStatusConfig } from "@/lib/status-config";
 
 export interface StatusCellProps {
   status: string;
+  /**
+   * 17.05.2026 — Wenn true, wird statt des regulären Status der "Gutschrift"-
+   * Badge angezeigt. User soll Rückerstattungen NIE mit Zahlungsforderungen
+   * verwechseln (Verwechslungsgefahr in der Buchhaltung = Geldverlust-Risiko).
+   */
+  istGutschrift?: boolean | null;
 }
 
-export function StatusCell({ status }: StatusCellProps) {
-  const cfg = getStatusConfig(status);
+export function StatusCell({ status, istGutschrift }: StatusCellProps) {
+  const cfg = getStatusConfig(getEffektiverStatus(status, istGutschrift));
   return (
     <span className={`status-tag ${cfg.bg} ${cfg.text}`}>
       <span
