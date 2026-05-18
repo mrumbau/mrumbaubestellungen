@@ -38,3 +38,6 @@ next-env.d.ts
 
 # python
 .python-version
+
+# test coverage (Vitest + Istanbul HTML-Reports, regeneriert pro Run)
+/coverage
