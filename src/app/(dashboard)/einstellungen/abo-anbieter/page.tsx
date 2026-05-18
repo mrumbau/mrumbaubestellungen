@@ -15,12 +15,13 @@ export default async function AboAnbieterPage() {
   const { data: abo } = await supabase
     .from("abo_anbieter")
     .select(
-      "id, name, domain, email_absender, intervall, erwarteter_betrag, toleranz, naechste_rechnung, vertragsbeginn, vertragsende, kuendigungsfrist_tage, notizen, letzter_betrag, letzte_rechnung_am, created_at",
+      "id, name, domain, email_absender, intervall, erwarteter_betrag, toleranz_prozent, naechste_rechnung, vertragsbeginn, vertragsende, kuendigungsfrist_tage, notizen, letzter_betrag, letzte_rechnung_am, created_at",
     )
     .order("name");
 
-  // The DB column is `toleranz` in this project (not `toleranz_prozent`)
-  // — normalize here so the client only knows the latter.
+  // 18.05.2026 (A1.8) — DB-Spalte heißt `toleranz_prozent`, alter Code fragte
+  // `toleranz` ab → stumm null → Default-Fallback 10. Mit typed-Client wurde
+  // der Mismatch sichtbar. Jetzt: direkt korrekte Spalte selecten.
   const normalized: AboAnbieter[] = (abo || []).map((a) => {
     const raw = a as Record<string, unknown>;
     return {
@@ -31,7 +32,7 @@ export default async function AboAnbieterPage() {
       intervall: (raw.intervall as AboAnbieter["intervall"]) || "monatlich",
       erwarteter_betrag:
         raw.erwarteter_betrag != null ? Number(raw.erwarteter_betrag) : null,
-      toleranz_prozent: raw.toleranz != null ? Number(raw.toleranz) : 10,
+      toleranz_prozent: raw.toleranz_prozent != null ? Number(raw.toleranz_prozent) : 10,
       naechste_rechnung: (raw.naechste_rechnung as string | null) ?? null,
       vertragsbeginn: (raw.vertragsbeginn as string | null) ?? null,
       vertragsende: (raw.vertragsende as string | null) ?? null,

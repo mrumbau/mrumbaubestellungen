@@ -52,6 +52,28 @@ export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> 
 /** Grobe USD→EUR-Konversion. Bei Bedarf pro Quartal aktualisieren. */
 export const USD_TO_EUR = 0.93;
 
+/**
+ * Hard-Cap pro Mail-Verarbeitung. Bei Überschreitung wird die Pipeline mit
+ * einer CostCapExceededError abgebrochen — eine fehlgeleitete KI-Welle kann
+ * dann maximal MAX_COST_PER_MAIL_EUR pro Mail verbrennen.
+ *
+ * 18.05.2026 (A1.10) — Schutzschicht gegen Cost-Spikes (z.B. wenn ein
+ * Vendor-Parser dauer-fail't und Always-KI-Mode 10× Retry macht, oder ein
+ * adversarial PDF die KI in eine Loop tricks't).
+ *
+ * Wert: 0.19 EUR ≈ $0.20. Aktuell normale Mail-Cost: $0.001-$0.01. Bei einer
+ * großen PDF-Mail mit 5 Anhängen + Always-KI: ~$0.05. Cap bei $0.20 lässt
+ * massiv Spielraum für legitime Edge-Cases und reagiert nur auf echte Ausreißer.
+ */
+export const MAX_COST_PER_MAIL_EUR = 0.19;
+
+export class CostCapExceededError extends Error {
+  constructor(public readonly bucket: CostBucket) {
+    super(`Cost-Cap überschritten: ${bucket.cost_eur.toFixed(4)} EUR (max ${MAX_COST_PER_MAIL_EUR} EUR, ${bucket.calls} calls)`);
+    this.name = "CostCapExceededError";
+  }
+}
+
 const costStore = new AsyncLocalStorage<CostBucket>();
 
 /**
@@ -121,6 +143,11 @@ function trackCost(model: string, usage: { prompt_tokens?: number; completion_to
   if (inputT === 0 && outputT === 0) {
     logInfo("openai/cost-debug", "trackCost: beide Token-Counter sind 0", { model, usage });
   }
+
+  // 18.05.2026 (A1.10) — Hard-Cap: nach jedem Call prüfen ob Bucket > Schwelle
+  if (bucket.cost_eur > MAX_COST_PER_MAIL_EUR) {
+    throw new CostCapExceededError(bucket);
+  }
 }
 
 /**
@@ -132,7 +159,7 @@ function trackCost(model: string, usage: { prompt_tokens?: number; completion_to
  * durchquert die Async-Local-Storage-Grenze. Für die Email-Pipeline daher
  * heute keine Per-Mail-Aggregation; siehe Phase-2b-Refactor.
  */
-export async function withCostTracking<T>(fn: () => Promise<T>): Promise<{ result: T; cost: CostBucket }> {
+export async function withCostTracking<T>(fn: () => Promise<T>): Promise<{ result: T; cost: CostBucket; capHit?: boolean }> {
   const bucket: CostBucket = {
     input_tokens: 0,
     output_tokens: 0,
@@ -140,8 +167,25 @@ export async function withCostTracking<T>(fn: () => Promise<T>): Promise<{ resul
     calls: 0,
     model_breakdown: {},
   };
-  const result = await costStore.run(bucket, fn);
-  return { result, cost: bucket };
+  try {
+    const result = await costStore.run(bucket, fn);
+    return { result, cost: bucket };
+  } catch (err) {
+    // 18.05.2026 (A1.10) — Cost-Cap-Abort speziell behandeln: Bucket-Snapshot
+    // trotzdem zurückgeben damit Caller die teilweise gesammelten Costs in
+    // email_processing_log persistieren kann. Caller muss `capHit` checken
+    // und entsprechend reagieren (z.B. Mail als 'failed' markieren mit Grund).
+    if (err instanceof CostCapExceededError) {
+      logError("openai/cost-cap", "Cost-Cap überschritten — Pipeline abgebrochen", {
+        cost_eur: bucket.cost_eur,
+        max: MAX_COST_PER_MAIL_EUR,
+        calls: bucket.calls,
+        model_breakdown: bucket.model_breakdown,
+      });
+      return { result: undefined as T, cost: bucket, capHit: true };
+    }
+    throw err;
+  }
 }
 
 /** Retry-Wrapper mit exponential backoff für OpenAI-Calls. Auto-trackt Costs

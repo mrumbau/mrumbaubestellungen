@@ -1,3 +1,4 @@
+import type React from "react";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -38,7 +39,7 @@ export default async function ProjektePage() {
 
   return (
     <ProjekteClient
-      projekte={projekte || []}
+      projekte={(projekte || []) as unknown as React.ComponentProps<typeof ProjekteClient>["projekte"]}
       stats={statsMap}
       kunden={kunden || []}
       istAdmin={profil.rolle === "admin" || profil.rolle === "besteller"}

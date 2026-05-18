@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     .range(offset, offset + limit - 1);
 
   if (folderId) query = query.eq("folder_id", folderId);
-  if (status) query = query.eq("status", status);
+  if (status) query = query.eq("status", status as "pending" | "irrelevant" | "processed" | "failed");
   if (mismatch) query = query.eq("folder_mismatch", true);
 
   const { data, count, error } = await query;

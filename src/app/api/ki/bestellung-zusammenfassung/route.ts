@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       (kommentare || []).map((k) => ({
         autor: k.autor_name,
         text: k.text,
-        datum: new Date(k.erstellt_am).toLocaleDateString("de-DE"),
+        datum: k.erstellt_am ? new Date(k.erstellt_am).toLocaleDateString("de-DE") : "-",
       }))
     );
 

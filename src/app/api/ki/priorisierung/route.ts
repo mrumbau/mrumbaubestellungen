@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
       betrag: Number(b.betrag) || null,
       // bestelldatum bevorzugt — created_at ist Pipeline-Erfassung, nicht Bestelltag
       tage_alt: Math.floor((now - new Date(b.bestelldatum ?? b.created_at).getTime()) / (1000 * 60 * 60 * 24)),
-      hat_rechnung: b.hat_rechnung,
-      hat_lieferschein: b.hat_lieferschein,
+      hat_rechnung: b.hat_rechnung ?? false,
+      hat_lieferschein: b.hat_lieferschein ?? false,
       faelligkeitsdatum: b.faelligkeitsdatum,
     }));
 
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         {
           user_id: profil.user_id,
           typ: "priorisierung",
-          inhalt: ergebnis,
+          inhalt: ergebnis as unknown as import("@/types/database").Database["public"]["Tables"]["dashboard_ki_cache"]["Insert"]["inhalt"],
           generated_at: generatedAt,
         },
         { onConflict: "user_id,typ" },

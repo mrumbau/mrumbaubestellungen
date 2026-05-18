@@ -28,7 +28,7 @@ export async function GET(
 
     // Dokument-Metadaten laden – unterstützt Dokument-ID direkt ODER Bestellungs-ID + typ
     const typ = _request.nextUrl.searchParams.get("typ");
-    let dokument: { storage_pfad: string; bestellung_id: string } | null = null;
+    let dokument: { storage_pfad: string | null; bestellung_id: string | null } | null = null;
 
     if (typ) {
       // Lookup per Bestellungs-ID + Dokumenttyp (für Tabellen-Vorschau)
@@ -65,16 +65,18 @@ export async function GET(
       dokument = dok;
     }
 
-    if (!dokument?.storage_pfad) {
+    if (!dokument?.storage_pfad || !dokument?.bestellung_id) {
       return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
     }
+    const storagePfad: string = dokument.storage_pfad;
+    const bestellungId: string = dokument.bestellung_id;
 
     if (!typ) {
       // Verify bestellung access via RLS (nur bei Dokument-ID Lookup nötig)
       const { data: bestellung } = await supabaseAuth
         .from("bestellungen")
         .select("id")
-        .eq("id", dokument.bestellung_id)
+        .eq("id", bestellungId)
         .single();
 
       if (!bestellung) {
@@ -89,7 +91,7 @@ export async function GET(
     if (mode === "url") {
       const { data: signedData, error: signError } = await supabase.storage
         .from("dokumente")
-        .createSignedUrl(dokument.storage_pfad, 300); // 5 Minuten gültig
+        .createSignedUrl(storagePfad, 300); // 5 Minuten gültig
 
       if (signError || !signedData?.signedUrl) {
         return NextResponse.json({ error: "Signed URL konnte nicht erstellt werden" }, { status: 500 });
@@ -110,7 +112,7 @@ export async function GET(
     // laden bei großen PDFs.
     const { data: signedData, error: signError } = await supabase.storage
       .from("dokumente")
-      .createSignedUrl(dokument.storage_pfad, 60);
+      .createSignedUrl(storagePfad, 60);
 
     if (signError || !signedData?.signedUrl) {
       return NextResponse.json({ error: "Datei nicht gefunden" }, { status: 404 });
@@ -127,7 +129,7 @@ export async function GET(
       return NextResponse.json({ error: "Datei nicht gefunden" }, { status: 404 });
     }
 
-    const ext = dokument.storage_pfad.split(".").pop()?.toLowerCase() || "";
+    const ext = storagePfad.split(".").pop()?.toLowerCase() || "";
     const MIME_MAP: Record<string, string> = {
       pdf: "application/pdf",
       jpg: "image/jpeg",
@@ -140,7 +142,7 @@ export async function GET(
     };
     const contentType = MIME_MAP[ext] || "application/octet-stream";
 
-    const rawFilename = dokument.storage_pfad.split("/").pop() || "dokument";
+    const rawFilename = storagePfad.split("/").pop() || "dokument";
     const safeFilename = sanitizeFilename(rawFilename);
 
     // Wichtige Upstream-Header durchreichen für Range/Streaming

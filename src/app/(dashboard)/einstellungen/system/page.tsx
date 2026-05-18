@@ -38,6 +38,7 @@ export default async function SystemOverviewPage() {
 
   const signalMap: Record<string, string> = {};
   for (const s of signale || []) {
+    if (!s.zeitstempel) continue; // DB-Spalte hat Default NOW(), praktisch nie null — nur Type-Sicherheit
     if (!signalMap[s.kuerzel]) signalMap[s.kuerzel] = s.zeitstempel;
   }
 

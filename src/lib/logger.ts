@@ -21,7 +21,7 @@ if (isServer) {
   try {
     // dynamische Auflösung verhindert Client-Bundle-Inclusion
     const moduleName = "node:async_hooks";
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { AsyncLocalStorage } = require(moduleName) as typeof import("node:async_hooks");
     requestIdStore = new AsyncLocalStorage<string>();
   } catch {
@@ -33,7 +33,7 @@ function makeId(): string {
   if (isServer) {
     try {
       const moduleName = "node:crypto";
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+       
       const { randomUUID } = require(moduleName) as typeof import("node:crypto");
       return randomUUID();
     } catch {

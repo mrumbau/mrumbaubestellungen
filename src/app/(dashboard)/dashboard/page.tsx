@@ -1,3 +1,4 @@
+import type React from "react";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -340,11 +341,11 @@ export default async function DashboardPage({
         statCards={statCards}
         freigegebenBetrag={freigegebenBetrag}
         gesamtVolumen={gesamtVolumen}
-        topProjekte={topProjekte}
+        topProjekte={topProjekte as unknown as React.ComponentProps<typeof DashboardWidgets>["topProjekte"]}
         isAdmin={profil.rolle === "admin"}
         kiVorschlaege={kiVorschlaege}
         neueKunden={neueKunden}
-        unzugeordnet={unzugeordnet}
+        unzugeordnet={unzugeordnet as unknown as React.ComponentProps<typeof DashboardWidgets>["unzugeordnet"]}
         bestellerListe={bestellerListe}
         neueHaendler={neueHaendler}
         neueSubunternehmer={neueSubunternehmer}

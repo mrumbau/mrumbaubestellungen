@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     const ueberfaelligeRechnungen: { bestellnummer: string; haendler: string; faellig: string; betrag: number }[] = [];
 
     for (const r of rechnungen || []) {
+      if (!r.faelligkeitsdatum) continue;
       if (new Date(r.faelligkeitsdatum).getTime() < Date.now()) {
         const best = alle.find((b) => b.id === r.bestellung_id);
         if (best && best.status !== "freigegeben") {
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
         {
           user_id: user.id,
           typ: "zusammenfassung",
-          inhalt: zusammenfassungMitRange,
+          inhalt: zusammenfassungMitRange as unknown as import("@/types/database").Database["public"]["Tables"]["dashboard_ki_cache"]["Insert"]["inhalt"],
           generated_at: generatedAt,
         },
         { onConflict: "user_id,typ" },

@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ArchivClient } from "@/components/archiv-client";
+import type { ArchivedProjekt, PaidBestellung } from "@/components/archiv/types";
 
 // 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
 export const runtime = "edge";
@@ -92,10 +93,17 @@ export default async function ArchivPage() {
       .in("bestellung_id", allOrderIds);
 
     for (const dok of dokumente || []) {
+      // Orphan-Dokus (bestellung_id null) defensive überspringen — sollte
+      // nie passieren weil dokumente.bestellung_id-FK NOT NULL ist, aber
+      // generated Types sagen nullable.
+      if (!dok.bestellung_id) continue;
       if (!dokumenteMap[dok.bestellung_id]) {
         dokumenteMap[dok.bestellung_id] = [];
       }
-      dokumenteMap[dok.bestellung_id].push(dok);
+      dokumenteMap[dok.bestellung_id].push({
+        ...dok,
+        bestellung_id: dok.bestellung_id, // narrow nach null-check
+      });
     }
   }
 
@@ -132,11 +140,16 @@ export default async function ArchivPage() {
   // Summary
   const totalVolumen = allOrders.reduce((sum, o) => sum + (Number(o.betrag) || 0), 0);
 
+  // 18.05.2026 (A1.8) — DB-Types sagen nullable, UI hat sich auf non-null
+  // verlassen (war vor typed-Switch implizit). Filter im Query (z.B. nur
+  // bezahlt_am NOT NULL) garantiert die Werte, aber Type-System weiß das
+  // nicht. Cast ist hier sicherer als die Frontend-Types zu lockern (würde
+  // tiefen Komponenten-Refactor brauchen — eigener Sprint).
   return (
     <ArchivClient
-      projekte={filteredProjekte}
-      materialOrders={safeMatOrders}
-      suOrders={enrichedSuOrders}
+      projekte={filteredProjekte as unknown as ArchivedProjekt[]}
+      materialOrders={safeMatOrders as unknown as PaidBestellung[]}
+      suOrders={enrichedSuOrders as unknown as PaidBestellung[]}
       dokumenteMap={dokumenteMap}
       projektStats={projektStatsMap}
       summary={{

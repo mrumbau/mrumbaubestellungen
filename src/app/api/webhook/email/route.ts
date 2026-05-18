@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     // 06.05.2026 (Welle 2 C3): Pipeline JETZT auch hier in withCostTracking
     // wrappen — vorher fehlte das im Make.com-Webhook-Pfad → openai_cost_eur
     // blieb 0 für direkt-via-Webhook eingehende Mails (z.B. Make.com-Tests).
-    const { result, cost } = await withCostTracking(() =>
+    const { result, cost, capHit } = await withCostTracking(() =>
       withRequestId(() => runEmailPipeline(input)),
     );
 
@@ -112,7 +112,22 @@ export async function POST(request: NextRequest) {
         output_tokens: cost.output_tokens,
         cost_eur: Number(cost.cost_eur.toFixed(6)),
         models: Object.keys(cost.model_breakdown),
+        cap_hit: capHit ?? false,
       });
+    }
+
+    // 18.05.2026 (A1.10) — Cost-Cap-Abort persistieren damit Admin sieht warum
+    // die Mail "stehen geblieben" ist + nicht stillschweigend Daten verloren gehen.
+    if (capHit) {
+      try {
+        const sb = createServiceClient();
+        await sb.from("webhook_logs").insert({
+          typ: "cost_cap_hit",
+          status: "warning",
+          fehler_text: `Mail-Verarbeitung bei ${cost.cost_eur.toFixed(4)} EUR abgebrochen (${cost.calls} KI-Calls). Verdacht auf KI-Loop oder unkontrollierte Retries. In Pipeline-Quality nachschauen.`,
+        });
+      } catch { /* Alert-Fehler nicht eskalieren */ }
+      return NextResponse.json({ error: "cost_cap_hit", cost_eur: cost.cost_eur }, { status: 503 });
     }
 
     return NextResponse.json(result);

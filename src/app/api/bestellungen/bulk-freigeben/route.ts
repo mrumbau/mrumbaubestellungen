@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
           p_bestellung_id: id,
           p_kuerzel: profil.kuerzel,
           p_name: profil.name,
-          p_kommentar: sanitizedKommentar,
+          p_kommentar: sanitizedKommentar ?? undefined,
         },
       );
 
@@ -143,13 +143,14 @@ export async function POST(request: NextRequest) {
         result.errors.push({ id, reason: rpcError.message });
         continue;
       }
-      if (rpcResult?.success === false) {
-        if (rpcResult.error === "bereits_freigegeben") {
+      const r = rpcResult as { success?: boolean; error?: string; freigabe_id?: string; duplicate?: boolean } | null;
+      if (r?.success === false) {
+        if (r.error === "bereits_freigegeben") {
           result.already_freigegeben.push(id);
           continue;
         }
-        logError(ROUTE_TAG, `RPC-Result-Fehler für ${id}`, rpcResult);
-        result.errors.push({ id, reason: rpcResult.error ?? "rpc_unbekannt" });
+        logError(ROUTE_TAG, `RPC-Result-Fehler für ${id}`, r);
+        result.errors.push({ id, reason: r.error ?? "rpc_unbekannt" });
         continue;
       }
 

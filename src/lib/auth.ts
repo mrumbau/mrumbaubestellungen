@@ -36,9 +36,12 @@ export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> 
   return data as BenutzerProfil | null;
 });
 
-// Prüft ob das Profil eine der erlaubten Rollen hat
-export function requireRoles(profil: { rolle: Rolle } | null, ...rollen: Rolle[]): boolean {
-  return !!profil && rollen.includes(profil.rolle);
+// Prüft ob das Profil eine der erlaubten Rollen hat.
+// 18.05.2026 (A1.8) — Signatur auf {rolle: string} gelockert, weil generated
+// DB-Types `rolle: string` liefern (DB-Spalte hat CHECK-Constraint, kein Enum).
+// Funktional unverändert: rollen.includes() prüft Set-Membership zur Laufzeit.
+export function requireRoles(profil: { rolle: string } | null, ...rollen: Rolle[]): boolean {
+  return !!profil && (rollen as readonly string[]).includes(profil.rolle);
 }
 
 // Redirect-Pfad basierend auf Rolle

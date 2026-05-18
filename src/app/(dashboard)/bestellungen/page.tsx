@@ -65,6 +65,7 @@ export default async function BestellungenPage({
       .select("bestellung_id, bestellnummer_erkannt, auftragsnummer, lieferscheinnummer")
       .in("bestellung_id", ids);
     for (const d of docNums || []) {
+      if (!d.bestellung_id) continue; // Orphan-Schutz (Type-Sicherheit)
       const arr = dokuNummernMap[d.bestellung_id] || [];
       if (d.bestellnummer_erkannt) arr.push(d.bestellnummer_erkannt);
       if (d.auftragsnummer) arr.push(d.auftragsnummer);
@@ -127,8 +128,8 @@ export default async function BestellungenPage({
       )}
 
       <BestellungenTabelle
-        bestellungen={bestellungenAngereichert}
-        projekte={(projekte || []) as { id: string; name: string; farbe: string }[]}
+        bestellungen={bestellungenAngereichert as unknown as import("@/components/bestellungen/types").Bestellung[]}
+        projekte={(projekte || []) as unknown as { id: string; name: string; farbe: string }[]}
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
         isAdmin={profil?.rolle === "admin"}

@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const { data: aehnliche } = await supabase
       .from("bestellungen")
       .select("id, bestellnummer, haendler_name, betrag, created_at")
-      .eq("haendler_name", bestellung.haendler_name)
+      .eq("haendler_name", bestellung.haendler_name ?? "")
       .neq("id", bestellung_id)
       .gte("created_at", siebenTageZurueck)
       .limit(10);
@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
 
     const artikelMap = new Map<string, { name: string; menge: number; einzelpreis: number }[]>();
     for (const dok of aehnlicheDoks || []) {
+      if (!dok.bestellung_id) continue; // Orphan-Schutz
       const art = dok.artikel as { name: string; menge: number; einzelpreis: number }[] | null;
       if (art) {
         const existing = artikelMap.get(dok.bestellung_id) || [];

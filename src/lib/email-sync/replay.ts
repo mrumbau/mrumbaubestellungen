@@ -167,7 +167,7 @@ async function replayOneMessageWithLock(
   // → AsyncLocalStorage-Bucket fließt durch alle OpenAI-Calls und wird in
   // markProcessed in email_processing_log.openai_* persistiert.
   try {
-    const { result, cost } = await withCostTracking(async () => {
+    const { result, cost, capHit } = await withCostTracking(async () => {
       const classifyResult = await classifyEmail({
         email_absender: message.from?.emailAddress.address ?? "",
         email_betreff: message.subject ?? "",
@@ -213,7 +213,19 @@ async function replayOneMessageWithLock(
         output_tokens: cost.output_tokens,
         cost_eur: Number(cost.cost_eur.toFixed(6)),
         models: Object.keys(cost.model_breakdown),
+        cap_hit: capHit ?? false,
       });
+    }
+
+    // 18.05.2026 (A1.10) — Cost-Cap-Abort: Mail als failed markieren mit
+    // Begründung. Retry-Cron wird sie pickem, weitere Cap-Hits → permanent_failed.
+    if (capHit) {
+      await markFailed(
+        supabase,
+        internetMessageId,
+        `cost_cap_hit:${cost.cost_eur.toFixed(4)}_eur_${cost.calls}_calls`,
+      );
+      return { outcome: "failed", fehler: "cost_cap_hit" };
     }
 
     if (result.outcome === "irrelevant") {

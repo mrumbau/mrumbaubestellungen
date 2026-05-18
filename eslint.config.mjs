@@ -1,8 +1,9 @@
 // @ts-check
 import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /**
- * Minimal ESLint flat config — single-purpose gate:
+ * ESLint flat config — Hex-Color-Gate + Type/Hook-Hygiene:
  *
  *   `no-restricted-syntax` with a regex selector against string Literals and
  *    template elements flags any Tailwind arbitrary hex-color value like
@@ -45,14 +46,17 @@ export default tseslint.config(
     },
     plugins: {
       "@typescript-eslint": tseslint.plugin,
+      "react-hooks": reactHooks,
     },
     rules: {
-      // Keep legacy @typescript-eslint/* rules registered-but-off so existing
-      // `eslint-disable-next-line @typescript-eslint/no-explicit-any` comments
-      // scattered through the codebase continue to parse without errors. We may
-      // enable these later — for now only the hex gate is active.
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unused-vars": "off",
+      // 18.05.2026 (A1.9) — Aktivierte Type/Hook-Regeln als WARNING (nicht
+      // error), damit existierende Codebasis nicht sofort rote Build-CI bricht.
+      // Über Zeit auf "error" hochstufen. Plus rules-of-hooks als ERROR weil
+      // das sind echte Runtime-Bugs, nicht Style.
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
 
       "no-restricted-syntax": [
         "error",

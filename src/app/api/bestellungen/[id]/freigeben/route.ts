@@ -82,11 +82,13 @@ export async function POST(
       return NextResponse.json({ error: "Freigabe konnte nicht durchgeführt werden" }, { status: 500 });
     }
 
-    if (rpcResult?.success === false) {
-      if (rpcResult.error === "bereits_freigegeben") {
+    // RPC-Return ist Json — wir wissen das Shape (success, error, freigabe_id, duplicate)
+    const r = rpcResult as { success?: boolean; error?: string; freigabe_id?: string; duplicate?: boolean } | null;
+    if (r?.success === false) {
+      if (r.error === "bereits_freigegeben") {
         return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
       }
-      logError("/api/bestellungen/[id]/freigeben", "Freigabe-RPC Fehler", rpcResult);
+      logError("/api/bestellungen/[id]/freigeben", "Freigabe-RPC Fehler", r);
       return NextResponse.json({ error: "Freigabe fehlgeschlagen" }, { status: 500 });
     }
 

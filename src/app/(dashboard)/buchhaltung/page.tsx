@@ -71,6 +71,7 @@ export default async function BuchhaltungPage() {
   // Bestellung selbst, weil Buchhaltung sonst Phantome sieht. Solche Bestellungen
   // erscheinen erst dann in Buchhaltung wenn ein Rechnungs-Doku angelegt wurde.
   const rows = (rechnungen || []).map((r) => {
+    if (!r.bestellung_id) return null; // Orphan-Schutz (Type-Sicherheit)
     const b = bestellungenMap.get(r.bestellung_id);
     const freigabe = freigabenMap.get(r.bestellung_id);
     if (!b) return null;
@@ -121,7 +122,7 @@ export default async function BuchhaltungPage() {
 
   return (
     <BuchhaltungClient
-      rows={rows}
+      rows={rows as unknown as import("@/components/buchhaltung/types").BuchhaltungRow[]}
       projekte={(projekte || []).map((p) => ({ id: p.id, name: p.name }))}
       rolle={profil.rolle}
       reachedCap={reachedCap}

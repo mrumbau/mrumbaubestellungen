@@ -260,6 +260,7 @@ export type Database = {
           hat_rechnung: boolean | null
           hat_versandbestaetigung: boolean | null
           id: string
+          ist_gutschrift: boolean
           kunden_id: string | null
           kunden_name: string | null
           kundennummer: string | null
@@ -312,6 +313,7 @@ export type Database = {
           hat_rechnung?: boolean | null
           hat_versandbestaetigung?: boolean | null
           id?: string
+          ist_gutschrift?: boolean
           kunden_id?: string | null
           kunden_name?: string | null
           kundennummer?: string | null
@@ -364,6 +366,7 @@ export type Database = {
           hat_rechnung?: boolean | null
           hat_versandbestaetigung?: boolean | null
           id?: string
+          ist_gutschrift?: boolean
           kunden_id?: string | null
           kunden_name?: string | null
           kundennummer?: string | null
@@ -604,12 +607,15 @@ export type Database = {
       }
       dokumente: {
         Row: {
+          archiviert_am: string | null
           artikel: Json | null
           auftragsnummer: string | null
           bestelldatum: string | null
           besteller_im_dokument: string | null
           bestellnummer_erkannt: string | null
           bestellung_id: string | null
+          bezahlt_am: string | null
+          bezahlt_von: string | null
           content_hash: string | null
           created_at: string
           email_absender: string | null
@@ -619,6 +625,7 @@ export type Database = {
           gesamtbetrag: number | null
           iban: string | null
           id: string
+          ist_gutschrift: boolean
           ki_roh_daten: Json | null
           kundennummer: string | null
           lieferdatum: string | null
@@ -631,12 +638,15 @@ export type Database = {
           typ: string
         }
         Insert: {
+          archiviert_am?: string | null
           artikel?: Json | null
           auftragsnummer?: string | null
           bestelldatum?: string | null
           besteller_im_dokument?: string | null
           bestellnummer_erkannt?: string | null
           bestellung_id?: string | null
+          bezahlt_am?: string | null
+          bezahlt_von?: string | null
           content_hash?: string | null
           created_at?: string
           email_absender?: string | null
@@ -646,6 +656,7 @@ export type Database = {
           gesamtbetrag?: number | null
           iban?: string | null
           id?: string
+          ist_gutschrift?: boolean
           ki_roh_daten?: Json | null
           kundennummer?: string | null
           lieferdatum?: string | null
@@ -658,12 +669,15 @@ export type Database = {
           typ: string
         }
         Update: {
+          archiviert_am?: string | null
           artikel?: Json | null
           auftragsnummer?: string | null
           bestelldatum?: string | null
           besteller_im_dokument?: string | null
           bestellnummer_erkannt?: string | null
           bestellung_id?: string | null
+          bezahlt_am?: string | null
+          bezahlt_von?: string | null
           content_hash?: string | null
           created_at?: string
           email_absender?: string | null
@@ -673,6 +687,7 @@ export type Database = {
           gesamtbetrag?: number | null
           iban?: string | null
           id?: string
+          ist_gutschrift?: boolean
           ki_roh_daten?: Json | null
           kundennummer?: string | null
           lieferdatum?: string | null
@@ -1426,6 +1441,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_stale_pending_mails: { Args: never; Returns: number }
+      delete_leere_bestellungen: {
+        Args: { p_max_batch?: number; p_min_age_minutes?: number }
+        Returns: number
+      }
       delete_orphan_dokumente_pdfs: {
         Args: { p_cutoff: string; p_limit: number }
         Returns: {
@@ -1515,34 +1534,64 @@ export type Database = {
           target_kuerzel: string
         }[]
       }
-      persist_dokument_atomic: {
-        Args: {
-          p_artikel: Json
-          p_auftragsnummer: string
-          p_bestelldatum: string
-          p_besteller_im_dokument: string
-          p_bestellnummer_erkannt: string
-          p_bestellung_id: string
-          p_content_hash: string
-          p_email_absender: string
-          p_email_betreff: string
-          p_email_datum: string
-          p_faelligkeitsdatum: string
-          p_gesamtbetrag: number
-          p_iban: string
-          p_ki_roh_daten: Json
-          p_kundennummer: string
-          p_lieferdatum: string
-          p_lieferscheinnummer: string
-          p_mwst: number
-          p_netto: number
-          p_projekt_referenz: string
-          p_quelle: string
-          p_storage_pfad: string
-          p_typ: string
-        }
-        Returns: string
-      }
+      persist_dokument_atomic:
+        | {
+            Args: {
+              p_artikel: Json
+              p_auftragsnummer: string
+              p_bestelldatum: string
+              p_besteller_im_dokument: string
+              p_bestellnummer_erkannt: string
+              p_bestellung_id: string
+              p_content_hash: string
+              p_email_absender: string
+              p_email_betreff: string
+              p_email_datum: string
+              p_faelligkeitsdatum: string
+              p_gesamtbetrag: number
+              p_iban: string
+              p_ki_roh_daten: Json
+              p_kundennummer: string
+              p_lieferdatum: string
+              p_lieferscheinnummer: string
+              p_mwst: number
+              p_netto: number
+              p_projekt_referenz: string
+              p_quelle: string
+              p_storage_pfad: string
+              p_typ: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_artikel: Json
+              p_auftragsnummer: string
+              p_bestelldatum: string
+              p_besteller_im_dokument: string
+              p_bestellnummer_erkannt: string
+              p_bestellung_id: string
+              p_content_hash: string
+              p_email_absender: string
+              p_email_betreff: string
+              p_email_datum: string
+              p_faelligkeitsdatum: string
+              p_gesamtbetrag: number
+              p_iban: string
+              p_ist_gutschrift?: boolean
+              p_ki_roh_daten: Json
+              p_kundennummer: string
+              p_lieferdatum: string
+              p_lieferscheinnummer: string
+              p_mwst: number
+              p_netto: number
+              p_projekt_referenz: string
+              p_quelle: string
+              p_storage_pfad: string
+              p_typ: string
+            }
+            Returns: string
+          }
       refresh_dashboard_kpis: { Args: never; Returns: undefined }
       sync_one_flag: {
         Args: { p_bestellung_id: string; p_typ: string }
@@ -1692,3 +1741,4 @@ export const Constants = {
     },
   },
 } as const
+
