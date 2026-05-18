@@ -65,6 +65,7 @@ import { tryAbgleich } from "./pipeline/abgleich";
 import { tryPreisanomalieCheck } from "./pipeline/preisanomalie";
 import { handleAboLogik } from "./pipeline/abo-handling";
 import { detectReplyAction, applyReplyAction } from "./pipeline/reply-action";
+import { shouldSkipAsStubDuplicate } from "./pipeline/dedup";
 
 // =====================================================================
 // INTERNAL TYPES (F3.F10: typed statt any)
@@ -1422,6 +1423,25 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       }
 
       if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ) && !gespeicherteTypen.includes(bodyAnalyseLokal.typ)) {
+        // 18.05.2026 — Stub-Duplikat-Schutz: verhindert Race-Condition-Duplikate
+        // (Brillux 7004572-Pattern) und Reminder-Mail-Stubs (Klaus Alter 78611).
+        // Wenn das Body-Doku nur ein Stub wäre (kein Betrag, kein PDF) und
+        // bereits ein vollständiges Rechnungs-Doku mit derselben Bestellnummer
+        // existiert → skip persist statt Duplikat in der Buchhaltung.
+        const skipAsStub = await shouldSkipAsStubDuplicate({
+          supabase,
+          bestellungId,
+          typ: bodyAnalyseLokal.typ,
+          bestellnummerErkannt: bodyAnalyseLokal.bestellnummer ?? erkannteBestellnummer,
+          newGesamtbetrag: bodyAnalyseLokal.gesamtbetrag ?? bodyExtractedBetrag,
+          newStoragePfad: null,
+          emailBetreff: email_betreff,
+          emailAbsender: email_absender,
+        });
+        if (skipAsStub) {
+          dokumenteGespeichert++; // Damit Schritt 16 nicht fälschlich Fallback triggert
+          gespeicherteTypen.push(bodyAnalyseLokal.typ);
+        } else {
         // Neuer Typ aus Body — über persist_dokument_atomic damit Re-Backfill
         // existing Dokus updated statt zu duplizieren (06.05.2026).
         // content_hash auf Body-Hash setzen für Idempotenz.
@@ -1460,6 +1480,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
         if (haendlerNameAfter) haendlerName = haendlerNameAfter;
         dokumenteGespeichert++;
         gespeicherteTypen.push(bodyAnalyseLokal.typ);
+        } // /skipAsStub-else
       } else if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ)) {
         // Nur Felder ergänzen
         await ergaenzeFelder(supabase, bestellungId, bodyAnalyseLokal, haendlerName, absenderDomain);
@@ -2307,6 +2328,23 @@ async function tryFallbackKeywordTyp(
     const fallbackKiRoh: Record<string, unknown> = ki
       ? { ...(ki as unknown as Record<string, unknown>), fallback_typ: fallbackTyp, quelle: "email_body" }
       : { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000), gesamtbetrag: effektiverGesamtbetrag, kundennummer: effektiveKundennummer };
+
+    // 18.05.2026 — Stub-Duplikat-Schutz (siehe pipeline/dedup.ts) auch im
+    // Fallback-Pfad: wenn fallbackTyp=rechnung UND wir keinen Betrag/PDF haben
+    // UND eine vollständige Rechnung mit gleicher BN existiert → skip.
+    const skipFallbackAsStub = await shouldSkipAsStubDuplicate({
+      supabase,
+      bestellungId,
+      typ: fallbackTyp,
+      bestellnummerErkannt: ki?.bestellnummer ?? null,
+      newGesamtbetrag: effektiverGesamtbetrag,
+      newStoragePfad: null,
+      emailBetreff: email_betreff,
+      emailAbsender: email_absender,
+    });
+    if (skipFallbackAsStub) {
+      return { shortCircuit: false, gespeichert: true };
+    }
 
     // 06.05.2026 — Fallback-Insert via persist_dokument_atomic-RPC für
     // Re-Backfill-Idempotenz. content_hash = sha256(email_text) verhindert
