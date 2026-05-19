@@ -64,6 +64,8 @@ type ToastItem = {
   description?: React.ReactNode;
   duration: number;
   action?: { label: string; onClick: () => void };
+  /** Wird im Toast-Footer als kopierbarer Code-Tag gerendert (Support-Diagnose). */
+  requestId?: string;
 };
 
 type ToastAPI = {
@@ -82,6 +84,12 @@ type ToastOptions = {
   description?: React.ReactNode;
   duration?: number; // 0 = persistent
   action?: { label: string; onClick: () => void };
+  /**
+   * 19.05.2026 (A4.16) — optional Request-/Correlation-ID für Support-Diagnose.
+   * Wird als kopierbarer Mono-Tag im Toast-Footer angezeigt. User kann die ID
+   * dem Support nennen damit der entsprechende Log-Eintrag gefunden wird.
+   */
+  requestId?: string;
 };
 
 const ToastContext = React.createContext<ToastAPI | null>(null);
@@ -169,6 +177,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         description: opts.description,
         duration,
         action: opts.action,
+        requestId: opts.requestId,
       };
       setItems((prev) => [...prev, item]);
 
@@ -269,6 +278,25 @@ function ToastViewport({
                   )}
                 >
                   {item.action.label}
+                </button>
+              )}
+              {item.requestId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof navigator !== "undefined" && navigator.clipboard) {
+                      navigator.clipboard.writeText(item.requestId!).catch(() => {});
+                    }
+                  }}
+                  title="Klicken zum Kopieren"
+                  className={cn(
+                    "mt-1.5 inline-flex items-center gap-1 text-[10px] font-mono",
+                    "text-foreground-subtle hover:text-foreground transition-colors",
+                    "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded",
+                  )}
+                >
+                  <span aria-hidden="true">⌥</span>
+                  <span>Code: {item.requestId}</span>
                 </button>
               )}
             </div>

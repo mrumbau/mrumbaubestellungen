@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { IconActivity, IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
-import type { PipelineQualityRow, IncompleteBestellung } from "./page";
+import type { PipelineQualityRow, IncompleteBestellung, ExpensiveMail } from "./page";
 
 function formatPct(n: number | null): string {
   if (n == null) return "—";
@@ -45,9 +45,11 @@ function formatRelative(iso: string): string {
 export function PipelineQualityClient({
   rows,
   incomplete,
+  expensive,
 }: {
   rows: PipelineQualityRow[];
   incomplete: IncompleteBestellung[];
+  expensive: ExpensiveMail[];
 }) {
   const aggregates = useMemo(() => {
     const last7 = rows.slice(0, 7);
@@ -196,6 +198,87 @@ export function PipelineQualityClient({
                   </li>
                 ))}
               </ul>
+            </SectionCard>
+          )}
+
+          {/* A4.12 — Top-20 teuerste Mails 7 Tage mit Drill-Down */}
+          {expensive.length > 0 && (
+            <SectionCard
+              title="Teuerste Mails (7 Tage)"
+              description={`Top ${expensive.length} nach OpenAI-Kosten. Klick auf Subject → Bestellung-Detail. Auffällig hohe Werte deuten auf Always-KI-Retry-Schleifen, fehl-konfigurierte Vendor-Parser oder adversariale PDFs.`}
+              padding="none"
+              headerBorder
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wide text-foreground-subtle border-b border-line-subtle">
+                      <th className="px-5 py-2 text-right font-medium">Kosten</th>
+                      <th className="px-5 py-2 text-right font-medium">Tokens (in/out)</th>
+                      <th className="px-5 py-2 text-left font-medium">Subject / Absender</th>
+                      <th className="px-5 py-2 text-left font-medium">Parser</th>
+                      <th className="px-5 py-2 text-left font-medium">Status</th>
+                      <th className="px-5 py-2 text-right font-medium">Wann</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line-subtle">
+                    {expensive.map((m) => (
+                      <tr key={m.graph_message_id} className="hover:bg-canvas-hover">
+                        <td className="px-5 py-2 text-right font-mono-amount tabular-nums font-semibold">
+                          {formatEur(m.openai_cost_eur)}
+                        </td>
+                        <td className="px-5 py-2 text-right font-mono-amount tabular-nums text-foreground-subtle">
+                          {formatNum(m.openai_input_tokens)} / {formatNum(m.openai_output_tokens)}
+                        </td>
+                        <td className="px-5 py-2 min-w-0 max-w-[420px]">
+                          {m.bestellung_id ? (
+                            <Link
+                              href={`/bestellungen/${m.bestellung_id}`}
+                              className="block text-foreground hover:text-brand truncate"
+                            >
+                              {m.subject || "(ohne Betreff)"}
+                            </Link>
+                          ) : (
+                            <span className="block text-foreground truncate">
+                              {m.subject || "(ohne Betreff)"}
+                            </span>
+                          )}
+                          <span className="block text-[11px] text-foreground-subtle truncate font-mono-amount">
+                            {m.sender || "—"}
+                            {m.has_attachments && <span className="ml-2 text-info">📎</span>}
+                          </span>
+                        </td>
+                        <td className="px-5 py-2 text-[12px] text-foreground-subtle">
+                          {m.parser_name ? (
+                            <span>
+                              {m.parser_name}
+                              <span className="text-foreground-faint"> ({m.parser_source ?? "?"})</span>
+                            </span>
+                          ) : (
+                            <span className="text-foreground-faint">{m.parser_source ?? "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-2">
+                          <Badge
+                            tone={
+                              m.status === "processed" ? "success" :
+                              m.status === "failed" || m.status === "terminally_failed" ? "error" :
+                              m.status === "irrelevant" ? "neutral" :
+                              "warning"
+                            }
+                            size="sm"
+                          >
+                            {m.status}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-2 text-right text-[12px] text-foreground-subtle">
+                          {formatRelative(m.processed_at ?? m.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </SectionCard>
           )}
 

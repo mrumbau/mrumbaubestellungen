@@ -15,81 +15,44 @@
  * `erkenneBestellerIntelligent` und `kategorisiereArtikel`.
  */
 
-import { createHash } from "crypto";
 import { createServiceClient } from "@/lib/supabase";
-import {
-  analysiereDokument,
-  erkenneBestellerIntelligent,
-  erkenneHaendlerAusEmail,
-  type DokumentAnalyse,
-} from "@/lib/openai";
-import { tryParseVendor, mergeVendorIntoKi } from "@/lib/email-pipeline/vendor-parsers";
 import { safeBestellnummer } from "@/lib/validation";
-import { updateBestellungStatus, aggregatePipelineConfidence } from "@/lib/bestellung-utils";
-import { buildTrackingUrl } from "@/lib/tracking-urls";
+import { aggregatePipelineConfidence } from "@/lib/bestellung-utils";
 import { logError, logInfo } from "@/lib/logger";
 
 import {
   extractEmailAddress,
   extractDomain,
-  isIrrelevantDomain,
   isVersandDomain,
   isVersandBetreff,
   isBestellBetreff,
   isStrictVersandBetreff,
   stripHtml,
   htmlToStructuredText,
-  safeBase64ToBuffer,
 } from "./pipeline/mail-utils";
-import { checkAndClaimIdempotency } from "./pipeline/idempotency-check";
 import { normalizeAnhaenge } from "./pipeline/anhang-handling";
 import { tryParseEInvoiceFromAttachments } from "./pipeline/xrechnung";
-import {
-  analysiereAnhaenge,
-  type AnalyseErgebnis,
-  getCachedAnalyse,
-  setCachedAnalyse,
-  hashBody,
-} from "./pipeline/anhang-analyse";
-import {
-  findByExactNumber,
-  findByFuzzyNumber,
-  findByCrossMatch,
-  findByBetragMatch,
-  findByErweiterterMatch,
-  type MatchContext,
-  type BestellungRow,
-} from "./pipeline/bestellung-match";
+import { analysiereAnhaenge } from "./pipeline/anhang-analyse";
+import { type MatchContext } from "./pipeline/bestellung-match";
 import { handleVersandEmail } from "./pipeline/versand-handler";
-import { tryAbgleich } from "./pipeline/abgleich";
-import { tryPreisanomalieCheck } from "./pipeline/preisanomalie";
-import { handleAboLogik } from "./pipeline/abo-handling";
-import { detectReplyAction, applyReplyAction } from "./pipeline/reply-action";
-import { shouldSkipAsStubDuplicate } from "./pipeline/dedup";
-
-// =====================================================================
-// INTERNAL TYPES (F3.F10: typed statt any)
-// =====================================================================
-
-interface HaendlerRow {
-  id: string | null;
-  name: string | null;
-  domain?: string | null;
-  email_absender?: string[] | null;
-  url_muster?: string[] | null;
-  [key: string]: unknown;
-}
-
-interface SignalRow {
-  id: string;
-  kuerzel: string;
-  haendler_domain?: string | null;
-  order_nummer?: string | null;
-  zeitstempel?: string | null;
-  status?: string | null;
-  matched_bestellung_id?: string | null;
-  [key: string]: unknown;
-}
+import { PRIMAER_TYPEN, BEKANNTE_TYPEN } from "./pipeline/constants";
+import { assignBesteller, applyGptBestellnummerNachlauf } from "./pipeline/besteller-zuordnung";
+import { tryFallbackKeywordTyp } from "./pipeline/fallback-keyword";
+import { extractBodyHints } from "./pipeline/regex-extract";
+import { findeOderErstelleBestellung } from "./pipeline/bestellung-finden";
+import { persistAnhangDokumente } from "./pipeline/dokument-persist";
+import { analysiereBody } from "./pipeline/body-analyse";
+import {
+  identifyHaendlerSuAbo,
+  autoErkenneNeuenHaendler,
+  type HaendlerRow,
+} from "./pipeline/haendler-erkennen";
+import { runPreBestellungsChecks } from "./pipeline/pre-bestellungs-checks";
+import {
+  sanityCleanupLeereBestellung,
+  propagiereBestellnummerAusDoku,
+} from "./pipeline/post-bestellungs-cleanup";
+import { runPostProcessing } from "./pipeline/post-processing";
 
 // =====================================================================
 // PUBLIC API
@@ -138,17 +101,6 @@ export interface EmailPipelineResult {
   versand?: { tracking_nummer: string | null; versanddienstleister: string | null; tracking_url: string | null };
 }
 
-const PRIMAER_TYPEN = ["bestellbestaetigung", "rechnung", "aufmass", "leistungsnachweis"];
-const BEKANNTE_TYPEN = ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis", "versandbestaetigung"];
-const FLAG_MAP: Record<string, string> = {
-  bestellbestaetigung: "hat_bestellbestaetigung",
-  lieferschein: "hat_lieferschein",
-  rechnung: "hat_rechnung",
-  aufmass: "hat_aufmass",
-  leistungsnachweis: "hat_leistungsnachweis",
-  versandbestaetigung: "hat_versandbestaetigung",
-};
-
 export async function runEmailPipeline(input: EmailPipelineInput): Promise<EmailPipelineResult> {
   const startTime = Date.now();
   const { email_betreff, email_absender, email_datum } = input;
@@ -177,112 +129,26 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
   const supabase = createServiceClient();
 
-  // 2. Irrelevante Domains + Blacklist (nur ohne Vorfilter)
-  if (!hatVorfilter) {
-    if (isIrrelevantDomain(absenderDomain)) {
-      const { data: bekannterHaendler } = await supabase
-        .from("haendler")
-        .select("id")
-        .contains("email_absender", [absenderAdresse])
-        .limit(1);
-      const { data: bekannterSU } = await supabase
-        .from("subunternehmer")
-        .select("id")
-        .contains("email_absender", [absenderAdresse])
-        .limit(1);
-
-      if ((!bekannterHaendler || bekannterHaendler.length === 0) &&
-          (!bekannterSU || bekannterSU.length === 0)) {
-        logInfo("webhook/email", `Irrelevante Domain: ${absenderDomain}`, { email_betreff });
-        return { success: true, skipped: true, reason: "irrelevant_domain" };
-      }
-    }
-
-    const { data: blacklist } = await supabase.from("email_blacklist").select("muster, typ");
-    if (blacklist && blacklist.length > 0) {
-      const istBlockiert = blacklist.some((bl) => {
-        const muster = bl.muster.toLowerCase();
-        if (bl.typ === "adresse") return absenderAdresse === muster;
-        return absenderDomain === muster || absenderDomain.endsWith("." + muster);
-      });
-      if (istBlockiert) {
-        return { success: true, skipped: true, reason: "blacklisted" };
-      }
-    }
-  }
-
-  // 2.5 Welle 5 O7 — Email-Reply-as-Action.
-  // Vor dem Idempotency-Check, damit Reply-Mails nicht als 24h-Body-Duplikate
-  // verworfen werden und auch keine PDF-Pipeline durchlaufen. Wenn die Mail einen
-  // gültigen [REF:<token>] + Action-Keyword enthält → Status-Wechsel + return.
-  if (!input.existing_bestellung_id) {
-    const replyBody = input.email_text || input.email_body || "";
-    if (replyBody) {
-      const replyMatch = await detectReplyAction(supabase, replyBody);
-      if (replyMatch) {
-        const senderAdresse = absenderAdresse;
-        const result = await applyReplyAction(supabase, replyMatch, senderAdresse);
-        if (result.success) {
-          logInfo("webhook/email", "Email-Reply-Action ausgeführt", {
-            bestellung_id: replyMatch.bestellungId,
-            action: replyMatch.action,
-            sender: senderAdresse,
-            new_status: result.newStatus,
-            skipped: result.skipped,
-          });
-          return {
-            success: true,
-            skipped: true,
-            reason: result.skipped
-              ? `reply_action_${replyMatch.action}_${result.reason ?? "skipped"}`
-              : `reply_action_${replyMatch.action}`,
-            bestellung_id: replyMatch.bestellungId,
-          };
-        }
-        // Bei !success und reason=sender_unknown / rolle_unzulaessig: weiter
-        // mit normaler Pipeline (z.B. wenn ein anderer Empfänger geantwortet hat).
-        logInfo("webhook/email", "Email-Reply-Action nicht ausgeführt", {
-          bestellung_id: replyMatch.bestellungId,
-          action: replyMatch.action,
-          reason: result.reason,
-        });
-      }
-    }
-  }
-
-  // 3. Idempotenz (24h-Body-Hash)
-  // Re-Backfill-Bypass: bei explizitem existing_bestellung_id-Hint überspringen
-  // wir den Hash-Check — wir wollen die Mail bewusst neu verarbeiten und
-  // an die existierende Bestellung anhängen. Sonst würde der Hash-Lock aus
-  // dem ursprünglichen Run die zweite Verarbeitung als "duplicate" abwürgen.
-  if (!input.existing_bestellung_id) {
-    const idem = await checkAndClaimIdempotency(supabase, {
-      email_absender,
-      email_betreff,
-      email_datum,
-      email_body: input.email_text || input.email_body || "",
-      anhaenge_count: Array.isArray(input.anhaenge) ? input.anhaenge.length : 0,
-    });
-    if (idem.isDuplicate) {
-      return { success: true, deduplicated: true };
-    }
-  } else {
-    logInfo("webhook/email", "24h-Hash-Idempotenz übersprungen wegen existing_bestellung_id (Re-Backfill)", {
-      existing_bestellung_id: input.existing_bestellung_id,
-    });
-  }
-
-  // 4. Betreff-Validierung
-  if (email_betreff && email_betreff.length > 500) {
-    throw new Error("Betreff zu lang");
-  }
+  // Schritte 2-4 — Filter + Reply-Action + Idempotenz + Betreff-Check.
+  // Siehe pipeline/pre-bestellungs-checks.ts.
+  const preCheck = await runPreBestellungsChecks(supabase, {
+    hatVorfilter,
+    existing_bestellung_id: input.existing_bestellung_id,
+    absenderAdresse,
+    absenderDomain,
+    email_absender,
+    email_betreff,
+    email_datum,
+    email_text: input.email_text,
+    email_body: input.email_body,
+    anhaenge_count: Array.isArray(input.anhaenge) ? input.anhaenge.length : 0,
+  });
+  if (preCheck) return preCheck;
 
   // F3.F15 Fix: Inline-Cleanup entfernt. Hot-Path-Webhook macht keine
   // heimlichen Side-Effects mehr — pg_cron `cleanup-stale-pending`,
   // `cleanup-pgnet-responses`, `cleanup-bestellung-signale` und
   // `cleanup-webhook-logs` (R4) übernehmen diese Cleanups deterministisch.
-  // Versand-Only-Cleanup läuft via /api/cron/cleanup (Make-getriggert oder
-  // pg_cron, atomar via delete_versand_only_bestellungen).
 
   // 6. Anhänge normalisieren
   const anhaenge = normalizeAnhaenge(input.anhaenge, email_betreff, email_absender);
@@ -338,125 +204,19 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     });
   }
 
-  // 9. Händler/SU erkennen (F3.F10: typed statt any)
-  let haendler: HaendlerRow | null = null;
-  let erkannterSubunternehmer: { id: string; firma: string } | null = null;
-  let bestellungsart: "material" | "subunternehmer" | "abo" = "material";
-
-  if (vorfilterHaendlerId) {
-    const { data: vfHaendler } = await supabase
-      .from("haendler").select("*").eq("id", vorfilterHaendlerId).maybeSingle();
-    if (vfHaendler) {
-      haendler = vfHaendler as HaendlerRow;
-      const bestehendeAdressen: string[] = vfHaendler.email_absender || [];
-      if (absenderAdresse && !bestehendeAdressen.some((a: string) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
-        await supabase.from("haendler")
-          .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
-          .eq("id", vfHaendler.id);
-      }
-    }
-  } else if (vorfilterSuId) {
-    const { data: vfSU } = await supabase
-      .from("subunternehmer").select("id, firma").eq("id", vorfilterSuId).maybeSingle();
-    if (vfSU) {
-      erkannterSubunternehmer = { id: vfSU.id, firma: vfSU.firma };
-      bestellungsart = "subunternehmer";
-    }
-  }
-
-  if (!haendler && !erkannterSubunternehmer) {
-    // F3.F13: Limit als Safety-Net (heute 74 Händler, bei >2000 muss Architektur überdacht werden)
-    const { data: haendlerListe } = await supabase.from("haendler").select("*").limit(2000);
-
-    haendler = haendlerListe?.find((h) =>
-      h.email_absender?.some((addr: string) => {
-        const normalized = addr.toLowerCase().trim();
-        if (normalized.startsWith("*@")) return absenderAdresse.endsWith("@" + normalized.slice(2));
-        return absenderAdresse === normalized;
-      }),
-    ) || null;
-
-    if (!haendler && absenderDomain) {
-      haendler = haendlerListe?.find((h) => {
-        const hDomain = h.domain?.toLowerCase();
-        if (!hDomain) return false;
-        return absenderDomain === hDomain || absenderDomain.endsWith("." + hDomain);
-      }) || null;
-
-      if (haendler && absenderAdresse) {
-        const bestehendeAdressen: string[] = haendler.email_absender || [];
-        if (!bestehendeAdressen.some((a) => a.toLowerCase() === absenderAdresse) && bestehendeAdressen.length < 10) {
-          await supabase.from("haendler")
-            .update({ email_absender: [...bestehendeAdressen, absenderAdresse] })
-            .eq("id", haendler.id);
-        }
-      }
-    }
-
-    if (!haendler) {
-      // F3.F13: Limit als Safety-Net
-      const { data: suListe } = await supabase.from("subunternehmer").select("*").limit(2000);
-      if (suListe && suListe.length > 0) {
-        const suMatch = suListe.find((su) =>
-          su.email_absender?.some((addr: string) => {
-            const normalized = addr.toLowerCase().trim();
-            if (normalized.startsWith("*@")) return absenderAdresse.endsWith("@" + normalized.slice(2));
-            return absenderAdresse === normalized;
-          }),
-        );
-        if (suMatch) {
-          erkannterSubunternehmer = { id: suMatch.id, firma: suMatch.firma };
-          bestellungsart = "subunternehmer";
-        } else if (absenderDomain) {
-          const suDomainMatch = suListe.find((su) => {
-            const suDomainField = su.domain?.toLowerCase?.();
-            if (suDomainField && (absenderDomain === suDomainField || absenderDomain.endsWith("." + suDomainField))) return true;
-            const suEmailDomain = su.email?.split("@")[1]?.toLowerCase();
-            if (suEmailDomain === absenderDomain) return true;
-            return su.email_absender?.some((addr: string) => {
-              const normalized = addr.toLowerCase().trim();
-              if (normalized.startsWith("*@")) return absenderDomain === normalized.slice(2) || absenderDomain.endsWith("." + normalized.slice(2));
-              return addr.split("@")[1]?.toLowerCase() === absenderDomain;
-            });
-          });
-          if (suDomainMatch) {
-            erkannterSubunternehmer = { id: suDomainMatch.id, firma: suDomainMatch.firma };
-            bestellungsart = "subunternehmer";
-          }
-        }
-      }
-    }
-  }
-
-  // Plancraft-Spezialbehandlung
-  if (!haendler && !erkannterSubunternehmer &&
-      (absenderDomain === "plancraft.com" || absenderDomain === "mail.plancraft.com")) {
-    bestellungsart = "subunternehmer";
-  }
-
-  // Abo-Anbieter
-  if (bestellungsart === "material") {
-    // F3.F13: Limit als Safety-Net (kleine Tabelle, aber bounded)
-    const { data: aboListe } = await supabase.from("abo_anbieter").select("*").limit(500);
-    if (aboListe && aboListe.length > 0) {
-      const aboMatch = aboListe.find((ab) => {
-        if (ab.email_absender?.some((addr: string) => addr.toLowerCase().trim() === absenderAdresse)) return true;
-        if (ab.domain && (absenderDomain === ab.domain.toLowerCase() || absenderDomain.endsWith("." + ab.domain.toLowerCase()))) return true;
-        return false;
-      });
-      if (aboMatch) {
-        bestellungsart = "abo";
-        if (!haendler) haendler = { id: null, name: aboMatch.name, domain: aboMatch.domain };
-        logInfo("webhook/email", `Abo-Anbieter erkannt: ${aboMatch.name}`, { absenderDomain, absenderAdresse });
-      }
-    }
-  }
-
-  const haendlerDomain: string = haendler?.domain || absenderDomain;
-  let haendlerName: string = haendler?.name || vorfilterHaendlerName || absenderDomain;
-  const istAmazon = absenderDomain === "amazon.de" || absenderDomain === "amazon.com" ||
-                    absenderDomain.endsWith(".amazon.de") || absenderDomain.endsWith(".amazon.com");
-  if (istAmazon) haendlerName = "Amazon Business";
+  // 9. Händler/SU/Abo erkennen — siehe pipeline/haendler-erkennen.ts
+  const haendlerInfo = await identifyHaendlerSuAbo(supabase, {
+    vorfilterHaendlerId,
+    vorfilterHaendlerName,
+    vorfilterSuId,
+    absenderAdresse,
+    absenderDomain,
+  });
+  let haendler: HaendlerRow | null = haendlerInfo.haendler;
+  const erkannterSubunternehmer = haendlerInfo.erkannterSubunternehmer;
+  let bestellungsart = haendlerInfo.bestellungsart;
+  const haendlerDomain = haendlerInfo.haendlerDomain;
+  let haendlerName = haendlerInfo.haendlerName;
 
   // 9b. XRechnung/ZUGFeRD-Schicht — strukturierte E-Rechnungen ohne KI.
   // Seit 1.1.2025 senden viele Lieferanten XML-Anhänge oder ZUGFeRD-PDFs
@@ -526,189 +286,37 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   const erkannteAuftragsnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.auftragsnummer)?.analyse.auftragsnummer);
   const erkannteLieferscheinnummer = safeBestellnummer(analyseErgebnisse.find((e) => e.analyse.lieferscheinnummer)?.analyse.lieferscheinnummer);
 
-  // F5.X Fix: Body-/Subject-Pattern für Bestellnummer.
-  // 05.05.2026 (Wurzelfix MobiHero-Drift): Subject-Pattern läuft IMMER (nicht
-  // nur als Fallback bei fehlender KI-BN). Sammelt zusätzliche Cross-Reference-
-  // Nummern für die Match-Logic. Beispiel MobiHero: KI extrahiert aus PDF die
-  // Rechnungsnr "21092906", Subject sagt aber "Ihre Rechnung zur Bestellung 54255120".
-  // Beide Nummern müssen in suchNummern landen, damit findByExactNumber gegen die
-  // existierende Bestellung 54255120 matchen kann statt eine neue anzulegen.
-  const subjectExtraNummern: string[] = [];
-  {
-    const subject = email_betreff ?? "";
-    const body = input.email_text ?? input.email_body ?? "";
-    const haystack = `${subject}\n${body}`;
-
-    const patterns: Array<{ name: string; regex: RegExp }> = [
-      // Amazon: "302-0733687-4332321"
-      { name: "amazon", regex: /\b\d{3}-\d{7}-\d{7}\b/ },
-      // Deutsche Shops: "BESTELLNR.: #DH39680" / "Bestell-Nr.: 12345" / "Bestellnummer: ABC-123"
-      { name: "bestellnr-prefix", regex: /(?:bestell(?:[\s-]*nr|nummer|nr\.|-?nummer)|order[\s-]*(?:nr|number|id))[\s.:#-]*(#?[A-Z0-9][A-Z0-9_/-]{3,40})/i },
-      // Deutsche Shop-Mails: "Deine/Ihre Bestellung 3006915 ist am ..." (Possessivpronomen + Bestellung + Digits)
-      { name: "possessiv-bestellung", regex: /\b(?:deine|ihre|eure|meine|unsere)\s+bestellung\s+([A-Z]*[0-9]{4,20}[A-Z0-9_/-]*)\b/i },
-      // "#DH39680" oder "#12345" mit Hash-Prefix (mind. 4 alphanumerisch + 1 Digit)
-      { name: "hash-prefix", regex: /#([A-Z]*[0-9]+[A-Z0-9_/-]*)\b/i },
-      // 06.05.2026 — Rechnungsnummer/Lieferscheinnummer/RechNr-Patterns. Vorher
-      // griff der "auftrag-rechnung"-Regex nicht auf "Rechnungsnummer: 8778804884"
-      // weil das "snummer" nach "rechnung" nicht behandelt wurde. Verhindert die
-      // Wave-1-Cluster (RK/Brillux/Fritz/Baustoff Union) ohne BN.
-      { name: "rechnungsnummer", regex: /\brechnungs?\s*[\s.:#-]*nummer[\s.:#-]*\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
-      { name: "rechnung-nr", regex: /\brech(?:nung)?\s*[-.\s]*nr\.?\s*[:#-]?\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
-      { name: "lieferscheinnummer", regex: /\blieferschein(?:s)?\s*[\s.:#-]*nummer[\s.:#-]*\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
-      { name: "auftragsnummer", regex: /\bauftrag(?:s)?\s*[\s.:#-]*nummer[\s.:#-]*\s*([A-Z]*[0-9][A-Z0-9_/-]{2,30})\b/i },
-      // "Auftrag: 2030561109" / "Rechnung Nr 12345" — bisheriger Fallback
-      { name: "auftrag-rechnung", regex: /(?:auftrag(?:s[\s-]*nr|s[\s-]*nummer)?|rechnung)[\s.:#-]*(?:nr\.?:?|nummer:?)?\s*([A-Z]*[0-9]+[A-Z0-9_/-]{2,20})\b/i },
-    ];
-
-    for (const p of patterns) {
-      const match = haystack.match(p.regex);
-      const candidate = match ? (match[1] ?? match[0]) : null;
-      const validated = safeBestellnummer(candidate);
-      if (!validated) continue;
-
-      // Erst-Treffer: Hauptnummer-Fallback wenn KI nichts hatte
-      if (!erkannteBestellnummer) {
-        erkannteBestellnummer = validated;
-        logInfo("webhook/email", `Bestellnummer-Body-Fallback gegriffen (${p.name}): ${validated}`, {
-          email_betreff,
-        });
-      } else if (validated !== erkannteBestellnummer && validated !== erkannteAuftragsnummer && validated !== erkannteLieferscheinnummer) {
-        // Zusatznummer (Cross-Reference) — wenn nicht bereits in den KI-Nummern
-        subjectExtraNummern.push(validated);
-        logInfo("webhook/email", `Subject-Cross-Reference-Nummer (${p.name}): ${validated}`, {
-          email_betreff,
-        });
-      }
-    }
-  }
-
-  // F5.Y Fix: Betrag-Body-Fallback. Wenn KI keinen Betrag erkannt hat, im Body
-  // nach Patterns wie "Bestellwert 547,95 €" / "Gesamtsumme: 1.234,56 EUR" suchen.
-  let bodyExtractedBetrag: number | null = null;
-  if (!analyseErgebnisse.find((e) => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag) {
-    const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
-    const betragPatterns: RegExp[] = [
-      // "Bestellwert 547,95 €" / "Gesamtsumme: 1.234,56 EUR" / "Total: 199,00€"
-      // "Gesamtkosten Brutto: 64,95 €" — DeubaXXL-Pattern + andere deutsche Shops
-      // 15.05.2026 — Erweitert um Standard-Vokabular deutscher Shops:
-      //   • Zahlbetrag (Bernstein)
-      //   • Zu zahlen / Zu zahlender Betrag (PayPal-Style, viele Shops)
-      //   • Endsumme / Brutto-Endsumme
-      //   • Insgesamt (PayPal-Confirms, Amazon)
-      //   • Bestellbetrag / Auftragssumme
-      //   • Rechnungssumme (Wortvariante zu rechnungsbetrag)
-      // Reihenfolge: spezifische Brutto-Schlagwörter VOR generischem `summe`/`betrag`,
-      // damit "Warenwert"/"Zwischensumme" nicht fälschlich greifen.
-      /(?:zahlbetrag|zu[\s.-]*zahlen(?:der[\s.-]*betrag)?|brutto[\s.-]*endsumme|endsumme|insgesamt|bestellwert|gesamtsumme|gesamtbetrag|gesamtkosten(?:[\s.]*brutto)?|total|rechnungsbetrag|rechnungssumme|endbetrag|bestellbetrag|auftragssumme)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})\s*(?:€|eur|euro)/i,
-      // "547,95 EUR" als Anker mit Schlüsselwort davor
-      /(?:summe|betrag|brutto)[\s.:#-]*([0-9]{1,3}(?:[.\s][0-9]{3})*[,.][0-9]{2})/i,
-    ];
-    for (const re of betragPatterns) {
-      const m = body.match(re);
-      if (m && m[1]) {
-        const normalized = m[1].replace(/[.\s]/g, "").replace(",", ".");
-        const num = parseFloat(normalized);
-        if (Number.isFinite(num) && num > 0 && num < 1_000_000) {
-          bodyExtractedBetrag = num;
-          logInfo("webhook/email", `Betrag-Body-Fallback gegriffen: ${num}€ aus "${m[0]}"`, {
-            email_betreff,
-          });
-          break;
-        }
-      }
-    }
-  }
-
-  // 15.05.2026 — Kundennummer-Body-Fallback. Analog zu bodyExtractedBetrag:
-  // wenn keine KI-Analyse einen kundennummer-Wert geliefert hat, im Body nach
-  // Standard-Patterns suchen. Greift bei body-only Mails wo KI typ='unbekannt'
-  // oder Felder nicht extrahiert hat (z.B. Bernstein "Deine Kundennummer: 1380585").
-  let bodyExtractedKundennummer: string | null = null;
-  if (!analyseErgebnisse.find((e) => e.analyse.kundennummer)?.analyse.kundennummer) {
-    const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
-    const kundennrPatterns: RegExp[] = [
-      // "Kundennummer: 1380585" / "Kunden-Nr.: 12345" / "Kunden-ID: ABC-12345"
-      // "Customer ID: 98765" / "Customer No.: 12345"
-      // Format: 4-15 Zeichen alphanumerisch + Bindestriche, beginnend mit Ziffer
-      // oder Buchstabe (vermeidet false-positive auf "Kundennummer ist wichtig")
-      /(?:kunden(?:[-\s.])?(?:nummer|nr|id)|customer\s*(?:id|no|number|nr))[\s.:#-]*([A-Z0-9][A-Z0-9-]{3,14})\b/i,
-    ];
-    for (const re of kundennrPatterns) {
-      const m = body.match(re);
-      if (m && m[1]) {
-        const value = m[1].toUpperCase();
-        // Sanity: nicht reine Buchstaben (= eher kein Kundenidentifier)
-        // und nicht zu wenig Ziffern (>= 3 Ziffern für minimale Plausibilität)
-        const digitCount = (value.match(/\d/g) || []).length;
-        if (digitCount >= 3) {
-          bodyExtractedKundennummer = value;
-          logInfo("webhook/email", `Kundennummer-Body-Fallback gegriffen: "${value}" aus "${m[0]}"`, {
-            email_betreff,
-          });
-          break;
-        }
-      }
-    }
-  }
-
-  // 17.05.2026 — Gutschrift-Body-Fallback. Defense-in-Depth Layer parallel zur
-  // KI-Detection: scannt Subject + Body nach Trigger-Begriffen für Rückerstattung/
-  // Gutschrift. Greift wenn KI ist_gutschrift=false liefert obwohl das Dokument
-  // klare Gutschrift-Signale hat (z.B. Strom-Jahresabrechnung mit Saldo zugunsten
-  // Kunde). Wert wird in bodyAnalyseLokal.ist_gutschrift gemerged.
-  // Gefährlich falsche Positiv-Klassifikation als Zahlungsforderung kostet
-  // theoretisch 1000€+ → Defense-in-Depth lohnt sich.
-  let bodyExtractedIstGutschrift = false;
-  {
-    const body = `${email_betreff ?? ""}\n${input.email_text ?? input.email_body ?? ""}`;
-    const gutschriftPatterns: RegExp[] = [
-      /\br(?:ü|ue)ckerstattungsbetrag\b/i,
-      /\bguthabenbetrag\b/i,
-      /\bguthaben[\s.:]+in\s+h(?:ö|oe)he\s+von\b/i,
-      /\bauszahlung\s+(?:des\s+)?guthabens?\b/i,
-      /\berstattungsbetrag\b/i,
-      /\br(?:ü|ue)ckzahlungsbetrag\b/i,
-      /\bcredit\s+(?:note|memo)\b/i,
-      // "Gutschrift Nr." oder "Gutschrift vom ..." als Dokument-Header
-      /\bgutschrift(?:\s+(?:nr\.?|nummer|vom))/i,
-    ];
-    for (const re of gutschriftPatterns) {
-      if (re.test(body)) {
-        bodyExtractedIstGutschrift = true;
-        logInfo("webhook/email", `Gutschrift-Body-Fallback gegriffen via Pattern ${re.source}`, {
-          email_betreff,
-        });
-        break;
-      }
-    }
-  }
+  // Regex-Extraction: Subject-Bestellnummer-Patterns + Body-Betrag/Kundennr/
+  // Gutschrift-Fallbacks. Deterministische Defense-in-Depth-Schicht parallel
+  // zur KI-Analyse. Siehe pipeline/regex-extract.ts.
+  const bodyHints = extractBodyHints({
+    email_betreff: email_betreff ?? "",
+    email_body: input.email_text ?? input.email_body ?? "",
+    analyseErgebnisse,
+    erkannteBestellnummer,
+    erkannteAuftragsnummer,
+    erkannteLieferscheinnummer,
+  });
+  erkannteBestellnummer = bodyHints.erkannteBestellnummer;
+  const subjectExtraNummern = bodyHints.subjectExtraNummern;
+  const bodyExtractedBetrag = bodyHints.bodyExtractedBetrag;
+  const bodyExtractedKundennummer = bodyHints.bodyExtractedKundennummer;
+  const bodyExtractedIstGutschrift = bodyHints.bodyExtractedIstGutschrift;
 
   const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer, ...subjectExtraNummern].filter((n): n is string => !!n);
 
-  // GPT-Bestellnummer-Nachlauf für Besteller-Match
-  if (erkannteBestellnummer && !signal && bestellerKuerzelMutable === "UNBEKANNT") {
-    const { data: signalByGpt } = await supabase
-      .from("bestellung_signale").select("*").eq("order_nummer", erkannteBestellnummer).eq("status", "pending").limit(1);
-    if (signalByGpt?.[0]) {
-      const { data: claimed } = await supabase
-        .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signalByGpt[0].id).eq("status", "pending").select("id");
-      if (claimed && claimed.length > 0) {
-        signal = signalByGpt[0];
-        bestellerKuerzelMutable = String(signal!.kuerzel);
-        zuordnungsMethodeMutable = "bestellnummer_match_gpt";
-        const { data: nachlaufBenutzer } = await supabase
-          .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzelMutable).maybeSingle();
-        if (nachlaufBenutzer) benutzer = nachlaufBenutzer;
-      }
-    }
-  }
-  if (signal && erkannteBestellnummer && !signal.order_nummer) {
-    await supabase.from("bestellung_signale")
-      .update({ order_nummer: erkannteBestellnummer })
-      .eq("id", signal.id);
-  }
+  // GPT-Bestellnummer-Nachlauf: ggf. pending bestellung_signal anhand der
+  // KI-extrahierten BN nachträglich claimen + Backfill von order_nummer.
+  const nachlauf = await applyGptBestellnummerNachlauf(supabase, {
+    bestellerKuerzel: bestellerKuerzelMutable,
+    signal,
+    benutzer,
+    erkannteBestellnummer,
+  });
+  bestellerKuerzelMutable = nachlauf.bestellerKuerzel;
+  if (nachlauf.zuordnungsMethode) zuordnungsMethodeMutable = nachlauf.zuordnungsMethode;
+  signal = nachlauf.signal;
+  benutzer = nachlauf.benutzer;
 
   const matchCtx: MatchContext = {
     haendler: haendler ? { id: haendler.id, name: haendler.name } : null,
@@ -716,542 +324,47 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     haendlerName,
   };
 
-  let existierendeBestellung: BestellungRow | null = null;
-
-  // Re-Backfill-Idempotenz (05.05.2026): Wenn diese Mail in einer früheren
-  // Pipeline-Run schon einer Bestellung zugeordnet war, diese als Match nehmen
-  // BEVOR die normale Match-Logic läuft. Verhindert dass Re-Backfills neue
-  // Bestellungen anlegen wenn die Mail-zu-Bestellung-Beziehung schon bekannt ist.
-  if (input.existing_bestellung_id) {
-    const { data: prev } = await supabase
-      .from("bestellungen")
-      .select("id, bestellnummer, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
-      .eq("id", input.existing_bestellung_id)
-      .maybeSingle();
-    if (prev) {
-      existierendeBestellung = prev as BestellungRow;
-      logInfo("webhook/email", "Re-Backfill-Idempotenz: existing_bestellung_id Match übernommen", {
-        bestellung_id: input.existing_bestellung_id,
-        bestellnummer: prev.bestellnummer,
-      });
-    }
+  // Schritt 12 — Bestellung finden oder erstellen.
+  // Siehe pipeline/bestellung-finden.ts für die volle Match-Reihenfolge
+  // (existing-Hint → Exact → Fuzzy → AN-Veto → Cross → Betrag → Erweitert →
+  // Evidence-Gate → Insert). Kann haendlerName + bestellungsart mutieren.
+  const findResult = await findeOderErstelleBestellung(supabase, {
+    existing_bestellung_id: input.existing_bestellung_id,
+    haendler: haendler ? { id: haendler.id, name: haendler.name } : null,
+    erkannterSubunternehmer,
+    bestellungsart,
+    haendlerName,
+    absenderDomain,
+    email_betreff: email_betreff ?? "",
+    email_absender: email_absender ?? "",
+    analyseErgebnisse,
+    erkannteBestellnummer,
+    erkannteAuftragsnummer,
+    suchNummern,
+    matchCtx,
+    bestellerKuerzelMutable,
+    zuordnungsMethodeMutable,
+    benutzer: benutzer ? { name: benutzer.name } : null,
+  });
+  if (findResult.kind === "skip") {
+    return findResult.response;
   }
+  const bestellungId = findResult.bestellungId;
+  const bestellungNeuErstellt = findResult.bestellungNeuErstellt;
+  haendlerName = findResult.haendlerName;
+  bestellungsart = findResult.bestellungsart;
 
-  if (!existierendeBestellung) {
-    existierendeBestellung = await findByExactNumber(supabase, suchNummern, matchCtx);
-  }
-
-  // R5c-Bugfix: Fuzzy-Match (Substring + Token)
-  if (!existierendeBestellung) {
-    existierendeBestellung = await findByFuzzyNumber(supabase, suchNummern, matchCtx);
-  }
-
-  // 07.05.2026 — Auftragsnummer-Konflikt-Veto (Defense-in-Depth).
-  // Egal welcher Match-Pfad oben gegriffen hat (existing_bestellung_id-Hint,
-  // findByExactNumber, findByFuzzyNumber): wenn das eingehende Doku eine
-  // KONKRETE Auftragsnummer hat und die Match-Bestellung eine ANDERE konkrete
-  // Auftragsnummer hat → es ist eine andere Bestellung. Match verwerfen,
-  // sodass weiter unten eine neue Bestellung angelegt wird.
-  if (existierendeBestellung) {
-    const dokuAuftragsnr = analyseErgebnisse
-      .map((e) => e.analyse.auftragsnummer)
-      .find((n): n is string => !!n);
-    const bestellungAuftragsnr = (existierendeBestellung as unknown as { auftragsnummer?: string | null }).auftragsnummer;
-    if (dokuAuftragsnr && bestellungAuftragsnr && dokuAuftragsnr !== bestellungAuftragsnr) {
-      logInfo("webhook/email", "Match-Veto: Auftragsnummer-Konflikt → neue Bestellung statt Doku-Andocken", {
-        match_bestellung_id: existierendeBestellung.id,
-        match_auftragsnummer: bestellungAuftragsnr,
-        doku_auftragsnummer: dokuAuftragsnr,
-        email_betreff,
-      });
-      existierendeBestellung = null;
-    }
-  }
-
-  // Duplikat-Typ-Check (gleicher Dokumenttyp existiert schon).
-  //
-  // Drei Fälle:
-  //   1. Existierende hat hat_typ=true UND validen Doku-Record mit PDF
-  //      → Multi-Slot: zusätzlicher Doku-Record (z.B. Amazon Teil-Rechnung 2)
-  //   2. Existierende hat hat_typ=true ABER nur Doku-Records ohne PDF
-  //      → Anreichern: alte (PDF-lose) Doku-Records ersetzen mit neuem PDF
-  //   3. Existierende hat hat_typ=true OHNE jeden Doku-Record (Make.com-Erbe)
-  //      → Anreichern: neuer Doku-Record wird angefügt
-  if (existierendeBestellung) {
-    const hauptTyp = analyseErgebnisse
-      .filter((e) => BEKANNTE_TYPEN.includes(e.analyse.typ))
-      .map((e) => e.analyse.typ)[0];
-    const flagKey = hauptTyp ? FLAG_MAP[hauptTyp] : null;
-    if (flagKey && existierendeBestellung[flagKey as keyof BestellungRow]) {
-      const { data: existingDoku } = await supabase
-        .from("dokumente")
-        .select("id, storage_pfad")
-        .eq("bestellung_id", existierendeBestellung.id)
-        .eq("typ", hauptTyp);
-
-      const dokuMitPdf = (existingDoku ?? []).filter((d) => d.storage_pfad !== null);
-      const dokuOhnePdf = (existingDoku ?? []).filter((d) => d.storage_pfad === null);
-
-      if (dokuMitPdf.length === 0) {
-        // Fall 2 oder 3: kein valider Doku-Record → die alten PDF-losen
-        // werden ersetzt, der neue Anhang-Insert läuft normal weiter.
-        if (dokuOhnePdf.length > 0) {
-          await supabase
-            .from("dokumente")
-            .delete()
-            .in("id", dokuOhnePdf.map((d) => d.id));
-          logInfo("webhook/email", `Anreicherung: ${dokuOhnePdf.length} alte ${hauptTyp}-Records ohne PDF wurden für Backfill mit neuem PDF ersetzt`, {
-            bestellungId: existierendeBestellung.id,
-          });
-        } else {
-          logInfo("webhook/email", `Anreicherung: hat_${hauptTyp}=true ohne dokumente-Record (Make.com-Erbe) — wird angefügt`, {
-            bestellungId: existierendeBestellung.id,
-          });
-        }
-        // Pipeline läuft weiter — kein skip.
-      } else {
-        // Fall 1: Multi-Slot. Neuer Doku-Record wird zusätzlich angelegt.
-        logInfo("webhook/email", `Multi-Slot: ${hauptTyp} bereits mit PDF vorhanden, neuer Anhang als zusätzlicher Doku-Record (z.B. Teil-Lieferung)`, {
-          bestellungId: existierendeBestellung.id,
-          existing_pdf_count: dokuMitPdf.length,
-        });
-        // Pipeline läuft weiter — kein skip.
-      }
-    }
-  }
-
-  // Cross-Match (ohne Händler-Filter)
-  if (!existierendeBestellung && suchNummern.length > 0) {
-    existierendeBestellung = await findByCrossMatch(supabase, suchNummern);
-  }
-
-  let bestellungId: string;
-  let bestellungNeuErstellt = false;
-
-  if (existierendeBestellung) {
-    bestellungId = existierendeBestellung.id;
-  } else {
-    // Betrag-Match (gleicher Händler + Betrag, andere Nummer)
-    const erkannterBetrag24h = analyseErgebnisse.find((e) => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag || null;
-    const hauptTyp24h = analyseErgebnisse
-      .filter((e) => ["bestellbestaetigung", "lieferschein", "rechnung", "aufmass", "leistungsnachweis"].includes(e.analyse.typ))
-      .map((e) => e.analyse.typ)[0];
-
-    if (erkannterBetrag24h && hauptTyp24h && haendlerName) {
-      const betragMatch = await findByBetragMatch(supabase, {
-        betrag: erkannterBetrag24h,
-        hauptTyp: hauptTyp24h,
-        ctx: matchCtx,
-      });
-      if (betragMatch) {
-        // Nummern ergänzen
-        const nummernUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
-        if (erkannteBestellnummer && !betragMatch.bestehendeBestellnummer) nummernUpdate.bestellnummer = erkannteBestellnummer;
-        if (erkannteAuftragsnummer && !betragMatch.bestehendeAuftragsnummer) nummernUpdate.auftragsnummer = erkannteAuftragsnummer;
-        if (Object.keys(nummernUpdate).length > 1) {
-          await supabase.from("bestellungen").update(nummernUpdate).eq("id", betragMatch.bestellungId);
-        }
-        logInfo("webhook/email", `Betrag-Match: gleicher Händler + Betrag → Duplikat verworfen`, {
-          bestellungId: betragMatch.bestellungId,
-          betrag: erkannterBetrag24h,
-          haendler: haendlerName,
-          alteNr: betragMatch.alteNr,
-          neueNr: erkannteBestellnummer,
-        });
-        return {
-          success: true,
-          skipped: true,
-          reason: "betrag_match_24h",
-          bestellung_id: betragMatch.bestellungId,
-        };
-      }
-    }
-
-    // Erweiterter Match (Händler + offen + Typ-noch-nicht-da)
-    const analyseTypen = analyseErgebnisse
-      .filter((e) => BEKANNTE_TYPEN.includes(e.analyse.typ))
-      .map((e) => e.analyse.typ);
-
-    let erweiterterMatch: string | null = null;
-    if (analyseTypen.length > 0) {
-      const dokumentNummern = [erkannteBestellnummer, erkannteAuftragsnummer].filter((n): n is string => !!n);
-      const erkannterBetrag = analyseErgebnisse.find((e) => e.analyse.gesamtbetrag)?.analyse.gesamtbetrag || null;
-      // Stabile Auftragsnummer aus den Anhang-Analysen für Strict-Konflikt-Check
-      const dokumentAuftragsnummer = analyseErgebnisse
-        .map((e) => e.analyse.auftragsnummer)
-        .find((n): n is string => !!n) ?? erkannteAuftragsnummer ?? null;
-      const result = await findByErweiterterMatch(supabase, {
-        analyseTypen,
-        dokumentNummern,
-        dokumentAuftragsnummer,
-        erkannterBetrag,
-        ctx: matchCtx,
-        bestellerKuerzel: bestellerKuerzelMutable,
-      });
-      if (result) erweiterterMatch = result.bestellungId;
-    }
-
-    if (erweiterterMatch) {
-      bestellungId = erweiterterMatch;
-    } else {
-      // 05.05.2026 (Wurzelfix Geister-Bestellungen): Wenn ALLE Anhang-Analysen
-      // parse_fehler haben UND keine BN/Betrag extrahiert wurde → KEINE neue
-      // Bestellung anlegen. Stattdessen Mail als 'failed' markieren damit der
-      // Auto-Retry-Cron sie später nochmal versucht (möglicherweise greift
-      // dann der gpt-4o-Fallback oder ein Modell-Update).
-      const allAnhaengeFailed = analyseErgebnisse.length > 0
-        && analyseErgebnisse.every((e) => e.analyse.parse_fehler === true || (!e.analyse.bestellnummer && !e.analyse.gesamtbetrag && e.analyse.konfidenz === 0));
-      if (allAnhaengeFailed && !erkannteBestellnummer && !erkannteAuftragsnummer) {
-        logError("webhook/email", "Alle Anhang-Analysen parse_fehler + keine Subject-BN → keine Geister-Bestellung anlegen", {
-          email_betreff, email_absender,
-          anhang_count: analyseErgebnisse.length,
-        });
-        // ingest.ts catched Exceptions → markFailed → Auto-Retry-Cron versucht später nochmal
-        // Verhindert dass eine null-BN-null-Betrag-Geister-Bestellung in der DB landet.
-        throw new Error("parse_fehler_alle_anhaenge: Mail wird zur Wiederverarbeitung markiert");
-      }
-
-      // 06.05.2026 (Pseudo-Bestellung-Filter): Mails OHNE Anhang + OHNE
-      // erkannte BN + haendlerName ist nur eine Mail-Domain → das ist
-      // höchstwahrscheinlich Korrespondenz / Notification / Mahnung, KEINE
-      // echte Bestellung. Verhindert die printful/rolladenplanet/wk-transport/
-      // studio-46/Bau-Technik-Pseudo-Bestellungen die User im UI verwirren.
-      // Mail wird als 'failed' markiert (nicht stillschweigend verworfen) —
-      // wenn es doch eine Bestellung war, kann der User manuell anlegen.
-      const haendlerSiehtNachDomainAus = haendlerName === absenderDomain
-        || /\.(de|com|net|info|eu|pl|org|at|ch)$/i.test(haendlerName)
-        || /-mail\.com$/i.test(haendlerName);
-      if (analyseErgebnisse.length === 0
-          && !erkannteBestellnummer
-          && !erkannteAuftragsnummer
-          && haendlerSiehtNachDomainAus) {
-        logError("webhook/email", "Pseudo-Bestellung verhindert: kein Anhang + keine BN + Domain-Händler → vermutlich Korrespondenz", {
-          email_betreff, email_absender, haendlerName,
-        });
-        throw new Error("pseudo_bestellung_kein_anhang_keine_bn: Mail wird als 'failed' markiert");
-      }
-
-      // 07.05.2026 (Strukturelles Evidence-Gate): Bevor eine NEUE Bestellung
-      // angelegt wird, muss mindestens eine konkrete Daten-Spur vorliegen —
-      // Betrag, Bestellnummer/Auftragsnummer/Lieferscheinnummer ODER eine
-      // nicht-leere Artikel-Liste. Sonst ist die Mail keine echte Transaktion,
-      // sondern Korrespondenz / AGB-Update / Vertrags-Anlage / Newsletter.
-      //
-      // Realer Auslöser: EnBW Ladekarten-Bestellbestätigung mit drei PDF-
-      // Anhängen (AGB, Widerrufsbelehrung, Widerrufsformular). Die KI
-      // klassifizierte alle drei mit Konfidenz 0.5–0.9 als 'bestellbestaetigung',
-      // aber jeder Anhang hatte gesamtbetrag=null, bestellnummer=null,
-      // artikel=[]. Eine leere Bestellung "Ohne Nr. – EnBW – Material" landete
-      // in der UI; nur durch noch eine Black-List-Regel (AGB-Filter) wäre der
-      // Edge-Case nicht zu schließen — strukturell gehören solche Mails ohne
-      // konkrete Transaktions-Daten gar nicht erst in die Bestellungs-Tabelle.
-      //
-      // 'irrelevant'-Skip statt 'failed': Retry bringt strukturell nichts —
-      // das Modell wird beim nächsten Versuch identisch antworten. Die Mail
-      // landet im email_processing_log als 'irrelevant: keine_konkreten_daten'
-      // und der Retry-Cron lässt sie in Ruhe. False-Negatives kann der User
-      // im Email-Sync-Monitor manuell zur Bestellung hochstufen.
-      const hatKonkreteDatenInAnhang = analyseErgebnisse.some((e) => {
-        const a = e.analyse;
-        const hatBetrag = typeof a.gesamtbetrag === "number" && a.gesamtbetrag > 0;
-        const hatNummer = !!(a.bestellnummer || a.auftragsnummer || a.lieferscheinnummer);
-        const hatArtikel = Array.isArray(a.artikel) && a.artikel.length > 0;
-        return hatBetrag || hatNummer || hatArtikel;
-      });
-      if (!hatKonkreteDatenInAnhang && !erkannteBestellnummer && !erkannteAuftragsnummer) {
-        logInfo("webhook/email", "Pseudo-Bestellung verhindert: keine konkreten Daten in Mail oder Anhängen", {
-          email_betreff,
-          email_absender,
-          haendlerName,
-          anhang_count: analyseErgebnisse.length,
-          typen: analyseErgebnisse.map((e) => e.analyse.typ),
-          konfidenzen: analyseErgebnisse.map((e) => e.analyse.konfidenz),
-        });
-        return {
-          success: true,
-          skipped: true,
-          reason: "keine_konkreten_daten",
-        };
-      }
-
-      // Neue Bestellung anlegen
-      if (bestellungsart === "material" && analyseErgebnisse.length > 0) {
-        const vermuteteArt = analyseErgebnisse.find((e) => e.analyse.vermutete_bestellungsart)?.analyse.vermutete_bestellungsart;
-        if (vermuteteArt === "subunternehmer") bestellungsart = "subunternehmer";
-      }
-
-      if (haendlerName === absenderDomain && analyseErgebnisse.length > 0) {
-        const gptHaendler = analyseErgebnisse.find((e) => e.analyse.haendler)?.analyse.haendler;
-        if (gptHaendler) {
-          logInfo("webhook/email", `Händlername aus GPT übernommen (statt Domain ${absenderDomain})`, { gptHaendler });
-          haendlerName = gptHaendler;
-        }
-      }
-
-      // 06.05.2026 — Letzte Verteidigung: wenn haendlerName immer noch wie
-      // eine Mail-Domain aussieht (KI hat keinen Firmennamen erkannt), markiere
-      // das im UI klar erkennbar. Verhindert dass "rolladenplanet.info" oder
-      // "studio-46.eu" als Pseudo-Händler in der Liste erscheinen — der User
-      // weiß so dass diese Bestellung manuell-händler-zugeordnet werden muss.
-      if (/\.(de|com|net|info|eu|pl|org|at|ch)$/i.test(haendlerName) && !haendlerName.includes(" ")) {
-        haendlerName = `Unbekannter Lieferant (${haendlerName})`;
-        logInfo("webhook/email", `haendlerName war Domain — markiert als 'Unbekannter Lieferant'`, {
-          original: absenderDomain,
-        });
-      }
-
-      // 08.05.2026 — Bestellnummer-Priorität: Auftragsnummer > Bestellnummer
-      // (aus Subject) > Rechnungsnummer (aus Doku). NIEMALS Lieferscheinnummer.
-      // Auftragsnummer ist die stabilste Identifikation einer Bestellung
-      // (bleibt über alle Doku-Typen gleich); Bestellnummer aus Subject kann
-      // bei Rechnungs-Mails auch eine Rechnungsnummer sein.
-      const dokuAuftragsnr = analyseErgebnisse
-        .map((e) => e.analyse.auftragsnummer)
-        .find((n): n is string => !!n);
-      const dokuRechnungsnr = analyseErgebnisse
-        .find((e) => e.analyse.typ === "rechnung")?.analyse.bestellnummer;
-      const initialeBestellnummer =
-        dokuAuftragsnr
-        ?? erkannteAuftragsnummer
-        ?? erkannteBestellnummer
-        ?? dokuRechnungsnr
-        ?? null;
-
-      const { data: neue, error: insertError } = await supabase
-        .from("bestellungen")
-        .insert({
-          bestellnummer: initialeBestellnummer,
-          auftragsnummer: dokuAuftragsnr ?? erkannteAuftragsnummer ?? null,
-          haendler_id: haendler?.id || null,
-          haendler_name: erkannterSubunternehmer?.firma || haendlerName,
-          besteller_kuerzel: bestellerKuerzelMutable,
-          besteller_name: benutzer?.name || bestellerKuerzelMutable,
-          status: "offen",
-          zuordnung_methode: zuordnungsMethodeMutable,
-          bestellungsart,
-          subunternehmer_id: erkannterSubunternehmer?.id || null,
-        })
-        .select()
-        .single();
-
-      if (insertError && erkannteBestellnummer) {
-        const { data: fallback } = await supabase
-          .from("bestellungen")
-          .select("id")
-          .eq("bestellnummer", erkannteBestellnummer)
-          .limit(1)
-          .maybeSingle();
-        if (fallback) {
-          bestellungId = fallback.id;
-        } else {
-          throw new Error("Bestellung konnte weder angelegt noch gefunden werden");
-        }
-      } else if (!neue) {
-        throw new Error("Bestellung konnte nicht angelegt werden");
-      } else {
-        bestellungId = neue.id;
-        bestellungNeuErstellt = true;
-      }
-    }
-  }
-
-  if (!bestellungId) {
-    throw new Error("Keine bestellungId gesetzt — weder gefunden noch erstellt");
-  }
-
-  // 13. Dokumente speichern
-  let dokumenteGespeichert = 0;
-  const gespeicherteTypen: string[] = [];
-
-  // Supabase Storage akzeptiert nur ASCII-safe Pfade. Deutsche Filenames mit
-  // Umlauten/Sonderzeichen (Brillux, Süd-Metall, Raab-Karcher) führen zu
-  // "Invalid key" — wir normalisieren den Filename vor dem Upload.
-  function sanitizeStorageFilename(name: string): string {
-    return name
-      .replace(/[äÄ]/g, "ae")
-      .replace(/[öÖ]/g, "oe")
-      .replace(/[üÜ]/g, "ue")
-      .replace(/[ßẞ]/g, "ss")
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-zA-Z0-9._-]/g, "_")
-      .replace(/_+/g, "_")
-      .slice(0, 120);
-  }
-
-  // Fallback wenn KI-Vision den Doku-Typ nicht erkennt: aus Mail-Betreff ableiten.
-  // Bei deutschen Geschäftsmails ist der Subject sehr aussagekräftig.
-  type DokuTyp = AnalyseErgebnis["analyse"]["typ"];
-  function inferTypFromSubject(subject: string | null | undefined): DokuTyp | null {
-    if (!subject) return null;
-    const s = subject.toLowerCase();
-    if (/\b(rechnung|invoice|rechnr|rg-?nr)\b/.test(s)) return "rechnung";
-    if (/\b(lieferschein|delivery)\b/.test(s)) return "lieferschein";
-    if (/\b(bestellbest[äa]tigung|auftragsbest[äa]tigung|order confirmation|bestellbestaetigung)\b/.test(s)) return "bestellbestaetigung";
-    if (/\b(versand(best[äa]tigung)?|tracking|shipping)\b/.test(s)) return "versandbestaetigung";
-    if (/\b(aufma(?:ss|ß))\b/.test(s)) return "aufmass";
-    if (/\b(leistungsnachweis)\b/.test(s)) return "leistungsnachweis";
-    return null;
-  }
-
-  for (const ergebnis of analyseErgebnisse) {
-    const { analyse, dateiName, base64, mime_type } = ergebnis;
-
-    // 06.05.2026 — Strict-VB-Subject-Override: bei eindeutigen Versand-Subjects
-    // ("ist unterwegs", "wird zugestellt", "voraussichtlicher Liefertermin")
-    // überstimmt das einen falschen KI-Klassifizierten BB-Typ. Verhindert die
-    // CHECK24/Megabad-Misklassifikation. Greift NUR wenn KI BB sagt — wenn KI
-    // schon VB sagt, kein Eingriff.
-    if (analyse.typ === "bestellbestaetigung" && isStrictVersandBetreff(email_betreff || "")) {
-      logInfo("webhook/email", `Strict-VB-Override: KI sagte bestellbestaetigung, Subject ist eindeutig Versand`, {
-        subject: email_betreff,
-      });
-      analyse.typ = "versandbestaetigung";
-    }
-
-    // 07.05.2026 — typ="anlage" ist KI-EXPLIZIT (AGB/Widerruf/Datenschutz/etc.)
-    // und darf NICHT durch Subject-Fallback umetikettiert werden. Sonst würde
-    // eine "Bestellbestätigung: EnBW Ladekarte"-Mail die mitgeschickte AGB-PDF
-    // als Bestellbestätigung persistieren — genau der Bug, den wir abstellen.
-    if (analyse.typ === "anlage") {
-      logInfo("webhook/email", `Anhang übersprungen: typ="anlage" (Begleit-Dokument, keine Transaktion)`, {
-        datei: dateiName,
-        subject: (email_betreff ?? "").slice(0, 80),
-      });
-      continue;
-    }
-
-    // F5.X Fix: Vision-Fallback. Wenn KI den Typ nicht erkennt (parse_fehler ODER
-    // typ="unbekannt"), versuchen wir den Typ aus dem Mail-Betreff abzuleiten —
-    // bei deutschen Geschäftsmails ist der Subject extrem aussagekräftig
-    // ("Brillux Rechnung Nr. 6887860"). Das PDF wird dann TROTZDEM in Storage
-    // hochgeladen statt silent verworfen.
-    const typIstUnbekannt = !BEKANNTE_TYPEN.includes(analyse.typ);
-    if (typIstUnbekannt || analyse.parse_fehler) {
-      const subjectTyp = inferTypFromSubject(email_betreff);
-      if (subjectTyp && BEKANNTE_TYPEN.includes(subjectTyp)) {
-        // Subject-Fallback greift: Typ überschreiben, weiter mit Storage-Upload.
-        logInfo("webhook/email", `Vision-Fallback: typ="${analyse.typ}" → "${subjectTyp}" (aus Betreff abgeleitet)`, {
-          datei: dateiName,
-          parse_fehler: !!analyse.parse_fehler,
-        });
-        analyse.typ = subjectTyp;
-        // Ab hier läuft der normale Storage+Insert-Pfad weiter.
-      } else {
-        // Subject gibt auch nichts her — als unklassifizierbar verwerfen.
-        if (analyse.parse_fehler) {
-          logError("webhook/email", `OpenAI parse_fehler — Dokument wird übersprungen`, {
-            datei: dateiName,
-            typ: analyse.typ,
-          });
-        } else {
-          logInfo("webhook/email", `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}"`);
-        }
-        await supabase.from("webhook_logs").insert({
-          typ: "email",
-          status: "error",
-          bestellung_id: bestellungId,
-          fehler_text: `Anhang übersprungen: typ="${analyse.typ}", datei="${dateiName}", parse_fehler=${!!analyse.parse_fehler}, subject="${(email_betreff ?? "").slice(0, 80)}"`,
-        });
-        continue;
-      }
-    }
-
-    const buffer = safeBase64ToBuffer(base64);
-    if (!buffer) {
-      logError("webhook/email", `Ungültiger base64-Inhalt: ${dateiName}`, { base64_len: base64?.length ?? 0 });
-      await supabase.from("webhook_logs").insert({
-        typ: "email",
-        status: "error",
-        bestellung_id: bestellungId,
-        fehler_text: `Anhang base64 ungültig: datei="${dateiName}", len=${base64?.length ?? 0}`,
-      });
-      continue;
-    }
-
-    // 06.05.2026 — PDF-Content-Hash. Verhindert Doku-Duplikate über exakt
-    // gleiches PDF (Reply-Mails mit gleichem Anhang, Re-Backfill-Doppelt-
-    // Verarbeitung). Pre-Insert-Check + Partial-Unique-Index als doppelte
-    // Verteidigung. Storage-Pfad enthält den Hash damit auch das Storage-
-    // File deterministisch ist (kein Date.now()-Random-Suffix mehr).
-    const contentHash = createHash("sha256").update(buffer).digest("hex");
-    const { data: existingDoku } = await supabase
-      .from("dokumente")
-      .select("id, storage_pfad")
-      .eq("bestellung_id", bestellungId)
-      .eq("typ", analyse.typ)
-      .eq("content_hash", contentHash)
-      .limit(1);
-    if (existingDoku && existingDoku.length > 0) {
-      logInfo("webhook/email", `Doku-Duplikat erkannt via content_hash — übersprungen`, {
-        bestellungId, typ: analyse.typ, content_hash: contentHash.slice(0, 16),
-        bestehender_pfad: existingDoku[0].storage_pfad,
-      });
-      continue;
-    }
-
-    const storagePfad = `${bestellungId}/${analyse.typ}_${contentHash.slice(0, 16)}_${sanitizeStorageFilename(dateiName)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("dokumente")
-      .upload(storagePfad, buffer, { contentType: mime_type, upsert: true });
-
-    if (uploadError) {
-      logError("webhook/email", `Storage Upload fehlgeschlagen: ${storagePfad}`, uploadError);
-      // Echter Storage-Fehler in webhook_logs persistieren — sonst nur in Vercel-Logs
-      await supabase.from("webhook_logs").insert({
-        typ: "email",
-        status: "error",
-        bestellung_id: bestellungId,
-        fehler_text: `Storage-Upload fehlgeschlagen: pfad="${storagePfad}", mime="${mime_type}", buffer_bytes=${buffer.length}, fehler="${uploadError.message ?? String(uploadError)}"`,
-      });
-      continue;
-    }
-
-    // 06.05.2026 (Welle 2 C4) — atomic-Persist via RPC mit Pre-Insert-Check.
-    // Vorher: direkter INSERT → bei content_hash-Konflikt (Race-Condition,
-    // Doppel-Webhook) gab's Unique-Constraint-Error. Jetzt: RPC macht
-    // Pre-Check + idempotenter Return des existierenden doku_id.
-    const { error: insertError } = await supabase.rpc("persist_dokument_atomic", {
-      p_bestellung_id: bestellungId,
-      p_typ: analyse.typ,
-      p_quelle: "email",
-      p_storage_pfad: storagePfad,
-      p_content_hash: contentHash,
-      p_email_betreff: email_betreff ?? null,
-      p_email_absender: email_absender ?? null,
-      p_email_datum: email_datum ?? null,
-      p_ki_roh_daten: analyse as unknown as Record<string, unknown>,
-      p_bestellnummer_erkannt: analyse.bestellnummer ?? null,
-      p_auftragsnummer: analyse.auftragsnummer || null,
-      p_lieferscheinnummer: analyse.lieferscheinnummer || null,
-      p_artikel: analyse.artikel as unknown as Record<string, unknown>,
-      p_gesamtbetrag: analyse.gesamtbetrag ?? bodyExtractedBetrag,
-      p_netto: analyse.netto,
-      p_mwst: analyse.mwst,
-      p_faelligkeitsdatum: analyse.faelligkeitsdatum,
-      p_lieferdatum: analyse.lieferdatum,
-      p_iban: analyse.iban,
-      p_kundennummer: analyse.kundennummer || null,
-      p_besteller_im_dokument: analyse.besteller_im_dokument || null,
-      p_projekt_referenz: analyse.projekt_referenz || null,
-      p_bestelldatum: analyse.bestelldatum || null,
-      p_ist_gutschrift: analyse.ist_gutschrift ?? false,
-    });
-    if (insertError) {
-      logError("webhook/email", "Dokument-Insert fehlgeschlagen", insertError);
-      await supabase.from("webhook_logs").insert({
-        typ: "email",
-        status: "error",
-        bestellung_id: bestellungId,
-        fehler_text: `Dokument-Insert fehlgeschlagen: pfad="${storagePfad}", fehler="${insertError.message}"`,
-      });
-      continue;
-    }
-
-    await applyAnalyseToBestellung(supabase, bestellungId, analyse);
-    gespeicherteTypen.push(analyse.typ);
-    dokumenteGespeichert++;
-  }
+  // 13. Dokumente speichern — siehe pipeline/dokument-persist.ts
+  const persistResult = await persistAnhangDokumente(supabase, {
+    bestellungId,
+    analyseErgebnisse,
+    email_betreff: email_betreff ?? "",
+    email_absender: email_absender ?? "",
+    email_datum: email_datum ?? "",
+    bodyExtractedBetrag,
+  });
+  let dokumenteGespeichert = persistResult.dokumenteGespeichert;
+  const gespeicherteTypen = persistResult.gespeicherteTypen;
 
   // 14. Rollback: Sekundäre Dokumente ohne Bestellung
   if (bestellungNeuErstellt && dokumenteGespeichert > 0) {
@@ -1270,244 +383,37 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     }
   }
 
-  // 15. Body-Analyse (Vendor-Parser oder KI)
-  // 06.05.2026 — bodyAnalyse hochgezogen damit der Fallback-Pfad (Schritt 16)
-  // die extrahierten KI-Werte mitnehmen kann, statt hardcoded NULLs zu schreiben.
-  // Vorher: bei typ='unbekannt' (KI versteht Mail nicht oder erkennt keinen
-  // BEKANNTE_TYPEN) gingen Bestellnummer/Betrag/Daten verloren obwohl die KI
-  // sie korrekt extrahiert hatte. Resultat: ~22 Bestellungen mit leeren Spalten.
-  let bodyAnalyse: DokumentAnalyse | null = null;
-  // 06.05.2026 — Cutoff-Logging: wenn wir die Body-Analyse skippen wegen 45s-Limit,
-  // wird das jetzt explizit geloggt + in webhook_logs persistiert. Vorher wurde
-  // skip stillschweigend gemacht und der Fallback-Pfad lief mit unvollständigen
-  // Daten weiter. Mit Logging können wir Mails finden die vom Cutoff betroffen
-  // sind und sie später re-processen (retry-Cron findet sie via 'failed').
-  const istBodyTimeout = emailText.length > 100 && Date.now() - startTime >= 45_000;
-  if (istBodyTimeout) {
-    logError("webhook/email", "Body-Analyse SKIP wegen 45s-Cutoff — Mail wird mit Anhang-Werten weitergeführt", {
-      bestellungId,
-      email_betreff,
-      email_absender,
-      elapsed_ms: Date.now() - startTime,
-      anhaenge_count: anhaenge.length,
-    });
-    // webhook_logs-Eintrag damit Admin sieht welche Mails Cutoff-betroffen sind
-    void supabase.from("webhook_logs").insert({
-      typ: "pipeline_cutoff",
-      status: "warning",
-      bestellung_id: bestellungId,
-      fehler_text: `Body-Analyse-Cutoff bei 45s — Mail "${(email_betreff || "").slice(0, 80)}" von ${email_absender} (${anhaenge.length} Anhänge). Bei unvollständigen Werten retry-failed-emails-Cron triggern.`,
-    }).then(() => undefined);
+  // 15. Body-Analyse (Vendor + KI parallel, Cache, Stub-Schutz, Field-Propagation).
+  // Siehe pipeline/body-analyse.ts.
+  const bodyResult = await analysiereBody(supabase, {
+    bestellungId,
+    bestellungNeuErstellt,
+    emailText,
+    emailTextStrukturiert,
+    email_betreff: email_betreff ?? "",
+    email_absender: email_absender ?? "",
+    email_datum: email_datum ?? "",
+    anhaenge: anhaenge.map((a) => ({ name: a.name, mime_type: a.mime_type, base64: a.base64 })),
+    documentHint,
+    startTime,
+    dokumenteGespeichert,
+    gespeicherteTypen,
+    erkannteBestellnummer,
+    bodyExtractedBetrag,
+    bodyExtractedKundennummer,
+    bodyExtractedIstGutschrift,
+    haendlerName,
+    absenderDomain,
+  });
+  if (bodyResult.kind === "rollback") {
+    return { success: true, skipped: true, reason: bodyResult.reason };
   }
-  if (emailText && emailText.length > 100 && Date.now() - startTime < 45_000) {
-    try {
-      // Vendor-Parser bekommen den strukturerhaltenden Text wenn HTML-Body
-      // vorhanden war. Bei Plain-Text-Mails ist emailTextStrukturiert ≈ emailText.
-      // Tabellen-Cells sind via ` | ` getrennt, was Regex-Matches auf Spalten
-      // (z.B. Brutto-Spalte in Telekom-/Brillux-/Raab-Karcher-Mails) erleichtert.
-      const vendorEmailText = emailTextStrukturiert && emailTextStrukturiert.length > 50
-        ? emailTextStrukturiert
-        : emailText;
-      const vendorResult = await tryParseVendor({
-        email_absender: email_absender || "",
-        email_betreff: email_betreff || "",
-        email_text: vendorEmailText,
-        // Anhänge durchreichen — Parser können PDF-Filename-Pattern matchen
-        // (z.B. Telekom: Rechnung_<digits>_<datum>.pdf, Brillux: RE-<n>-<datum>-<kunde>.pdf).
-        // Inhalt (base64) ist enthalten falls ein Parser ZUGFeRD-XML aus PDF lesen will.
-        anhaenge: anhaenge.map((a) => ({ name: a.name, mime_type: a.mime_type, base64: a.base64 })),
-      });
-
-      // Always-KI (05.05.2026): KI läuft IMMER parallel zum Vendor-Parser.
-      // Vendor-Parser-Hints werden via mergeVendorIntoKi gemerged. Vorher hatten
-      // wir bei Vendor-Konfidenz ≥0.75 die KI komplett geskipped — das hat
-      // Vendor-Parser-Lücken (z.B. fehlende BN/Beträge im PDF) ungenutzt gelassen.
-      // Cost-Trade: ~5x höhere OpenAI-Cost, dafür konsistente PDF-Inhalts-Extraktion.
-      // KI bekommt strukturerhaltenden Text (Tabellen mit ` | ` zwischen Cells,
-      // Block-Elemente als Newlines). Bei reinen Plain-Text-Mails fällt es auf
-      // emailText (flat) zurück damit nichts verloren geht.
-      const kiBody = emailTextStrukturiert && emailTextStrukturiert.length > 50
-        ? emailTextStrukturiert
-        : emailText;
-      const bodyMitBetreff = email_betreff
-        ? `E-Mail Betreff: ${email_betreff}\nAbsender: ${email_absender || ""}\n\n${kiBody.slice(0, 15000)}`
-        : kiBody.slice(0, 15000);
-
-      // 06.05.2026 — Body-Cache via openai_analysis_cache (Hash-basiert).
-      // Bei wiederkehrenden Mails (Telekom-Abo, Amazon-Reminder mit identischem
-      // Footer, Buchhaltungs-Erinnerungen) trifft der Cache → spart ~20%
-      // OpenAI-Cost und beschleunigt Pipeline um ~3-5s pro Mail.
-      // Bei DB-Fehler fail-open: KI-Call läuft normal.
-      const bodyHashKey = hashBody(bodyMitBetreff);
-      let bodyAnalyseLokal: DokumentAnalyse | null = await getCachedAnalyse(supabase, bodyHashKey);
-      if (bodyAnalyseLokal) {
-        logInfo("webhook/email", "Body-Cache HIT — KI-Call übersprungen", {
-          email_betreff,
-          hash_prefix: bodyHashKey.slice(0, 12),
-        });
-      } else {
-        const bodyBase64 = Buffer.from(bodyMitBetreff).toString("base64");
-        bodyAnalyseLokal = await analysiereDokument(bodyBase64, "text/plain", {
-          folderHint: documentHint || undefined,
-        });
-        // Best-effort Cache-Write (nur wenn KI brauchbares Ergebnis lieferte).
-        if (bodyAnalyseLokal && bodyAnalyseLokal.typ !== "unbekannt") {
-          void setCachedAnalyse(supabase, bodyHashKey, "text/plain", bodyAnalyseLokal);
-        }
-      }
-
-      if (vendorResult && vendorResult.result.documents.length > 0) {
-        const vendorDoc = vendorResult.result.documents[0];
-        bodyAnalyseLokal = mergeVendorIntoKi(bodyAnalyseLokal, vendorDoc);
-        parserName = vendorResult.result.vendor;
-        parserSource = vendorResult.acceptWithoutKI ? "vendor" : "ki";
-        logInfo("webhook/email", "Vendor + KI parallel", {
-          vendor: parserName,
-          vendor_konfidenz: vendorResult.result.konfidenz,
-          ki_konfidenz: bodyAnalyseLokal.konfidenz,
-          accept_without_ki_war_aktiviert: vendorResult.acceptWithoutKI,
-          merged_bestellnummer: bodyAnalyseLokal.bestellnummer,
-          merged_typ: bodyAnalyseLokal.typ,
-        });
-      }
-
-      // Betreff-Korrektur
-      if (email_betreff) {
-        const betreffLower = email_betreff.toLowerCase();
-        const betreffIstBestellung = ["ihre bestellung", "bestellbestätigung", "auftragsbestätigung", "order confirmation", "bestellung eingegangen", "bestellung bei"].some((kw) => betreffLower.includes(kw));
-        if (betreffIstBestellung && bodyAnalyseLokal.typ === "versandbestaetigung") {
-          logInfo("webhook/email", "Betreff-Korrektur: Versand → Bestellung", { email_betreff, gpt_typ: bodyAnalyseLokal.typ });
-          bodyAnalyseLokal.typ = "bestellbestaetigung";
-        }
-      }
-
-      // 15.05.2026 — Regex-Fallback `bodyExtractedBetrag` (Z. 586) ins KI-Result
-      // mergen. Vorher landete der Wert NUR in dokumente.gesamtbetrag (Z. 1346
-      // via `?? bodyExtractedBetrag`), aber NICHT in bestellungen.betrag, weil
-      // applyAnalyseToBestellung (Z. 1358) und ergaenzeFelder (Z. 1367/1385)
-      // nur bodyAnalyseLokal.gesamtbetrag lesen. Resultat: UI-Header zeigte "—"
-      // obwohl die Doku-Detailseite den Wert hatte (z.B. body-only Bernstein
-      // mit "Rechnungsbetrag: 89,45 €" → KI extrahierte gesamtbetrag nicht,
-      // Regex schon, Wert versickerte zwischen Doku und Bestellung).
-      if (bodyAnalyseLokal.gesamtbetrag == null && bodyExtractedBetrag != null) {
-        bodyAnalyseLokal.gesamtbetrag = bodyExtractedBetrag;
-      }
-      // Analog für Kundennummer (Bernstein: "Deine Kundennummer: 1380585" wird
-      // von der KI bei body-only HTML oft nicht extrahiert).
-      if (!bodyAnalyseLokal.kundennummer && bodyExtractedKundennummer) {
-        bodyAnalyseLokal.kundennummer = bodyExtractedKundennummer;
-      }
-      // 17.05.2026 — Gutschrift-Flag: bodyExtractedIstGutschrift überschreibt
-      // niemals true→false (KI hat möglicherweise Kontext den Regex nicht hat),
-      // aber kann false→true setzen wenn Regex eindeutiges Signal hat.
-      if (bodyExtractedIstGutschrift && !bodyAnalyseLokal.ist_gutschrift) {
-        bodyAnalyseLokal.ist_gutschrift = true;
-      }
-
-      // Outer-Variable für Fallback-Pfad zuweisen — auch bei typ=unbekannt,
-      // weil die KI-Werte (Bestellnr, Betrag, Daten) im Fallback genutzt werden.
-      bodyAnalyse = bodyAnalyseLokal;
-
-      // Body-only Versand-Rollback
-      if (bodyAnalyseLokal.typ === "versandbestaetigung" && bestellungNeuErstellt && dokumenteGespeichert === 0) {
-        logInfo("webhook/email", "Rollback: Body-only Versandbestätigung", {
-          bestellungId, email_absender, email_betreff,
-        });
-        await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
-        await supabase.from("bestellungen").delete().eq("id", bestellungId);
-        return {
-          success: true,
-          skipped: true,
-          reason: "versand_body_ohne_bestellung",
-        };
-      }
-
-      if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ) && !gespeicherteTypen.includes(bodyAnalyseLokal.typ)) {
-        // 18.05.2026 — Stub-Duplikat-Schutz: verhindert Race-Condition-Duplikate
-        // (Brillux 7004572-Pattern) und Reminder-Mail-Stubs (Klaus Alter 78611).
-        // Wenn das Body-Doku nur ein Stub wäre (kein Betrag, kein PDF) und
-        // bereits ein vollständiges Rechnungs-Doku mit derselben Bestellnummer
-        // existiert → skip persist statt Duplikat in der Buchhaltung.
-        const skipAsStub = await shouldSkipAsStubDuplicate({
-          supabase,
-          bestellungId,
-          typ: bodyAnalyseLokal.typ,
-          bestellnummerErkannt: bodyAnalyseLokal.bestellnummer ?? erkannteBestellnummer,
-          newGesamtbetrag: bodyAnalyseLokal.gesamtbetrag ?? bodyExtractedBetrag,
-          newStoragePfad: null,
-          emailBetreff: email_betreff,
-          emailAbsender: email_absender,
-        });
-        if (skipAsStub) {
-          dokumenteGespeichert++; // Damit Schritt 16 nicht fälschlich Fallback triggert
-          gespeicherteTypen.push(bodyAnalyseLokal.typ);
-        } else {
-        // Neuer Typ aus Body — über persist_dokument_atomic damit Re-Backfill
-        // existing Dokus updated statt zu duplizieren (06.05.2026).
-        // content_hash auf Body-Hash setzen für Idempotenz.
-        const bodyHash = createHash("sha256").update(emailText).digest("hex");
-        await supabase.rpc("persist_dokument_atomic", {
-          p_bestellung_id: bestellungId,
-          p_typ: bodyAnalyseLokal.typ,
-          p_quelle: "email",
-          p_storage_pfad: null,
-          p_content_hash: bodyHash,
-          p_email_betreff: email_betreff,
-          p_email_absender: email_absender,
-          p_email_datum: email_datum,
-          p_ki_roh_daten: bodyAnalyseLokal as unknown as Record<string, unknown>,
-          p_bestellnummer_erkannt: bodyAnalyseLokal.bestellnummer ?? erkannteBestellnummer,
-          p_auftragsnummer: bodyAnalyseLokal.auftragsnummer || null,
-          p_lieferscheinnummer: bodyAnalyseLokal.lieferscheinnummer || null,
-          p_artikel: (bodyAnalyseLokal.artikel ?? null) as unknown as Record<string, unknown>,
-          p_gesamtbetrag: bodyAnalyseLokal.gesamtbetrag ?? bodyExtractedBetrag,
-          p_netto: bodyAnalyseLokal.netto,
-          p_mwst: bodyAnalyseLokal.mwst,
-          p_faelligkeitsdatum: bodyAnalyseLokal.faelligkeitsdatum,
-          p_lieferdatum: bodyAnalyseLokal.lieferdatum,
-          p_iban: bodyAnalyseLokal.iban,
-          p_kundennummer: bodyAnalyseLokal.kundennummer || null,
-          p_besteller_im_dokument: bodyAnalyseLokal.besteller_im_dokument || null,
-          p_projekt_referenz: bodyAnalyseLokal.projekt_referenz || null,
-          p_bestelldatum: bodyAnalyseLokal.bestelldatum || null,
-          p_ist_gutschrift: bodyAnalyseLokal.ist_gutschrift ?? false,
-        });
-
-        const haendlerNameAfter = await applyAnalyseToBestellung(supabase, bestellungId, bodyAnalyseLokal, {
-          haendlerName,
-          absenderDomain,
-        });
-        if (haendlerNameAfter) haendlerName = haendlerNameAfter;
-        dokumenteGespeichert++;
-        gespeicherteTypen.push(bodyAnalyseLokal.typ);
-        } // /skipAsStub-else
-      } else if (BEKANNTE_TYPEN.includes(bodyAnalyseLokal.typ)) {
-        // Nur Felder ergänzen
-        await ergaenzeFelder(supabase, bestellungId, bodyAnalyseLokal, haendlerName, absenderDomain);
-      } else {
-        // 06.05.2026 — Werte-Propagation auch bei typ='unbekannt': KI hat
-        // ggf. Bestellnummer/Betrag/Datum extrahiert, auch wenn sie den
-        // Doku-Typ nicht erkannt hat. Wir propagieren diese Werte trotzdem
-        // in die `bestellungen`-Tabelle, sodass die UI sie sieht.
-        const hatExtrahierteWerte =
-          bodyAnalyseLokal.bestellnummer ||
-          bodyAnalyseLokal.gesamtbetrag != null ||
-          bodyAnalyseLokal.faelligkeitsdatum ||
-          bodyAnalyseLokal.bestelldatum ||
-          bodyAnalyseLokal.kundennummer ||
-          bodyAnalyseLokal.projekt_referenz ||
-          bodyAnalyseLokal.auftragsnummer;
-        if (hatExtrahierteWerte) {
-          logInfo("webhook/email", "Werte-Propagation bei typ='unbekannt'", {
-            bestellungId, typ: bodyAnalyseLokal.typ, bn: bodyAnalyseLokal.bestellnummer, betrag: bodyAnalyseLokal.gesamtbetrag,
-          });
-          await ergaenzeFelder(supabase, bestellungId, bodyAnalyseLokal, haendlerName, absenderDomain);
-        }
-      }
-    } catch (bodyErr) {
-      logError("webhook/email", "Body-Analyse fehlgeschlagen", bodyErr);
-    }
-  }
+  const bodyAnalyse = bodyResult.bodyAnalyse;
+  parserName = bodyResult.parserName;
+  parserSource = bodyResult.parserSource;
+  dokumenteGespeichert = bodyResult.dokumenteGespeichert;
+  // gespeicherteTypen ist by-reference geupdated; haendlerName ggf. überschrieben.
+  haendlerName = bodyResult.haendlerName;
 
   // 16. Fallback: Kein Dokument gespeichert
   if (dokumenteGespeichert === 0) {
@@ -1535,193 +441,40 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     if (fallbackResult.gespeichert) dokumenteGespeichert = 1;
   }
 
-  // 16b. Sanity-Check: Bestellungen MÜSSEN mindestens einen Doku-Record haben.
-  // Wenn die Pipeline trotz aller Fallbacks keinen einzigen Doku-Record erstellt
-  // hat, ist die Bestellung leer und unverwendbar — automatisch löschen statt
-  // im UI als "Ohne Nr. + 0/3 Doku" zu erscheinen.
-  if (bestellungNeuErstellt && dokumenteGespeichert === 0) {
-    logInfo("webhook/email", "Sanity-Cleanup: leere Bestellung gelöscht (kein Doku-Record erstellt)", {
-      bestellungId, email_absender, email_betreff,
-    });
-    await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
-    await supabase.from("bestellungen").delete().eq("id", bestellungId);
-    return {
-      success: true,
-      skipped: true,
-      reason: "leer_kein_doku_record",
-    };
+  // 16b. Sanity-Check: leere Bestellung → komplett löschen + skip.
+  const sanity = await sanityCleanupLeereBestellung(supabase, {
+    bestellungId, bestellungNeuErstellt, dokumenteGespeichert,
+    email_absender, email_betreff,
+  });
+  if (sanity.shouldShortCircuit) {
+    return { success: true, skipped: true, reason: sanity.reason };
   }
 
-  // 16c. Bestellnummer-Propagation: Wenn die Bestellung selbst noch keine
-  // Bestellnummer hat aber irgendein Doku-Record eine erkannt hat, übernehmen.
-  // Behebt: "Bestellung Ohne Nr." obwohl PDF-Anhang die Nummer enthielt.
-  {
-    const { data: bestellungAktuell } = await supabase
-      .from("bestellungen")
-      .select("bestellnummer, betrag")
-      .eq("id", bestellungId)
-      .maybeSingle();
+  // 16c. Bestellnummer/Betrag aus Doku-Record propagieren falls Bestellung
+  // selbst noch leer ist.
+  await propagiereBestellnummerAusDoku(supabase, bestellungId);
 
-    const bestellungUpdate: Record<string, unknown> = {};
-    if (!bestellungAktuell?.bestellnummer) {
-      const { data: dokuMitNr } = await supabase
-        .from("dokumente")
-        .select("bestellnummer_erkannt, gesamtbetrag")
-        .eq("bestellung_id", bestellungId)
-        .not("bestellnummer_erkannt", "is", null)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (dokuMitNr?.bestellnummer_erkannt) {
-        bestellungUpdate.bestellnummer = dokuMitNr.bestellnummer_erkannt;
-        if (!bestellungAktuell?.betrag && dokuMitNr.gesamtbetrag) {
-          bestellungUpdate.betrag = dokuMitNr.gesamtbetrag;
-        }
-      }
-    }
-    if (Object.keys(bestellungUpdate).length > 0) {
-      bestellungUpdate.updated_at = new Date().toISOString();
-      await supabase.from("bestellungen").update(bestellungUpdate).eq("id", bestellungId);
-      logInfo("webhook/email", "Bestellnummer/Betrag aus Doku-Record propagiert", {
-        bestellungId, ...bestellungUpdate,
-      });
-    }
-  }
+  // 17. Händler-Auto-Erkennung (Cross-Table-Fuzzy gegen haendler/SU/abo
+  // bevor neuer Händler angelegt wird) — siehe pipeline/haendler-erkennen.ts
+  await autoErkenneNeuenHaendler(supabase, {
+    bestellungId,
+    haendler,
+    analyseErgebnisse,
+    email_absender: email_absender ?? "",
+    email_betreff: email_betreff ?? "",
+    absenderAdresse,
+    startTime,
+  });
 
-  // 17. Händler-Auto-Erkennung
-  // 07.05.2026 — Cross-Table-Fuzzy-Match VOR dem Insert eines neuen Händlers.
-  // Vorher wurde nur in `haendler` per exact-domain-match geprüft. Folge: ein
-  // bekannter Subunternehmer oder Abo-Anbieter (Hold & Spada, Microsoft etc.),
-  // der mit einer leicht abweichenden Absenderadresse mailt, wurde als neuer
-  // "Händler" angelegt — und die Bestellung rutschte in eine falsche Kategorie
-  // weil die Klassifikation pro Kontakt neu lief.
-  // Jetzt: prüfen wir gegen alle drei Anbieter-Tabellen (haendler / subunter-
-  // nehmer / abo_anbieter) auf Domain ODER Email-Adresse. Bei Match an die
-  // existierende Entity andocken (email_absender-Array updaten), KEIN Insert.
-  if (!haendler && analyseErgebnisse.length > 0 && Date.now() - startTime < 50_000) {
-    try {
-      const erkannterHaendlerName = analyseErgebnisse.find((e) => e.analyse.haendler)?.analyse.haendler || null;
-      const neuerHaendler = await erkenneHaendlerAusEmail(email_absender, email_betreff, erkannterHaendlerName);
-      if (neuerHaendler) {
-        const cleanDomain = neuerHaendler.domain.toLowerCase();
-        const cleanAbsender = absenderAdresse.toLowerCase();
-
-        // Cross-Table-Match: prüft Domain, exact-Adresse und *@domain-Wildcards
-        // in haendler, subunternehmer und abo_anbieter parallel.
-        const matchesEmailArray = (arr: string[] | null | undefined): boolean =>
-          (arr || []).some((entry) => {
-            const e = entry.toLowerCase().trim();
-            if (e.startsWith("*@")) return cleanAbsender.endsWith("@" + e.slice(2));
-            return e === cleanAbsender || e === cleanDomain;
-          });
-
-        const [haendlerCheck, suCheck, aboCheck] = await Promise.all([
-          supabase.from("haendler").select("id, name, domain, email_absender").eq("domain", cleanDomain).limit(5),
-          supabase.from("subunternehmer").select("id, firma, email_absender").limit(500),
-          supabase.from("abo_anbieter").select("id, name, domain, email_absender").limit(500),
-        ]);
-
-        const existingHaendler = (haendlerCheck.data || [])[0]
-          ?? (haendlerCheck.data || []).find((h) => matchesEmailArray(h.email_absender));
-        const existingSu = (suCheck.data || []).find((s) => matchesEmailArray(s.email_absender));
-        const existingAbo = (aboCheck.data || []).find((a) =>
-          a.domain?.toLowerCase() === cleanDomain || matchesEmailArray(a.email_absender)
-        );
-
-        if (existingSu) {
-          logInfo("webhook/email", `Cross-Match: bekannter Subunternehmer (${existingSu.firma}) — keine neue Händler-Anlage`, {
-            absender: cleanAbsender, domain: cleanDomain,
-          });
-          // bestellungsart auf SU korrigieren falls KI sie als material klassifiziert hat
-          await supabase.from("bestellungen")
-            .update({
-              bestellungsart: "subunternehmer",
-              subunternehmer_id: existingSu.id,
-              haendler_name: existingSu.firma,
-            })
-            .eq("id", bestellungId);
-          // Plus: neuen Absender in das email_absender-Array des SU mergen,
-          // damit künftige Mails sofort gematcht werden.
-          if (!matchesEmailArray(existingSu.email_absender)) {
-            const next = Array.from(new Set([...(existingSu.email_absender || []), cleanAbsender]));
-            await supabase.from("subunternehmer").update({ email_absender: next }).eq("id", existingSu.id);
-          }
-        } else if (existingAbo) {
-          logInfo("webhook/email", `Cross-Match: bekannter Abo-Anbieter (${existingAbo.name}) — keine neue Händler-Anlage`, {
-            absender: cleanAbsender, domain: cleanDomain,
-          });
-          await supabase.from("bestellungen")
-            .update({ bestellungsart: "abo", haendler_name: existingAbo.name })
-            .eq("id", bestellungId);
-          if (!matchesEmailArray(existingAbo.email_absender)) {
-            const next = Array.from(new Set([...(existingAbo.email_absender || []), cleanAbsender]));
-            await supabase.from("abo_anbieter").update({ email_absender: next }).eq("id", existingAbo.id);
-          }
-        } else if (existingHaendler) {
-          // Bekannter Händler — Absender ergänzen, kein neuer Insert
-          if (!matchesEmailArray(existingHaendler.email_absender)) {
-            const next = Array.from(new Set([...(existingHaendler.email_absender || []), cleanAbsender]));
-            await supabase.from("haendler").update({ email_absender: next }).eq("id", existingHaendler.id);
-            logInfo("webhook/email", `Existing Händler ${existingHaendler.name} um Absender ${cleanAbsender} ergänzt`, {});
-          }
-        } else {
-          // Wirklich neu — anlegen
-          await supabase.from("haendler").insert({
-            name: neuerHaendler.name,
-            domain: cleanDomain,
-            email_absender: [neuerHaendler.email_muster],
-            url_muster: [],
-          });
-          await supabase.from("bestellungen")
-            .update({ haendler_name: neuerHaendler.name })
-            .eq("id", bestellungId);
-          logInfo("webhook/email", `Neuer Händler: ${neuerHaendler.name}`, { domain: cleanDomain });
-        }
-      }
-    } catch (err) {
-      logError("webhook/email", "Händler-Erkennung fehlgeschlagen", err);
-    }
-  }
-
-  // 18. Status aktualisieren
-  await updateBestellungStatus(supabase, bestellungId);
-
-  // 19. KI-Abgleich (nur material)
-  if (bestellungsart === "material" && dokumenteGespeichert > 0) {
-    await tryAbgleich(supabase, bestellungId);
-  }
-
-  // 20. Preisanomalie-Check
-  await tryPreisanomalieCheck(supabase, bestellungId, haendlerName, analyseErgebnisse);
-
-  // 21. Abo-Logik
-  if (bestellungsart === "abo") {
-    await handleAboLogik(supabase, bestellungId, haendlerDomain, haendlerName);
-  }
-
-  // 22. Signal verknüpfen
-  if (signal) {
-    await supabase.from("bestellung_signale")
-      .update({ matched_bestellung_id: bestellungId })
-      .eq("id", signal.id);
-  }
-
-  // 23. UNBEKANNT-Hinweis
-  if (bestellerKuerzelMutable === "UNBEKANNT") {
-    await supabase.from("kommentare").insert({
-      bestellung_id: bestellungId,
-      autor_kuerzel: "SYSTEM",
-      autor_name: "Zuordnungs-Assistent",
-      text: `Bestellung konnte keinem Besteller zugeordnet werden.\nHändler: ${haendlerName}\nAbsender: ${email_absender}\nBetreff: ${email_betreff || "–"}\n\nBitte manuell zuordnen.`,
-    });
-  }
-
-  // 24. Webhook-Log Erfolg
-  await supabase.from("webhook_logs").insert({
-    typ: "email",
-    status: "success",
-    bestellung_id: bestellungId,
-    bestellnummer: erkannteBestellnummer || null,
+  // Schritte 18-24 — Status / Abgleich / Preisanomalie / Abo / Signal /
+  // UNBEKANNT-Kommentar / Webhook-Log. Siehe pipeline/post-processing.ts.
+  await runPostProcessing(supabase, {
+    bestellungId, bestellungsart, dokumenteGespeichert,
+    haendlerDomain, haendlerName, analyseErgebnisse, signal,
+    bestellerKuerzelMutable,
+    email_absender: email_absender ?? "",
+    email_betreff: email_betreff ?? "",
+    erkannteBestellnummer,
   });
 
   const dauer = Date.now() - startTime;
@@ -1760,656 +513,4 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       analysiert: analyseErgebnisse.length,
     },
   };
-}
-
-// =====================================================================
-// HELPER: Besteller-Zuordnung
-// =====================================================================
-
-async function assignBesteller(
-  supabase: ReturnType<typeof createServiceClient>,
-  ctx: {
-    haendlerDomain: string;
-    haendlerName: string;
-    absenderDomain: string;
-    vorfilterBestellnummer: string | null;
-    analyseErgebnisse: AnalyseErgebnis[];
-    emailText: string;
-    email_betreff: string;
-    email_datum: string;
-  },
-): Promise<{ bestellerKuerzel: string; zuordnungsMethode: string; signal: SignalRow | null }> {
-  const { haendlerDomain, haendlerName, absenderDomain, vorfilterBestellnummer, analyseErgebnisse, emailText, email_betreff, email_datum } = ctx;
-  let bestellerKuerzel = "";
-  let zuordnungsMethode = "";
-  let signal: SignalRow | null = null;
-
-  const parsedDate = email_datum ? new Date(email_datum) : new Date();
-  const emailZeit = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
-
-  // 06.05.2026 (Welle 4 O8) — STUFE -1: Rules-Engine.
-  // Admin-konfigurierbare Regeln aus besteller_rules-Tabelle. Wenn DB-Match
-  // → Besteller direkt setzen ohne weitere Stufen zu durchlaufen. Tabelle
-  // leer → kein Effekt (silent skip), nachfolgende Stufen greifen wie gewohnt.
-  // Plus: Statistik (hit_count + last_hit_at) wird automatisch upd via RPC.
-  try {
-    const { data: ruleMatch } = await supabase
-      .rpc("match_besteller_rules", {
-        p_haendler_domain: haendlerDomain,
-        p_haendler_id: null,
-        p_email_absender: ctx.haendlerName ?? null,  // Absender-Domain via haendlerDomain abgedeckt; pattern matcht haendlerName auch
-        p_email_betreff: email_betreff ?? null,
-      });
-    if (ruleMatch && Array.isArray(ruleMatch) && ruleMatch.length > 0) {
-      const match = ruleMatch[0] as { rule_id: string; target_kuerzel: string; confidence: number; rule_name: string };
-      bestellerKuerzel = match.target_kuerzel;
-      zuordnungsMethode = `rule:${match.rule_name}`;
-      logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
-        target_kuerzel: match.target_kuerzel,
-        confidence: match.confidence,
-        rule_id: match.rule_id,
-      });
-    }
-  } catch (e) {
-    logError("webhook/email", "match_besteller_rules fehlgeschlagen (fail-open, weiter mit STUFE 0+)", e);
-  }
-
-  // STUFE 0: Bestellnummer-Match
-  const betreffNrMatch =
-    (email_betreff || "").match(/(?:bestellnummer|bestellung|order|auftrag|auftrags-?nr)[:\s#]*([A-Z0-9][\w\-]{2,29})/i)
-    || (email_betreff || "").match(/(\d{3}-\d{7}-\d{7})/);
-  const schnellBestellnummer = vorfilterBestellnummer || betreffNrMatch?.[1] || null;
-
-  if (schnellBestellnummer) {
-    const { data: signalByNr } = await supabase
-      .from("bestellung_signale").select("*")
-      .eq("order_nummer", schnellBestellnummer)
-      .eq("status", "pending")
-      .order("zeitstempel", { ascending: false })
-      .limit(1);
-
-    if (signalByNr?.[0]) {
-      const { data: claimed } = await supabase
-        .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signalByNr[0].id).eq("status", "pending").select("id");
-      if (claimed && claimed.length > 0) {
-        const claimedSignal = signalByNr[0] as SignalRow;
-        signal = claimedSignal;
-        bestellerKuerzel = claimedSignal.kuerzel;
-        zuordnungsMethode = "bestellnummer_match";
-        logInfo("webhook/email", `Besteller per Bestellnummer zugeordnet: ${claimedSignal.kuerzel}`, { bestellnummer: schnellBestellnummer });
-      }
-    }
-  }
-
-  // STUFE 1: Signal ±4h
-  if (!bestellerKuerzel) {
-    const { data: signale } = await supabase
-      .from("bestellung_signale").select("*")
-      .eq("haendler_domain", haendlerDomain)
-      .eq("status", "pending")
-      .gte("zeitstempel", new Date(emailZeit - 4 * 60 * 60 * 1000).toISOString())
-      .lte("zeitstempel", new Date(emailZeit + 4 * 60 * 60 * 1000).toISOString())
-      .order("confidence", { ascending: false })
-      .order("zeitstempel", { ascending: false })
-      .limit(1);
-
-    if (signale?.[0]) {
-      const { data: claimed } = await supabase
-        .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signale[0].id).eq("status", "pending").select("id");
-      if (claimed && claimed.length > 0) {
-        const claimedSignal = signale[0] as SignalRow;
-        signal = claimedSignal;
-        bestellerKuerzel = claimedSignal.kuerzel;
-        zuordnungsMethode = "signal_4h";
-      }
-    }
-  }
-
-  // STUFE 3: Händler-Affinität
-  // 06.05.2026 — Cache: Historie wird in STUFE 4.5 wiederverwendet (gleiche
-  // bestellungen-Tabelle + ähnlicher Filter). Prefetch hier in einem
-  // gemeinsamen Block. Nur fetchen wenn wirklich nötig (kein bestellerKuerzel).
-  let historieCache: Array<{ besteller_kuerzel: string; besteller_name: string | null; haendler_name: string | null }> | null = null;
-  if (!bestellerKuerzel) {
-    const { data: affinitaet } = await supabase
-      .from("bestellungen").select("besteller_kuerzel, besteller_name, haendler_name")
-      .ilike("haendler_name", haendlerName)
-      .neq("besteller_kuerzel", "UNBEKANNT")
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    historieCache = affinitaet || [];
-
-    if (historieCache.length >= 3) {
-      const zaehler = new Map<string, number>();
-      for (const b of historieCache) {
-        zaehler.set(b.besteller_kuerzel, (zaehler.get(b.besteller_kuerzel) || 0) + 1);
-      }
-      const sortiert = [...zaehler.entries()].sort((a, b) => b[1] - a[1]);
-      const [topKuerzel, topAnzahl] = sortiert[0];
-      if (topAnzahl / historieCache.length > 0.6) {
-        bestellerKuerzel = topKuerzel;
-        zuordnungsMethode = "haendler_affinitaet";
-      }
-    }
-  }
-
-  // STUFE 4: Name im Text
-  if (!bestellerKuerzel) {
-    const { data: benutzerListe } = await supabase
-      .from("benutzer_rollen").select("kuerzel, name, email")
-      .in("rolle", ["besteller", "admin"]);
-
-    if (benutzerListe) {
-      const gptBesteller = analyseErgebnisse.find((e) => e.analyse.besteller_im_dokument)?.analyse.besteller_im_dokument?.toLowerCase() || "";
-      if (gptBesteller) {
-        for (const benutzer of benutzerListe) {
-          const namen: string[] = String(benutzer.name).toLowerCase().split(" ");
-          if (namen.length >= 2 && namen.every((n: string) => gptBesteller.includes(n))) {
-            bestellerKuerzel = String(benutzer.kuerzel);
-            zuordnungsMethode = "besteller_im_dokument";
-            break;
-          }
-        }
-      }
-
-      if (!bestellerKuerzel) {
-        const suchTexte = [
-          emailText,
-          email_betreff || "",
-          ...analyseErgebnisse.map((e) => e.analyse.volltext || ""),
-          ...analyseErgebnisse.map((e) => JSON.stringify(e.analyse.lieferadressen || [])),
-        ].join(" ").toLowerCase();
-
-        for (const benutzer of benutzerListe) {
-          const namen: string[] = String(benutzer.name).toLowerCase().split(" ");
-          if (namen.length >= 2 && namen.every((n: string) => suchTexte.includes(n))) {
-            bestellerKuerzel = String(benutzer.kuerzel);
-            zuordnungsMethode = "name_im_text";
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  // STUFE 4.5: KI-Historisch
-  if (!bestellerKuerzel && haendlerName && haendlerName !== absenderDomain) {
-    const gptArtikel = analyseErgebnisse.flatMap((e) => e.analyse.artikel || []).slice(0, 10);
-    if (gptArtikel.length > 0) {
-      try {
-        // 06.05.2026 — historieCache aus STUFE 3 wiederverwenden (gleiche Query)
-        const historie = historieCache;
-
-        if (historie && historie.length >= 5) {
-          const bestellerIds = [...new Set(historie.map((b) => b.besteller_kuerzel))];
-          const bestellerInfo = bestellerIds.map((kuerzel) => {
-            const benutzer = historie.find((b) => b.besteller_kuerzel === kuerzel);
-            return {
-              kuerzel,
-              name: benutzer?.besteller_name || kuerzel,
-              artikel_namen: [] as string[],
-              haendler: [haendlerName],
-            };
-          });
-
-          type Artikel = NonNullable<DokumentAnalyse["artikel"]>[number];
-          const artikelInput = gptArtikel.map((a: Artikel) => ({
-            name: a.name,
-            menge: typeof a.menge === "number" ? a.menge : 1,
-            einzelpreis: typeof a.einzelpreis === "number" ? a.einzelpreis : 0,
-          }));
-
-          const ergebnis = await erkenneBestellerIntelligent(artikelInput, haendlerName, bestellerInfo);
-          if (ergebnis.kuerzel && ergebnis.kuerzel !== "UNBEKANNT" && ergebnis.konfidenz >= 0.6) {
-            bestellerKuerzel = ergebnis.kuerzel;
-            zuordnungsMethode = "ki_historisch";
-            logInfo("webhook/email", `Besteller via KI-Historie erkannt: ${ergebnis.kuerzel}`, {
-              konfidenz: ergebnis.konfidenz, begruendung: ergebnis.begruendung,
-            });
-          }
-        }
-      } catch (e) {
-        logError("webhook/email", "erkenneBestellerIntelligent fehlgeschlagen", e);
-      }
-    }
-  }
-
-  if (!bestellerKuerzel) {
-    bestellerKuerzel = "UNBEKANNT";
-    zuordnungsMethode = "unbekannt";
-  }
-
-  return { bestellerKuerzel, zuordnungsMethode, signal };
-}
-
-// =====================================================================
-// HELPER: Analyse → Bestellung Field-Propagation
-// 06.05.2026 (Welle 1, H1) — applyAnalyseToBestellung + ergaenzeFelder waren
-// 200 LOC Duplikat. Jetzt eine einzige Function `propagateAnalyseFields`
-// mit options-basierten Modi:
-//
-//   mode="document"  → setzt hat_*-Flag, RG überschreibt betrag (= applyAnalyse)
-//   mode="body"      → keine Flags (Body ist kein Doku), kein betrag-overwrite
-//
-// Beide Modi propagieren ALLE übrigen Felder fill-if-empty. Identische Lese-
-// Query (1 SELECT statt 2). Verhindert Drift bei künftigen neuen Feldern.
-// =====================================================================
-
-interface PropagateOptions {
-  /** "document" = Doku-basiert (mit FLAG-Set + RG-Betrag-Overwrite). "body" = Body-Analyse (nur fill-if-empty). */
-  mode: "document" | "body";
-  /** Händler-Kontext für haendler_name-Auto-Fill (wenn aktueller Wert leer/Domain). */
-  haendlerContext?: { current: string; absenderDomain: string };
-}
-
-async function propagateAnalyseFields(
-  supabase: ReturnType<typeof createServiceClient>,
-  bestellungId: string,
-  analyse: DokumentAnalyse,
-  options: PropagateOptions,
-): Promise<{ haendlerName: string | null }> {
-  // Lese-Query: 1 SELECT mit allen propagierbaren Feldern.
-  type ExistingRow = {
-    bestellnummer: string | null;
-    auftragsnummer: string | null;
-    lieferscheinnummer: string | null;
-    betrag: number | null;
-    voraussichtliche_lieferung: string | null;
-    lieferadresse_erkannt: string | null;
-    tracking_nummer: string | null;
-    bestelldatum: string | null;
-    faelligkeitsdatum: string | null;
-    kundennummer: string | null;
-    projekt_referenz: string | null;
-  };
-  const { data } = await supabase
-    .from("bestellungen")
-    .select(
-      "bestellnummer, auftragsnummer, lieferscheinnummer, betrag, " +
-      "voraussichtliche_lieferung, lieferadresse_erkannt, tracking_nummer, " +
-      "bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
-    )
-    .eq("id", bestellungId)
-    .maybeSingle();
-  const existing = data as ExistingRow | null;
-  if (!existing) return { haendlerName: null };
-
-  const updateFields: Record<string, unknown> = { updated_at: new Date().toISOString() };
-
-  // hat_*-Flag (nur bei Doku-Mode)
-  if (options.mode === "document" && FLAG_MAP[analyse.typ]) {
-    updateFields[FLAG_MAP[analyse.typ]] = true;
-  }
-
-  // ----- Identifikatoren — fill-if-empty + LS-Upgrade-Logik -----
-  // 07./08.05.2026 — fill-if-empty in beiden Modi (Doku + Body). Plus:
-  // bestellnummer wird **upgegradet** wenn aktueller Wert eine Lieferschein-
-  // nummer ist (= identisch mit existing.lieferscheinnummer) und ein besserer
-  // Wert verfügbar ist (Auftrags-/Bestell-/Rechnungsnummer aus dem Doku).
-  // Begründung: Pipeline-Vorgänger setzte bei Lieferschein-Mails die LS-Nr
-  // als bestellnummer — semantisch falsch, weil eine Bestellung mehrere LS
-  // haben kann und die LS-Nr keine stabile Bestell-Identität ist.
-  if (analyse.typ !== "versandbestaetigung") {
-    const fillIfEmpty = (field: keyof ExistingRow, value: string | null | undefined) => {
-      if (!value) return;
-      if (existing[field]) {
-        if (existing[field] !== value) {
-          logInfo("webhook/email/propagate", `Konflikt ${field}: existing="${existing[field]}" vs neu="${value}" — bleibt existing`, {
-            bestellungId, doku_typ: analyse.typ,
-          });
-        }
-        return;
-      }
-      updateFields[field] = value;
-    };
-
-    // bestellnummer-Upgrade: wenn aktueller Wert die LS-Nr ist, eine bessere
-    // Identifikation einsetzen (Auftragsnummer > Bestellnr > Rechnungsnr).
-    const aktBestellnr = existing.bestellnummer;
-    const ls = existing.lieferscheinnummer;
-    const istBestellnummerLsNr = !!aktBestellnr && !!ls && aktBestellnr === ls;
-    if (istBestellnummerLsNr) {
-      const besserNr = analyse.auftragsnummer || analyse.bestellnummer;
-      if (besserNr && besserNr !== aktBestellnr) {
-        updateFields.bestellnummer = besserNr;
-        logInfo("webhook/email/propagate", `bestellnummer upgegradet: LS-Nr "${aktBestellnr}" → "${besserNr}"`, {
-          bestellungId, doku_typ: analyse.typ,
-        });
-      }
-    } else {
-      fillIfEmpty("bestellnummer", analyse.bestellnummer);
-    }
-
-    fillIfEmpty("auftragsnummer", analyse.auftragsnummer);
-    fillIfEmpty("lieferscheinnummer", analyse.lieferscheinnummer);
-  }
-
-  // ----- Betrag — RG überschreibt im Doku-Mode, sonst fill-if-empty -----
-  // (DB-Trigger sync_bestellung_betrag_from_rechnungen liefert finale RG-Summe)
-  const effektiverBetrag = analyse.gesamtbetrag != null ? analyse.gesamtbetrag : (analyse.netto ?? null);
-  const istNetto = !analyse.gesamtbetrag && !!analyse.netto;
-  if (effektiverBetrag != null && analyse.typ !== "versandbestaetigung") {
-    const istRgOverwrite = options.mode === "document" && analyse.typ === "rechnung";
-    if (istRgOverwrite || !existing.betrag) {
-      updateFields.betrag = effektiverBetrag;
-      if (istNetto) updateFields.betrag_ist_netto = true;
-    }
-  }
-
-  // ----- Tracking-Felder (auch BB/RG können Tracking liefern) -----
-  if (analyse.tracking_nummer && (options.mode === "document" || !existing.tracking_nummer)) {
-    updateFields.tracking_nummer = analyse.tracking_nummer;
-    if (analyse.versanddienstleister) updateFields.versanddienstleister = analyse.versanddienstleister;
-    if (analyse.tracking_url) {
-      updateFields.tracking_url = analyse.tracking_url;
-    } else if (analyse.versanddienstleister) {
-      const autoUrl = buildTrackingUrl(analyse.versanddienstleister, analyse.tracking_nummer);
-      if (autoUrl) updateFields.tracking_url = autoUrl;
-    }
-  }
-
-  // ----- Liefertermin (VB liefert voraussichtliche_lieferung, BB lieferdatum) -----
-  const lieferterminKandidat = analyse.voraussichtliche_lieferung ?? analyse.lieferdatum;
-  if (lieferterminKandidat && !existing.voraussichtliche_lieferung) {
-    updateFields.voraussichtliche_lieferung = lieferterminKandidat;
-  }
-
-  // ----- Lieferadresse, Bestelldatum, Kundennummer, Projekt-Referenz — fill-if-empty -----
-  if (analyse.lieferadressen && analyse.lieferadressen.length > 0
-      && analyse.lieferadressen[0] && !existing.lieferadresse_erkannt) {
-    updateFields.lieferadresse_erkannt = analyse.lieferadressen[0];
-  }
-  if (analyse.bestelldatum && !existing.bestelldatum) {
-    updateFields.bestelldatum = analyse.bestelldatum;
-  }
-  // Fälligkeit NUR aus Rechnung (= echte Zahlfrist; BB-Liefertermin wäre falsch)
-  if (analyse.faelligkeitsdatum && analyse.typ === "rechnung" && !existing.faelligkeitsdatum) {
-    updateFields.faelligkeitsdatum = analyse.faelligkeitsdatum;
-  }
-  if (analyse.kundennummer && !existing.kundennummer) {
-    updateFields.kundennummer = analyse.kundennummer;
-  }
-  if (analyse.projekt_referenz && !existing.projekt_referenz) {
-    updateFields.projekt_referenz = analyse.projekt_referenz;
-  }
-
-  // ----- 17.05.2026 — Gutschrift-Flag — ODER-Logik, einmal true bleibt true.
-  // Wenn IRGENDEIN Doku der Bestellung eine Gutschrift ist, ist die ganze
-  // Bestellung eine Gutschrift (= keine Freigabe nötig, direkt in Buchhaltung).
-  // Wir lesen den existing-Wert nicht extra aus, weil es ODER ist: false→true
-  // schadet nicht, true→true ist No-Op. Andere Richtung verhindern via Skip.
-  if (analyse.ist_gutschrift === true) {
-    updateFields.ist_gutschrift = true;
-  }
-
-  // ----- Händlername — fallback wenn Domain-Pseudo / leer -----
-  let haendlerNameAfter: string | null = null;
-  if (options.haendlerContext && analyse.haendler) {
-    const ctx = options.haendlerContext;
-    if (!ctx.current || ctx.current === ctx.absenderDomain || ctx.current === "") {
-      updateFields.haendler_name = analyse.haendler;
-      haendlerNameAfter = analyse.haendler;
-      logInfo("webhook/email", `Händlername aus ${options.mode}-Analyse übernommen: ${analyse.haendler}`);
-    }
-  }
-
-  await supabase.from("bestellungen").update(updateFields).eq("id", bestellungId);
-  return { haendlerName: haendlerNameAfter };
-}
-
-// Backward-compat-Wrapper: alte Signatur für die existing Call-Sites
-async function applyAnalyseToBestellung(
-  supabase: ReturnType<typeof createServiceClient>,
-  bestellungId: string,
-  analyse: DokumentAnalyse,
-  ctx?: { haendlerName: string; absenderDomain: string },
-): Promise<string | null> {
-  const result = await propagateAnalyseFields(supabase, bestellungId, analyse, {
-    mode: "document",
-    haendlerContext: ctx ? { current: ctx.haendlerName, absenderDomain: ctx.absenderDomain } : undefined,
-  });
-  return result.haendlerName;
-}
-
-async function ergaenzeFelder(
-  supabase: ReturnType<typeof createServiceClient>,
-  bestellungId: string,
-  bodyAnalyse: DokumentAnalyse,
-  haendlerName: string,
-  absenderDomain: string,
-): Promise<void> {
-  await propagateAnalyseFields(supabase, bestellungId, bodyAnalyse, {
-    mode: "body",
-    haendlerContext: { current: haendlerName, absenderDomain },
-  });
-}
-
-// =====================================================================
-// HELPER: Fallback-Keyword-Typ
-// =====================================================================
-
-interface FallbackInput {
-  emailText: string;
-  email_betreff: string;
-  email_absender: string;
-  email_datum: string;
-  anhaenge_count: number;
-  bestellungNeuErstellt: boolean;
-  /**
-   * 06.05.2026 — KI-Analyse-Result aus Schritt 15. Wenn vorhanden, werden
-   * extrahierte Werte (Bestellnr, Betrag, Daten) ins Fallback-Doku übernommen
-   * statt hardcoded NULLs. Greift z.B. bei Mails wo die KI typ='unbekannt'
-   * liefert aber Bestellnummer/Betrag erkannt hat.
-   */
-  bodyAnalyse?: DokumentAnalyse | null;
-  /**
-   * 15.05.2026 — Regex-Fallback aus Z. 586 (matcht "Rechnungsbetrag/Gesamtsumme/
-   * Endbetrag … X,XX €"). Greift wenn KI gesamtbetrag nicht extrahiert hat,
-   * z.B. bei body-only HTML-Tabellen-Mails ohne Vendor-Parser. Wird als
-   * letzte Stufe genutzt wenn auch bodyAnalyse null ist (Body-Block geskippt).
-   */
-  bodyExtractedBetrag?: number | null;
-  /**
-   * 15.05.2026 — Regex-Fallback aus Z. 612 (matcht "Kundennummer/Kunden-Nr/
-   * Customer ID: X"). Analog bodyExtractedBetrag — letzte Stufe wenn KI
-   * bodyAnalyse=null oder kundennummer-Feld nicht extrahiert hat.
-   */
-  bodyExtractedKundennummer?: string | null;
-  haendlerName?: string | null;
-  absenderDomain?: string | null;
-}
-
-interface FallbackResult {
-  shortCircuit: boolean;
-  response?: EmailPipelineResult;
-  gespeichert: boolean;
-}
-
-async function tryFallbackKeywordTyp(
-  supabase: ReturnType<typeof createServiceClient>,
-  bestellungId: string,
-  input: FallbackInput,
-): Promise<FallbackResult> {
-  const {
-    emailText, email_betreff, email_absender, email_datum,
-    anhaenge_count, bestellungNeuErstellt,
-    bodyAnalyse, bodyExtractedBetrag, bodyExtractedKundennummer,
-    haendlerName, absenderDomain,
-  } = input;
-
-  if (emailText && emailText.length > 20) {
-    const suchText = ((email_betreff || "") + " " + emailText.slice(0, 500)).toLowerCase();
-    const bestellungKw = ["bestellbestätigung", "bestellbestaetigung", "auftragsbestätigung", "order confirmation", "ihre bestellung", "bestellung eingegangen", "bestellung bei"];
-    const rechnungKw = ["rechnung", "invoice", "zahlungsaufforderung", "fällig", "rechnungsnummer", "zahlungsziel"];
-    const lieferscheinKw = ["lieferschein", "lieferung", "delivery note", "warenausgang"];
-    const versandKw = ["versandbestätigung", "versandbestaetigung", "versendet", "sendungsverfolgung", "tracking", "shipped", "zustellung", "unterwegs", "paket wurde", "sendung verfolgen"];
-
-    let fallbackTyp: string;
-    let fallbackFlag: string;
-
-    if (bestellungKw.some((k) => suchText.includes(k))) {
-      fallbackTyp = "bestellbestaetigung";
-      fallbackFlag = "hat_bestellbestaetigung";
-    } else if (rechnungKw.some((k) => suchText.includes(k))) {
-      fallbackTyp = "rechnung";
-      fallbackFlag = "hat_rechnung";
-    } else if (lieferscheinKw.some((k) => suchText.includes(k))) {
-      fallbackTyp = "lieferschein";
-      fallbackFlag = "hat_lieferschein";
-    } else if (versandKw.some((k) => suchText.includes(k))) {
-      fallbackTyp = "versandbestaetigung";
-      fallbackFlag = "hat_versandbestaetigung";
-    } else {
-      if (bestellungNeuErstellt) {
-        logInfo("webhook/email", "Rollback: Body-only ohne erkannten Typ", { bestellungId, email_absender, email_betreff });
-        await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
-        await supabase.from("bestellungen").delete().eq("id", bestellungId);
-      }
-      return {
-        shortCircuit: true,
-        response: { success: true, skipped: true, reason: "kein_dokument_erkannt" },
-        gespeichert: false,
-      };
-    }
-
-    if ((fallbackTyp === "versandbestaetigung" || fallbackTyp === "lieferschein") && bestellungNeuErstellt) {
-      logInfo("webhook/email", `Rollback: ${fallbackTyp} ohne bestehende Bestellung`, { bestellungId, email_absender, email_betreff });
-      await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
-      await supabase.from("bestellungen").delete().eq("id", bestellungId);
-      return {
-        shortCircuit: true,
-        response: { success: true, skipped: true, reason: "sekundaer_ohne_bestellung" },
-        gespeichert: false,
-      };
-    }
-
-    const bestellungUpdate: Record<string, unknown> = {
-      [fallbackFlag]: true,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (fallbackTyp === "versandbestaetigung") {
-      const trackingMatch = emailText.match(/(?:sendungsnummer|tracking[- ]?(?:nr|nummer|number|id|code)|paketnummer)[:\s]*([A-Z0-9]{8,30})/i);
-      if (trackingMatch) bestellungUpdate.tracking_nummer = trackingMatch[1];
-
-      const carriers = [
-        { name: "DHL", pattern: /\bDHL\b/i },
-        { name: "DPD", pattern: /\bDPD\b/i },
-        { name: "Hermes", pattern: /\bHermes\b/i },
-        { name: "UPS", pattern: /\bUPS\b/i },
-        { name: "GLS", pattern: /\bGLS\b/i },
-      ];
-      const carrier = carriers.find((c) => c.pattern.test(emailText));
-      if (carrier) bestellungUpdate.versanddienstleister = carrier.name;
-
-      const urlMatch = emailText.match(/https?:\/\/[^\s"'<>]+(?:track|sendung|parcel|verfolg)[^\s"'<>]*/i);
-      if (urlMatch) bestellungUpdate.tracking_url = urlMatch[0];
-      else if (carrier && trackingMatch) {
-        const autoUrl = buildTrackingUrl(carrier.name, trackingMatch[1]);
-        if (autoUrl) bestellungUpdate.tracking_url = autoUrl;
-      }
-    }
-
-    // 06.05.2026 — Fallback-Insert nutzt KI-Werte (falls vorhanden) statt
-    // hardcoded NULLs. Selbst wenn die KI typ='unbekannt' lieferte (deshalb
-    // sind wir im Fallback gelandet), hat sie oft trotzdem Bestellnr/Betrag/
-    // Daten extrahiert — die wären sonst verloren gegangen.
-    // 15.05.2026 — Wenn weder KI noch ki.gesamtbetrag/kundennummer, aber Regex
-    // hat einen Wert erkannt (z.B. "Rechnungsbetrag: 89,45 €" oder
-    // "Kundennummer: 1380585"), nutzen wir den.
-    const ki = bodyAnalyse ?? null;
-    const effektiverGesamtbetrag = ki?.gesamtbetrag ?? bodyExtractedBetrag ?? null;
-    const effektiveKundennummer = ki?.kundennummer || bodyExtractedKundennummer || null;
-    const fallbackKiRoh: Record<string, unknown> = ki
-      ? { ...(ki as unknown as Record<string, unknown>), fallback_typ: fallbackTyp, quelle: "email_body" }
-      : { typ: fallbackTyp, quelle: "email_body", email_text: emailText.slice(0, 5000), gesamtbetrag: effektiverGesamtbetrag, kundennummer: effektiveKundennummer };
-
-    // 18.05.2026 — Stub-Duplikat-Schutz (siehe pipeline/dedup.ts) auch im
-    // Fallback-Pfad: wenn fallbackTyp=rechnung UND wir keinen Betrag/PDF haben
-    // UND eine vollständige Rechnung mit gleicher BN existiert → skip.
-    const skipFallbackAsStub = await shouldSkipAsStubDuplicate({
-      supabase,
-      bestellungId,
-      typ: fallbackTyp,
-      bestellnummerErkannt: ki?.bestellnummer ?? null,
-      newGesamtbetrag: effektiverGesamtbetrag,
-      newStoragePfad: null,
-      emailBetreff: email_betreff,
-      emailAbsender: email_absender,
-    });
-    if (skipFallbackAsStub) {
-      return { shortCircuit: false, gespeichert: true };
-    }
-
-    // 06.05.2026 — Fallback-Insert via persist_dokument_atomic-RPC für
-    // Re-Backfill-Idempotenz. content_hash = sha256(email_text) verhindert
-    // doppelte Dokus beim retry derselben Mail.
-    const fallbackBodyHash = createHash("sha256").update(emailText).digest("hex");
-    await supabase.rpc("persist_dokument_atomic", {
-      p_bestellung_id: bestellungId,
-      p_typ: fallbackTyp,
-      p_quelle: "email",
-      p_storage_pfad: null,
-      p_content_hash: fallbackBodyHash,
-      p_email_betreff: email_betreff,
-      p_email_absender: email_absender,
-      p_email_datum: email_datum,
-      p_ki_roh_daten: fallbackKiRoh,
-      p_bestellnummer_erkannt: ki?.bestellnummer ?? null,
-      p_auftragsnummer: ki?.auftragsnummer || null,
-      p_lieferscheinnummer: ki?.lieferscheinnummer || null,
-      p_artikel: (ki?.artikel ?? null) as unknown as Record<string, unknown>,
-      p_gesamtbetrag: effektiverGesamtbetrag,
-      p_netto: ki?.netto ?? null,
-      p_mwst: ki?.mwst ?? null,
-      p_faelligkeitsdatum: ki?.faelligkeitsdatum ?? null,
-      p_lieferdatum: ki?.lieferdatum ?? null,
-      p_iban: ki?.iban ?? null,
-      p_kundennummer: effektiveKundennummer,
-      p_besteller_im_dokument: ki?.besteller_im_dokument || null,
-      p_projekt_referenz: ki?.projekt_referenz || null,
-      p_bestelldatum: ki?.bestelldatum || null,
-      p_ist_gutschrift: ki?.ist_gutschrift ?? false,
-    });
-
-    // bestellungen-Update: Flag setzen + KI-Werte (Betrag, Daten, BN) ergänzen
-    // via applyAnalyseToBestellung damit Bestellnummer/betrag/faelligkeit/
-    // bestelldatum/kundennummer in der UI sichtbar werden.
-    // 15.05.2026 — Wenn ki null aber Regex-Betrag erkannt: betrag fill-if-empty
-    // direkt setzen (applyAnalyseToBestellung wird nicht aufgerufen weil ki=null,
-    // sonst bliebe bestellungen.betrag NULL trotz Regex-Treffer). Existing-Check
-    // verhindert Überschreiben eines bereits gesetzten PDF-/Anhang-Betrags.
-    if (ki == null && (effektiverGesamtbetrag != null || effektiveKundennummer)) {
-      const { data: existingRow } = await supabase
-        .from("bestellungen").select("betrag, kundennummer").eq("id", bestellungId).maybeSingle();
-      if (effektiverGesamtbetrag != null && !existingRow?.betrag) {
-        bestellungUpdate.betrag = effektiverGesamtbetrag;
-      }
-      if (effektiveKundennummer && !existingRow?.kundennummer) {
-        bestellungUpdate.kundennummer = effektiveKundennummer;
-      }
-    }
-    await supabase.from("bestellungen").update(bestellungUpdate).eq("id", bestellungId);
-    if (ki) {
-      await applyAnalyseToBestellung(supabase, bestellungId, ki, {
-        haendlerName: haendlerName ?? "",
-        absenderDomain: absenderDomain ?? "",
-      });
-    }
-    return { shortCircuit: false, gespeichert: true };
-  }
-
-  if (bestellungNeuErstellt) {
-    logError("webhook/email", "Rollback: Keine Dokumente", { bestellungId, email_absender, email_betreff });
-    await supabase.from("dokumente").delete().eq("bestellung_id", bestellungId);
-    await supabase.from("bestellungen").delete().eq("id", bestellungId);
-    throw new Error(`Keine Dokumente konnten gespeichert werden (anhaenge=${anhaenge_count}, body_len=${emailText.length})`);
-  }
-
-  return { shortCircuit: false, gespeichert: false };
 }

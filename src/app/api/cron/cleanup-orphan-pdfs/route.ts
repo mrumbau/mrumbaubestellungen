@@ -35,6 +35,54 @@ const BodySchema = z.object({
 const BUCKET = "dokumente";
 const ROUTE_TAG = "/api/cron/cleanup-orphan-pdfs";
 
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
+interface PathInconsistencyRow {
+  doku_id: string;
+  bestellung_id_in_db: string;
+  bestellung_id_in_path: string;
+  storage_pfad: string;
+  typ: string;
+  created_at: string;
+}
+
+/**
+ * A4.15 — Storage-Pfad-Konsistenz: prüft ob `dokumente.storage_pfad` mit
+ * `dokumente.bestellung_id` im ersten Pfad-Segment übereinstimmt. Bei Drift
+ * loggen wir Sample + Count in `webhook_logs` (Status=warning) damit Admin
+ * im /system/logs-UI sieht ob Re-Uploads nötig sind.
+ *
+ * KEIN Auto-Rename: Storage-Copy verbraucht Egress, plus UI-/Email-Cache-URLs
+ * würden brechen. Admin entscheidet manuell pro Fall.
+ */
+async function checkPathConsistency(supabase: ServiceClient): Promise<{ count: number }> {
+  const { data, error } = await supabase.rpc("find_path_inconsistent_dokumente", { p_limit: 100 });
+  if (error) {
+    logError(ROUTE_TAG, "Path-Konsistenz-Query fehlgeschlagen", error);
+    return { count: 0 };
+  }
+  const rows = (data ?? []) as PathInconsistencyRow[];
+  if (rows.length === 0) return { count: 0 };
+
+  logInfo(ROUTE_TAG, "Path-Inkonsistenzen erkannt", {
+    count: rows.length,
+    sample: rows.slice(0, 5).map((r) => ({
+      doku_id: r.doku_id,
+      db_bestellung: r.bestellung_id_in_db,
+      path_bestellung: r.bestellung_id_in_path,
+    })),
+  });
+  await supabase.from("webhook_logs").insert({
+    typ: "cron_cleanup",
+    status: "warning",
+    fehler_text: `Path-Konsistenz: ${rows.length} dokumente mit storage_pfad-Drift (db_bestellung_id ≠ erstes Pfad-Segment). Sample: ${rows
+      .slice(0, 5)
+      .map((r) => `${r.doku_id.slice(0, 8)}…(db=${r.bestellung_id_in_db.slice(0, 8)}…, path=${r.bestellung_id_in_path.slice(0, 8)}…)`)
+      .join("; ")}. Detection-only — manuelle Re-Uploads ggf. erforderlich.`,
+  });
+  return { count: rows.length };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.json().catch(() => ({}));
@@ -88,6 +136,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (dryRun || orphanCount === 0) {
+      // A4.15 — auch im dry-run Pfad-Konsistenz prüfen
+      const inconsistency = await checkPathConsistency(supabase);
       return NextResponse.json({
         success: true,
         dry_run: dryRun,
@@ -95,6 +145,7 @@ export async function POST(request: NextRequest) {
         orphan_mb: Math.round(orphanBytes / 1024 / 1024 * 100) / 100,
         sample: orphanList.slice(0, 10).map((o) => ({ name: o.name, size_kb: Math.round((o.size_bytes ?? 0) / 1024) })),
         deleted: 0,
+        path_inconsistencies: inconsistency.count,
       });
     }
 
@@ -120,12 +171,19 @@ export async function POST(request: NextRequest) {
       fehler_text: `${deletedCount} von ${orphanCount} Orphan-PDFs gelöscht (~${Math.round(orphanBytes / 1024 / 1024 * 100) / 100} MB)`,
     });
 
+    // A4.15 (19.05.2026) — Path-Konsistenz-Check.
+    // Bytes liegen ggf. unter alter bestellung_id im Pfad obwohl dokumente.bestellung_id
+    // bereits verschoben wurde. Wir loggen nur — kein Auto-Rename (Storage-Copy
+    // ist teuer + URL-Cache-Konflikte). Admin sichtet via webhook_logs.
+    const inconsistency = await checkPathConsistency(supabase);
+
     return NextResponse.json({
       success: true,
       dry_run: false,
       orphan_count: orphanCount,
       deleted: deletedCount,
       freed_mb: Math.round(orphanBytes / 1024 / 1024 * 100) / 100,
+      path_inconsistencies: inconsistency.count,
     });
   } catch (err) {
     logError(ROUTE_TAG, "Unerwarteter Fehler", err);

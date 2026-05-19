@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { IconUsers, IconShield } from "@/components/ui/icons";
+import { IconUsers, IconShield, IconDownload } from "@/components/ui/icons";
 
 export type Benutzer = {
   id: string;
@@ -34,7 +34,47 @@ export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
     (b) => !["admin", "buchhaltung", "besteller"].includes(b.rolle),
   );
 
+  const { toast } = useToast();
   const [erasureTarget, setErasureTarget] = useState<Benutzer | null>(null);
+  const [isExporting, setIsExporting] = useState<string | null>(null);
+
+  // A4.13 (19.05.2026) — DSGVO Art. 15 Auskunftsrecht: JSON-Download
+  // aller personenbezogenen Daten eines Bestellers für Aushändigung.
+  async function handleExport(b: Benutzer) {
+    setIsExporting(b.kuerzel);
+    try {
+      const res = await fetch("/api/admin/dsgvo-export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ besteller_kuerzel: b.kuerzel }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error("DSGVO-Export fehlgeschlagen", {
+          description: data.error || data.details || `HTTP ${res.status}`,
+        });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dsgvo-export-${b.kuerzel}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("DSGVO-Export erstellt", {
+        description: `Personenbezogene Daten für ${b.name} heruntergeladen.`,
+      });
+    } catch (err) {
+      toast.error("Netzwerk-Fehler", {
+        description: err instanceof Error ? err.message : "Unbekannt",
+      });
+    } finally {
+      setIsExporting(null);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -85,6 +125,8 @@ export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
               rolle="besteller"
               benutzer={besteller}
               onErasureRequest={setErasureTarget}
+              onExportRequest={handleExport}
+              exportingKuerzel={isExporting}
             />
           )}
           {sonstige.length > 0 && (
@@ -106,11 +148,15 @@ function Gruppe({
   rolle,
   benutzer,
   onErasureRequest,
+  onExportRequest,
+  exportingKuerzel,
 }: {
   title: string;
   rolle: string;
   benutzer: Benutzer[];
   onErasureRequest?: (b: Benutzer) => void;
+  onExportRequest?: (b: Benutzer) => void;
+  exportingKuerzel?: string | null;
 }) {
   return (
     <SectionCard
@@ -140,6 +186,19 @@ function Gruppe({
             </div>
             <div className="flex items-center gap-2">
               <RolleBadge rolle={u.rolle} />
+              {onExportRequest && rolle === "besteller" && (
+                <button
+                  type="button"
+                  onClick={() => onExportRequest(u)}
+                  disabled={exportingKuerzel === u.kuerzel}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] text-foreground-subtle hover:text-info hover:bg-info-bg transition-colors disabled:opacity-50 disabled:cursor-wait"
+                  title="DSGVO Art. 15 — Daten exportieren (JSON-Download)"
+                  aria-label={`DSGVO-Export für ${u.name}`}
+                >
+                  <IconDownload className="w-3 h-3" />
+                  {exportingKuerzel === u.kuerzel ? "Lädt…" : "Export"}
+                </button>
+              )}
               {onErasureRequest && rolle === "besteller" && (
                 <button
                   type="button"

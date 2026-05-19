@@ -1456,6 +1456,7 @@ export type Database = {
         Returns: number
       }
       dsgvo_anonymize_besteller: { Args: { p_kuerzel: string }; Returns: Json }
+      dsgvo_export_user_data: { Args: { p_kuerzel: string }; Returns: Json }
       fan_out_pending_mails: {
         Args: never
         Returns: {
@@ -1469,6 +1470,17 @@ export type Database = {
           created_at: string
           name: string
           size_bytes: number
+        }[]
+      }
+      find_path_inconsistent_dokumente: {
+        Args: { p_limit?: number }
+        Returns: {
+          bestellung_id_in_db: string
+          bestellung_id_in_path: string
+          created_at: string
+          doku_id: string
+          storage_pfad: string
+          typ: string
         }[]
       }
       freigeben_bestellung: {
