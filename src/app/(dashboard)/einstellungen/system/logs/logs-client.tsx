@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,51 +12,82 @@ import { cn } from "@/lib/cn";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { IconActivity, IconSearch } from "@/components/ui/icons";
 
-export type WebhookLog = {
-  id: string;
+/**
+ * 19.05.2026 (A4.14) — Unified-Log-Type über v_pipeline_logs.
+ * Vereint webhook_logs + email_processing_log mit normalisierten Spalten.
+ */
+export type PipelineLog = {
+  quelle: "webhook" | "email_pipeline" | string;
+  record_id: string | null;
   typ: string;
   status: string;
+  bestellung_id: string | null;
   bestellnummer: string | null;
-  fehler_text: string | null;
+  sender: string | null;
+  subject: string | null;
+  detail: string | null;
   created_at: string;
+  extras: Record<string, unknown> | null;
 };
 
-type Filter = "alle" | "error" | "info";
+type StatusFilter = "alle" | "error" | "info" | "success";
+type QuelleFilter = "alle" | "webhook" | "email_pipeline";
 
-export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
+export function LogsClient({ initialLogs }: { initialLogs: PipelineLog[] }) {
   const { toast } = useToast();
-  const [logs, setLogs] = useState<WebhookLog[]>(initialLogs);
-  const [filter, setFilter] = useState<Filter>("alle");
+  const [logs, setLogs] = useState<PipelineLog[]>(initialLogs);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
+  const [quelleFilter, setQuelleFilter] = useState<QuelleFilter>("alle");
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   const filtered = logs.filter((l) => {
-    // Status-Filter
-    if (filter === "error" && l.status !== "error") return false;
-    if (filter === "info" && l.status !== "info") return false;
-    // Such-Filter (bestellnummer + fehler_text + typ)
+    if (statusFilter === "error" && l.status !== "error" && l.status !== "failed" && l.status !== "terminally_failed") return false;
+    if (statusFilter === "info" && !["info", "warning", "processing"].includes(l.status)) return false;
+    if (statusFilter === "success" && !["success", "processed"].includes(l.status)) return false;
+    if (quelleFilter !== "alle" && l.quelle !== quelleFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      const haystack = `${l.bestellnummer ?? ""} ${l.fehler_text ?? ""} ${l.typ}`.toLowerCase();
+      const haystack = [
+        l.bestellnummer,
+        l.detail,
+        l.typ,
+        l.subject,
+        l.sender,
+        l.bestellung_id,
+        l.record_id,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       if (!haystack.includes(q)) return false;
     }
     return true;
   });
 
-  const errorCount = logs.filter((l) => l.status === "error").length;
-  const infoCount = logs.filter((l) => l.status === "info").length;
+  const errorCount = logs.filter((l) =>
+    ["error", "failed", "terminally_failed"].includes(l.status),
+  ).length;
+  const infoCount = logs.filter((l) =>
+    ["info", "warning", "processing"].includes(l.status),
+  ).length;
+  const successCount = logs.filter((l) => ["success", "processed"].includes(l.status)).length;
+  const webhookCount = logs.filter((l) => l.quelle === "webhook").length;
+  const emailCount = logs.filter((l) => l.quelle === "email_pipeline").length;
 
   async function refresh() {
     setRefreshing(true);
     try {
       const supabase = createBrowserSupabaseClient();
       const { data } = await supabase
-        .from("webhook_logs")
-        .select("id, typ, status, bestellnummer, fehler_text, created_at")
+        .from("v_pipeline_logs")
+        .select(
+          "quelle, record_id, typ, status, bestellung_id, bestellnummer, sender, subject, detail, created_at, extras",
+        )
         .order("created_at", { ascending: false })
-        .limit(50);
-      if (data) setLogs(data);
-      toast.success("Webhook-Logs aktualisiert");
+        .limit(100);
+      if (data) setLogs(data as PipelineLog[]);
+      toast.success("Pipeline-Logs aktualisiert");
     } catch {
       toast.error("Aktualisierung fehlgeschlagen");
     } finally {
@@ -69,14 +101,14 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
         breadcrumbs={[
           { label: "Einstellungen", href: "/einstellungen" },
           { label: "System", href: "/einstellungen/system" },
-          { label: "Webhook-Logs" },
+          { label: "Pipeline-Logs" },
         ]}
-        title="Webhook-Protokoll"
-        description="Die letzten 50 eingehenden Webhooks (E-Mail, Extension, Cron). Bei Fehlern: Ursache in der Details-Spalte."
+        title="Pipeline-Protokoll"
+        description="Vereinheitlichter Log-View aus webhook_logs (Pipeline-Phasen-Logs, Cron-Cleanups, Extension) und email_processing_log (Mail-State je Microsoft-Graph-Mail). Cross-Link via bestellung_id."
         meta={
           <>
             <span className="text-[12px] text-foreground-subtle font-mono-amount">
-              {logs.length} Einträge
+              {logs.length} Einträge · {webhookCount} webhook · {emailCount} email
             </span>
             {errorCount > 0 && (
               <Badge tone="error" size="md">
@@ -96,24 +128,50 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
         <div className="flex items-center gap-3 px-5 py-3 border-b border-line-subtle flex-wrap">
           <div
             role="tablist"
-            aria-label="Log-Filter"
+            aria-label="Quelle-Filter"
             className="inline-flex bg-canvas border border-line-subtle rounded-md p-0.5"
           >
             <FilterTab
-              active={filter === "alle"}
-              onClick={() => setFilter("alle")}
+              active={quelleFilter === "alle"}
+              onClick={() => setQuelleFilter("alle")}
               label={`Alle · ${logs.length}`}
             />
             <FilterTab
-              active={filter === "error"}
-              onClick={() => setFilter("error")}
+              active={quelleFilter === "webhook"}
+              onClick={() => setQuelleFilter("webhook")}
+              label={`Webhook · ${webhookCount}`}
+            />
+            <FilterTab
+              active={quelleFilter === "email_pipeline"}
+              onClick={() => setQuelleFilter("email_pipeline")}
+              label={`Email · ${emailCount}`}
+            />
+          </div>
+          <div
+            role="tablist"
+            aria-label="Status-Filter"
+            className="inline-flex bg-canvas border border-line-subtle rounded-md p-0.5"
+          >
+            <FilterTab
+              active={statusFilter === "alle"}
+              onClick={() => setStatusFilter("alle")}
+              label="Status: Alle"
+            />
+            <FilterTab
+              active={statusFilter === "error"}
+              onClick={() => setStatusFilter("error")}
               label={`Fehler · ${errorCount}`}
               tone="error"
             />
             <FilterTab
-              active={filter === "info"}
-              onClick={() => setFilter("info")}
+              active={statusFilter === "info"}
+              onClick={() => setStatusFilter("info")}
               label={`Info · ${infoCount}`}
+            />
+            <FilterTab
+              active={statusFilter === "success"}
+              onClick={() => setStatusFilter("success")}
+              label={`OK · ${successCount}`}
             />
           </div>
           <label className="relative flex-1 min-w-[220px] max-w-md">
@@ -122,7 +180,7 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Bestellnummer / Fehlertext / Typ"
+              placeholder="Bestellnr. / Detail / Typ / Subject / Sender"
               aria-label="Logs durchsuchen"
               className="w-full h-8 pl-8 pr-3 text-[12px] bg-canvas border border-line-subtle rounded-md text-foreground placeholder:text-foreground-subtle focus:outline-none focus:border-brand focus:shadow-[var(--shadow-focus-ring)]"
             />
@@ -130,18 +188,18 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
         </div>
         {filtered.length === 0 ? (
           <EmptyState
-            tone={filter === "error" ? "success" : "info"}
+            tone={statusFilter === "error" ? "success" : "info"}
             icon={<IconActivity className="h-5 w-5" />}
             title={
-              filter === "error"
+              statusFilter === "error"
                 ? "Keine Fehler"
                 : logs.length === 0
-                  ? "Noch keine Webhook-Logs"
+                  ? "Noch keine Pipeline-Logs"
                   : "Keine Einträge für diesen Filter"
             }
             description={
-              filter === "error"
-                ? "Alle Webhook-Aufrufe sind erfolgreich verarbeitet."
+              statusFilter === "error"
+                ? "Alle Pipeline-Phasen sind erfolgreich verarbeitet."
                 : undefined
             }
             compact
@@ -152,19 +210,21 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
               <thead className="bg-canvas sticky top-0 z-10 border-b border-line-subtle">
                 <tr>
                   <Th>Zeitpunkt</Th>
-                  <Th>Typ</Th>
+                  <Th>Quelle / Typ</Th>
                   <Th>Status</Th>
-                  <Th>Bestellnr.</Th>
-                  <Th>Details</Th>
+                  <Th>Bestellung</Th>
+                  <Th>Detail</Th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((log) => (
                   <tr
-                    key={log.id}
+                    key={`${log.quelle}-${log.record_id ?? log.created_at}`}
                     className={cn(
                       "border-b border-line-subtle last:border-b-0 hover:bg-surface-hover transition-colors",
-                      log.status === "error" ? "bg-error-bg/40" : "",
+                      ["error", "failed", "terminally_failed"].includes(log.status)
+                        ? "bg-error-bg/40"
+                        : "",
                     )}
                   >
                     <td className="px-5 py-2.5 font-mono-amount text-[12px] text-foreground-muted whitespace-nowrap">
@@ -177,20 +237,46 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
                       })}
                     </td>
                     <td className="px-3 py-2.5">
-                      <Badge tone="muted" size="sm">
-                        {log.typ}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge tone={log.quelle === "email_pipeline" ? "info" : "muted"} size="sm">
+                          {log.quelle === "email_pipeline" ? "email" : "webhook"}
+                        </Badge>
+                        <span className="text-[12px] text-foreground-subtle font-mono-amount">{log.typ}</span>
+                      </div>
                     </td>
                     <td className="px-3 py-2.5">
                       <StatusPill status={log.status} />
                     </td>
                     <td className="px-3 py-2.5 font-mono-amount text-[12px] text-foreground">
-                      {log.bestellnummer || "–"}
+                      {log.bestellung_id ? (
+                        <Link
+                          href={`/bestellungen/${log.bestellung_id}`}
+                          className="hover:text-brand"
+                          title={log.bestellung_id}
+                        >
+                          {log.bestellnummer || log.bestellung_id.slice(0, 8) + "…"}
+                        </Link>
+                      ) : (
+                        log.bestellnummer || "–"
+                      )}
                     </td>
-                    <td className="px-5 py-2.5 text-[12px] text-foreground-subtle max-w-[360px]">
-                      <span className="line-clamp-2 break-words" title={log.fehler_text ?? undefined}>
-                        {log.fehler_text || "–"}
-                      </span>
+                    <td className="px-5 py-2.5 text-[12px] text-foreground-subtle max-w-[420px]">
+                      {log.subject && (
+                        <div className="text-foreground truncate" title={log.subject}>
+                          {log.subject}
+                        </div>
+                      )}
+                      {log.sender && (
+                        <div className="font-mono-amount text-[11px] text-foreground-subtle truncate" title={log.sender}>
+                          {log.sender}
+                        </div>
+                      )}
+                      {log.detail && (
+                        <div className="line-clamp-2 break-words mt-0.5" title={log.detail}>
+                          {log.detail}
+                        </div>
+                      )}
+                      {!log.subject && !log.sender && !log.detail && "–"}
                     </td>
                   </tr>
                 ))}
@@ -204,7 +290,7 @@ export function LogsClient({ initialLogs }: { initialLogs: WebhookLog[] }) {
 }
 
 function StatusPill({ status }: { status: string }) {
-  if (status === "success") {
+  if (status === "success" || status === "processed") {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-status-freigegeben">
         <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-status-freigegeben" />
@@ -212,11 +298,19 @@ function StatusPill({ status }: { status: string }) {
       </span>
     );
   }
-  if (status === "error") {
+  if (["error", "failed", "terminally_failed"].includes(status)) {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-error">
         <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-error" />
         Fehler
+      </span>
+    );
+  }
+  if (status === "warning") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-warning">
+        <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-warning" />
+        Warn
       </span>
     );
   }

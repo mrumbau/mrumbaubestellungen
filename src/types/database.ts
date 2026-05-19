@@ -1434,6 +1434,22 @@ export type Database = {
         }
         Relationships: []
       }
+      v_pipeline_logs: {
+        Row: {
+          bestellnummer: string | null
+          bestellung_id: string | null
+          created_at: string | null
+          detail: string | null
+          extras: Json | null
+          quelle: string | null
+          record_id: string | null
+          sender: string | null
+          status: string | null
+          subject: string | null
+          typ: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       append_haendler_url_pattern: {
