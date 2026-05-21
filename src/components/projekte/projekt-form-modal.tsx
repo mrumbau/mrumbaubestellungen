@@ -63,7 +63,7 @@ export function ProjektFormModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md"
+        className="bg-surface rounded-xl shadow-2xl w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-line">

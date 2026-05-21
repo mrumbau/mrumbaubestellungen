@@ -132,7 +132,7 @@ export function OrderRow({
                       {docs.map((dok) => (
                         <div
                           key={dok.id}
-                          className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-line"
+                          className="flex items-center gap-2 px-3 py-2 bg-surface rounded-lg border border-line"
                         >
                           <svg
                             className="w-3.5 h-3.5 text-foreground-subtle"
@@ -189,7 +189,7 @@ export function OrderRow({
                 <Link
                   href={`/bestellungen/${order.id}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand hover:text-brand-light font-medium border border-line rounded-lg hover:bg-white transition-colors shrink-0 group/link"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand hover:text-brand-light font-medium border border-line rounded-lg hover:bg-surface transition-colors shrink-0 group/link"
                 >
                   Details
                   <svg

@@ -88,7 +88,7 @@ export function ArchivToolbar({
             onClick={() => onTabChange(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               activeTab === tab.key
-                ? "bg-white text-foreground shadow-sm"
+                ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
             }`}
           >
@@ -122,11 +122,12 @@ export function ArchivToolbar({
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
-            type="text"
+            type="search"
+            aria-label="Archiv durchsuchen"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Projekt, Bestellnummer, Händler..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
           />
         </div>
         <input

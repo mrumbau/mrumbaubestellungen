@@ -41,7 +41,7 @@ export function ArtTabs({ value, onChange, counts, tabs = DEFAULT_TABS }: ArtTab
             aria-pressed={isActive}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               isActive
-                ? "bg-white text-foreground shadow-sm"
+                ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
             }`}
           >

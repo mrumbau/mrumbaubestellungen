@@ -53,7 +53,7 @@ export interface FilterBarProps {
 }
 
 const inputBase =
-  "w-full pl-10 pr-4 py-2.5 bg-white border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors";
+  "w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors";
 
 // 12.05.2026 (Mobile-Sweep, F-MOB-NEU): vorher `hidden md:block` →
 // Mobile-User konnte gar nicht filtern, nur suchen. Selects jetzt auf

@@ -353,7 +353,7 @@ export function BuchhaltungClient({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowDatev(true)}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-white rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
             >
               <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -362,7 +362,7 @@ export function BuchhaltungClient({
             </button>
             <button
               onClick={exportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-white rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -394,7 +394,7 @@ export function BuchhaltungClient({
             onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               tab === "offen"
-                ? "bg-white text-foreground shadow-sm"
+                ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
             }`}
           >
@@ -411,7 +411,7 @@ export function BuchhaltungClient({
             onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               tab === "bezahlt"
-                ? "bg-white text-foreground shadow-sm"
+                ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
             }`}
           >
@@ -549,7 +549,7 @@ export function BuchhaltungClient({
             <button
               onClick={() => goToPage(safeCurrentPage - 1)}
               disabled={safeCurrentPage <= 1}
-              className="px-3 py-1.5 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Vorherige
             </button>
@@ -559,7 +559,7 @@ export function BuchhaltungClient({
             <button
               onClick={() => goToPage(safeCurrentPage + 1)}
               disabled={safeCurrentPage >= totalPages}
-              className="px-3 py-1.5 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Nächste
             </button>
