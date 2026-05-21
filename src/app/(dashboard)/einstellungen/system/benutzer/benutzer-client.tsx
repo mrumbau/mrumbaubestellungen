@@ -344,10 +344,11 @@ function DsgvoErasureModal({
         </Alert>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[12px] text-foreground-subtle">
+          <label htmlFor="dsgvo-confirm-input" className="text-[12px] text-foreground-subtle">
             Tippe das Kürzel <code className="font-mono-amount font-semibold text-foreground">{expectedToken}</code> ein, um zu bestätigen:
           </label>
           <input
+            id="dsgvo-confirm-input"
             type="text"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}

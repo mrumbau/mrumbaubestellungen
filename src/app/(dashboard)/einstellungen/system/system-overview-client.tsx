@@ -186,6 +186,7 @@ export function SystemOverviewClient({
           <Input
             label="Konfidenz Direkt-Zuordnung"
             type="number"
+            inputMode="decimal"
             min={0}
             max={1}
             step={0.05}
@@ -197,6 +198,7 @@ export function SystemOverviewClient({
           <Input
             label="Konfidenz Vorschlag"
             type="number"
+            inputMode="decimal"
             min={0}
             max={1}
             step={0.05}

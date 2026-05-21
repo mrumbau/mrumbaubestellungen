@@ -184,7 +184,7 @@ export function RulesClient({
                       title={r.enabled ? "Deaktivieren" : "Aktivieren"}
                     >
                       <span
-                        className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                        className={`absolute top-0.5 w-4 h-4 bg-surface rounded-full transition-transform ${
                           r.enabled ? "translate-x-[18px]" : "translate-x-0.5"
                         }`}
                       />
@@ -322,10 +322,10 @@ function RuleForm({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          <label className="block">
+            <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               Name
-            </label>
+            </span>
             <input
               type="text"
               value={name}
@@ -334,26 +334,27 @@ function RuleForm({
               placeholder="z.B. RK → MT"
               className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             />
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          </label>
+          <label className="block">
+            <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               Priorität (niedrigster Wert zuerst)
-            </label>
+            </span>
             <input
               type="number"
+              inputMode="numeric"
               value={priority}
               onChange={(e) => setPriority(parseInt(e.target.value, 10) || 100)}
               min={0}
               max={9999}
               className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             />
-          </div>
+          </label>
         </div>
 
-        <div>
-          <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+        <label className="block">
+          <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
             Bedingungs-Typ
-          </label>
+          </span>
           <select
             value={conditionType}
             onChange={(e) => setConditionType(e.target.value)}
@@ -365,12 +366,12 @@ function RuleForm({
               </option>
             ))}
           </select>
-        </div>
+        </label>
 
-        <div>
-          <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+        <label className="block">
+          <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
             Bedingungs-Wert
-          </label>
+          </span>
           <input
             type="text"
             value={conditionValue}
@@ -379,13 +380,13 @@ function RuleForm({
             placeholder={selectedConditionType?.example ?? ""}
             className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
           />
-        </div>
+        </label>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          <label className="block">
+            <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               → Besteller
-            </label>
+            </span>
             <select
               value={targetKuerzel}
               onChange={(e) => setTargetKuerzel(e.target.value)}
@@ -399,13 +400,14 @@ function RuleForm({
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+          </label>
+          <label className="block">
+            <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
               Konfidenz (0.0 – 1.0)
-            </label>
+            </span>
             <input
               type="number"
+              inputMode="decimal"
               value={confidence}
               onChange={(e) => setConfidence(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
               step={0.05}
@@ -413,13 +415,13 @@ function RuleForm({
               max={1}
               className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
             />
-          </div>
+          </label>
         </div>
 
-        <div>
-          <label className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
+        <label className="block">
+          <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
             Notizen (optional)
-          </label>
+          </span>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -427,7 +429,7 @@ function RuleForm({
             placeholder="z.B. 'MT bestellt fast nur bei RK seit Jan 2026'"
             className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
           />
-        </div>
+        </label>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-line-subtle">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={saving}>

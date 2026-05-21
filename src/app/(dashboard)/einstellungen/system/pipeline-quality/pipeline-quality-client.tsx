@@ -120,8 +120,8 @@ export function PipelineQualityClient({
       {rows.length === 0 ? (
         <EmptyState
           icon={<IconActivity className="h-5 w-5" />}
-          title="Keine Daten vorhanden"
-          description="Noch keine verarbeiteten Mails in den letzten 30 Tagen."
+          title="Noch keine Pipeline-Aktivität"
+          description="In den letzten 30 Tagen wurden keine Mails verarbeitet. Sobald die Email-Sync wieder eingehende Mails findet, erscheinen hier täglich Mengen-, Cost- und Konfidenz-Metriken plus Anomalie-Warnungen."
         />
       ) : (
         <>

@@ -444,6 +444,13 @@ export function DataTable<TRow>({
                       <button
                         type="button"
                         onClick={() => handleHeaderSort(col)}
+                        title={
+                          sort?.key === col.key
+                            ? sort?.direction === "asc"
+                              ? `Sortiert nach ${col.label} aufsteigend — Klick für absteigend`
+                              : `Sortiert nach ${col.label} absteigend — Klick zum Zurücksetzen`
+                            : `Sortieren nach ${col.label}`
+                        }
                         className={cn(
                           "inline-flex items-center gap-1",
                           col.align === "right" && "flex-row-reverse",

@@ -230,6 +230,7 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
             </Select>
             <Input
               label="Erwarteter Betrag"
+              inputMode="decimal"
               placeholder="z.B. 49,90"
               value={form.betrag}
               onChange={(e) => setForm((f) => ({ ...f, betrag: e.target.value }))}
@@ -239,6 +240,7 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
             <Input
               label="Toleranz"
               type="number"
+              inputMode="numeric"
               min={0}
               max={100}
               value={form.toleranz}
@@ -267,6 +269,7 @@ export function AboAnbieterClient({ initialListe }: { initialListe: AboAnbieter[
             <Input
               label="Kündigungsfrist"
               type="number"
+              inputMode="numeric"
               min={0}
               placeholder="z.B. 30"
               value={form.kuendigungsfrist}

@@ -606,10 +606,12 @@ export function BestellungenTabelle({
             <button
               onClick={() => goToPage(safeCurrentPage - 1)}
               disabled={safeCurrentPage <= 1}
-              className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              aria-label="Vorherige Seite"
+              className="p-2 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Vorherige Seite"
             >
               <svg
+                aria-hidden="true"
                 className="w-4 h-4"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -629,10 +631,12 @@ export function BestellungenTabelle({
             <button
               onClick={() => goToPage(safeCurrentPage + 1)}
               disabled={safeCurrentPage >= totalPages}
-              className="p-2 text-sm font-medium bg-white border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              aria-label="Nächste Seite"
+              className="p-2 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Nächste Seite"
             >
               <svg
+                aria-hidden="true"
                 className="w-4 h-4"
                 fill="none"
                 viewBox="0 0 24 24"

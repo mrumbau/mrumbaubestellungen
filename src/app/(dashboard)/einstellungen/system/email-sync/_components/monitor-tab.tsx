@@ -123,8 +123,8 @@ export function MonitorTab({
       {entries.length === 0 && !loading ? (
         <EmptyState
           icon={<IconMail className="h-10 w-10" />}
-          title="Keine Einträge"
-          description="Sobald der Cron läuft, erscheinen hier verarbeitete Mails."
+          title="Noch keine Mail-Verarbeitungen"
+          description="Sobald der Email-Sync-Cron läuft, erscheinen hier alle verarbeiteten Mails mit Status, Konfidenz und Pipeline-Schritten. Cron läuft alle 5 Minuten."
         />
       ) : (
         <div className="rounded-lg border border-line-subtle overflow-x-auto">

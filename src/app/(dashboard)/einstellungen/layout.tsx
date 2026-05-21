@@ -9,6 +9,7 @@ import {
   IconShield,
   IconSettings,
   IconKey,
+  IconTrash,
 } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
@@ -24,13 +25,34 @@ export default async function EinstellungenLayout({
   const istAdmin = profil.rolle === "admin";
   const istBuchhaltung = profil.rolle === "buchhaltung";
 
-  // Buchhaltung only sees /einstellungen (Passwort ändern) — no sub-nav needed.
+  // 21.05.2026 — Buchhaltung bekommt jetzt auch eine SubNav (Passwort +
+  // Verworfen-Audit). Vorher early-return ohne SubNav, weil sie nur 1 Item
+  // hatten. Jetzt 2+ Items rechtfertigen die Navigation.
   if (istBuchhaltung) {
-    return <div className="max-w-5xl mx-auto">{children}</div>;
+    const buchhaltungItems: SubNavItem[] = [
+      {
+        label: "Übersicht",
+        href: "/einstellungen",
+        match: "exact",
+        icon: <IconKey />,
+      },
+      {
+        label: "Verworfen-Audit",
+        href: "/einstellungen/verworfene",
+        icon: <IconTrash />,
+      },
+    ];
+    return (
+      <div className="max-w-5xl mx-auto">
+        <SubNav items={buchhaltungItems} ariaLabel="Einstellungen-Bereiche" className="mb-6" />
+        {children}
+      </div>
+    );
   }
 
   // Rollen-Logik: fachliche Stammdaten (Händler, SU, Projekte, Abo-Anbieter, Blacklist)
   // sind für Admin + Besteller sichtbar. System (Benutzer-Mgmt, Logs, Testdaten, Firma) nur Admin.
+  // Verworfen-Audit ist Transparenz-Tool für alle (auch Buchhaltung — siehe oben).
   const items: SubNavItem[] = [
     {
       label: "Übersicht",
@@ -62,6 +84,11 @@ export default async function EinstellungenLayout({
       label: "Blacklist",
       href: "/einstellungen/blacklist",
       icon: <IconShield />,
+    },
+    {
+      label: "Verworfen-Audit",
+      href: "/einstellungen/verworfene",
+      icon: <IconTrash />,
     },
     {
       label: "System",

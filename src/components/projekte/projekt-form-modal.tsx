@@ -165,9 +165,10 @@ export function ProjektFormModal({
             </label>
             <input
               type="number"
+              inputMode="decimal"
               value={formBudget}
               onChange={(e) => setFormBudget(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
               placeholder="Optional"
               min="0"
               step="0.01"

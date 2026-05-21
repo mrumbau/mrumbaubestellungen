@@ -192,15 +192,17 @@ export function LogsClient({ initialLogs }: { initialLogs: PipelineLog[] }) {
             icon={<IconActivity className="h-5 w-5" />}
             title={
               statusFilter === "error"
-                ? "Keine Fehler"
+                ? "Keine Fehler in der Pipeline"
                 : logs.length === 0
                   ? "Noch keine Pipeline-Logs"
-                  : "Keine Einträge für diesen Filter"
+                  : "Filter ergibt keine Treffer"
             }
             description={
               statusFilter === "error"
-                ? "Alle Pipeline-Phasen sind erfolgreich verarbeitet."
-                : undefined
+                ? "Alle Pipeline-Phasen der letzten Verarbeitung sind erfolgreich gelaufen — keine Fehler-, Warning- oder Failed-Einträge."
+                : logs.length === 0
+                  ? "Sobald Mails verarbeitet werden, erscheinen hier alle Pipeline-Ereignisse aus webhook_logs und email_processing_log."
+                  : "Probiere einen anderen Status- oder Quellen-Filter, oder erhöhe das Limit auf 100 Einträge."
             }
             compact
           />

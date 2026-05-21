@@ -51,8 +51,10 @@ export const buttonVariants = cva(
         sm: "h-8 px-3 text-[14px] gap-1.5 rounded-md",
         md: "h-9 px-4 text-sm gap-2 rounded-md",
         lg: "h-11 px-5 text-[16px] gap-2 rounded-lg font-semibold",
-        "icon-sm": "h-8 w-8 rounded-md",
-        "icon-md": "h-9 w-9 rounded-md",
+        // Touch-Targets auf Mobile (<md) auf 44×44px hochziehen für WCAG 2.5.5
+        // / Apple HIG. Auf Desktop (md:) bleiben die kompakten Tabellen-Maße.
+        "icon-sm": "h-11 w-11 md:h-8 md:w-8 rounded-md",
+        "icon-md": "h-11 w-11 md:h-9 md:w-9 rounded-md",
       },
       fullWidth: {
         true: "w-full",
