@@ -573,7 +573,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #adadaf;
+  background: var(--mr-gray);
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb {
