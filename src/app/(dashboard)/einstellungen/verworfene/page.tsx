@@ -1,7 +1,9 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { VerworfeneClient, AUDIT_CUTOFF_ISO, type VerworfeneEntry } from "./verworfene-client";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 /**
  * /einstellungen/verworfene
@@ -18,6 +20,12 @@ export const dynamic = "force-dynamic";
  * Zugang: alle eingeloggten User (RLS-Policy `alle_authenticated_select_verworfene`).
  */
 export default async function VerworfenePage() {
+  // 21.05.2026 — Audit-Liste darf nicht gecacht werden. `dynamic = "force-dynamic"`
+  // erzwingt zwar per-Request-Rendering, aber Next.js' interner Fetch-Cache kann
+  // die supabase-Antwort trotzdem deduplizieren. noStore() ist die explizite
+  // Garantie, dass jeder Page-Load eine frische DB-Query auslöst.
+  noStore();
+
   const supabase = await createServerSupabaseClient();
   const { data: rows } = await supabase
     .from("verworfene_emails")
