@@ -701,7 +701,7 @@ export function KundenClient({
                   {formKeywords.map((kw, i) => (
                     <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-info-bg text-info rounded text-[12px] font-medium">
                       {kw}
-                      <button type="button" onClick={() => setFormKeywords((prev) => prev.filter((_, j) => j !== i))} className="text-blue-400 hover:text-info">
+                      <button type="button" onClick={() => setFormKeywords((prev) => prev.filter((_, j) => j !== i))} className="text-info/70 hover:text-info">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </span>

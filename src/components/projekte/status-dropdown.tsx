@@ -9,11 +9,13 @@
 
 import { useState, useRef, useEffect } from "react";
 
+// 19.05.2026 (A4.11) — alle Pill-Farben über Tokens; "abgeschlossen" nutzt
+// neutrale canvas-soft+foreground-muted+line-Tokens statt bg-gray-*.
 export const STATUS_OPTIONS = [
-  { value: "aktiv", label: "Aktiv", icon: "circle", color: "#059669", bg: "bg-success-bg", text: "text-success", border: "border-success-border" },
-  { value: "pausiert", label: "Pausiert", icon: "pause", color: "#d97706", bg: "bg-warning-bg", text: "text-warning", border: "border-warning-border" },
-  { value: "abgeschlossen", label: "Abgeschlossen", icon: "check", color: "#6b7280", bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-200" },
-  { value: "archiviert", label: "Archivieren", icon: "archive", color: "#dc2626", bg: "bg-error-bg", text: "text-error", border: "border-error-border" },
+  { value: "aktiv", label: "Aktiv", icon: "circle", color: "var(--success)", bg: "bg-success-bg", text: "text-success", border: "border-success-border" },
+  { value: "pausiert", label: "Pausiert", icon: "pause", color: "var(--warning)", bg: "bg-warning-bg", text: "text-warning", border: "border-warning-border" },
+  { value: "abgeschlossen", label: "Abgeschlossen", icon: "check", color: "var(--text-tertiary)", bg: "bg-input", text: "text-foreground-muted", border: "border-line" },
+  { value: "archiviert", label: "Archivieren", icon: "archive", color: "var(--error)", bg: "bg-error-bg", text: "text-error", border: "border-error-border" },
 ];
 
 export function getStatusCfg(status: string) {
@@ -100,7 +102,7 @@ export function StatusDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-lg shadow-lg border border-line py-1 min-w-[160px]">
+        <div className="absolute right-0 top-full mt-1 z-20 bg-surface rounded-lg shadow-lg border border-line py-1 min-w-[160px]">
           {STATUS_OPTIONS.map((opt) => {
             const isActive = opt.value === currentStatus;
             return (
