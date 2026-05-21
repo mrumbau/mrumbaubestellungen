@@ -1282,7 +1282,11 @@ export type Database = {
         Row: {
           absender_adresse: string
           absender_domain: string
+          bestellnummer: string | null
+          bestellung_id: string | null
+          betrag: number | null
           created_at: string
+          dokumente_snapshot: Json | null
           email_betreff: string
           id: string
           verworfen_von: string
@@ -1290,7 +1294,11 @@ export type Database = {
         Insert: {
           absender_adresse: string
           absender_domain: string
+          bestellnummer?: string | null
+          bestellung_id?: string | null
+          betrag?: number | null
           created_at?: string
+          dokumente_snapshot?: Json | null
           email_betreff: string
           id?: string
           verworfen_von: string
@@ -1298,7 +1306,11 @@ export type Database = {
         Update: {
           absender_adresse?: string
           absender_domain?: string
+          bestellnummer?: string | null
+          bestellung_id?: string | null
+          betrag?: number | null
           created_at?: string
+          dokumente_snapshot?: Json | null
           email_betreff?: string
           id?: string
           verworfen_von?: string

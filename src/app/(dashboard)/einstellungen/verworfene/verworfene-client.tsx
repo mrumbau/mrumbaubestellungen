@@ -10,6 +10,13 @@ import { useToast } from "@/components/ui/toast";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { IconTrash, IconSearch } from "@/components/ui/icons";
 
+export type VerworfeneDokuSnapshot = {
+  id: string;
+  typ: string;
+  storage_pfad: string | null;
+  dateiname?: string | null;
+};
+
 export type VerworfeneEntry = {
   id: string;
   absender_adresse: string | null;
@@ -17,7 +24,20 @@ export type VerworfeneEntry = {
   email_betreff: string | null;
   verworfen_von: string | null;
   created_at: string;
+  bestellung_id: string | null;
+  bestellnummer: string | null;
+  betrag: number | null;
+  dokumente_snapshot: VerworfeneDokuSnapshot[] | null;
 };
+
+/**
+ * 21.05.2026 — Cutoff für Audit-Sicht.
+ * Frühere Einträge sind Test-Verwerfungen + Spam-Cleanup aus der Pre-Audit-
+ * Phase und werden ausgeblendet (sowohl Server-Query als auch Browser-Refresh).
+ * Wert: 18.05.2026 14:19 Berliner Zeit = 12:19 UTC = erster "echter" Audit-
+ * Eintrag (WK Transport / CR).
+ */
+export const AUDIT_CUTOFF_ISO = "2026-05-18T12:19:00Z";
 
 /**
  * Verworfene-Audit-Liste — wer hat wann welche Mail verworfen.
@@ -73,10 +93,13 @@ export function VerworfeneClient({
       const supabase = createBrowserSupabaseClient();
       const { data } = await supabase
         .from("verworfene_emails")
-        .select("id, absender_adresse, absender_domain, email_betreff, verworfen_von, created_at")
+        .select(
+          "id, absender_adresse, absender_domain, email_betreff, verworfen_von, created_at, bestellung_id, bestellnummer, betrag, dokumente_snapshot",
+        )
+        .gte("created_at", AUDIT_CUTOFF_ISO)
         .order("created_at", { ascending: false })
         .limit(500);
-      if (data) setEntries(data as VerworfeneEntry[]);
+      if (data) setEntries(data as unknown as VerworfeneEntry[]);
       toast.success("Verworfen-Audit aktualisiert");
     } catch {
       toast.error("Aktualisierung fehlgeschlagen");
@@ -176,6 +199,18 @@ export function VerworfeneClient({
                     scope="col"
                     className="text-left px-4 py-2 font-semibold text-[10px] text-foreground-subtle uppercase tracking-wider"
                   >
+                    Bestellnr.
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-right px-4 py-2 font-semibold text-[10px] text-foreground-subtle uppercase tracking-wider"
+                  >
+                    Betrag
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-left px-4 py-2 font-semibold text-[10px] text-foreground-subtle uppercase tracking-wider"
+                  >
                     Absender
                   </th>
                   <th
@@ -183,6 +218,12 @@ export function VerworfeneClient({
                     className="text-left px-4 py-2 font-semibold text-[10px] text-foreground-subtle uppercase tracking-wider"
                   >
                     Subject
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-left px-4 py-2 font-semibold text-[10px] text-foreground-subtle uppercase tracking-wider"
+                  >
+                    Dokumente
                   </th>
                 </tr>
               </thead>
@@ -197,18 +238,27 @@ export function VerworfeneClient({
                         {e.verworfen_von ?? "?"}
                       </Badge>
                     </td>
+                    <td className="px-4 py-2.5 text-[12px] text-foreground font-mono-amount whitespace-nowrap">
+                      {e.bestellnummer ?? <span className="text-foreground-faint">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-[12px] text-foreground text-right font-mono-amount whitespace-nowrap">
+                      {e.betrag != null ? formatEuro(e.betrag) : <span className="text-foreground-faint">—</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-[12px]">
-                      <div className="text-foreground font-mono-amount truncate max-w-[260px]">
+                      <div className="text-foreground font-mono-amount truncate max-w-[240px]">
                         {e.absender_adresse ?? "—"}
                       </div>
                       {e.absender_domain && e.absender_adresse !== e.absender_domain && (
-                        <div className="text-[11px] text-foreground-subtle font-mono-amount truncate max-w-[260px]">
+                        <div className="text-[11px] text-foreground-subtle font-mono-amount truncate max-w-[240px]">
                           {e.absender_domain}
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-[12px] text-foreground-muted">
-                      <span className="block truncate max-w-[440px]">{e.email_betreff || <em className="text-foreground-faint">leer</em>}</span>
+                      <span className="block truncate max-w-[320px]">{e.email_betreff || <em className="text-foreground-faint">leer</em>}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <DokumentePills snapshot={e.dokumente_snapshot} onError={(msg) => toast.error("Dokument nicht verfügbar", { description: msg })} />
                     </td>
                   </tr>
                 ))}
@@ -217,6 +267,64 @@ export function VerworfeneClient({
           </div>
         )}
       </SectionCard>
+    </div>
+  );
+}
+
+function DokumentePills({
+  snapshot,
+  onError,
+}: {
+  snapshot: VerworfeneDokuSnapshot[] | null;
+  onError: (msg: string) => void;
+}) {
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  if (!snapshot || snapshot.length === 0) {
+    return <span className="text-[11px] text-foreground-faint">—</span>;
+  }
+
+  async function openDoku(d: VerworfeneDokuSnapshot) {
+    if (!d.storage_pfad) {
+      onError("Kein Storage-Pfad im Snapshot.");
+      return;
+    }
+    setLoadingId(d.id);
+    try {
+      const res = await fetch(`/api/audit/verworfene-doku/${d.id}`);
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        onError(json.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {snapshot.map((d) => (
+        <button
+          key={d.id}
+          type="button"
+          onClick={() => openDoku(d)}
+          disabled={loadingId === d.id || !d.storage_pfad}
+          title={d.storage_pfad ? `${d.typ} öffnen (PDF im neuen Tab)` : `Kein PDF-Pfad gespeichert`}
+          className={
+            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider " +
+            "transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] " +
+            (d.storage_pfad
+              ? "bg-info-bg text-info hover:bg-info hover:text-white cursor-pointer"
+              : "bg-input text-foreground-faint cursor-not-allowed") +
+            (loadingId === d.id ? " opacity-60" : "")
+          }
+        >
+          {loadingId === d.id ? "…" : d.typ.slice(0, 3).toUpperCase()}
+        </button>
+      ))}
     </div>
   );
 }
@@ -254,6 +362,14 @@ function badgeToneForActor(kuerzel: string | null): "brand" | "info" | "success"
   if (k === "MH") return "warning";
   if (k === "NJ") return "success";
   return "muted";
+}
+
+function formatEuro(value: number): string {
+  try {
+    return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value);
+  } catch {
+    return `${value} €`;
+  }
 }
 
 function formatBerliner(iso: string): string {

@@ -83,13 +83,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Verworfene Email-Muster lernen (vor dem Löschen!)
+    // 21.05.2026 — Snapshot der Bestellung + Dokumente in verworfene_emails
+    // mitspeichern, damit der Audit-View "Wer hat was mit wieviel verworfen"
+    // und Dokument-Link anzeigen kann. Bestellung wird unten gelöscht; ohne
+    // Snapshot wäre der Audit-Eintrag nach Delete inhaltlos.
     for (const id of ids) {
-      const { data: docs } = await supabase
-        .from("dokumente")
-        .select("email_absender, email_betreff")
-        .eq("bestellung_id", id);
+      const [bestellungRes, docsRes] = await Promise.all([
+        supabase
+          .from("bestellungen")
+          .select("id, bestellnummer, betrag")
+          .eq("id", id)
+          .maybeSingle(),
+        supabase
+          .from("dokumente")
+          .select("id, typ, storage_pfad, email_absender, email_betreff")
+          .eq("bestellung_id", id),
+      ]);
+
+      const bestellung = bestellungRes.data;
+      const docs = docsRes.data;
 
       if (docs && docs.length > 0) {
+        const dokumenteSnapshot = docs.map((d) => ({
+          id: d.id,
+          typ: d.typ,
+          storage_pfad: d.storage_pfad,
+        }));
+
         const muster = docs
           .filter((d) => d.email_absender && d.email_betreff)
           .map((d) => {
@@ -100,6 +120,10 @@ export async function POST(request: NextRequest) {
               absender_domain: domain,
               email_betreff: d.email_betreff || "",
               verworfen_von: profil!.kuerzel,
+              bestellung_id: id,
+              bestellnummer: bestellung?.bestellnummer ?? null,
+              betrag: bestellung?.betrag ?? null,
+              dokumente_snapshot: dokumenteSnapshot as unknown as Record<string, unknown>,
             };
           })
           .filter((m) => m.absender_domain);

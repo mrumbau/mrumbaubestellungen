@@ -69,17 +69,23 @@ function makeServiceClient(opts: {
   // generic from() router
   const from = vi.fn().mockImplementation((table: string) => {
     if (table === "bestellungen") {
-      // 2 contexts: SELECT für gueltigkeit, DELETE für actual wipe
+      // 3 contexts: SELECT.in (permissions-check), SELECT.eq.maybeSingle (snapshot
+      // pro id für verworfene_emails), DELETE für actual wipe
+      const bestellungenList = opts.bestellungen ?? [];
       return {
-        select: vi.fn().mockReturnValue({ in: vi.fn().mockResolvedValue({ data: opts.bestellungen ?? [], error: null }) }),
+        select: vi.fn().mockImplementation(() => ({
+          in: vi.fn().mockResolvedValue({ data: bestellungenList, error: null }),
+          eq: vi.fn().mockImplementation((_col: string, val: string) => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: bestellungenList.find((b) => b.id === val) ?? null,
+              error: null,
+            }),
+          })),
+        })),
         delete: () => ({
-          in: (col: string, vals: string[]) => {
-            // Letzter DELETE-Aufruf — returns delError
-            return {
-              or: () => deleteOr(),
-            };
-            void col; void vals;
-          },
+          in: () => ({
+            or: () => deleteOr(),
+          }),
         }),
       };
     }
