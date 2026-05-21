@@ -153,7 +153,8 @@ export function useBestelldetail({
           if (!res.ok) {
             setScanError(data.error || "Upload fehlgeschlagen");
           } else {
-            router.refresh();
+            // 21.05.2026 (Perf) — kein router.refresh; events.INSERT (doku_added)
+            // triggert Realtime → automatic server-sync.
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
@@ -164,7 +165,7 @@ export function useBestelldetail({
       };
       reader.readAsDataURL(file);
     },
-    [bestellungId, router],
+    [bestellungId],
   );
 
   const handleZipDownload = useCallback(async () => {
@@ -278,7 +279,9 @@ export function useBestelldetail({
         });
         if (res.ok) {
           setActionError(null);
-          router.refresh();
+          // 21.05.2026 (Perf) — kein router.refresh; useBestellungRealtime (Z. 88)
+          // fängt das bestellungen-UPDATE und triggert den Server-Reload selbst.
+          // Vorher: doppelter SSR-Reload (Action + Realtime).
         } else {
           setActionError("Projekt-Zuordnung fehlgeschlagen");
         }
@@ -288,7 +291,7 @@ export function useBestelldetail({
         setProjektLoading(false);
       }
     },
-    [bestellungId, router],
+    [bestellungId],
   );
 
   const handleVorschlagAktion = useCallback(
@@ -308,7 +311,7 @@ export function useBestelldetail({
         });
         if (res.ok) {
           setActionError(null);
-          router.refresh();
+          // 21.05.2026 (Perf) — kein router.refresh; Realtime synced.
         } else {
           setActionError("Projekt-Bestätigung fehlgeschlagen");
         }
@@ -318,7 +321,7 @@ export function useBestelldetail({
         setVorschlagLoading(false);
       }
     },
-    [bestellungId, router],
+    [bestellungId],
   );
 
   // ─── Bestellungsart ─────────────────────────────────────
@@ -334,9 +337,9 @@ export function useBestelldetail({
           body: JSON.stringify({ bestellungsart: neueArt }),
         });
         if (res.ok) {
-          setAktuelleArt(neueArt);
+          setAktuelleArt(neueArt); // optimistic local-state
           setActionError(null);
-          router.refresh();
+          // 21.05.2026 (Perf) — kein router.refresh; Realtime synced.
         } else {
           setActionError("Bestellungsart konnte nicht geändert werden");
         }
@@ -346,7 +349,7 @@ export function useBestelldetail({
         setBestellungsartLoading(false);
       }
     },
-    [aktuelleArt, bestellungId, router],
+    [aktuelleArt, bestellungId],
   );
 
   // ─── Freigabe ───────────────────────────────────────────
@@ -374,19 +377,21 @@ export function useBestelldetail({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (res.ok) {
-        router.refresh();
-      } else {
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setFreigabeError(data.error || "Freigabe fehlgeschlagen");
         // useOptimistic rollback automatisch beim nächsten Render
       }
+      // 21.05.2026 (Perf) — kein router.refresh nach Success. Optimistic-State
+      // ist bereits sichtbar; useBestellungRealtime fängt bestellungen.UPDATE
+      // (status→freigegeben) + events.INSERT (freigabe_eingetragen) → automatic
+      // server-sync ohne zweiten Reload.
     } catch {
       setFreigabeError("Netzwerkfehler bei der Freigabe");
     } finally {
       setLoading(false);
     }
-  }, [bestellungId, router, addOptimisticFreigabe, bestellerName, bestellerKuerzel]);
+  }, [bestellungId, addOptimisticFreigabe, bestellerName, bestellerKuerzel]);
 
   // ─── Verwerfen ──────────────────────────────────────────
 
@@ -422,14 +427,14 @@ export function useBestelldetail({
         body: JSON.stringify({ mahnung_am: null, mahnung_count: 0 }),
       });
       if (res.ok) {
-        router.refresh();
+        // 21.05.2026 (Perf) — kein router.refresh; Realtime fängt UPDATE.
         return;
       }
       setActionError("Mahnung konnte nicht quittiert werden. Bitte erneut versuchen.");
     } catch {
       setActionError("Netzwerkfehler beim Quittieren der Mahnung.");
     }
-  }, [bestellungId, router]);
+  }, [bestellungId]);
 
   // ─── Kommentar ──────────────────────────────────────────
 
@@ -444,7 +449,8 @@ export function useBestelldetail({
           body: JSON.stringify({ bestellung_id: bestellungId, text }),
         });
         if (res.ok) {
-          router.refresh();
+          // 21.05.2026 (Perf) — kein router.refresh; events.INSERT
+          // (kommentar_added) triggert Realtime → automatic server-sync.
           return true;
         }
         setActionError("Kommentar konnte nicht gespeichert werden");
@@ -456,7 +462,7 @@ export function useBestelldetail({
         setLoading(false);
       }
     },
-    [bestellungId, router],
+    [bestellungId],
   );
 
   return {

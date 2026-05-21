@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createServerSupabaseClient } from "./supabase-server";
 
 export type Rolle = "besteller" | "buchhaltung" | "admin";
@@ -17,9 +18,62 @@ export interface BenutzerProfil {
   rolle: Rolle;
 }
 
-// Holt das Benutzerprofil inkl. Rolle aus benutzer_rollen
-// cache() dedupliziert innerhalb eines Server-Requests (Layout + Page = 1 Call statt 2)
+const PROFIL_COOKIE_NAME = "mr_profil_cache";
+const ERLAUBTE_ROLLEN: readonly string[] = ["admin", "besteller", "buchhaltung"];
+
+interface ProfilCacheCookie {
+  id?: string;
+  user_id?: string;
+  email?: string;
+  name?: string;
+  kuerzel?: string;
+  rolle?: string;
+  uid?: string;
+  exp?: number;
+}
+
+/**
+ * 21.05.2026 (Perf) — Cookie-First-Path für Profil.
+ * Middleware (src/middleware.ts) schreibt das volle Profil ins httpOnly-Cookie
+ * mit 5-Min-TTL. Layout liest hier den Cookie direkt — spart pro Page-
+ * Navigation einen auth.getUser()-Roundtrip (~150ms) + einen benutzer_rollen-
+ * SELECT (~80ms). Bei Cookie-Miss oder Stale fällt auf den vollen DB-Pfad
+ * zurück. cache() dedupliziert weiterhin innerhalb des SAME Request.
+ */
 export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> => {
+  // Fast-Path: Cookie-Cache (von Middleware geschrieben)
+  try {
+    const cookieStore = await cookies();
+    const raw = cookieStore.get(PROFIL_COOKIE_NAME)?.value;
+    if (raw) {
+      const cached = JSON.parse(raw) as ProfilCacheCookie;
+      if (
+        cached &&
+        typeof cached.exp === "number" && cached.exp > Date.now() &&
+        typeof cached.uid === "string" &&
+        typeof cached.id === "string" &&
+        typeof cached.user_id === "string" &&
+        typeof cached.email === "string" &&
+        typeof cached.name === "string" &&
+        typeof cached.kuerzel === "string" &&
+        typeof cached.rolle === "string" &&
+        ERLAUBTE_ROLLEN.includes(cached.rolle)
+      ) {
+        return {
+          id: cached.id,
+          user_id: cached.user_id,
+          email: cached.email,
+          name: cached.name,
+          kuerzel: cached.kuerzel,
+          rolle: cached.rolle as Rolle,
+        };
+      }
+    }
+  } catch {
+    // Cookie kaputt oder cookies()-API nicht verfügbar → DB-Fallback
+  }
+
+  // Slow-Path: voller DB-Lookup (Cookie-Miss, abgelaufen, oder Profil-Aktualisierung)
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

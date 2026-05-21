@@ -21,9 +21,13 @@ const AUTH_HEADER_REQUIRED_EXCEPTIONS = ["/api/webhook/graph-notification"];
 // Exakte Pfade die ohne Auth erreichbar sind (Tool-Auswahl)
 const PUBLIC_EXACT = ["/"];
 
-// Rolle wird für 5 Minuten im Cookie gecacht → spart 1 DB-Query pro Navigation
+// 21.05.2026 — volles Profil-Cache (vorher nur Rolle).
+// Spart pro Page-Navigation: 1× auth.getUser() Roundtrip + 1× benutzer_rollen-SELECT
+// im Dashboard-Layout (siehe src/lib/auth.ts getBenutzerProfil).
+// httpOnly → kein JS-Access, nicht spoofbar für User-facing-Decisions.
+// API-Routes laden Profil weiterhin frisch aus DB (Defense-in-Depth).
 const ROLLE_CACHE_TTL_MS = 5 * 60 * 1000;
-const ROLLE_COOKIE_NAME = "mr_rolle_cache";
+const ROLLE_COOKIE_NAME = "mr_profil_cache";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -92,15 +96,14 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Rolle: erst aus Cookie-Cache lesen, nur bei Cache-Miss aus DB
+  // Profil: erst aus Cookie-Cache lesen, nur bei Cache-Miss aus DB
   let rolle = "";
-  const rolleCookie = request.cookies.get(ROLLE_COOKIE_NAME)?.value;
+  const profilCookie = request.cookies.get(ROLLE_COOKIE_NAME)?.value;
 
   const ERLAUBTE_ROLLEN = ["admin", "besteller", "buchhaltung"];
-  if (rolleCookie) {
+  if (profilCookie) {
     try {
-      const cached = JSON.parse(rolleCookie);
-      // Cache gültig wenn: gleicher User + nicht abgelaufen + gültige Rolle
+      const cached = JSON.parse(profilCookie);
       if (
         cached && typeof cached === "object" &&
         cached.uid === user.id &&
@@ -114,29 +117,29 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!rolle) {
-    // Cache-Miss: aus DB laden
+    // Cache-Miss: volles Profil aus DB laden (id, user_id, email, name, kuerzel, rolle)
+    // Layout liest später denselben Cookie → spart dort einen weiteren DB-Roundtrip.
     const { data: profil } = await supabase
       .from("benutzer_rollen")
-      .select("rolle")
+      .select("id, user_id, email, name, kuerzel, rolle")
       .eq("user_id", user.id)
       .single();
 
     rolle = profil?.rolle || "";
 
-    // In Cookie cachen (httpOnly, nicht von JS auslesbar, nicht spoofbar für Auth)
-    // Die Rolle im Cookie wird NUR für Middleware-Routing verwendet,
-    // API-Routes laden die Rolle immer frisch aus der DB
-    response.cookies.set(ROLLE_COOKIE_NAME, JSON.stringify({
-      rolle,
-      uid: user.id,
-      exp: Date.now() + ROLLE_CACHE_TTL_MS,
-    }), {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: Math.ceil(ROLLE_CACHE_TTL_MS / 1000),
-    });
+    if (profil) {
+      response.cookies.set(ROLLE_COOKIE_NAME, JSON.stringify({
+        ...profil,
+        uid: user.id,
+        exp: Date.now() + ROLLE_CACHE_TTL_MS,
+      }), {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: Math.ceil(ROLLE_CACHE_TTL_MS / 1000),
+      });
+    }
   }
 
   // Kein Profil in benutzer_rollen → kein Zugang
