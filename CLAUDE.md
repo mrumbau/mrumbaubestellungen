@@ -48,8 +48,8 @@ Auth:         Supabase Auth
 Dateispeicher: Supabase Storage (PDFs, Scan-Fotos)
 KI:           OpenAI GPT-4o (PDF-Analyse, OCR, Abgleich)
 Automation:   Make.com Pro (E-Mail Verarbeitung, Webhooks)
-Extension:    Chrome Extension (Besteller-Erkennung)
 DNS:          All-Inkl (CNAME cloud → cname.vercel-dns.com)
+(Historisch: Chrome-Extension Besteller-Erkennung — 22.05.2026 stillgelegt)
 ```
 
 ---
@@ -91,18 +91,12 @@ DNS:          All-Inkl (CNAME cloud → cname.vercel-dns.com)
     /buchhaltung          Nur freigegebene Rechnungen (Rolle: buchhaltung)
     /einstellungen        Händlerliste + Benutzerverwaltung (Rolle: admin)
   /api                    Vercel API Routes
-    /webhook/bestellung   POST – Empfängt Signal von Chrome Extension
     /webhook/email        POST – Empfängt verarbeitete E-Mail-Daten von Make.com
     /bestellungen         GET – Liste (gefiltert nach User-Rolle)
     /bestellungen/[id]    GET – Details + KI-Abgleich
     /bestellungen/[id]/freigeben  POST – Rechnung freigeben
     /pdfs/[id]            GET – PDF aus Supabase Storage abrufen
     /scan                 POST – Hochgeladenes Foto/PDF an OpenAI zur OCR-Analyse
-  /extension              Chrome Extension
-    manifest.json
-    background.js
-    content.js
-    config.js             Benutzerkürzel + bekannte Händler-URLs
   /supabase
     schema.sql            Komplettes Datenbankschema
     seed.sql              Testdaten
@@ -140,14 +134,7 @@ CREATE TABLE haendler (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Temporäre Signale von Chrome Extension
-CREATE TABLE bestellung_signale (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  kuerzel TEXT NOT NULL, -- MT, CR, MH
-  haendler_domain TEXT NOT NULL,
-  zeitstempel TIMESTAMPTZ DEFAULT NOW(),
-  verarbeitet BOOLEAN DEFAULT FALSE
-);
+-- 22.05.2026 — bestellung_signale entfernt (Chrome-Extension stillgelegt).
 
 -- Bestellungen (Haupttabelle)
 CREATE TABLE bestellungen (
@@ -160,7 +147,7 @@ CREATE TABLE bestellungen (
   betrag NUMERIC(10,2),
   waehrung TEXT DEFAULT 'EUR',
   status TEXT NOT NULL DEFAULT 'offen' CHECK (status IN (
-    'erwartet',       -- Signal von Chrome Extension, noch keine E-Mail
+    'erwartet',       -- Reserviert (historisch von Chrome-Extension), aktuell unused
     'offen',          -- Mindestens 1 Dokument vorhanden
     'vollstaendig',   -- Alle 3 Dokumente vorhanden, Abgleich OK
     'abweichung',     -- KI hat Abweichung gefunden
@@ -274,24 +261,14 @@ OPENAI_API_KEY=sk-...
 
 # Make.com Webhook Sicherheit
 MAKE_WEBHOOK_SECRET=geheimer-key-hier
-
-# Chrome Extension Sicherheit
-EXTENSION_SECRET=geheimer-key-hier
 ```
 
 ---
 
 ## 🔄 Make.com Szenarien
 
-### Szenario 1 – Chrome Extension Signal empfangen
-```
-HINWEIS: Die Chrome Extension sendet DIREKT an die Vercel API Route,
-         NICHT über Make.com. Make.com ist hier nicht beteiligt.
-
-Chrome Extension → POST /api/webhook/bestellung
-Payload:  { kuerzel: "MT", haendler_domain: "bauhaus.de", zeitstempel: "...", secret: "..." }
-Aktion:   Eintrag in bestellung_signale Tabelle via Supabase Service Role
-```
+### Szenario 1 – Chrome Extension (22.05.2026 stillgelegt)
+*Modul ohne Ersatz entfernt — eingehende E-Mails alleine decken die Erkennung ab.*
 
 ### Szenario 2 – Eingehende E-Mail in info@ verarbeiten
 ```
@@ -372,31 +349,11 @@ Gib NUR ein JSON-Objekt zurück:
 
 ---
 
-## 🌐 Chrome Extension
+## 🌐 Chrome Extension (22.05.2026 stillgelegt)
 
-Die Extension läuft im Hintergrund in Chrome auf jedem Rechner.
-Jeder Rechner hat ein eigenes Benutzerkürzel (MT, CR, MH) das einmalig konfiguriert wird.
-
-**Erkennungslogik:**
-```javascript
-// config.js – Liste der bekannten Händler-Checkout-URLs
-const HAENDLER_PATTERNS = [
-  { domain: "bauhaus.de", patterns: ["/checkout/confirmation", "/bestellbestaetigung"] },
-  { domain: "obi.de", patterns: ["/bestellbestaetigung", "/order-success"] },
-  { domain: "amazon.de", patterns: ["/gp/buy/thankyou", "/order-confirm"] },
-  { domain: "wuerth.de", patterns: ["/order/success", "/bestellung/bestaetigung"] },
-  // Weitere Händler hier hinzufügen
-];
-
-// Wenn URL einem Muster entspricht → Webhook senden
-const payload = {
-  kuerzel: BENUTZER_KUERZEL, // aus config
-  haendler_domain: window.location.hostname,
-  zeitstempel: new Date().toISOString(),
-  secret: EXTENSION_SECRET
-};
-fetch(WEBHOOK_URL, { method: "POST", body: JSON.stringify(payload) });
-```
+Modul + alle Endpoints (api/extension/*, webhook/bestellung, bestellung_signale-Tabelle)
+entfernt. Besteller-Erkennung läuft jetzt nur noch über die E-Mail-Pipeline
+(Rules-Engine → Händler-Affinität → Name-im-Text → KI-Historie).
 
 ---
 
@@ -460,20 +417,12 @@ Zusätzlich: Datei-Upload Button für PC (PDF oder JPG vom Scanner).
 
 ## 🔗 API Routes – Detailspezifikation
 
-### POST /api/webhook/bestellung
-```javascript
-// Empfängt Signal von Chrome Extension
-// Prüft EXTENSION_SECRET
-// Speichert in bestellung_signale
-// Response: { success: true }
-```
-
 ### POST /api/webhook/email
 ```javascript
-// Empfängt E-Mail-Daten von Make.com
+// Empfängt E-Mail-Daten von Make.com / Microsoft Graph
 // Prüft MAKE_WEBHOOK_SECRET
 // 1. PDFs an OpenAI senden → Daten extrahieren
-// 2. Besteller ermitteln: bestellung_signale nach Händler + Zeitstempel (±60 min)
+// 2. Besteller ermitteln (Rules-Engine → Händler-Affinität → Name-im-Text → KI-Historie)
 // 3. Bestellung in DB anlegen oder updaten
 // 4. Wenn alle 3 Dokumente da → KI-Abgleich starten
 // 5. Status aktualisieren
@@ -510,13 +459,12 @@ Baue in genau dieser Reihenfolge:
 3. **Login-Seite** – Supabase Auth, Weiterleitung nach Rolle
 4. **Vercel API Routes** – alle Endpunkte, zuerst Webhooks
 5. **OpenAI Integration** – PDF-Analyse Prompt + Abgleich-Prompt testen
-6. **Make.com Szenarien** – Szenario 2 zuerst (E-Mail), dann 1 und 3
-7. **Chrome Extension** – manifest.json, background.js, config.js
-8. **Frontend Bestellübersicht** – Tabelle mit Filtern
-9. **Frontend Bestelldetail** – PDF-Viewer, KI-Abgleich, Freigabe
-10. **Scan-Funktion** – Kamera + Upload
-11. **Buchhaltungsansicht** – gefilterte Ansicht + CSV Export
-12. **Dashboard** – Statistiken, offene Aktionen
+6. **Make.com Szenarien** – Szenario 2 (E-Mail) und 3 (Freigabe)
+7. **Frontend Bestellübersicht** – Tabelle mit Filtern
+8. **Frontend Bestelldetail** – PDF-Viewer, KI-Abgleich, Freigabe
+9. **Scan-Funktion** – Kamera + Upload
+10. **Buchhaltungsansicht** – gefilterte Ansicht + CSV Export
+11. **Dashboard** – Statistiken, offene Aktionen
 
 ---
 

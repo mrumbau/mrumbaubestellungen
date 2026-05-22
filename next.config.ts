@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // 22.05.2026 — Bestellwesen-Manifest (next-generated aus manifest.ts).
+        // Ohne expliziten Content-Type liefert Next/Vercel application/octet-stream
+        // oder text/plain → Chrome wirft "Manifest: Syntax error".
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json; charset=utf-8" },
+        ],
+      },
+      {
         source: "/api/pdfs/:id*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

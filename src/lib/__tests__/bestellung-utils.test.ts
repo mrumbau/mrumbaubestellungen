@@ -18,8 +18,8 @@ import {
 } from "../bestellung-utils";
 
 describe("aggregatePipelineConfidence", () => {
-  it("liefert 1.0 für deterministischen bestellnummer_match", () => {
-    expect(aggregatePipelineConfidence("bestellnummer_match")).toBe(1.0);
+  it("liefert 0.85 für deterministischen besteller_im_dokument", () => {
+    expect(aggregatePipelineConfidence("besteller_im_dokument")).toBe(0.85);
   });
 
   it("liefert 0.0 für 'unbekannt'", () => {
@@ -50,12 +50,14 @@ describe("aggregatePipelineConfidence", () => {
     expect(aggregatePipelineConfidence("ki_historisch", -1)).toBe(0);
   });
 
-  it("Reihenfolge: deterministischer Match > Signal > KI", () => {
-    const det = aggregatePipelineConfidence("bestellnummer_match");
-    const sig = aggregatePipelineConfidence("signal_4h");
-    const ki = aggregatePipelineConfidence("ki_historisch", 1.0);
-    expect(det).toBeGreaterThan(sig);
-    expect(sig).toBeGreaterThan(ki);
+  it("Reihenfolge: text-Match > Affinität > KI bei niedriger Konfidenz", () => {
+    // 22.05.2026 — bestellnummer_match/signal_4h entfernt mit Extension-Removal.
+    // besteller_im_dokument ist jetzt höchste Konfidenz.
+    const text = aggregatePipelineConfidence("besteller_im_dokument");
+    const affin = aggregatePipelineConfidence("haendler_affinitaet");
+    const kiLow = aggregatePipelineConfidence("ki_historisch", 0.3);
+    expect(text).toBeGreaterThan(affin);
+    expect(affin).toBeGreaterThan(kiLow);
   });
 });
 

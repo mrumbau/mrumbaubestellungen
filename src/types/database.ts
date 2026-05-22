@@ -181,59 +181,8 @@ export type Database = {
         }
         Relationships: []
       }
-      bestellung_signale: {
-        Row: {
-          confidence: number | null
-          erkennung: string | null
-          haendler_domain: string
-          id: string
-          kuerzel: string
-          matched_bestellung_id: string | null
-          order_nummer: string | null
-          page_title: string | null
-          status: string | null
-          url_path: string | null
-          verarbeitet: boolean | null
-          zeitstempel: string | null
-        }
-        Insert: {
-          confidence?: number | null
-          erkennung?: string | null
-          haendler_domain: string
-          id?: string
-          kuerzel: string
-          matched_bestellung_id?: string | null
-          order_nummer?: string | null
-          page_title?: string | null
-          status?: string | null
-          url_path?: string | null
-          verarbeitet?: boolean | null
-          zeitstempel?: string | null
-        }
-        Update: {
-          confidence?: number | null
-          erkennung?: string | null
-          haendler_domain?: string
-          id?: string
-          kuerzel?: string
-          matched_bestellung_id?: string | null
-          order_nummer?: string | null
-          page_title?: string | null
-          status?: string | null
-          url_path?: string | null
-          verarbeitet?: boolean | null
-          zeitstempel?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bestellung_signale_matched_bestellung_id_fkey"
-            columns: ["matched_bestellung_id"]
-            isOneToOne: false
-            referencedRelation: "bestellungen"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      // 22.05.2026 — bestellung_signale entfernt (Chrome-Extension stillgelegt).
+      // DB-Tabelle separat per Migration droppen (siehe Memory perf_sprint_*).
       bestellungen: {
         Row: {
           archiviert_am: string | null

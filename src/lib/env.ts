@@ -27,7 +27,7 @@ const envSchema = z.object({
   // ── Webhook/Cron-Secrets (production-critical) ──────────────────────────
   CRON_SECRET: z.string().min(32),
   MAKE_WEBHOOK_SECRET: z.string().min(16),
-  EXTENSION_SECRET: z.string().min(8),
+  // 22.05.2026 — EXTENSION_SECRET entfernt, Chrome-Extension stillgelegt.
 
   // ── Microsoft Graph (production-critical für Email-Sync) ────────────────
   MS_TENANT_ID: z.string().uuid(),

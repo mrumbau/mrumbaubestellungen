@@ -1,14 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/webhook", "/api/cron", "/api/extension", "/api/health"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/webhook",
+  "/api/cron",
+  "/api/health",
+  // 22.05.2026 — PWA-Manifest muss ohne Auth abrufbar sein, sonst redirected
+  // Middleware den Manifest-Fetch zu /login HTML und Browser meldet
+  // "Manifest: Line: 1, column: 1, Syntax error".
+  "/manifest.webmanifest",
+];
 
 // F2.18: Defense-in-Depth — diese Prefix-public Routen MÜSSEN selbst
-// authentifizieren (Bearer/Body-Secret/EXTENSION_SECRET). Wenn eine Route
-// versehentlich ohne Auth-Check erstellt wird, fängt dieser Check sie ab:
+// authentifizieren (Bearer/Body-Secret). Wenn eine Route versehentlich ohne
+// Auth-Check erstellt wird, fängt dieser Check sie ab:
 // `Authorization: Bearer ...` oder `secret`-Body-Field MUSS vorhanden sein.
 // Verhindert dass z.B. /api/webhook/debug versehentlich offen ist.
-const AUTH_HEADER_REQUIRED_PREFIXES = ["/api/webhook", "/api/cron", "/api/extension"];
+const AUTH_HEADER_REQUIRED_PREFIXES = ["/api/webhook", "/api/cron"];
 
 // Ausnahmen vom F2.18-Block: Routen die NICHT mit Header/Body-Secret authen
 // können, weil ein externer Service ohne Vorab-Wissen sie callt.

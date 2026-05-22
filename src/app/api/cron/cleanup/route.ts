@@ -34,15 +34,7 @@ export async function POST(request: NextRequest) {
     const stunden = body.stunden ?? 48;
     const schwelleDatum = new Date(Date.now() - stunden * 60 * 60 * 1000).toISOString();
 
-    // 1. Abgelaufene Signale als "expired" markieren
-    const { data: abgelaufeneSignale } = await supabase
-      .from("bestellung_signale")
-      .update({ status: "expired" })
-      .eq("status", "pending")
-      .lt("zeitstempel", schwelleDatum)
-      .select("id");
-
-    const signaleExpired = abgelaufeneSignale?.length || 0;
+    // 22.05.2026 — Schritt 1 (Signal-Expire) entfernt, Chrome-Extension stillgelegt.
 
     // 2. Versand-only Bestellungen identifizieren
     const { data: versandOnly } = await supabase
@@ -88,12 +80,11 @@ export async function POST(request: NextRequest) {
     await supabase.from("webhook_logs").insert({
       typ: "cron",
       status: "success",
-      fehler_text: `Cleanup: ${signaleExpired} Signale expired, ${versandGeloescht} Versand-only gelöscht`,
+      fehler_text: `Cleanup: ${versandGeloescht} Versand-only gelöscht`,
     });
 
     return NextResponse.json({
       success: true,
-      signale_expired: signaleExpired,
       versand_geloescht: versandGeloescht,
     });
   } catch (err) {

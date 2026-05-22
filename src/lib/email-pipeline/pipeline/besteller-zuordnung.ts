@@ -2,14 +2,16 @@
  * Besteller-Zuordnung über mehrere Stufen:
  *
  *   STUFE -1 — Rules-Engine (besteller_rules-Tabelle, Welle 4 O8)
- *   STUFE 0  — Bestellnummer-Match (claim'd ein pending bestellung_signal)
- *   STUFE 1  — Signal ±4h (claim'd ein zeit-nahes pending Signal pro Domain)
  *   STUFE 3  — Händler-Affinität (50-Bestellungen-Stichprobe ≥60% gleicher Besteller)
  *   STUFE 4  — Name im Text (besteller_im_dokument + Volltext-Match auf benutzer_rollen)
  *   STUFE 4.5 — KI-Historisch (erkenneBestellerIntelligent mit Artikel-Vergleich)
  *   Fallback — "UNBEKANNT" + Methode "unbekannt"
  *
  * 19.05.2026 (A2.1) — aus run.ts extrahiert. Verhalten unverändert.
+ * 22.05.2026 — STUFE 0 (Bestellnummer-Signal-Match) + STUFE 1 (Signal ±4h) + GPT-
+ * Bestellnummer-Nachlauf entfernt, da Chrome-Extension stillgelegt wurde. Die
+ * verbleibenden Stufen reichen, weil die KI-historische Erkennung in der Praxis
+ * fast immer trifft sobald 5+ Bestellungen für einen Händler in der DB sind.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -18,17 +20,6 @@ import {
 } from "@/lib/openai";
 import { logError, logInfo } from "@/lib/logger";
 import type { AnalyseErgebnis } from "./anhang-analyse";
-
-export interface SignalRow {
-  id: string;
-  kuerzel: string;
-  haendler_domain?: string | null;
-  order_nummer?: string | null;
-  zeitstempel?: string | null;
-  status?: string | null;
-  matched_bestellung_id?: string | null;
-  [key: string]: unknown;
-}
 
 export interface BestellerZuordnungContext {
   haendlerDomain: string;
@@ -44,20 +35,15 @@ export interface BestellerZuordnungContext {
 export interface BestellerZuordnungResult {
   bestellerKuerzel: string;
   zuordnungsMethode: string;
-  signal: SignalRow | null;
 }
 
 export async function assignBesteller(
   supabase: SupabaseClient,
   ctx: BestellerZuordnungContext,
 ): Promise<BestellerZuordnungResult> {
-  const { haendlerDomain, haendlerName, absenderDomain, vorfilterBestellnummer, analyseErgebnisse, emailText, email_betreff, email_datum } = ctx;
+  const { haendlerDomain, haendlerName, absenderDomain, analyseErgebnisse, emailText, email_betreff } = ctx;
   let bestellerKuerzel = "";
   let zuordnungsMethode = "";
-  let signal: SignalRow | null = null;
-
-  const parsedDate = email_datum ? new Date(email_datum) : new Date();
-  const emailZeit = isNaN(parsedDate.getTime()) ? Date.now() : parsedDate.getTime();
 
   // 06.05.2026 (Welle 4 O8) — STUFE -1: Rules-Engine.
   // Admin-konfigurierbare Regeln aus besteller_rules-Tabelle. Wenn DB-Match
@@ -83,62 +69,7 @@ export async function assignBesteller(
       });
     }
   } catch (e) {
-    logError("webhook/email", "match_besteller_rules fehlgeschlagen (fail-open, weiter mit STUFE 0+)", e);
-  }
-
-  // STUFE 0: Bestellnummer-Match
-  const betreffNrMatch =
-    (email_betreff || "").match(/(?:bestellnummer|bestellung|order|auftrag|auftrags-?nr)[:\s#]*([A-Z0-9][\w\-]{2,29})/i)
-    || (email_betreff || "").match(/(\d{3}-\d{7}-\d{7})/);
-  const schnellBestellnummer = vorfilterBestellnummer || betreffNrMatch?.[1] || null;
-
-  if (schnellBestellnummer) {
-    const { data: signalByNr } = await supabase
-      .from("bestellung_signale").select("*")
-      .eq("order_nummer", schnellBestellnummer)
-      .eq("status", "pending")
-      .order("zeitstempel", { ascending: false })
-      .limit(1);
-
-    if (signalByNr?.[0]) {
-      const { data: claimed } = await supabase
-        .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signalByNr[0].id).eq("status", "pending").select("id");
-      if (claimed && claimed.length > 0) {
-        const claimedSignal = signalByNr[0] as SignalRow;
-        signal = claimedSignal;
-        bestellerKuerzel = claimedSignal.kuerzel;
-        zuordnungsMethode = "bestellnummer_match";
-        logInfo("webhook/email", `Besteller per Bestellnummer zugeordnet: ${claimedSignal.kuerzel}`, { bestellnummer: schnellBestellnummer });
-      }
-    }
-  }
-
-  // STUFE 1: Signal ±4h
-  if (!bestellerKuerzel) {
-    const { data: signale } = await supabase
-      .from("bestellung_signale").select("*")
-      .eq("haendler_domain", haendlerDomain)
-      .eq("status", "pending")
-      .gte("zeitstempel", new Date(emailZeit - 4 * 60 * 60 * 1000).toISOString())
-      .lte("zeitstempel", new Date(emailZeit + 4 * 60 * 60 * 1000).toISOString())
-      .order("confidence", { ascending: false })
-      .order("zeitstempel", { ascending: false })
-      .limit(1);
-
-    if (signale?.[0]) {
-      const { data: claimed } = await supabase
-        .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signale[0].id).eq("status", "pending").select("id");
-      if (claimed && claimed.length > 0) {
-        const claimedSignal = signale[0] as SignalRow;
-        signal = claimedSignal;
-        bestellerKuerzel = claimedSignal.kuerzel;
-        zuordnungsMethode = "signal_4h";
-      }
-    }
+    logError("webhook/email", "match_besteller_rules fehlgeschlagen (fail-open, weiter mit STUFE 3+)", e);
   }
 
   // STUFE 3: Händler-Affinität
@@ -256,64 +187,5 @@ export async function assignBesteller(
     zuordnungsMethode = "unbekannt";
   }
 
-  return { bestellerKuerzel, zuordnungsMethode, signal };
-}
-
-export interface NachlaufInput {
-  bestellerKuerzel: string;
-  signal: SignalRow | null;
-  benutzer: { name: string | null } | null;
-  erkannteBestellnummer: string | null;
-}
-
-export interface NachlaufResult {
-  bestellerKuerzel: string;
-  zuordnungsMethode: string | null;
-  signal: SignalRow | null;
-  benutzer: { name: string | null } | null;
-}
-
-/**
- * GPT-Bestellnummer-Nachlauf: Wenn nach assignBesteller noch "UNBEKANNT" als
- * Besteller gesetzt ist, aber die KI eine Bestellnummer extrahiert hat, gibt
- * es vielleicht ein pending bestellung_signal mit dieser Nummer (vom Chrome-
- * Extension-Webhook bevor die E-Mail eingetroffen ist). Claim's atomar via
- * status=pending → matched.
- *
- * Plus: backfill von `order_nummer` auf bereits geclaim'tem signal wenn die
- * Bestellnummer erst aus der KI-Analyse kam.
- */
-export async function applyGptBestellnummerNachlauf(
-  supabase: SupabaseClient,
-  input: NachlaufInput,
-): Promise<NachlaufResult> {
-  let { bestellerKuerzel, signal, benutzer } = input;
-  let zuordnungsMethode: string | null = null;
-  const { erkannteBestellnummer } = input;
-
-  if (erkannteBestellnummer && !signal && bestellerKuerzel === "UNBEKANNT") {
-    const { data: signalByGpt } = await supabase
-      .from("bestellung_signale").select("*").eq("order_nummer", erkannteBestellnummer).eq("status", "pending").limit(1);
-    if (signalByGpt?.[0]) {
-      const { data: claimed } = await supabase
-        .from("bestellung_signale")
-        .update({ status: "matched", verarbeitet: true })
-        .eq("id", signalByGpt[0].id).eq("status", "pending").select("id");
-      if (claimed && claimed.length > 0) {
-        signal = signalByGpt[0] as SignalRow;
-        bestellerKuerzel = String(signal!.kuerzel);
-        zuordnungsMethode = "bestellnummer_match_gpt";
-        const { data: nachlaufBenutzer } = await supabase
-          .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzel).maybeSingle();
-        if (nachlaufBenutzer) benutzer = nachlaufBenutzer;
-      }
-    }
-  }
-  if (signal && erkannteBestellnummer && !signal.order_nummer) {
-    await supabase.from("bestellung_signale")
-      .update({ order_nummer: erkannteBestellnummer })
-      .eq("id", signal.id);
-  }
-
-  return { bestellerKuerzel, zuordnungsMethode, signal, benutzer };
+  return { bestellerKuerzel, zuordnungsMethode };
 }

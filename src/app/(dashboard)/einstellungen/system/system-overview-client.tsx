@@ -32,13 +32,9 @@ export type CrossDuplikat = {
 
 export function SystemOverviewClient({
   firma,
-  besteller,
-  extensionSignale,
   crossDuplikate = [],
 }: {
   firma: { bueroAdresse: string; konfidenzDirekt: string; konfidenzVorschlag: string };
-  besteller: Besteller[];
-  extensionSignale: Record<string, string>;
   crossDuplikate?: CrossDuplikat[];
 }) {
   const { toast } = useToast();
@@ -114,7 +110,7 @@ export function SystemOverviewClient({
           { label: "Übersicht" },
         ]}
         title="System-Übersicht"
-        description="Health-Status externer Dienste, KI-Erkennung und Chrome-Extension. Detail-Bereiche (Logs, Benutzer, Testdaten) findest du in der Sub-Navigation oben."
+        description="Health-Status externer Dienste und KI-Erkennung. Detail-Bereiche (Logs, Benutzer, Testdaten) findest du in der Sub-Navigation oben."
       />
 
       {/* HEALTH */}
@@ -215,53 +211,7 @@ export function SystemOverviewClient({
         </div>
       </SectionCard>
 
-      {/* CHROME EXTENSION */}
-      <SectionCard
-        title="Chrome-Extension"
-        description="Signale pro Besteller. Die Extension meldet jede Bestellung automatisch an die API."
-      >
-        {besteller.length === 0 ? (
-          <p className="text-[14px] text-foreground-subtle py-2">Keine Besteller vorhanden.</p>
-        ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {besteller.map((b) => {
-              const ext = getExtensionStatus(extensionSignale[b.kuerzel]);
-              return (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between px-3 py-2.5 rounded-md border border-line-subtle"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      aria-hidden="true"
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-white font-semibold text-[12px] font-mono-amount"
-                    >
-                      {b.kuerzel}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[14px] font-semibold text-foreground truncate">{b.name}</p>
-                      <p className={cn("text-[12px]", ext.colorClass)}>{ext.label}</p>
-                    </div>
-                  </div>
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "w-2.5 h-2.5 rounded-full shrink-0",
-                      ext.dot,
-                      ext.tone === "error" ? "pulse-urgent" : "",
-                    )}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <p className="mt-3 text-[12px] text-foreground-subtle">
-          Installieren unter{" "}
-          <span className="font-mono-amount text-foreground-muted">chrome://extensions</span>{" "}
-          (Entwicklermodus). Die Extension sendet bei jeder erkannten Händler-Bestellung ein Signal.
-        </p>
-      </SectionCard>
+      {/* 22.05.2026 — Chrome-Extension-Sektion entfernt (Modul stillgelegt). */}
 
       {/* Welle 4 — Cross-Bestellung-PDF-Hash-Anomalien */}
       {crossDuplikate.length > 0 && (
@@ -352,44 +302,3 @@ function HealthCell({
   );
 }
 
-function getExtensionStatus(letztesSignal: string | undefined): {
-  label: string;
-  colorClass: string;
-  dot: string;
-  tone: "success" | "warning" | "error";
-} {
-  if (!letztesSignal) {
-    return {
-      label: "Noch kein Signal",
-      colorClass: "text-error",
-      dot: "bg-error",
-      tone: "error",
-    };
-  }
-  const tage = Math.floor(
-    (Date.now() - new Date(letztesSignal).getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (tage < 7) {
-    const label = tage === 0 ? "Aktiv heute" : `Aktiv vor ${tage} Tag${tage > 1 ? "en" : ""}`;
-    return {
-      label,
-      colorClass: "text-status-freigegeben",
-      dot: "bg-status-freigegeben",
-      tone: "success",
-    };
-  }
-  if (tage <= 30) {
-    return {
-      label: `Vor ${tage} Tagen`,
-      colorClass: "text-warning",
-      dot: "bg-warning",
-      tone: "warning",
-    };
-  }
-  return {
-    label: `Vor ${tage} Tagen`,
-    colorClass: "text-error",
-    dot: "bg-error",
-    tone: "error",
-  };
-}

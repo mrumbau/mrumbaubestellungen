@@ -36,7 +36,7 @@ import { analysiereAnhaenge } from "./pipeline/anhang-analyse";
 import { type MatchContext } from "./pipeline/bestellung-match";
 import { handleVersandEmail } from "./pipeline/versand-handler";
 import { PRIMAER_TYPEN, BEKANNTE_TYPEN } from "./pipeline/constants";
-import { assignBesteller, applyGptBestellnummerNachlauf } from "./pipeline/besteller-zuordnung";
+import { assignBesteller } from "./pipeline/besteller-zuordnung";
 import { tryFallbackKeywordTyp } from "./pipeline/fallback-keyword";
 import { extractBodyHints } from "./pipeline/regex-extract";
 import { findeOderErstelleBestellung } from "./pipeline/bestellung-finden";
@@ -147,8 +147,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
   // F3.F15 Fix: Inline-Cleanup entfernt. Hot-Path-Webhook macht keine
   // heimlichen Side-Effects mehr — pg_cron `cleanup-stale-pending`,
-  // `cleanup-pgnet-responses`, `cleanup-bestellung-signale` und
-  // `cleanup-webhook-logs` (R4) übernehmen diese Cleanups deterministisch.
+  // `cleanup-pgnet-responses` und `cleanup-webhook-logs` (R4) übernehmen
+  // diese Cleanups deterministisch.
 
   // 6. Anhänge normalisieren
   const anhaenge = normalizeAnhaenge(input.anhaenge, email_betreff, email_absender);
@@ -262,7 +262,9 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   }
 
   // 11. Besteller zuordnen
-  const { bestellerKuerzel, zuordnungsMethode, signal: bestellerSignal } =
+  // 22.05.2026 — Chrome-Extension stillgelegt → signal-Rückgabe entfernt.
+  // Verbleibende Stufen: Rules-Engine → Händler-Affinität → Name im Text → KI-Historie.
+  const { bestellerKuerzel, zuordnungsMethode } =
     await assignBesteller(supabase, {
       haendlerDomain,
       haendlerName,
@@ -273,12 +275,11 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       email_betreff,
       email_datum,
     });
-  let bestellerKuerzelMutable = bestellerKuerzel;
-  let zuordnungsMethodeMutable = zuordnungsMethode;
-  let signal = bestellerSignal;
+  const bestellerKuerzelMutable = bestellerKuerzel;
+  const zuordnungsMethodeMutable = zuordnungsMethode;
 
   // Besteller-Name laden
-  let { data: benutzer } = await supabase
+  const { data: benutzer } = await supabase
     .from("benutzer_rollen").select("name").eq("kuerzel", bestellerKuerzelMutable).maybeSingle();
 
   // 12. Bestellung finden oder erstellen
@@ -305,18 +306,9 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
 
   const suchNummern = [erkannteBestellnummer, erkannteAuftragsnummer, erkannteLieferscheinnummer, ...subjectExtraNummern].filter((n): n is string => !!n);
 
-  // GPT-Bestellnummer-Nachlauf: ggf. pending bestellung_signal anhand der
-  // KI-extrahierten BN nachträglich claimen + Backfill von order_nummer.
-  const nachlauf = await applyGptBestellnummerNachlauf(supabase, {
-    bestellerKuerzel: bestellerKuerzelMutable,
-    signal,
-    benutzer,
-    erkannteBestellnummer,
-  });
-  bestellerKuerzelMutable = nachlauf.bestellerKuerzel;
-  if (nachlauf.zuordnungsMethode) zuordnungsMethodeMutable = nachlauf.zuordnungsMethode;
-  signal = nachlauf.signal;
-  benutzer = nachlauf.benutzer;
+  // 22.05.2026 — GPT-Bestellnummer-Nachlauf entfernt (Chrome-Extension stillgelegt).
+  // Vorher: pending bestellung_signal anhand der KI-extrahierten BN nachträglich
+  // claimen. Ohne Signale entfällt der Schritt.
 
   const matchCtx: MatchContext = {
     haendler: haendler ? { id: haendler.id, name: haendler.name } : null,
@@ -466,11 +458,12 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     startTime,
   });
 
-  // Schritte 18-24 — Status / Abgleich / Preisanomalie / Abo / Signal /
+  // Schritte 18-24 — Status / Abgleich / Preisanomalie / Abo /
   // UNBEKANNT-Kommentar / Webhook-Log. Siehe pipeline/post-processing.ts.
+  // 22.05.2026 — Schritt "Signal verknüpfen" entfernt (Chrome-Extension stillgelegt).
   await runPostProcessing(supabase, {
     bestellungId, bestellungsart, dokumenteGespeichert,
-    haendlerDomain, haendlerName, analyseErgebnisse, signal,
+    haendlerDomain, haendlerName, analyseErgebnisse,
     bestellerKuerzelMutable,
     email_absender: email_absender ?? "",
     email_betreff: email_betreff ?? "",

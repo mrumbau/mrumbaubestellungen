@@ -59,7 +59,7 @@ export function BestellungenEmptyState({
           </svg>
         }
         title="Noch keine Bestellungen"
-        description="Bestellungen erscheinen automatisch sobald eine Dokumenten-E-Mail bei info@ eingeht oder die Chrome-Extension eine Bestellbestätigung erkennt."
+        description="Bestellungen erscheinen automatisch sobald eine Dokumenten-E-Mail bei info@ eingeht."
       />
     );
   }

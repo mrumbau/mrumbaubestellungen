@@ -2,8 +2,8 @@
  * safeCompare Tests — Timing-Safe Secret-Compare.
  *
  * Sicherheitskritisch: webhook/email + cron-Routes nutzen safeCompare gegen
- * MAKE_WEBHOOK_SECRET, EXTENSION_SECRET, CRON_SECRET. Bei Bug → entweder
- * Timing-Side-Channel-Leak oder False-Positives die Auth umgehen.
+ * MAKE_WEBHOOK_SECRET, CRON_SECRET. Bei Bug → entweder Timing-Side-Channel-Leak
+ * oder False-Positives die Auth umgehen.
  */
 
 import { describe, it, expect } from "vitest";

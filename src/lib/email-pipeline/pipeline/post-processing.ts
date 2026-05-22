@@ -5,11 +5,11 @@
  *   19. KI-Abgleich (nur material + min. 1 Doku)
  *   20. Preisanomalie-Check
  *   21. Abo-Logik
- *   22. Signal verknüpfen
  *   23. UNBEKANNT-Hinweis (Kommentar an Bestellung)
  *   24. webhook_logs success-Eintrag
  *
  * 19.05.2026 (A2.1) — aus run.ts extrahiert. Verhalten unverändert.
+ * 22.05.2026 — Schritt 22 (Signal verknüpfen) entfernt, Chrome-Extension stillgelegt.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
@@ -17,7 +17,6 @@ import { tryAbgleich } from "./abgleich";
 import { tryPreisanomalieCheck } from "./preisanomalie";
 import { handleAboLogik } from "./abo-handling";
 import type { AnalyseErgebnis } from "./anhang-analyse";
-import type { SignalRow } from "./besteller-zuordnung";
 
 export interface PostProcessingInput {
   bestellungId: string;
@@ -26,7 +25,6 @@ export interface PostProcessingInput {
   haendlerDomain: string;
   haendlerName: string;
   analyseErgebnisse: AnalyseErgebnis[];
-  signal: SignalRow | null;
   bestellerKuerzelMutable: string;
   email_absender: string;
   email_betreff: string;
@@ -39,7 +37,7 @@ export async function runPostProcessing(
 ): Promise<void> {
   const {
     bestellungId, bestellungsart, dokumenteGespeichert,
-    haendlerDomain, haendlerName, analyseErgebnisse, signal,
+    haendlerDomain, haendlerName, analyseErgebnisse,
     bestellerKuerzelMutable, email_absender, email_betreff, erkannteBestellnummer,
   } = input;
 
@@ -57,13 +55,6 @@ export async function runPostProcessing(
   // 21. Abo-Logik
   if (bestellungsart === "abo") {
     await handleAboLogik(supabase, bestellungId, haendlerDomain, haendlerName);
-  }
-
-  // 22. Signal verknüpfen
-  if (signal) {
-    await supabase.from("bestellung_signale")
-      .update({ matched_bestellung_id: bestellungId })
-      .eq("id", signal.id);
   }
 
   // 23. UNBEKANNT-Hinweis

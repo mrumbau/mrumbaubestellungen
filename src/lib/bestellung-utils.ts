@@ -15,10 +15,11 @@ export function aggregatePipelineConfidence(
   zuordnungsMethode: string,
   kiKonfidenz?: number | null,
 ): number {
+  // 22.05.2026 — bestellnummer_match / bestellnummer_match_gpt / signal_4h
+  // entfernt (Chrome-Extension stillgelegt). Historische Werte mit diesen
+  // Methoden bekommen den Fallback ?? 0.5 — vertretbar weil die Methode in
+  // der UI nur als label gerendert wird, nicht als Filter-Kriterium.
   const methodeBase: Record<string, number> = {
-    bestellnummer_match: 1.0,
-    bestellnummer_match_gpt: 0.95,
-    signal_4h: 0.92,
     besteller_im_dokument: 0.85,
     name_im_text: 0.78,
     ki_historisch: 0.72,
