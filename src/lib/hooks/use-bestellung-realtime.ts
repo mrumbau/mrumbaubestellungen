@@ -71,13 +71,21 @@ export function useBestellungRealtime(
  * nichts auf bestellungen ändert (z.B. Kommentare, Doku-Adds). Beide Subscriptions
  * teilen denselben Debounce — ein Burst aus bestellungs-UPDATE + zugehörigem
  * event-INSERT triggert nur ein Refresh.
+ *
+ * 22.05.2026 (Perf Stufe 2.5) — Debounce-Default 1500 → 800ms reduziert.
+ * Hintergrund: explizite `router.refresh()` in den Bulk-Action-Handlern wurden
+ * entfernt — Realtime ist jetzt der einzige Sync-Pfad. 800ms ist der Kompromiss
+ * zwischen "schnelles Sync nach Single-Action" und "ein Refresh bei Burst-Updates
+ * vom Backfill-Cron statt 30 Refreshes". Bulk-Success-Flash-Animation läuft 1300ms,
+ * Refresh kommt jetzt mit ~800ms — User sieht ~500ms Flash bevor Row aus dem
+ * Filter fällt (Status-Wechsel offen → freigegeben). Akzeptiert als Trade.
  */
 export function useBestellungenListRealtime(options?: {
   debounceMs?: number;
   onChange?: () => void;
 }) {
   const router = useRouter();
-  const debounceMs = options?.debounceMs ?? 1500;
+  const debounceMs = options?.debounceMs ?? 800;
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();

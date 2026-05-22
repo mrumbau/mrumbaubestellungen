@@ -53,12 +53,12 @@ export function useBestellungenActions({
         // 12.05.2026 (Continuity-Patch): Single-Row-Freigabe bekommt auch
         // den Success-Flash damit der "ich hab's geklickt → es ist passiert"
         // Moment visuell verbunden ist.
+        // 22.05.2026 (Perf Stufe 2.5): expliziter router.refresh entfernt.
+        // useBestellungenListRealtime (debounce 800ms) fängt das bestellungen-
+        // UPDATE + events-INSERT (freigabe_eingetragen). Refresh kommt ~800ms
+        // nach API-Success — Flash läuft 1300ms, also ~500ms Flash sichtbar
+        // bevor Row aus "offen"-Filter fällt.
         onAffectedRows?.([bestellungId]);
-        if (onAffectedRows) {
-          setTimeout(() => router.refresh(), 1100);
-        } else {
-          router.refresh();
-        }
         toast.success("Bestellung freigegeben");
         return;
       }
@@ -70,6 +70,11 @@ export function useBestellungenActions({
       //   damit der UI-State frisch ist + info-Toast statt error-Toast.
       // - 403 "Keine Berechtigung" mit klarerer Erklärung.
       // - Sonstige Fehler bekommen den Server-Error-Text mit eingeblendet.
+      //
+      // 22.05.2026 (Perf Stufe 2.5): router.refresh hier BEHALTEN. Bei 409
+      // (Race-Cond) hat Realtime das ursprüngliche UPDATE evtl. schon vor
+      // diesem Tab-Click verarbeitet → kein neues Event triggert. Expliziter
+      // Refresh garantiert sofortige UI-Sync statt Warten auf nächstes Event.
       if (res.status === 409) {
         router.refresh();
         toast.info("Bereits freigegeben", {
@@ -108,7 +113,10 @@ export function useBestellungenActions({
         const count = selected.size;
         setSelected(new Set());
         setShowDeleteDialog(false);
-        router.refresh();
+        // 22.05.2026 (Perf Stufe 2.5): router.refresh entfernt — useBestellungen
+        // ListRealtime catches bestellungen DELETE events, refresht mit 800ms
+        // debounce. Bei Bulk (alle DELETEs binnen ~500ms) sieht User die Rows
+        // nach ~1300ms verschwinden (vorher: sofortiger Refresh).
         toast.success(
           `${count} ${count === 1 ? "Bestellung entfernt" : "Bestellungen entfernt"}`,
         );
@@ -163,17 +171,18 @@ export function useBestellungenActions({
       setSelected(new Set());
 
       // 12.05.2026 (Continuity-Patch): wenn Caller einen Flash-Receiver
-      // bereitgestellt hat, emit affected IDs und delay refresh damit die
-      // Rows kurz Success-Green aufleuchten bevor sie aus der Liste fallen.
+      // bereitgestellt hat, emit affected IDs für den Success-Flash.
+      // 22.05.2026 (Perf Stufe 2.5): expliziter router.refresh + setTimeout
+      // entfernt. useBestellungenListRealtime fängt die bulk-UPDATEs +
+      // freigabe_eingetragen-events, refresht 800ms nach letztem Event.
+      // Bulk-Success-Flash läuft 1300ms parallel — User sieht Green-Sweep
+      // bevor Rows aus dem Filter fallen.
       const freigegebenIds: string[] = (data.freigegeben ?? []).map(
         (x: { id?: string } | string) =>
           typeof x === "string" ? x : (x.id ?? ""),
       ).filter(Boolean);
       if (onAffectedRows && freigegebenIds.length > 0) {
         onAffectedRows(freigegebenIds);
-        setTimeout(() => router.refresh(), 1100);
-      } else {
-        router.refresh();
       }
 
       // 12.05.2026 (Freigabe-Bug-Härtung): differenzierte Toast-Meldungen
