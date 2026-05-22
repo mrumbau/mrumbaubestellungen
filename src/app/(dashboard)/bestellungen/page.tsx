@@ -24,10 +24,16 @@ export default async function BestellungenPage({
   const supabase = await createServerSupabaseClient();
   const { projekt_id: projektIdParam } = await searchParams;
 
+  // 21.05.2026 (Perf) — dokumente via FK-Embed statt sequentiellem 2. Roundtrip.
+  // Vorher: Query 1 (bestellungen) parallel Query 2 (projekte), DANN Query 3
+  // (dokumente.IN(ids)). Drei Roundtrips total. Jetzt: dokumente embedded in
+  // bestellung-Query → 2 statt 3 Roundtrips, spart ~80-150ms.
+  // Trade-off: Response wird ~30% größer (bei 500 Bestellungen × ~3 Dokus × 3
+  // Nummern-Felder ≈ +50KB). Bei aktuell ~150 Bestellungen vernachlässigbar.
   let dataQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift",
+      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer)",
     )
     .is("archiviert_am", null)
     .order("created_at", { ascending: false })
@@ -53,31 +59,29 @@ export default async function BestellungenPage({
       .order("name"),
   ]);
 
-  // 07.05.2026 — Doku-Nummern für Such-Index nachladen.
-  // Bei Raab Karcher u.ä. enthält eine einzelne Bestellung (Auftragsnr) mehrere
-  // Rechnungs- und Lieferschein-PDFs mit eigenen Nummern. Die User-Suche soll
-  // auch nach diesen Nummern finden — nicht nur nach b.bestellnummer.
-  const ids = (bestellungen || []).map((b) => b.id);
-  const dokuNummernMap: Record<string, string[]> = {};
-  if (ids.length > 0) {
-    const { data: docNums } = await supabase
-      .from("dokumente")
-      .select("bestellung_id, bestellnummer_erkannt, auftragsnummer, lieferscheinnummer")
-      .in("bestellung_id", ids);
-    for (const d of docNums || []) {
-      if (!d.bestellung_id) continue; // Orphan-Schutz (Type-Sicherheit)
-      const arr = dokuNummernMap[d.bestellung_id] || [];
-      if (d.bestellnummer_erkannt) arr.push(d.bestellnummer_erkannt);
-      if (d.auftragsnummer) arr.push(d.auftragsnummer);
-      if (d.lieferscheinnummer) arr.push(d.lieferscheinnummer);
-      if (arr.length > 0) dokuNummernMap[d.bestellung_id] = arr;
-    }
-  }
+  // 07.05.2026 — Doku-Nummern für Such-Index aus eingebetteten dokumente-Rows
+  // extrahieren. 21.05.2026 — kein separater Roundtrip mehr, embedded via
+  // FK-Join in der bestellung-Query oben.
+  type BestellungMitDokus = {
+    id: string;
+    dokumente?: Array<{
+      bestellnummer_erkannt: string | null;
+      auftragsnummer: string | null;
+      lieferscheinnummer: string | null;
+    }> | null;
+  } & Record<string, unknown>;
 
-  const bestellungenAngereichert = (bestellungen || []).map((b) => ({
-    ...b,
-    doku_nummern: dokuNummernMap[b.id] || [],
-  }));
+  const bestellungenAngereichert = ((bestellungen || []) as BestellungMitDokus[]).map((b) => {
+    const dokuNummern: string[] = [];
+    for (const d of b.dokumente || []) {
+      if (d.bestellnummer_erkannt) dokuNummern.push(d.bestellnummer_erkannt);
+      if (d.auftragsnummer) dokuNummern.push(d.auftragsnummer);
+      if (d.lieferscheinnummer) dokuNummern.push(d.lieferscheinnummer);
+    }
+    const { dokumente: _drop, ...rest } = b;
+    void _drop;
+    return { ...rest, doku_nummern: dokuNummern };
+  });
 
   const total = bestellungen?.length ?? 0;
   const reachedCap = total >= HARD_CAP;

@@ -33,35 +33,22 @@ export default async function BestellungDetailPage({
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: bestellung } = await supabase
-    .from("bestellungen")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (!bestellung) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <p className="text-foreground-subtle text-[16px]">Bestellung nicht gefunden.</p>
-        <Link
-          href="/bestellungen"
-          className="mt-4 text-brand hover:text-brand-light text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
-        >
-          Zurück zu Bestellungen
-        </Link>
-      </div>
-    );
-  }
-
+  // 21.05.2026 (Perf) — alle Queries die nur die `id` (aus params) brauchen,
+  // parallel mit bestellung-Query starten. Vorher: erst `await bestellung`,
+  // DANN 7 parallele Queries → 2 Wellen, ~80-150ms verschenkt.
+  // Jetzt: 7 Queries parallel mit bestellung → 1 Welle. subunternehmer bleibt
+  // sequential (braucht bestellung.subunternehmer_id), wird aber konditional
+  // nur ausgeführt wenn FK gesetzt ist.
   const [
+    { data: bestellung },
     { data: dokumente },
     { data: abgleich },
     { data: kommentare },
     { data: freigabe },
     { data: projekte },
-    { data: subunternehmerData },
     { data: events },
   ] = await Promise.all([
+    supabase.from("bestellungen").select("*").eq("id", id).single(),
     supabase
       .from("dokumente")
       .select(
@@ -91,13 +78,6 @@ export default async function BestellungDetailPage({
       .select("id, name, farbe, budget")
       .in("status", ["aktiv", "pausiert"])
       .order("name"),
-    bestellung.subunternehmer_id
-      ? supabase
-          .from("subunternehmer")
-          .select("id, firma, gewerk, ansprechpartner, telefon, email")
-          .eq("id", bestellung.subunternehmer_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
     // 06.05.2026 (Welle 4 O2) — Audit-Events aus events-Tabelle laden für
     // reichhaltigere Timeline (status-Wechsel, Bezahlung, Mahnung, etc.)
     supabase
@@ -108,6 +88,30 @@ export default async function BestellungDetailPage({
       .order("created_at", { ascending: true })
       .limit(500),
   ]);
+
+  if (!bestellung) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <p className="text-foreground-subtle text-[16px]">Bestellung nicht gefunden.</p>
+        <Link
+          href="/bestellungen"
+          className="mt-4 text-brand hover:text-brand-light text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
+        >
+          Zurück zu Bestellungen
+        </Link>
+      </div>
+    );
+  }
+
+  // Subunternehmer-Lookup erst nach bestellung verfügbar (braucht FK).
+  // Skip wenn nicht gesetzt — typische material-Bestellung hat kein SU.
+  const { data: subunternehmerData } = bestellung.subunternehmer_id
+    ? await supabase
+        .from("subunternehmer")
+        .select("id, firma, gewerk, ansprechpartner, telefon, email")
+        .eq("id", bestellung.subunternehmer_id)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="flex flex-col h-full">
