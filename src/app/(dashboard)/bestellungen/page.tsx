@@ -1,6 +1,12 @@
+import dynamicImport from "next/dynamic";
 import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
+
+// 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1141-LOC-Mega-Component.
+// SSR bleibt aktiv. Spart Initial-JS pro Page-Load.
+const BestellungenTabelle = dynamicImport(
+  () => import("@/components/bestellungen-tabelle").then((m) => m.BestellungenTabelle),
+);
 
 // 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
 export const runtime = "edge";

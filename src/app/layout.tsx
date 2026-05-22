@@ -54,6 +54,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de" className={`${dmSans.variable} ${barlow.variable} ${mono.variable}`}>
+      <head>
+        {/* 22.05.2026 (Perf Stufe 4 / Item 1) — Supabase-Origin preconnect.
+            Browser baut TLS-Handshake + DNS schon vor der ersten DB-Query auf,
+            spart ~50-100ms beim ersten Supabase-Request pro Session. */}
+        <link rel="preconnect" href="https://fxeobohsgzvymgbnxbdc.supabase.co" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fxeobohsgzvymgbnxbdc.supabase.co" />
+      </head>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

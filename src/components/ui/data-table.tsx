@@ -93,6 +93,14 @@ export type DataTableProps<TRow> = {
   /** Row click (drill-down). Receives the event so callers can decide on metaKey etc. */
   onRowClick?: (row: TRow, event: React.MouseEvent<HTMLTableRowElement>) => void;
 
+  /**
+   * Row hover (prefetch hook). Used to warm router-cache for likely-next pages.
+   * Fires on mouseenter; callers should debounce / cap as needed since Next.js
+   * router.prefetch is no-op when target is already in cache.
+   * 22.05.2026 (Perf Stufe 4 / Item 3).
+   */
+  onRowMouseEnter?: (row: TRow, event: React.MouseEvent<HTMLTableRowElement>) => void;
+
   /** Per-row class hook (e.g. add `bg-error-bg/40` for rows with issues). */
   getRowClassName?: (row: TRow, index: number) => string;
 
@@ -184,6 +192,7 @@ export function DataTable<TRow>({
   sort,
   onSortChange,
   onRowClick,
+  onRowMouseEnter,
   getRowClassName,
   emptyState,
   loading = false,
@@ -505,6 +514,7 @@ export function DataTable<TRow>({
                     aria-selected={selectionEnabled ? isSelected : undefined}
                     tabIndex={isFocusCandidate ? 0 : -1}
                     onClick={(e) => onRowClick?.(row, e)}
+                    onMouseEnter={onRowMouseEnter ? (e) => onRowMouseEnter(row, e) : undefined}
                     onKeyDown={(e) => handleRowKeyDown(e, row, i)}
                     onFocus={() => setFocusedRowId(id)}
                     className={cn(

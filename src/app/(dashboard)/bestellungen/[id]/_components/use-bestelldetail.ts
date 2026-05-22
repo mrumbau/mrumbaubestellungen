@@ -4,6 +4,7 @@ import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition 
 import { useRouter } from "next/navigation";
 import type { Bestellungsart } from "@/lib/bestellung-utils";
 import { useBestellungRealtime } from "@/lib/hooks/use-bestellung-realtime";
+import { freigebenBestellung } from "@/app/actions/freigaben";
 import type { DuplikatResult, Freigabe, KatResult, ProjektStats } from "./types";
 
 /**
@@ -372,14 +373,12 @@ export function useBestelldetail({
     });
 
     try {
-      const res = await fetch(`/api/bestellungen/${bestellungId}/freigeben`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setFreigabeError(data.error || "Freigabe fehlgeschlagen");
+      // 22.05.2026 (Perf Stufe 4 / Item 6 — POC) — Server Action statt fetch.
+      // Spart HTTP-Layer-Roundtrip + JSON-Parse. CSRF-Check übernimmt Next.js 16
+      // automatisch via Origin-Header-Validation. Audit + RPC bleiben identisch.
+      const result = await freigebenBestellung(bestellungId);
+      if (!result.success) {
+        setFreigabeError(result.error);
         // useOptimistic rollback automatisch beim nächsten Render
       }
       // 21.05.2026 (Perf) — kein router.refresh nach Success. Optimistic-State

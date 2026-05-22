@@ -188,6 +188,7 @@ export function OrderRow({
                 {/* Action */}
                 <Link
                   href={`/bestellungen/${order.id}`}
+                  prefetch
                   onClick={(e) => e.stopPropagation()}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand hover:text-brand-light font-medium border border-line rounded-lg hover:bg-surface transition-colors shrink-0 group/link"
                 >

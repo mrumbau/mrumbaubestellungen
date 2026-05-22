@@ -563,6 +563,10 @@ export function BestellungenTabelle({
             recordRowVisit("bestellungen", b.id);
             router.push(`/bestellungen/${b.id}`);
           }}
+          // 22.05.2026 (Perf Stufe 4 / Item 3): Hover-Prefetch warmt den
+          // Router-Cache für die Detail-Page. router.prefetch dedupliziert
+          // automatisch — kein Throttling nötig.
+          onRowMouseEnter={(b) => router.prefetch(`/bestellungen/${b.id}`)}
           getRowClassName={(b) => {
             // Spatial-Continuity-Highlight — Priorisierung von oben nach unten:
             //   1. Bulk-Success (kurzer Green-Flash, dann verschwindet Row evtl.)

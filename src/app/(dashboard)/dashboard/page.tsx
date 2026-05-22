@@ -1,9 +1,16 @@
 import type React from "react";
+import dynamicImport from "next/dynamic";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { DashboardWidgets } from "@/components/dashboard-widgets";
 import { parseTimeRange, computeRangeBounds, sparklineBuckets } from "@/lib/time-range";
+
+// 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1144-LOC-Mega-Component.
+// SSR bleibt aktiv (Default), nur der JS-Chunk wird lazy gesplittet → kleinerer
+// Initial-JS-Download für die Dashboard-Route, FCP/LCP früher.
+const DashboardWidgets = dynamicImport(
+  () => import("@/components/dashboard-widgets").then((m) => m.DashboardWidgets),
+);
 
 // 15.05.2026 (Cold-Start-Fix, Option 1):
 // Edge-Runtime → V8-Isolate statt Lambda-Container → ~0ms Cold-Start statt ~10s.

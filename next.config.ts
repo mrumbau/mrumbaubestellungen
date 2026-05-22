@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // 22.05.2026 (Perf Stufe 4 / Item 4) — React Compiler aktivieren.
+  // Babel-Plugin auto-memoizt Components ohne useMemo/useCallback-Boilerplate
+  // → 30-50% weniger Re-Renders in DataTable + Filter-Pfaden erwartet.
+  // Rollback: reactCompiler: false setzen falls Production-Bug.
+  reactCompiler: true,
   async headers() {
     return [
       {

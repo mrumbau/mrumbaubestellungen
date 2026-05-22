@@ -1,8 +1,13 @@
+import dynamicImport from "next/dynamic";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { ArchivClient } from "@/components/archiv-client";
 import type { ArchivedProjekt, PaidBestellung } from "@/components/archiv/types";
+
+// 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1103-LOC-Mega-Component.
+const ArchivClient = dynamicImport(
+  () => import("@/components/archiv-client").then((m) => m.ArchivClient),
+);
 
 // 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
 export const runtime = "edge";
