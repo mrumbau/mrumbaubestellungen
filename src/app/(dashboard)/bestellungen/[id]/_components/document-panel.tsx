@@ -238,8 +238,15 @@ export function DocumentPanel({
       >
         {aktivesDokument?.storage_pfad ? (
           <>
+            {/* 22.05.2026 (Perf) — loading="lazy" verhindert PDF-Fetch wenn
+                der iframe in einem display:none-Parent ist. Bestelldetail-Shell
+                mountet DocumentPanel 2× (Desktop + Mobile-Variante via Tailwind
+                hidden/md:hidden). Ohne lazy lädt jede Variante ihre PDFs
+                parallel — pro Tab-Open also ~600ms × 2 Roundtrips verschenkt.
+                Mit lazy lädt nur der iframe der wirklich im Viewport ist. */}
             <iframe
               src={`/api/pdfs/${aktivesDokument.id}`}
+              loading="lazy"
               className="w-full h-full"
               title={`PDF: ${dokTabs.find((t) => t.key === activeTab)?.label ?? "Dokument"}`}
             />
