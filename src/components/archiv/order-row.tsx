@@ -188,7 +188,12 @@ export function OrderRow({
                 {/* Action */}
                 <Link
                   href={`/bestellungen/${order.id}`}
-                  prefetch
+                  // 22.05.2026 (Perf Stufe 2.7) — prefetch={true} entfernt.
+                  // Bei vielen Rows im Viewport feuerten alle Full-Prefetches
+                  // gleichzeitig (12+ parallele ~3s-Server-Queries = Storm).
+                  // Default "auto" macht nur Partial-Prefetch (loading.tsx
+                  // Boundary, ~0.3 kB) → User sieht beim Click sofort Skeleton,
+                  // Daten kommen während der Navigation.
                   onClick={(e) => e.stopPropagation()}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-brand hover:text-brand-light font-medium border border-line rounded-lg hover:bg-surface transition-colors shrink-0 group/link"
                 >

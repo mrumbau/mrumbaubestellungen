@@ -162,7 +162,8 @@ export function ProjekteTab({
                       <Link
                         key={o.id}
                         href={`/bestellungen/${o.id}`}
-                        prefetch
+                        // 22.05.2026 (Perf Stufe 2.7) — prefetch entfernt
+                        // (siehe order-row.tsx Kommentar zum Prefetch-Storm).
                         className={`group/row flex items-center justify-between py-2.5 px-2.5 -mx-0.5 rounded-lg hover:bg-line-subtle/60 transition-all ${
                           i < projektOrders.length - 1 ? "border-b border-canvas" : ""
                         }`}

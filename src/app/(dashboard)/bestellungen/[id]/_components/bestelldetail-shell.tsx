@@ -5,6 +5,7 @@ import type { BenutzerProfil } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cn } from "@/lib/cn";
+import { useIsDesktop } from "@/lib/hooks/use-is-desktop";
 import { useBestelldetail } from "./use-bestelldetail";
 import { DocumentPanel } from "./document-panel";
 import { SidebarMetadata } from "./sidebar-metadata";
@@ -75,6 +76,15 @@ export function BestelldetailShell({
     "dokumente",
   );
 
+  // 22.05.2026 (Perf Stufe 2.7) — Tailwind hidden/md:hidden mountete vorher
+  // BEIDE Layout-Subtrees (Desktop + Mobile) gleichzeitig. Folge: DocumentPanel
+  // 2× im DOM → 2× iframe-Mount → 2× PDF-Roundtrip pro Detail-Open. Der naive
+  // loading="lazy"-Versuch (siehe document-panel.tsx) verhinderte den Doppel-
+  // Fetch nicht zuverlässig (Chrome lädt lazy iframes in display:none-Parents
+  // bei initialer Navigation trotzdem). Jetzt: useIsDesktop entscheidet,
+  // welcher Subtree überhaupt gemountet wird → echter Single-Mount.
+  const isDesktop = useIsDesktop();
+
   // Shared accordion-open-state — opening one widget closes the others.
   // Domain-Doku: erlaubte WidgetIds in `types.ts` (`WidgetId`-Union),
   // aber das State-Typing bleibt `string` damit CollapsibleWidget-Variance passt.
@@ -101,11 +111,14 @@ export function BestelldetailShell({
         </Alert>
       )}
 
-      {/* Mobile section tabs */}
-      <MobileSectionTabs active={mobileSection} onChange={setMobileSection} />
+      {/* Mobile section tabs — nur auf Mobile sichtbar (md:hidden) */}
+      {!isDesktop && (
+        <MobileSectionTabs active={mobileSection} onChange={setMobileSection} />
+      )}
 
-      {/* Desktop layout — 2-column split */}
-      <div className="hidden md:flex flex-row gap-5 flex-1 min-h-0">
+      {/* Desktop layout — 2-column split. Conditional-render: kein Doppel-Mount mit Mobile. */}
+      {isDesktop && (
+      <div className="flex flex-row gap-5 flex-1 min-h-0">
         <DocumentPanel
           bestellung={bestellung}
           dokumente={dokumente}
@@ -196,9 +209,11 @@ export function BestelldetailShell({
           />
         </div>
       </div>
+      )}
 
-      {/* Mobile layout */}
-      <div className="md:hidden flex flex-col flex-1 min-h-0">
+      {/* Mobile layout — conditional gegen Doppel-Mount mit Desktop. */}
+      {!isDesktop && (
+      <div className="flex flex-col flex-1 min-h-0">
         {mobileSection === "dokumente" && (
           <DocumentPanel
             bestellung={bestellung}
@@ -302,22 +317,25 @@ export function BestelldetailShell({
           </div>
         )}
       </div>
+      )}
 
-      {/* Mobile fixed bottom bar */}
-      <ApprovalPanel
-        bestellung={bestellung}
-        freigabe={bd.optimisticFreigabe ?? freigabe}
-        profil={profil}
-        kannFreigeben={kannFreigeben}
-        hatRechnung={hatRechnung}
-        loading={bd.loading}
-        verwerfenLoading={bd.verwerfenLoading}
-        freigabeError={bd.freigabeError}
-        onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
-        onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
-        onMahnungQuittieren={bd.handleMahnungQuittieren}
-        variant="mobile-bar"
-      />
+      {/* Mobile fixed bottom bar — nur auf Mobile */}
+      {!isDesktop && (
+        <ApprovalPanel
+          bestellung={bestellung}
+          freigabe={bd.optimisticFreigabe ?? freigabe}
+          profil={profil}
+          kannFreigeben={kannFreigeben}
+          hatRechnung={hatRechnung}
+          loading={bd.loading}
+          verwerfenLoading={bd.verwerfenLoading}
+          freigabeError={bd.freigabeError}
+          onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
+          onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
+          onMahnungQuittieren={bd.handleMahnungQuittieren}
+          variant="mobile-bar"
+        />
+      )}
 
       {/* Dialogs */}
       <ConfirmDialog
