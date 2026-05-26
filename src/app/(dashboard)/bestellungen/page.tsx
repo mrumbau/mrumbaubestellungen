@@ -1,12 +1,15 @@
-import dynamicImport from "next/dynamic";
 import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
 
-// 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1141-LOC-Mega-Component.
-// SSR bleibt aktiv. Spart Initial-JS pro Page-Load.
-const BestellungenTabelle = dynamicImport(
-  () => import("@/components/bestellungen-tabelle").then((m) => m.BestellungenTabelle),
-);
+// 22.05.2026 (Perf Stufe 2.8) — Dynamic-Split für BestellungenTabelle zurückgenommen.
+// Grund: BestellungenTabelle hostet useRowReturnFlash (Spatial-Continuity-Afterglow
+// beim Back-Navigation von Detail-Page). Mit dynamic() wird der Component-Mount
+// nach popstate verzögert UND React Compiler stable@1.0.0 cached getRowClassName
+// in einer Weise, die die setId-State-Update aus dem Hook nicht zuverlässig im
+// Row-Render-Loop reflektiert. User-Report 22.05.: Afterglow nach Back ist weg.
+// Bundle-Win war marginal (~30-50 kB), UX-Verlust war kritisch — Trade umgekehrt.
+// Andere 3 Splits (dashboard-widgets, archiv-client, email-sync-client) bleiben.
 
 // 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
 export const runtime = "edge";
