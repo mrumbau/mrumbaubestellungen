@@ -149,6 +149,7 @@ export function DashboardUnzugeordnet({
             <div className="flex items-center justify-between">
               <Link
                 href={`/bestellungen/${b.id}`}
+                prefetch={false}
                 className="flex-1 group"
               >
                 <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors">

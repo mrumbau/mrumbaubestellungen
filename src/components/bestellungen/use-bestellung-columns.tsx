@@ -47,6 +47,13 @@ export function useBestellungColumns({
         render: (b) => (
           <Link
             href={`/bestellungen/${b.id}`}
+            // 22.05.2026 (Perf) — prefetch={false}: Bestellungen-Liste zeigt 20+
+            // Rows mit je einem Link → default-Auto-Prefetch feuert 20+ parallele
+            // RSC-Fetches a 3-7s. Plus: wenn User klickt bevor Prefetch fertig,
+            // startet Next.js eine 2. Fetch für die Navigation (Doppel-Fetch
+            // sichtbar als zwei ?_rsc=...-Requests im Network-Tab). Click-Pfad
+            // bleibt normal schnell (~3s), kein Background-Storm.
+            prefetch={false}
             onClick={(e) => e.stopPropagation()}
             className="font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
           >

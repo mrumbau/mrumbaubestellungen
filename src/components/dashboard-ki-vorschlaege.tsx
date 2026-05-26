@@ -76,6 +76,7 @@ export function DashboardKiVorschlaege({
                 <div className="flex items-center gap-2 mb-1">
                   <Link
                     href={`/bestellungen/${v.id}`}
+                    prefetch={false}
                     className="text-sm font-medium text-foreground hover:text-brand transition-colors"
                   >
                     {v.bestellnummer || "–"}
@@ -126,6 +127,7 @@ export function DashboardKiVorschlaege({
                 </button>
                 <Link
                   href={`/bestellungen/${v.id}`}
+                  prefetch={false}
                   className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
