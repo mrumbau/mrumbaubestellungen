@@ -23,6 +23,14 @@ function IconBestellungen({ className }: { className?: string }) {
   );
 }
 
+function IconTodo({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l2.25 2.25 4.5-4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
 function IconBuchhaltung({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -64,10 +72,23 @@ function IconEinstellungen({ className }: { className?: string }) {
   );
 }
 
-const NAV_ITEMS = {
+// 22.05.2026 — Nav-Items mit optionalem `requireDashboard`-Flag. Dashboard wird
+// nur gerendert wenn `profil.dashboardEnabled` true ist (Default: false für
+// MT/CR, true für andere — siehe lib/auth.computeDashboardEnabled).
+// Todo ist ein neues Top-Level-Item für jeden, das die "Zu prüfen"-Widgets
+// aus dem Dashboard übernimmt (Neue Händler, Nicht zugeordnet, etc.).
+type NavItem = {
+  href: string;
+  label: string;
+  Icon: (props: { className?: string }) => React.JSX.Element;
+  requireDashboard?: boolean;
+};
+
+const NAV_ITEMS: Record<string, NavItem[]> = {
   admin: [
-    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard },
+    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
     { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen },
+    { href: "/todo", label: "Todo", Icon: IconTodo },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
     { href: "/kunden", label: "Kunden", Icon: IconKunden },
     { href: "/archiv", label: "Archiv", Icon: IconArchiv },
@@ -75,8 +96,9 @@ const NAV_ITEMS = {
     { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
   ],
   besteller: [
-    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard },
+    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
     { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen },
+    { href: "/todo", label: "Todo", Icon: IconTodo },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
     { href: "/kunden", label: "Kunden", Icon: IconKunden },
     { href: "/archiv", label: "Archiv", Icon: IconArchiv },
@@ -93,7 +115,9 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const items = NAV_ITEMS[profil.rolle] || [];
+  const items = (NAV_ITEMS[profil.rolle] || []).filter(
+    (item) => !item.requireDashboard || profil.dashboardEnabled,
+  );
 
   async function handleLogout() {
     const supabase = createBrowserSupabaseClient();
@@ -108,7 +132,11 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       {/* Logo */}
       <div className="px-5 py-6 border-b border-white/[0.06]">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <Link
+            href={profil.dashboardEnabled ? "/dashboard" : "/bestellungen"}
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
             <Logo size={32} className="text-white" />
             <div>
               <p className="font-headline text-[16px] text-white tracking-tight leading-none">UMBAU</p>

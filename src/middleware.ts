@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { computeDashboardEnabled } from "@/lib/auth";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -128,17 +129,26 @@ export async function middleware(request: NextRequest) {
   if (!rolle) {
     // Cache-Miss: volles Profil aus DB laden (id, user_id, email, name, kuerzel, rolle)
     // Layout liest später denselben Cookie → spart dort einen weiteren DB-Roundtrip.
+    // 22.05.2026 — `dashboard_config` mit-laden um dashboardEnabled-Flag für die
+    // Sidebar-Visibility zu berechnen und ins Cookie zu pinnen.
     const { data: profil } = await supabase
       .from("benutzer_rollen")
-      .select("id, user_id, email, name, kuerzel, rolle")
+      .select("id, user_id, email, name, kuerzel, rolle, dashboard_config")
       .eq("user_id", user.id)
       .single();
 
     rolle = profil?.rolle || "";
 
     if (profil) {
+      const dashboardConfig =
+        (profil.dashboard_config as { dashboard_enabled?: boolean } | null) ?? null;
+      const dashboardEnabled = computeDashboardEnabled(profil.kuerzel, dashboardConfig);
+      // dashboard_config nicht ins Cookie (potenziell groß) — nur den derived flag.
+      const { dashboard_config: _drop, ...slim } = profil;
+      void _drop;
       response.cookies.set(ROLLE_COOKIE_NAME, JSON.stringify({
-        ...profil,
+        ...slim,
+        dashboardEnabled,
         uid: user.id,
         exp: Date.now() + ROLLE_CACHE_TTL_MS,
       }), {

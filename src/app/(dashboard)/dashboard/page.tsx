@@ -31,6 +31,11 @@ export default async function DashboardPage({
   // aber Page-Guard schützt, falls Middleware-Config sich ändert)
   if (profil.rolle === "buchhaltung") redirect("/buchhaltung");
 
+  // 22.05.2026 — User-Setting "Dashboard deaktiviert" (Default false für MT/CR,
+  // siehe lib/auth.computeDashboardEnabled). Bei disabled → direkt zu
+  // /bestellungen, ohne die teuren Dashboard-Queries auszuführen.
+  if (!profil.dashboardEnabled) redirect("/bestellungen");
+
   // Zeitraum-Picker-State aus URL. Default 30d. Shareable Links via ?range=...
   const { range: rangeParam } = await searchParams;
   const range = parseTimeRange(rangeParam ?? null);
@@ -57,20 +62,17 @@ export default async function DashboardPage({
     ? supabase.from("dashboard_kpis_per_besteller").select("*").eq("besteller_kuerzel", kuerzel).maybeSingle()
     : supabase.from("dashboard_kpis_global").select("*").maybeSingle();
 
-  // Dashboard-Config + alle Daten parallel laden
+  // Dashboard-Config + alle Daten parallel laden.
+  // 22.05.2026 — "Zu prüfen"-Daten (unzugeordnet, neueKunden, neueSubunternehmer,
+  // neueHaendler, kiVorschlaege) sind nach /todo umgezogen und werden hier nicht
+  // mehr gefetched. Spart ~5 parallele Supabase-Queries pro Dashboard-Load.
   const [
     { data: profilRow },
     { data: kpiRow },
     { data: letzteRaw },
     { data: aktionenNoetigRaw },
-    { data: unzugeordnetRaw },
     { data: aktiveProjekte },
     { data: projektBestellungen },
-    { data: bestellerRollen },
-    { data: neueHaendlerRoh },
-    { data: kiVorschlaegeRoh },
-    { data: neueKundenRoh },
-    { data: neueSubunternehmerRoh },
     { data: aboAnbieterRoh },
     { data: mahnungenRoh },
     { data: kiCacheRoh },
@@ -80,29 +82,8 @@ export default async function DashboardPage({
     kpiQuery,
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").order("created_at", { ascending: false }).limit(5)),
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("status", "vollstaendig").order("created_at", { ascending: false }).limit(10)),
-    supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("besteller_kuerzel", "UNBEKANNT").not("bestellungsart", "in", "(abo,subunternehmer)").order("created_at", { ascending: false }),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
-    profil.rolle === "admin"
-      ? supabase.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller")
-      : Promise.resolve({ data: [] as { kuerzel: string; name: string }[] }),
-    // Neue Händler — fachliche Stammdaten-Pflege: beide Rollen sehen die 7-Tages-Liste
-    supabase.from("haendler").select("id, name, domain, email_absender, created_at").is("confirmed_at", null).gte("created_at", siebenTageZurueck).order("created_at", { ascending: false }),
-    // KI-Projekt-Vorschläge — Besteller sieht eigene + Abo/SU (via eigene()), Admin sieht alle.
-    // Besteller dürfen für ihre Bestellungen selbst bestätigen (API nach P4.5 geöffnet).
-    eigene(
-      supabase.from("bestellungen")
-        .select("id, bestellnummer, haendler_name, projekt_vorschlag_id, projekt_vorschlag_konfidenz, projekt_vorschlag_methode, projekt_vorschlag_begruendung, lieferadresse_erkannt")
-        .is("projekt_id", null)
-        .not("projekt_vorschlag_id", "is", null)
-        .eq("projekt_bestaetigt", false)
-        .order("created_at", { ascending: false })
-        .limit(20)
-    ),
-    // Neue Kunden — Besteller (Firmeninhaber mit Domain-Wissen) sieht alle unbestätigten
-    supabase.from("kunden").select("id, name, keywords, created_at").is("confirmed_at", null).order("created_at", { ascending: false }),
-    // Neue Subunternehmer — gleich
-    supabase.from("subunternehmer").select("id, firma, gewerk, email_absender").is("confirmed_at", null).order("created_at", { ascending: false }),
     supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),
     // Mahnungen: Bestellungen mit mahnung_am die noch nicht bezahlt sind
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, mahnung_am, mahnung_count").not("mahnung_am", "is", null).is("bezahlt_am", null).order("mahnung_am", { ascending: false })),
@@ -146,7 +127,6 @@ export default async function DashboardPage({
   const dieseWocheFaelligVolumen = Number(kpi?.diese_woche_faellig_volumen ?? 0);
   const letzte = letzteRaw || [];
   const aktionenNoetig = aktionenNoetigRaw || [];
-  const unzugeordnet = unzugeordnetRaw || [];
 
   // ── Volumen + Sparkline + MoM-Delta aus Trend-Daten, gefiltert nach Zeitraum ──
   // Alle Werte sind range-scoped. Freigegebenes-Volumen = status=freigegeben im Range (nach updated_at).
@@ -210,16 +190,6 @@ export default async function DashboardPage({
   }
   const gesamtMoM = vergleichsProzent(gesamtVolumen, gesamtVor);
   const freigegebenMoM = vergleichsProzent(freigegebenBetrag, freigegebenVor);
-
-  const bestellerListe = bestellerRollen || [];
-  const neueHaendler = (neueHaendlerRoh || []) as { id: string; name: string; domain: string; email_absender: string[]; created_at: string }[];
-  const neueKunden = (neueKundenRoh || []) as { id: string; name: string; keywords: string[] | null; created_at: string }[];
-  const neueSubunternehmer = (neueSubunternehmerRoh || []) as { id: string; firma: string; gewerk: string | null; email_absender: string[] }[];
-
-  const kiVorschlaege = ((kiVorschlaegeRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; projekt_vorschlag_id: string | null; projekt_vorschlag_konfidenz: number | null; projekt_vorschlag_methode: string | null; projekt_vorschlag_begruendung: string | null; lieferadresse_erkannt: string | null }[]).map((v) => {
-    const projekt = (aktiveProjekte || []).find((p) => p.id === v.projekt_vorschlag_id);
-    return { ...v, vorschlag_projekt_name: projekt?.name || null, vorschlag_projekt_farbe: projekt?.farbe || null };
-  });
 
   const projektStatsMap = new Map<string, { gesamt: number; offen: number; volumen: number }>();
   for (const b of projektBestellungen || []) {
@@ -350,12 +320,6 @@ export default async function DashboardPage({
         gesamtVolumen={gesamtVolumen}
         topProjekte={topProjekte as unknown as React.ComponentProps<typeof DashboardWidgets>["topProjekte"]}
         isAdmin={profil.rolle === "admin"}
-        kiVorschlaege={kiVorschlaege}
-        neueKunden={neueKunden}
-        unzugeordnet={unzugeordnet as unknown as React.ComponentProps<typeof DashboardWidgets>["unzugeordnet"]}
-        bestellerListe={bestellerListe}
-        neueHaendler={neueHaendler}
-        neueSubunternehmer={neueSubunternehmer}
         aktionenNoetig={aktionenNoetig}
         letzte={letzte}
         aboHinweise={aboHinweise}

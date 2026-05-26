@@ -6,7 +6,9 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 
-// POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen (nur Admin)
+// POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen.
+// 22.05.2026 — von admin-only auf admin+besteller geöffnet, weil "Nicht zugeordnet"
+// jetzt auf der /todo-Page für alle sichtbar ist (jeder soll claimen können).
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
@@ -22,14 +24,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
 
-    // Rolle prüfen (nur Admin)
+    // Rolle prüfen (admin + besteller — beide dürfen UNBEKANNT-Bestellungen zuordnen)
     const { data: profil } = await supabaseAuth
       .from("benutzer_rollen")
-      .select("rolle")
+      .select("rolle, kuerzel, name")
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin")) {
+    if (!requireRoles(profil, "admin", "besteller")) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
@@ -67,12 +69,16 @@ export async function POST(request: NextRequest) {
     const vorher = bestellung?.besteller_kuerzel || "UNBEKANNT";
 
     // Bestellung aktualisieren
+    // 22.05.2026 — zuordnung_methode kennzeichnet den ausführenden Actor:
+    // "manuell_admin" wenn Admin, "manuell_besteller" wenn Besteller (für Audit).
+    const zuordnungsMethode =
+      profil?.rolle === "admin" ? "manuell_admin" : "manuell_besteller";
     const { error } = await supabase
       .from("bestellungen")
       .update({
         besteller_kuerzel: benutzer.kuerzel,
         besteller_name: benutzer.name,
-        zuordnung_methode: "manuell_admin",
+        zuordnung_methode: zuordnungsMethode,
         updated_at: new Date().toISOString(),
       })
       .eq("id", bestellung_id);
@@ -87,10 +93,12 @@ export async function POST(request: NextRequest) {
     const safeKuerzel = String(benutzer.kuerzel).replace(/[^A-Za-z0-9]/g, "");
     const safeName = String(benutzer.name).replace(/[<>"&']/g, "").slice(0, 100);
     const safeVorher = String(vorher).replace(/[<>"&']/g, "").slice(0, 100);
+    const actorKuerzel = String(profil?.kuerzel ?? "SYSTEM").replace(/[^A-Za-z0-9]/g, "");
+    const actorName = String(profil?.name ?? "System").replace(/[<>"&']/g, "").slice(0, 100);
     await supabase.from("kommentare").insert({
       bestellung_id,
-      autor_kuerzel: "ADMIN",
-      autor_name: "Admin",
+      autor_kuerzel: actorKuerzel,
+      autor_name: actorName,
       text: `Besteller manuell zugeordnet: ${safeVorher} → ${safeKuerzel} (${safeName})`,
     });
 

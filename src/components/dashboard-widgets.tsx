@@ -8,11 +8,10 @@ import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { bestellerDisplay } from "@/lib/besteller-display";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
-import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
-import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
-import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
-import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
-import { DashboardNeueSubunternehmer } from "@/components/dashboard-neue-subunternehmer";
+// 22.05.2026 — "Zu prüfen"-Widgets (DashboardUnzugeordnet, DashboardNeueHaendler,
+// DashboardKiVorschlaege, DashboardNeueKunden, DashboardNeueSubunternehmer) sind
+// jetzt auf /todo (siehe app/(dashboard)/todo/page.tsx). Dashboard fokussiert auf
+// Workflow-Metriken (KPIs, Volumen, Mahnungen, Letzte/Offene Bestellungen).
 import { Sparkline } from "@/components/ui/sparkline";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
@@ -43,55 +42,9 @@ interface TopProjekt {
   stats: { gesamt: number; offen: number; volumen: number };
 }
 
-interface KiVorschlag {
-  id: string;
-  bestellnummer: string | null;
-  haendler_name: string | null;
-  projekt_vorschlag_id: string | null;
-  projekt_vorschlag_konfidenz: number | null;
-  projekt_vorschlag_methode: string | null;
-  projekt_vorschlag_begruendung: string | null;
-  lieferadresse_erkannt: string | null;
-  vorschlag_projekt_name: string | null;
-  vorschlag_projekt_farbe: string | null;
-}
-
-interface NeuerHaendler {
-  id: string;
-  name: string;
-  domain: string;
-  email_absender: string[];
-  created_at: string;
-}
-
-interface NeuerKunde {
-  id: string;
-  name: string;
-  keywords: string[] | null;
-  created_at: string;
-}
-
-interface NeuerSubunternehmer {
-  id: string;
-  firma: string;
-  gewerk: string | null;
-  email_absender: string[];
-}
-
-interface Besteller {
-  kuerzel: string;
-  name: string;
-}
-
-interface UnzugeordneteBestellung {
-  id: string;
-  bestellnummer: string | null;
-  haendler_name: string | null;
-  betrag: number | null;
-  waehrung: string;
-  status: string;
-  created_at: string;
-}
+// 22.05.2026 — Typen für die nach /todo umgezogenen Widgets (KiVorschlag,
+// NeuerHaendler, NeuerKunde, NeuerSubunternehmer, Besteller, UnzugeordneteBestellung)
+// hier entfernt — leben jetzt in app/(dashboard)/todo/page.tsx.
 
 export interface StatCardData {
   id: string;
@@ -122,12 +75,6 @@ export interface DashboardWidgetsProps {
   gesamtVolumen: number;
   topProjekte: TopProjekt[];
   isAdmin: boolean;
-  kiVorschlaege: KiVorschlag[];
-  neueKunden: NeuerKunde[];
-  unzugeordnet: UnzugeordneteBestellung[];
-  bestellerListe: Besteller[];
-  neueHaendler: NeuerHaendler[];
-  neueSubunternehmer: NeuerSubunternehmer[];
   aktionenNoetig: BestellungItem[];
   letzte: BestellungItem[];
   /** @deprecated Peer-Stats wurden nach /einstellungen verschoben. Prop bleibt für API-Kompatibilität, wird nicht mehr gerendert. */
@@ -176,22 +123,17 @@ interface WidgetDef {
 //   adminOnly = true  →  nur Admin sieht das Widget (echte System-Pflege)
 //   adminOnly = false →  Besteller + Admin (fachliche Entscheidungen, Firmeninhaber-Kontext)
 // Buchhaltung sieht das Dashboard gar nicht (Middleware + Page-Guard redirecten nach /buchhaltung).
+// 22.05.2026 — Stammdaten-Pflege-Widgets (ki_vorschlaege, neue_kunden,
+// neue_subunternehmer, neue_haendler, unzugeordnet) sind nach /todo umgezogen.
+// Dashboard fokussiert auf Workflow-Metriken.
 const WIDGET_DEFS: WidgetDef[] = [
   { id: "ki_zusammenfassung", label: "KI-Zusammenfassung", defaultVisible: true },
   { id: "volumen", label: "Volumen-Übersicht", defaultVisible: true },
   { id: "projekte", label: "Aktive Projekte", defaultVisible: true },
-  // Fachliche Stammdaten-Pflege: Admin + Besteller (Firmeninhaber kennen die Fachdaten)
-  { id: "ki_vorschlaege", label: "KI-Projekt-Vorschläge", defaultVisible: true },
-  { id: "neue_kunden", label: "Neue Kunden", defaultVisible: true },
-  { id: "neue_subunternehmer", label: "Neue Subunternehmer", defaultVisible: true },
-  { id: "neue_haendler", label: "Neue Händler", defaultVisible: true },
-  // System-Operation (Bestellung einem Besteller zuweisen): nur Admin
-  { id: "unzugeordnet", label: "Nicht zugeordnet", defaultVisible: true, adminOnly: true },
   { id: "abo_status", label: "Abo-Übersicht", defaultVisible: true },
   { id: "aktionen", label: "Offene Bestellungen", defaultVisible: true },
   { id: "letzte", label: "Letzte Bestellungen", defaultVisible: true },
   { id: "priorisierung", label: "KI-Priorisierung", defaultVisible: true },
-  // besteller_stats wurde nach /einstellungen verschoben — Dashboard bleibt Workflow-fokussiert
 ];
 
 // ─── Auto-Refresh Interval ──────────────────────────────
@@ -710,12 +652,6 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
     gesamtVolumen,
     topProjekte,
     isAdmin,
-    kiVorschlaege,
-    neueKunden,
-    unzugeordnet,
-    bestellerListe,
-    neueHaendler,
-    neueSubunternehmer,
     aktionenNoetig,
     letzte,
     aboHinweise,
@@ -830,16 +766,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
   // 06.05.2026 — row 3 für Fälligkeit-KPIs (überfällig, diese-Woche-fällig).
   const row3Stats = statCards.filter((s) => s.row === 3 && isStatVisible(s.id));
 
-  // "Zu prüfen"-Section: aggregierter Count über alle gerenderten Confirm-Widgets.
-  // Role-dependent: Admin sieht Unzugeordnet (System-Op), Besteller nicht. Das ergibt
-  // unterschiedliche Counts (z.B. MH=12, MT=9) — gewollt, nicht global firmenweit.
-  // Jedes Widget wird nur gezählt wenn es auch tatsächlich rendert (Toggle AN + Items > 0).
-  const confirmCount =
-    (isAdmin && isWidgetVisible("unzugeordnet") ? unzugeordnet.length : 0) +
-    (isWidgetVisible("ki_vorschlaege") ? kiVorschlaege.length : 0) +
-    (isWidgetVisible("neue_kunden") ? neueKunden.length : 0) +
-    (isWidgetVisible("neue_subunternehmer") ? neueSubunternehmer.length : 0) +
-    (isWidgetVisible("neue_haendler") ? neueHaendler.length : 0);
+  // 22.05.2026 — "Zu prüfen"-Count + Section nach /todo umgezogen.
 
   return (
     <div>
@@ -888,44 +815,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       )}
 
-      {/* Zu prüfen — Confirm-Queue am Top, direkt unter Mahnungen.
-          Section rendert komplett nicht wenn confirmCount === 0 (keine leere Shell, kein "Aufgeräumt"-Empty).
-          Reihenfolge identisch für Admin + Besteller — Unzugeordnet (admin-only) erscheint oben oder ist einfach null bei Besteller. */}
-      {confirmCount > 0 && (
-        <section aria-labelledby="zu-pruefen-heading" className="mb-6">
-          <div className="flex items-baseline justify-between mb-3">
-            <h2
-              id="zu-pruefen-heading"
-              className="font-headline text-[12px] uppercase tracking-[0.14em] text-foreground-subtle"
-            >
-              Zu prüfen
-            </h2>
-            <span
-              className="font-mono-amount text-[12px] text-foreground-muted"
-              aria-label={`${confirmCount} ${confirmCount === 1 ? "Eintrag" : "Einträge"} zur Prüfung`}
-            >
-              {confirmCount}
-            </span>
-          </div>
-          <div className="space-y-4">
-            {isAdmin && isWidgetVisible("unzugeordnet") && unzugeordnet.length > 0 && (
-              <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
-            )}
-            {isWidgetVisible("ki_vorschlaege") && kiVorschlaege.length > 0 && (
-              <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />
-            )}
-            {isWidgetVisible("neue_kunden") && neueKunden.length > 0 && (
-              <DashboardNeueKunden kunden={neueKunden} />
-            )}
-            {isWidgetVisible("neue_subunternehmer") && neueSubunternehmer.length > 0 && (
-              <DashboardNeueSubunternehmer subunternehmer={neueSubunternehmer} />
-            )}
-            {isWidgetVisible("neue_haendler") && neueHaendler.length > 0 && (
-              <DashboardNeueHaendler haendler={neueHaendler} />
-            )}
-          </div>
-        </section>
-      )}
+      {/* 22.05.2026 — "Zu prüfen"-Section nach /todo umgezogen. Dashboard fokussiert
+          jetzt auf Workflow-Metriken (KPIs, Volumen, Mahnungen, Letzte/Offene Bestellungen). */}
 
       {/* --- HANDLUNG-Cluster: was muss ich konkret tun? ---
           Offene Bestellungen + Letzte Bestellungen als Kontext-Paar,
@@ -959,7 +850,14 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   {aktionenNoetig.slice(0, 10).map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
-                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
+                      // 22.05.2026 (Perf Stufe 2.9) — prefetch={false}.
+                      // Dashboard zeigt bis zu 10 Aktionen-Links + 5-10 Letzte-Links,
+                      // viele Bestellungen erscheinen in beiden Widgets → 2× Prefetch pro
+                      // UUID. Bei Vercel-Free + Edge + Supabase-Free dauert jeder
+                      // Detail-Prefetch 2-8s (sichtbar in Network: 6 parallel Prefetches
+                      // = 18-50s Server-CPU pro Dashboard-Load). Click-Pfad bleibt
+                      // normal (~3s nach Click), kein Background-Storm mehr.
+                      <Link key={b.id} href={`/bestellungen/${b.id}`} prefetch={false} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <AktionIcon status={b.status} />
                           <div className="min-w-0">
@@ -1017,7 +915,8 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   {letzte.map((b) => {
                     const s = getStatusConfig(b.status);
                     return (
-                      <Link key={b.id} href={`/bestellungen/${b.id}`} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
+                      // 22.05.2026 (Perf Stufe 2.9) — prefetch={false} (siehe aktionenNoetig oben).
+                      <Link key={b.id} href={`/bestellungen/${b.id}`} prefetch={false} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                             <span className="font-mono-amount">{displayBestellnummer(b)}</span>
@@ -1169,7 +1068,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 const budgetProzent = p.budget ? Math.min((p.stats.volumen / Number(p.budget)) * 100, 100) : 0;
                 const budgetFarbe = budgetProzent > 90 ? "#dc2626" : budgetProzent > 70 ? "#d97706" : "#059669";
                 return (
-                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
+                  <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} prefetch={false} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
                       <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>

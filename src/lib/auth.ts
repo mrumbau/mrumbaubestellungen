@@ -16,10 +16,35 @@ export interface BenutzerProfil {
   name: string;
   kuerzel: string;
   rolle: Rolle;
+  /**
+   * 22.05.2026 — Dashboard sichtbar in Sidebar + erreichbar via /dashboard?
+   * Default false für MT/CR (User-Wunsch — Workflow ist eh /bestellungen-zentriert),
+   * true für alle anderen. User kann in /einstellungen überschreiben.
+   * Wird in Middleware aus dashboard_config.dashboard_enabled gelesen.
+   */
+  dashboardEnabled: boolean;
 }
 
 const PROFIL_COOKIE_NAME = "mr_profil_cache";
 const ERLAUBTE_ROLLEN: readonly string[] = ["admin", "besteller", "buchhaltung"];
+
+/** Kürzel die per Default kein Dashboard sehen wollen (siehe BenutzerProfil.dashboardEnabled). */
+const DASHBOARD_DISABLED_BY_DEFAULT: readonly string[] = ["MT", "CR"];
+
+/**
+ * Effektiver Dashboard-Visibility-Flag.
+ * Wenn der User in `dashboard_config.dashboard_enabled` einen expliziten Wert
+ * gesetzt hat: der gewinnt. Sonst: Default-Heuristik (MT/CR off, Rest on).
+ */
+export function computeDashboardEnabled(
+  kuerzel: string,
+  dashboardConfig: { dashboard_enabled?: boolean } | null | undefined,
+): boolean {
+  if (typeof dashboardConfig?.dashboard_enabled === "boolean") {
+    return dashboardConfig.dashboard_enabled;
+  }
+  return !DASHBOARD_DISABLED_BY_DEFAULT.includes(kuerzel);
+}
 
 interface ProfilCacheCookie {
   id?: string;
@@ -30,6 +55,7 @@ interface ProfilCacheCookie {
   rolle?: string;
   uid?: string;
   exp?: number;
+  dashboardEnabled?: boolean;
 }
 
 /**
@@ -66,6 +92,10 @@ export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> 
           name: cached.name,
           kuerzel: cached.kuerzel,
           rolle: cached.rolle as Rolle,
+          dashboardEnabled:
+            typeof cached.dashboardEnabled === "boolean"
+              ? cached.dashboardEnabled
+              : computeDashboardEnabled(cached.kuerzel, null),
         };
       }
     }
@@ -83,11 +113,24 @@ export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> 
 
   const { data } = await supabase
     .from("benutzer_rollen")
-    .select("*")
+    .select("id, user_id, email, name, kuerzel, rolle, dashboard_config")
     .eq("user_id", user.id)
     .single();
 
-  return data as BenutzerProfil | null;
+  if (!data || !data.user_id) return null;
+
+  const dashboardConfig =
+    (data.dashboard_config as { dashboard_enabled?: boolean } | null) ?? null;
+
+  return {
+    id: data.id,
+    user_id: data.user_id,
+    email: data.email,
+    name: data.name,
+    kuerzel: data.kuerzel,
+    rolle: data.rolle as Rolle,
+    dashboardEnabled: computeDashboardEnabled(data.kuerzel, dashboardConfig),
+  };
 });
 
 // Prüft ob das Profil eine der erlaubten Rollen hat.

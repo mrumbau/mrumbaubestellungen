@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PasswortAendern } from "@/components/passwort-aendern";
 import { TeamStats } from "@/components/team-stats";
+import { DashboardVisibilityToggle } from "@/components/einstellungen/dashboard-visibility-toggle";
 import {
   IconBuilding,
   IconTool,
@@ -161,6 +162,18 @@ export default async function EinstellungenIndexPage() {
             Team
           </h2>
           <TeamStats counts={teamStatsCounts} nameMap={teamNameMap} />
+        </section>
+      )}
+
+      {!istBuchhaltung && (
+        <section aria-labelledby="anzeige-heading" className="max-w-md">
+          <h2
+            id="anzeige-heading"
+            className="font-headline text-[14px] uppercase tracking-[0.14em] text-foreground-subtle mb-3"
+          >
+            Anzeige
+          </h2>
+          <DashboardVisibilityToggle initialEnabled={profil.dashboardEnabled} />
         </section>
       )}
 

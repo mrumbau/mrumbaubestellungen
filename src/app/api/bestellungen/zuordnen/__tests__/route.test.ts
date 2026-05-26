@@ -3,6 +3,9 @@
  *
  * 19.05.2026 (A2.5) — Admin-only Route: Bestellung manuell einem Besteller
  * zuweisen. Plus: XSS-Schutz für Besteller-Name im Audit-Kommentar.
+ *
+ * 22.05.2026 — Route auf admin+besteller geöffnet (Todo-Page für alle).
+ * Audit-Kommentar nutzt jetzt den Actor-Kuerzel/Name statt hardcoded "ADMIN".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
@@ -20,9 +23,17 @@ vi.mock("@/lib/supabase-server", () => ({
 vi.mock("@/lib/supabase", () => ({ createServiceClient: () => mockCreateServiceClient() }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
 
-function makeAuthClient(user: { id: string } | null, rolle?: "admin" | "besteller" | "buchhaltung") {
+function makeAuthClient(
+  user: { id: string } | null,
+  rolle?: "admin" | "besteller" | "buchhaltung",
+  opts?: { kuerzel?: string; name?: string },
+) {
+  // 22.05.2026 — Route liest jetzt rolle+kuerzel+name aus benutzer_rollen,
+  // damit der Audit-Kommentar den Actor benennt (nicht hardcoded "ADMIN").
   const single = vi.fn().mockResolvedValue({
-    data: rolle ? { rolle } : null,
+    data: rolle
+      ? { rolle, kuerzel: opts?.kuerzel ?? "MH", name: opts?.name ?? "Mohammed Hawrami" }
+      : null,
     error: null,
   });
   const eq = vi.fn().mockReturnValue({ single });
@@ -78,11 +89,17 @@ describe("POST /api/bestellungen/zuordnen", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403 für Besteller (nur Admin erlaubt)", async () => {
-    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "besteller"));
+  it("200 für Besteller (Todo-Page erlaubt jedem das Claimen)", async () => {
+    // 22.05.2026 — vorher 403 (admin-only). Jetzt jeder Besteller darf, weil
+    // /todo das Unzugeordnet-Widget für alle Rollen zeigt.
+    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "besteller", { kuerzel: "MT", name: "Marlon Tschon" }));
+    mockCreateServiceClient.mockReturnValue(makeServiceClient({
+      benutzer: { name: "Marlon Tschon", kuerzel: "MT" },
+      bestellung: { besteller_kuerzel: "UNBEKANNT", besteller_name: "Unbekannt" },
+    }));
     const { POST } = await import("../route");
     const res = await POST(makeRequest({ bestellung_id: TEST_UUID.bestellung, besteller_kuerzel: "MT" }));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it("403 für Buchhaltung", async () => {
@@ -115,7 +132,9 @@ describe("POST /api/bestellungen/zuordnen", () => {
   });
 
   it("Happy-Path: 200 + Bestellung aktualisiert + Audit-Kommentar", async () => {
-    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "admin"));
+    // 22.05.2026 — autor_kuerzel ist jetzt der ausführende Admin/Besteller,
+    // nicht mehr hardcoded "ADMIN". Mock-Profil hier ist Admin MH.
+    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "admin", { kuerzel: "MH", name: "Mohammed Hawrami" }));
     const sb = makeServiceClient({
       benutzer: { name: "Marlon Tschon", kuerzel: "MT" },
       bestellung: { besteller_kuerzel: "UNBEKANNT", besteller_name: "Unbekannt" },
@@ -126,7 +145,7 @@ describe("POST /api/bestellungen/zuordnen", () => {
     expect(res.status).toBe(200);
     expect(sb._insert).toHaveBeenCalledWith(expect.objectContaining({
       bestellung_id: TEST_UUID.bestellung,
-      autor_kuerzel: "ADMIN",
+      autor_kuerzel: "MH",
       text: expect.stringContaining("UNBEKANNT → MT"),
     }));
   });
