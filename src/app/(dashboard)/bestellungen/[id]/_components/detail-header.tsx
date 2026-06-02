@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { getEffektiverStatus, getStatusConfig } from "@/lib/status-config";
 import { DOKUMENT_CONFIG, type Bestellungsart, displayBestellnummer } from "@/lib/bestellung-utils";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
+import { haendlerDisplay } from "@/lib/haendler-display";
 import {
   IconArrowLeft,
   IconBuilding,
@@ -126,12 +127,28 @@ export function DetailHeader({
                 NUR noch hier gerendert, wenn die OwnerLane unten NICHT greift
                 (= SU/Abo "Geteilt"-Anzeige, Freigegebene, Gutschriften). Bei
                 Material-Pool/Claimed übernimmt die OwnerLane die Owner-Info,
-                sonst hätten wir dieselbe Aussage zweimal im Header. */}
+                sonst hätten wir dieselbe Aussage zweimal im Header.
+                "Unbekannter Lieferant (X)"-Prefix aus der Pipeline-Defensive
+                wird hier display-only zu X + Unsicher-Marker aufgelöst. */}
             <div className="flex items-center gap-2 mt-2 flex-wrap text-[12px] text-foreground-subtle">
-              <span className="inline-flex items-center gap-1.5 font-medium text-foreground-muted">
-                <IconBuilding className="h-3.5 w-3.5 text-foreground-subtle" />
-                {bestellung.haendler_name || "–"}
-              </span>
+              {(() => {
+                const hd = haendlerDisplay(bestellung.haendler_name);
+                return (
+                  <span className="inline-flex items-center gap-1.5 font-medium text-foreground-muted">
+                    <IconBuilding className="h-3.5 w-3.5 text-foreground-subtle" />
+                    <span>{hd.name}</span>
+                    {hd.isUnsicher && (
+                      <span
+                        aria-hidden="true"
+                        title="Pipeline hat den Lieferanten nicht eindeutig erkannt — Domain als Marker übernommen."
+                        className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-warning-bg text-warning text-[9px] font-bold font-mono-amount cursor-help"
+                      >
+                        ?
+                      </span>
+                    )}
+                  </span>
+                );
+              })()}
               {(() => {
                 const ownerLaneTakesOver =
                   art === "material" &&

@@ -186,8 +186,22 @@ export function DocumentPanel({
         )}
       </div>
 
-      {/* Sub-Selector wenn mehrere Dokumente vom gleichen Typ existieren (z.B. mehrere Teilrechnungen) */}
-      {aktiveDokumente.length > 1 && (
+      {/* Sub-Selector wenn mehrere Dokumente vom gleichen Typ existieren (z.B. mehrere Teilrechnungen).
+          02.06.2026 (UX-Polish): wenn zwei Dokumente identische bestellnummer_erkannt+gesamtbetrag
+          haben, kennzeichnen wir das als Duplikat-Verdacht (Sub-Selector-Eyebrow
+          wechselt von „2 RECHNUNGEN" zu „2 RECHNUNGEN · MÖGLICH DUPLIKAT").
+          Heuristik konservativ: nur identical Nr+Betrag, sonst stiller Multi-Tab. */}
+      {aktiveDokumente.length > 1 && (() => {
+        const verdachtDuplikat = (() => {
+          const signatures = new Set<string>();
+          for (const d of aktiveDokumente) {
+            const sig = `${d.bestellnummer_erkannt ?? ""}|${d.gesamtbetrag ?? ""}`;
+            if (sig !== "|" && signatures.has(sig)) return true;
+            signatures.add(sig);
+          }
+          return false;
+        })();
+        return (
         <div
           role="tablist"
           aria-label={`${dokTabs.find((t) => t.key === activeTab)?.label ?? "Dokument"} — Auswahl`}
@@ -196,6 +210,24 @@ export function DocumentPanel({
           <span className="text-[12px] text-foreground-subtle uppercase tracking-wide font-mono-amount mr-2 shrink-0">
             {aktiveDokumente.length} {pluralLabel(activeTab, aktiveDokumente.length)}
           </span>
+          {verdachtDuplikat && (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 mr-1 rounded text-[10px] font-semibold uppercase tracking-wide bg-warning-bg text-warning border border-warning-border shrink-0"
+              title="Zwei oder mehr Dokumente haben identische Bestellnummer + Betrag. Möglicherweise doppelt erfasst."
+            >
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-2.5 w-2.5"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 4.5v3.5M8 11h.01M2 8a6 6 0 1112 0A6 6 0 012 8z" />
+              </svg>
+              Möglich Duplikat
+            </span>
+          )}
           {aktiveDokumente.map((d, i) => {
             const isActive = i === safeIndex;
             const nr = d.bestellnummer_erkannt
@@ -231,7 +263,8 @@ export function DocumentPanel({
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       {/* Content */}
       <div

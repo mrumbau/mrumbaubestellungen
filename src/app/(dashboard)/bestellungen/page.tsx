@@ -261,6 +261,7 @@ export default async function BestellungenPage({
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
         isAdmin={profil?.rolle === "admin"}
+        scope={scope}
       />
     </div>
   );

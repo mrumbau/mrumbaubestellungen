@@ -65,8 +65,16 @@ export function SidebarMetadata({
 
   return (
     <>
+      {/* 02.06.2026 (UX-Polish): Group-Header über der Sidebar-Metadata-Card
+          damit die zwei losen Selects (Art + Projekt) nicht mehr zusammenhangs-
+          los wirken. Eyebrow-Pattern konsistent zu DetailHeader / globals.css. */}
+      <div className="px-1">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-foreground-faint">
+          Klassifizierung
+        </span>
+      </div>
       {/* Bestellungsart + Projekt combined card */}
-      <Card padding="md" className="space-y-3">
+      <Card padding="md" className="space-y-3 -mt-2">
         {/* Bestellungsart */}
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-subtle">

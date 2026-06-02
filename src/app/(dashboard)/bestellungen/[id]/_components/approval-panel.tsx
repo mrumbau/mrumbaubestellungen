@@ -155,8 +155,12 @@ export function ApprovalPanel({
       )}
 
       {/* Bestellung verwerfen — admin + Besteller (eigene Material + SU/Abo).
-          Permission-Logik spiegelt API: jeder Besteller darf SU/Abo verwerfen
-          (analog Freigabe), Material nur die eigene. */}
+          02.06.2026 (UX-Polish): destruktive Aktion ist jetzt subtle Ghost-Link
+          statt prominent roter Border-Button. Der ConfirmDialog ist die echte
+          Sicherheits-Brücke; visuell so prominent wie die Hero-Freigabe zu sein
+          ist anti-pattern (rote Border = Augen-Magnet, dann ConfirmDialog =
+          „möchtest du wirklich" Reibung — Doppelung). Jetzt: leiser Text-Link
+          mit Trash-Glyph, hover:error-Token als Affordance. */}
       {(profil.rolle === "admin" ||
         (profil.rolle === "besteller" &&
           (bestellung.besteller_kuerzel === profil.kuerzel ||
@@ -167,9 +171,9 @@ export function ApprovalPanel({
           onClick={onOpenVerwerfenDialog}
           disabled={verwerfenLoading}
           className={cn(
-            "w-full flex items-center justify-center gap-2 py-2.5 text-[12px] font-medium rounded-lg",
-            "border border-error-border bg-transparent text-error",
-            "hover:bg-error hover:border-error hover:text-white transition-colors",
+            "w-full inline-flex items-center justify-center gap-1.5 py-2 mt-1 text-[12px] font-medium rounded-md",
+            "text-foreground-subtle bg-transparent border border-transparent",
+            "hover:text-error hover:bg-error-bg transition-colors",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
           )}

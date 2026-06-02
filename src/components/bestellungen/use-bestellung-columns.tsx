@@ -24,6 +24,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { formatDatum } from "@/lib/formatters";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
+import { haendlerDisplay } from "@/lib/haendler-display";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
 import { StatusCell } from "@/components/ui/cells/status-cell";
@@ -61,7 +62,10 @@ export function useBestellungColumns({
           const artValue = b.bestellungsart || "material";
           const isSub = artValue === "subunternehmer";
           const isAbo = artValue === "abo";
-          const haendlerLabel = b.haendler_name || "–";
+          // 02.06.2026 (UX-Polish): "Unbekannter Lieferant (X)" → X + Unsicher-
+          // Marker. Pipeline-Defensive bleibt in der DB, UI zeigt es sauber.
+          const hd = haendlerDisplay(b.haendler_name);
+          const haendlerLabel = hd.name;
           return (
             <div className="flex flex-col gap-0.5 min-w-0 max-w-[280px]">
               <Link
@@ -89,6 +93,15 @@ export function useBestellungColumns({
                 <span className="truncate" title={haendlerLabel}>
                   {haendlerLabel}
                 </span>
+                {hd.isUnsicher && (
+                  <span
+                    aria-hidden="true"
+                    title="Pipeline hat den Lieferanten nicht eindeutig erkannt — Domain als Marker übernommen."
+                    className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-warning-bg text-warning text-[8px] font-bold font-mono-amount cursor-help shrink-0"
+                  >
+                    ?
+                  </span>
+                )}
                 {isSub && (
                   <Badge tone="warning" size="sm">
                     SUB

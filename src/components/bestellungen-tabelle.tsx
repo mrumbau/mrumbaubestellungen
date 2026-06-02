@@ -45,12 +45,22 @@ export function BestellungenTabelle({
   projekte = [],
   aktiverProjektFilter,
   aktiverProjektName,
+  scope,
 }: {
   bestellungen: Bestellung[];
   projekte?: ProjektOption[];
   aktiverProjektFilter?: string | null;
   aktiverProjektName?: string | null;
   isAdmin?: boolean;
+  /**
+   * 02.06.2026 (UX-Polish gegen Filter-Konflikt): aktueller ScopeTabs-Wert
+   * aus der URL. Bei "mine-done" filtert der Server schon auf
+   * status=freigegeben — der Client-Status-Filter darf dann nicht auf "offen"
+   * stehen (sonst leere Schnittmenge). Mapping:
+   *   - "mine-done"               → Status-Default "" (Alle Status)
+   *   - "pool" | "mine-open" | "all" | undefined → "offen"
+   */
+  scope?: "pool" | "mine-open" | "mine-done" | "all";
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,9 +88,14 @@ export function BestellungenTabelle({
     [router, searchParams],
   );
 
-  // Filters
+  // Filters — 02.06.2026 (UX-Polish gegen Filter-Konflikt): bei Scope
+  // "mine-done" wird serverseitig auf status=freigegeben gefiltert. Der
+  // Client-Status-Default darf dann nicht "offen" sein (würde leere
+  // Schnittmenge erzeugen — siehe Screenshot mit "Status: Offen (= alle außer
+  // freigegeben)"). Wir docken den Default an den Scope an.
+  const defaultStatusForScope = scope === "mine-done" ? "" : "offen";
   const filters = useTableFilters({
-    defaultStatusFilter: "offen",
+    defaultStatusFilter: defaultStatusForScope,
     projektFilter: aktiverProjektFilter || "",
   });
   const {
@@ -597,6 +612,14 @@ export function BestellungenTabelle({
               faelligkeitsFilter={faelligkeitsFilter}
               projekte={projekte}
               onResetFilters={resetFilters}
+              // 02.06.2026 — Per-Filter-Clear für die Pills + scope-aware
+              // Konflikt-Detektion (z.B. mine-done + "Offen"-Status).
+              onClearSuche={() => setSuche("")}
+              onClearStatus={() => setStatusFilter("")}
+              onClearArt={() => setArtFilter("")}
+              onClearProjekt={() => setProjektFilter("")}
+              onClearFaelligkeit={() => filters.setFaelligkeitsFilter("alle")}
+              scope={scope}
             />
           }
         />

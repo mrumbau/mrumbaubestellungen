@@ -8,10 +8,20 @@
  *   - `totalCount === 0` → "Noch keine Bestellungen" mit Erklärung wie sie ankommen
  *   - Sonst (= Filter-Zero-Match) → "Keine Treffer" mit Pill-Liste der aktiven Filter
  *     + Reset-Button (UI-Audit F3.16)
+ *
+ * 02.06.2026 (UX-Polish gegen Filter-Konflikt):
+ *   - Jede Filter-Pill ist jetzt removable (X-Icon) wenn der entsprechende
+ *     Setter durchgereicht wurde. So kann der User PRÄZISE den einen Filter
+ *     entfernen, der den Konflikt erzeugt — statt mit der Brechstange "Alle
+ *     Filter zurücksetzen" auch funktionierende Filter wegzunehmen.
+ *   - Wenn der Scope ein widersprüchliches Filter-Setup erzwingt (z.B.
+ *     "Meine erledigt" + Status "Offen"), wird der präzise CTA als Primary
+ *     gerendert ("Status-Filter aufheben") und der generische Reset wandert
+ *     zur Secondary-Action.
  */
 
 import { Button, EmptyState } from "@/components/ui";
-import { IconSearch } from "@/components/ui/icons";
+import { IconSearch, IconX } from "@/components/ui/icons";
 import type { FaelligkeitsFilter } from "@/lib/use-table-filters";
 import type { ProjektOption } from "./types";
 
@@ -25,6 +35,52 @@ export interface BestellungenEmptyStateProps {
   faelligkeitsFilter: FaelligkeitsFilter;
   projekte: ProjektOption[];
   onResetFilters: () => void;
+  /**
+   * 02.06.2026 — Per-Filter-Clear (optional). Wenn durchgereicht, bekommt die
+   * jeweilige Pill ein kleines X-Icon. Wenn weggelassen, ist die Pill rein
+   * informativ wie bisher (Backward-Compat).
+   */
+  onClearSuche?: () => void;
+  onClearStatus?: () => void;
+  onClearArt?: () => void;
+  onClearProjekt?: () => void;
+  onClearFaelligkeit?: () => void;
+  /**
+   * Aktueller Scope-Tab. Wenn "mine-done" und der einzige aktive Filter ein
+   * Status-Filter ist (außer "" / "freigegeben"), schalten wir den Status-
+   * Clear auf Primary-CTA — das ist der häufigste Konflikt-Fall.
+   */
+  scope?: "pool" | "mine-open" | "mine-done" | "all";
+}
+
+function FilterPill({
+  label,
+  value,
+  mono,
+  onClear,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+  onClear?: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-canvas border border-line text-foreground-muted">
+      <span>{label}:</span>
+      <span className={`font-medium text-foreground${mono ? " font-mono-amount" : ""}`}>{value}</span>
+      {onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="ml-0.5 inline-flex items-center justify-center w-4 h-4 -mr-0.5 rounded-sm text-foreground-faint hover:text-error hover:bg-error-bg transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          aria-label={`${label} entfernen`}
+          title={`${label} entfernen`}
+        >
+          <IconX className="w-3 h-3" />
+        </button>
+      )}
+    </span>
+  );
 }
 
 export function BestellungenEmptyState({
@@ -37,6 +93,12 @@ export function BestellungenEmptyState({
   faelligkeitsFilter,
   projekte,
   onResetFilters,
+  onClearSuche,
+  onClearStatus,
+  onClearArt,
+  onClearProjekt,
+  onClearFaelligkeit,
+  scope,
 }: BestellungenEmptyStateProps) {
   if (totalCount === 0) {
     return (
@@ -64,6 +126,14 @@ export function BestellungenEmptyState({
     );
   }
 
+  // 02.06.2026 — Konflikt-Detektion: bei "Meine erledigt" filtert der Server
+  // schon auf status=freigegeben. Wenn der Client-Status auf etwas Konflikt-
+  // erzeugendes steht (Default "offen" wäre der häufigste Fall, aber auch
+  // andere wie "abweichung" landen unter "freigegeben" eh nie), bieten wir
+  // den präzisen Status-Clear als Primary-CTA.
+  const statusKonfliktMitScope =
+    scope === "mine-done" && statusFilter !== "" && statusFilter !== "freigegeben";
+
   return (
     <EmptyState
       tone="info"
@@ -73,47 +143,48 @@ export function BestellungenEmptyState({
       description={
         hasFilters ? (
           <>
-            <span>Keine Bestellungen passen zu den aktuellen Filtern.</span>
+            <span>
+              {statusKonfliktMitScope
+                ? "Der Tab „Meine erledigt“ zeigt freigegebene Bestellungen, dein Status-Filter steht aber auf etwas anderes. Beides zusammen passt nicht."
+                : "Keine Bestellungen passen zu den aktuellen Filtern."}
+            </span>
             <span className="mt-2 flex flex-wrap gap-1.5">
               {suche && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-canvas border border-line text-foreground-muted">
-                  Suche: <span className="font-mono-amount text-foreground">„{suche}"</span>
-                </span>
+                <FilterPill label="Suche" value={`„${suche}“`} mono onClear={onClearSuche} />
               )}
               {statusFilter && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-canvas border border-line text-foreground-muted">
-                  Status:{" "}
-                  <span className="font-medium text-foreground">
-                    {statusFilter === "offen"
+                <FilterPill
+                  label="Status"
+                  value={
+                    statusFilter === "offen"
                       ? "Offen (= alle außer freigegeben)"
-                      : statusFilter}
-                  </span>
-                </span>
+                      : statusFilter
+                  }
+                  onClear={onClearStatus}
+                />
               )}
               {artFilter && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-canvas border border-line text-foreground-muted">
-                  Art: <span className="font-medium text-foreground">{artFilter}</span>
-                </span>
+                <FilterPill label="Art" value={artFilter} onClear={onClearArt} />
               )}
               {projektFilter && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-canvas border border-line text-foreground-muted">
-                  Projekt:{" "}
-                  <span className="font-medium text-foreground">
-                    {projekte.find((p) => p.id === projektFilter)?.name ?? "—"}
-                  </span>
-                </span>
+                <FilterPill
+                  label="Projekt"
+                  value={projekte.find((p) => p.id === projektFilter)?.name ?? "—"}
+                  onClear={onClearProjekt}
+                />
               )}
               {faelligkeitsFilter && faelligkeitsFilter !== "alle" && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-canvas border border-line text-foreground-muted">
-                  Fälligkeit:{" "}
-                  <span className="font-medium text-foreground">
-                    {faelligkeitsFilter === "ueberfaellig"
+                <FilterPill
+                  label="Fälligkeit"
+                  value={
+                    faelligkeitsFilter === "ueberfaellig"
                       ? "Überfällig"
                       : faelligkeitsFilter === "diese_woche"
                         ? "Diese Woche"
-                        : faelligkeitsFilter}
-                  </span>
-                </span>
+                        : faelligkeitsFilter
+                  }
+                  onClear={onClearFaelligkeit}
+                />
               )}
             </span>
           </>
@@ -122,8 +193,19 @@ export function BestellungenEmptyState({
         )
       }
       primaryAction={
-        hasFilters ? (
+        statusKonfliktMitScope && onClearStatus ? (
+          <Button variant="primary" size="sm" onClick={onClearStatus}>
+            Status-Filter aufheben
+          </Button>
+        ) : hasFilters ? (
           <Button variant="secondary" size="sm" onClick={onResetFilters}>
+            Alle Filter zurücksetzen
+          </Button>
+        ) : undefined
+      }
+      secondaryAction={
+        statusKonfliktMitScope && hasFilters ? (
+          <Button variant="ghost" size="sm" onClick={onResetFilters}>
             Alle Filter zurücksetzen
           </Button>
         ) : undefined
