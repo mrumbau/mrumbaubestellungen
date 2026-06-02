@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getEffektiverStatus, getStatusConfig } from "@/lib/status-config";
 import { DOKUMENT_CONFIG, type Bestellungsart, displayBestellnummer } from "@/lib/bestellung-utils";
-import { bestellerDisplay } from "@/lib/besteller-display";
+import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import {
   IconArrowLeft,
   IconBuilding,
@@ -116,29 +116,14 @@ export function DetailHeader({
                 ·
               </span>
 
-              {(() => {
-                const bd = bestellerDisplay(
-                  bestellung.besteller_kuerzel,
-                  bestellung.besteller_name,
-                  bestellung.bestellungsart,
-                );
-                return (
-                  <span
-                    className="inline-flex items-center gap-1.5"
-                    title={bd.isShared ? "Subunternehmer/Abo — alle Besteller dürfen freigeben" : undefined}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold font-mono-amount ${
-                        bd.isShared ? "bg-foreground-muted text-white" : "bg-brand text-white"
-                      }`}
-                    >
-                      {bd.kuerzel}
-                    </span>
-                    <span className="text-foreground-muted">{bd.name}</span>
-                  </span>
-                );
-              })()}
+              <BestellerCell
+                besteller_kuerzel={bestellung.besteller_kuerzel}
+                besteller_name={bestellung.besteller_name}
+                bestellungsart={bestellung.bestellungsart}
+                vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
+                vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+                variant="with-name"
+              />
               <span aria-hidden="true" className="text-line-strong">
                 ·
               </span>

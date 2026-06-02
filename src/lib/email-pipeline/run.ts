@@ -264,7 +264,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   // 11. Besteller zuordnen
   // 22.05.2026 — Chrome-Extension stillgelegt → signal-Rückgabe entfernt.
   // Verbleibende Stufen: Rules-Engine → Händler-Affinität → Name im Text → KI-Historie.
-  const { bestellerKuerzel, zuordnungsMethode } =
+  const { bestellerKuerzel, zuordnungsMethode, vorschlagKuerzel, vorschlagKonfidenz } =
     await assignBesteller(supabase, {
       haendlerDomain,
       haendlerName,
@@ -336,6 +336,8 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     matchCtx,
     bestellerKuerzelMutable,
     zuordnungsMethodeMutable,
+    vorschlagKuerzel,
+    vorschlagKonfidenz,
     benutzer: benutzer ? { name: benutzer.name } : null,
   });
   if (findResult.kind === "skip") {

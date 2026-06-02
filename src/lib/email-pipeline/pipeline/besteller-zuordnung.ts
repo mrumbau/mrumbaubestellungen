@@ -35,7 +35,33 @@ export interface BestellerZuordnungContext {
 export interface BestellerZuordnungResult {
   bestellerKuerzel: string;
   zuordnungsMethode: string;
+  /**
+   * Pipeline-Vorschlag-Provenance (02.06.2026 Pool Phase 1):
+   *   - Wenn die Pipeline eindeutig zugeordnet hat, ist `vorschlagKuerzel` =
+   *     `bestellerKuerzel` und `vorschlagKonfidenz` = methoden-spezifischer
+   *     Score (siehe METHOD_CONFIDENCE).
+   *   - Wenn die Pipeline auf `UNBEKANNT` fällt aber Affinitäts-Historie
+   *     existiert, liefert sie einen Best-Guess (Top-Affinitäts-Kürzel ohne
+   *     60%-Cutoff) plus dessen Anteilskonfidenz — nur als UI-Hinweis, nicht
+   *     als Owner-Zuweisung. UNBEKANNT bleibt der echte Owner-Wert.
+   *   - Wenn weder Eindeutigkeit noch Affinitäts-Historie greifen: beide null.
+   */
+  vorschlagKuerzel: string | null;
+  vorschlagKonfidenz: number | null;
 }
+
+/**
+ * Methoden-spezifische Konfidenz-Defaults für eindeutige Zuordnungen.
+ * Pool-UI rendert diese als Tooltip-Hinweis. Werte sind grobe Schätzungen
+ * basierend auf historischer Trefferqualität (siehe Workflow-Discovery
+ * 02.06.2026). Nicht für Pipeline-Entscheidungen, nur für User-Anzeige.
+ */
+const METHOD_CONFIDENCE: Record<string, number> = {
+  haendler_affinitaet: 0.7, // wird überschrieben durch tatsächliche Mehrheit
+  besteller_im_dokument: 0.85,
+  name_im_text: 0.75,
+  ki_historisch: 0.7, // wird überschrieben durch erkenneBestellerIntelligent
+};
 
 export async function assignBesteller(
   supabase: SupabaseClient,
@@ -44,6 +70,11 @@ export async function assignBesteller(
   const { haendlerDomain, haendlerName, absenderDomain, analyseErgebnisse, emailText, email_betreff } = ctx;
   let bestellerKuerzel = "";
   let zuordnungsMethode = "";
+  // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance, getrennt vom
+  // verbindlichen Owner-Wert (bestellerKuerzel). Wird auch bei UNBEKANNT
+  // gesetzt, wenn die Affinitäts-Historie einen Best-Guess hergibt.
+  let vorschlagKuerzel: string | null = null;
+  let vorschlagKonfidenz: number | null = null;
 
   // 06.05.2026 (Welle 4 O8) — STUFE -1: Rules-Engine.
   // Admin-konfigurierbare Regeln aus besteller_rules-Tabelle. Wenn DB-Match
@@ -62,6 +93,8 @@ export async function assignBesteller(
       const match = ruleMatch[0] as { rule_id: string; target_kuerzel: string; confidence: number; rule_name: string };
       bestellerKuerzel = match.target_kuerzel;
       zuordnungsMethode = `rule:${match.rule_name}`;
+      vorschlagKuerzel = match.target_kuerzel;
+      vorschlagKonfidenz = typeof match.confidence === "number" ? match.confidence : 0.95;
       logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
         target_kuerzel: match.target_kuerzel,
         confidence: match.confidence,
@@ -94,9 +127,18 @@ export async function assignBesteller(
       }
       const sortiert = [...zaehler.entries()].sort((a, b) => b[1] - a[1]);
       const [topKuerzel, topAnzahl] = sortiert[0];
-      if (topAnzahl / historieCache.length > 0.6) {
+      const anteil = topAnzahl / historieCache.length;
+      if (anteil > 0.6) {
         bestellerKuerzel = topKuerzel;
         zuordnungsMethode = "haendler_affinitaet";
+        vorschlagKuerzel = topKuerzel;
+        vorschlagKonfidenz = Number(anteil.toFixed(2));
+      } else {
+        // 02.06.2026 (Pool Phase 1) — Schwacher Hint: Top-Affinitäts-Kürzel
+        // unter Cutoff. Wird nicht als Owner gesetzt (UNBEKANNT bleibt), aber
+        // als Pool-UI-Vorschlag mit niedriger Konfidenz angezeigt.
+        vorschlagKuerzel = topKuerzel;
+        vorschlagKonfidenz = Number(anteil.toFixed(2));
       }
     }
   }
@@ -115,6 +157,8 @@ export async function assignBesteller(
           if (namen.length >= 2 && namen.every((n: string) => gptBesteller.includes(n))) {
             bestellerKuerzel = String(benutzer.kuerzel);
             zuordnungsMethode = "besteller_im_dokument";
+            vorschlagKuerzel = bestellerKuerzel;
+            vorschlagKonfidenz = METHOD_CONFIDENCE.besteller_im_dokument;
             break;
           }
         }
@@ -133,6 +177,8 @@ export async function assignBesteller(
           if (namen.length >= 2 && namen.every((n: string) => suchTexte.includes(n))) {
             bestellerKuerzel = String(benutzer.kuerzel);
             zuordnungsMethode = "name_im_text";
+            vorschlagKuerzel = bestellerKuerzel;
+            vorschlagKonfidenz = METHOD_CONFIDENCE.name_im_text;
             break;
           }
         }
@@ -171,9 +217,16 @@ export async function assignBesteller(
           if (ergebnis.kuerzel && ergebnis.kuerzel !== "UNBEKANNT" && ergebnis.konfidenz >= 0.6) {
             bestellerKuerzel = ergebnis.kuerzel;
             zuordnungsMethode = "ki_historisch";
+            vorschlagKuerzel = ergebnis.kuerzel;
+            vorschlagKonfidenz = Number(ergebnis.konfidenz.toFixed(2));
             logInfo("webhook/email", `Besteller via KI-Historie erkannt: ${ergebnis.kuerzel}`, {
               konfidenz: ergebnis.konfidenz, begruendung: ergebnis.begruendung,
             });
+          } else if (ergebnis.kuerzel && ergebnis.kuerzel !== "UNBEKANNT" && !vorschlagKuerzel) {
+            // KI hat einen schwachen Hint (Konfidenz < 0.6) — nicht für Owner,
+            // aber für Pool-UI als Vorschlag akzeptabel.
+            vorschlagKuerzel = ergebnis.kuerzel;
+            vorschlagKonfidenz = Number(ergebnis.konfidenz.toFixed(2));
           }
         }
       } catch (e) {
@@ -187,5 +240,5 @@ export async function assignBesteller(
     zuordnungsMethode = "unbekannt";
   }
 
-  return { bestellerKuerzel, zuordnungsMethode };
+  return { bestellerKuerzel, zuordnungsMethode, vorschlagKuerzel, vorschlagKonfidenz };
 }

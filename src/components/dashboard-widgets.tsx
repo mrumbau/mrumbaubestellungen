@@ -6,7 +6,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { TimeRangePicker, type TimeRange } from "@/components/ui/time-range-picker";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
-import { bestellerDisplay } from "@/lib/besteller-display";
+import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 // 22.05.2026 — "Zu prüfen"-Widgets (DashboardUnzugeordnet, DashboardNeueHaendler,
 // DashboardKiVorschlaege, DashboardNeueKunden, DashboardNeueSubunternehmer) sind
@@ -31,6 +31,9 @@ interface BestellungItem {
   waehrung: string;
   status: string;
   created_at: string;
+  // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance, optional.
+  vorschlag_kuerzel?: string | null;
+  vorschlag_konfidenz?: number | null;
 }
 
 interface TopProjekt {
@@ -865,7 +868,18 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                               <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                               <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
                             </p>
-                            <p className="text-[12px] text-foreground-faint">{bestellerDisplay(b.besteller_kuerzel, b.besteller_name, b.bestellungsart).name} · {formatDatum(b.created_at)}</p>
+                            <p className="text-[12px] text-foreground-faint flex items-center gap-1.5 flex-wrap mt-0.5">
+                              <BestellerCell
+                                besteller_kuerzel={b.besteller_kuerzel}
+                                besteller_name={b.besteller_name}
+                                bestellungsart={b.bestellungsart}
+                                vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
+                                vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
+                                variant="with-name"
+                              />
+                              <span aria-hidden="true">·</span>
+                              <span>{formatDatum(b.created_at)}</span>
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">

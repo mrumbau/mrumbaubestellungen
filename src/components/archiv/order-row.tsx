@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { DOKUMENT_CONFIG, displayBestellnummer } from "@/lib/bestellung-utils";
-import { bestellerDisplay } from "@/lib/besteller-display";
+import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import type { Dokument, PaidBestellung } from "./types";
 
@@ -70,7 +70,12 @@ export function OrderRow({
         </td>
         {istAdmin && (
           <td className="px-4 py-3.5 text-foreground-muted hidden lg:table-cell">
-            {bestellerDisplay(order.besteller_kuerzel, order.besteller_name, order.bestellungsart).name}
+            <BestellerCell
+              besteller_kuerzel={order.besteller_kuerzel}
+              besteller_name={order.besteller_name}
+              bestellungsart={order.bestellungsart}
+              variant="with-name"
+            />
           </td>
         )}
         <td className="px-4 py-3.5 hidden md:table-cell">

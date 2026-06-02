@@ -47,6 +47,9 @@ export interface FindOrCreateInput {
   matchCtx: MatchContext;
   bestellerKuerzelMutable: string;
   zuordnungsMethodeMutable: string;
+  /** 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance (optional). */
+  vorschlagKuerzel?: string | null;
+  vorschlagKonfidenz?: number | null;
   benutzer: { name: string | null } | null;
 }
 
@@ -88,6 +91,8 @@ export async function findeOderErstelleBestellung(
     matchCtx,
     bestellerKuerzelMutable,
     zuordnungsMethodeMutable,
+    vorschlagKuerzel,
+    vorschlagKonfidenz,
     benutzer,
   } = input;
   let bestellungsart = input.bestellungsart;
@@ -412,6 +417,11 @@ export async function findeOderErstelleBestellung(
       zuordnung_methode: zuordnungsMethodeMutable,
       bestellungsart,
       subunternehmer_id: erkannterSubunternehmer?.id || null,
+      // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance. Bleibt
+      // permanent erhalten, auch nach Claim. Audit-Anker für "warum hat die
+      // Pipeline so vorgeschlagen?".
+      vorschlag_kuerzel: vorschlagKuerzel ?? null,
+      vorschlag_konfidenz: vorschlagKonfidenz ?? null,
     })
     .select()
     .single();

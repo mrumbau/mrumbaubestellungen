@@ -132,6 +132,11 @@ export type Bestellung = {
   // Jahresabrechnung mit Überzahlung). UI: anderes Badge, keine Freigabe,
   // direkt für Buchhaltung sichtbar.
   ist_gutschrift?: boolean | null;
+  // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag als unverbindlicher Hinweis.
+  // Wird in BestellerCell als ghost-Pill angezeigt wenn besteller_kuerzel
+  // UNBEKANNT ist. Beide bleiben auch nach Claim erhalten (Audit-Provenance).
+  vorschlag_kuerzel?: string | null;
+  vorschlag_konfidenz?: number | null;
 };
 
 export type ProjektStats = {
