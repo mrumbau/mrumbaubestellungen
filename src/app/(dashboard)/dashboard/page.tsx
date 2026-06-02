@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { parseTimeRange, computeRangeBounds, sparklineBuckets } from "@/lib/time-range";
+import { PoolHeroCard } from "@/components/dashboard/pool-hero-card";
 
 // 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1144-LOC-Mega-Component.
 // SSR bleibt aktiv (Default), nur der JS-Chunk wird lazy gesplittet → kleinerer
@@ -310,6 +311,17 @@ export default async function DashboardPage({
             <line x1="40" y1="31" x2="48" y2="23" stroke="#570006" strokeWidth="0.75" />
             <rect x="44" y="28" width="3" height="3" fill="#570006" opacity="0.5" />
           </svg>
+        </div>
+      </div>
+
+      {/* 02.06.2026 (Pool Phase 6) — Pool-HeroStatCard als asymmetrische
+          Bento-Karte VOR den Standard-Widgets. Lädt eigene Daten via Server-
+          Component; rendert null wenn Pool leer ist (keine Card → kein Lärm).
+          Brand-Anker (MR-Red border-top) verankert sie visuell als Top-Card
+          ohne den Status-Snapshot in den Standard-Widgets zu verdrängen. */}
+      <div className="mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <PoolHeroCard />
         </div>
       </div>
 

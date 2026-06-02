@@ -70,3 +70,26 @@ Alle drei Bestell-Personen teilen sich `info@mrumbau.de` — alle eingehenden Ma
 - Decomposition heute: 4618 → 1946 LOC in 4 Monolith-Files (-58%)
 - 394 Tests grün, Production-Build clean
 - Foundation-System: 6 Status-Tokens × 3-Part-Triplet, Industrial-SVG-Texturen, OKLCH-Tinted-Neutrals, DM Sans + Barlow Condensed + JetBrains Mono
+
+## Pool-Modell (02.06.2026)
+
+**Was sich geändert hat:** UNBEKANNT-Material-Bestellungen — Pipeline kann den Besteller nicht eindeutig zuordnen — lagen historisch im Limbo und wurden nur via separater `/todo`-Page sichtbar. Real-World-Effekt: 27% Recall-Lücke (19,3% der Bestellungen) und 138h Median-Latenz bis Pick. Die Pool-Reform macht UNBEKANNT-Items für **alle Besteller in der Hauptliste sichtbar** und gibt klare Aktionen ohne Limbo.
+
+**Mental Model (in einem Satz für MT/CR/MH):**
+> Pool = was niemand erledigt hat. Meine erledigten = was ich freigegeben habe. Alles dazwischen ist Filter, und der Pipeline-Vorschlag ist eine Maschinen-Meinung, kein Urteil.
+
+**Was bleibt unverändert:**
+- Status-Machine (6 Workflow-States) bleibt intakt — Pool ist KEIN 7. Status, sondern ein **Filter-Scope** über die Owner-Zuweisung
+- Buchhaltungs-Sicht — NJ sieht weiterhin NUR freigegebene/Gutschrift-Items, RLS-verifiziert pro Rolle
+- Pipeline-Stufen (Rules-Engine → haendler_affinitaet → name_im_text → ki_historisch) bleiben aktiv und liefern **unverbindliche Vorschläge** in `vorschlag_kuerzel` + `vorschlag_konfidenz`
+
+**Was neu ist (Phasen 1–6):**
+- 4 ScopeTabs in `/bestellungen`: Pool / Meine offen / Meine erledigt / Alle (URL-State, Counter-Pills)
+- BestellerCell mit 4 States als Single Render-Pfad (Owner / Vorschlag / Geteilt / Unzugeordnet) — Inline-Klone verboten
+- OwnerLane im Detail-Header: Magnetic-CTA „Übernehmen", Reassign-Modal, Return-ConfirmDialog, Optimistic-UI mit race-safe RPC-Layer
+- PresenceBanner: „CR schaut seit 2 Min." als Awareness ohne Hard-Lock — neutral muted, statischer Live-Dot
+- Sidebar Pool-Counter Badge am Bestellungen-NavItem
+- Daily-Mahn-Mail: Pool-Digest (07:45) + Owner-Mahnung (08:00), beide mit Reply-Token-Action `UEBERNEHMEN [REF:…]` für Mail-Reply-Claim. Token-Invalidierung nach erster Action (Hijacking-Schutz).
+- PoolHeroCard im Dashboard: Anzahl + Ältester-Eintrag + Top-3-Vendor-Histogramm
+
+**Conflict-Resolution-Prinzip:** Race-Conditions werden silent + kontextualisiert behandelt. Bei Doppel-Claim sieht der zweite Klick einen Toast „Wurde gerade von MT übernommen — 14:32" + auto-Refresh; kein 409, kein Modal. GoBD-Audit-Trail über `events.pool_claim` / `pool_reassign` / `pool_return`.

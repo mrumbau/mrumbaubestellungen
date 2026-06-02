@@ -106,6 +106,31 @@ Jeder Status hat 3-Part-Color + Icon (`status-config.ts`):
 
 **Render:** `<StatusCell>` als Pill mit Icon + Label + Color-Bar links. Color-not-only erfüllt.
 
+## Pool-Modell — Drei-Sprachen-Disziplin (02.06.2026)
+
+UNBEKANNT-Material-Bestellungen liegen in einem geteilten Pool, sichtbar für alle Besteller (RLS Phase 1). Wer freigibt = echter Owner. Die UI muss drei semantische Layer **strikt visuell trennen**, sonst entsteht „Maschine hat schon entschieden"-Fehlinterpretation.
+
+| Layer | Sprache | Token-Set | Beispiel |
+|---|---|---|---|
+| **Pipeline-Vorschlag** (Maschine denkt) | Eyebrow + ghost-style + dashed border | `bg-canvas` + `border-dashed border-line-strong` + dotted-underline auf Kürzel | „VORSCHLAG MT · Konfidenz 89 %" |
+| **Workflow-Status** (Dokumentenlage) | Color + Icon + Label | Status-Token-Triplet (s.o.) | StatusCell (offen / vollständig / …) |
+| **Owner-Binding** (Mensch hat sich verpflichtet) | Solid Brand + tabular-nums | `bg-brand text-foreground-inverse` (Authority-Signal) | „[MT] Übernommen von Marlon Tschon" |
+| **Presence** (anderer User schaut gerade) | Neutral muted + statischer Live-Dot | `text-foreground-subtle` + `bg-success` 6px Dot, **kein Pulse** | „CR schaut seit 2 Min." |
+
+**Regel:** Niemand darf zwei Layer auf dieselbe Token-Familie mappen. Insbesondere: Pipeline-Vorschlag bekommt **niemals** den Status-Pill-Stil (sonst wirkt es wie eine Workflow-Aussage).
+
+**Conflict-Resolution-Pattern (race-safe Optimistic):**
+- Bei `pool_claim` → RPC `WHERE besteller_kuerzel = 'UNBEKANNT'` als Race-Schutz
+- Verlierer bekommt `was_already_claimed`-Toast statt 409: `„Wurde gerade von MT übernommen — 14:32"`
+- Eigene Aktionen feuern Optimistic-Update + Action-Toast; Realtime-Subscription bei Fremd-Action zeigt kontextualisierten Hinweis
+
+**Pool-Komponenten-Inventar:**
+- `BestellerCell` (`@/components/ui/cells/besteller-cell.tsx`) — Single Render-Pfad für Owner-Visualisierung (4 States: Owner / Vorschlag / Geteilt / Unzugeordnet). Kein Inline-Klon erlaubt.
+- `OwnerLane` (`_components/owner-lane.tsx`) — Detail-Surface mit POOL / CLAIMED / FREIGEGEBEN, Magnetic-CTA „Übernehmen", Reassign-Modal, Return-ConfirmDialog
+- `PresenceBanner` (`_components/presence-banner.tsx`) — Avatar-Stack mit statischem Live-Dot
+- `ScopeTabs` (`@/components/bestellungen/scope-tabs.tsx`) — Pool / Meine offen / Meine erledigt / Alle
+- `PoolHeroCard` (`@/components/dashboard/pool-hero-card.tsx`) — Dashboard-Bento mit Anzahl + Ältester-Eintrag + Top-3-Vendor-Histogramm
+
 ## Motion
 
 **Easing-Tokens (in `:root`, exposiert via `--default-transition-timing-function`):**
