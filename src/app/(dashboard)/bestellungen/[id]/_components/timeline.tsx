@@ -401,6 +401,39 @@ function buildTimelineFromEvents(events: AuditEvent[]): TimelineItem[] {
             typ: "info",
             farbe: timelineColor("bestellungsart_geaendert"),
           };
+        // 02.06.2026 (Pool Phase 3) — Pool-Events. Kategorie 'status'
+        // (Workflow-Übergang), Color jeweils aus timeline-config.
+        case "pool_claim":
+          return {
+            zeit: e.created_at,
+            label: `Aus Pool übernommen${e.actor ? ` von ${e.actor}` : ""}`,
+            typ: "status",
+            farbe: timelineColor("pool_claim"),
+          };
+        case "pool_reassign": {
+          const from = String(p.from_kuerzel ?? "?");
+          const to = String(p.to_kuerzel ?? p.to_name ?? "?");
+          const kommentar = typeof p.kommentar === "string" && p.kommentar
+            ? `: "${p.kommentar.slice(0, 60)}"`
+            : "";
+          return {
+            zeit: e.created_at,
+            label: `Übertragen: ${from} → ${to}${e.actor ? ` (durch ${e.actor})` : ""}${kommentar}`,
+            typ: "status",
+            farbe: timelineColor("pool_reassign"),
+          };
+        }
+        case "pool_return": {
+          const kommentar = typeof p.kommentar === "string" && p.kommentar
+            ? `: "${p.kommentar.slice(0, 60)}"`
+            : "";
+          return {
+            zeit: e.created_at,
+            label: `Zurück in Pool${e.actor ? ` von ${e.actor}` : ""}${kommentar}`,
+            typ: "status",
+            farbe: timelineColor("pool_return"),
+          };
+        }
         default:
           // Unbekannter Event-Type — fallback-Render
           return {

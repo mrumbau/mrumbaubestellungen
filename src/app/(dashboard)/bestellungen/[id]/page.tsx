@@ -47,6 +47,7 @@ export default async function BestellungDetailPage({
     { data: freigabe },
     { data: projekte },
     { data: events },
+    { data: bestellerOptions },
   ] = await Promise.all([
     supabase.from("bestellungen").select("*").eq("id", id).single(),
     supabase
@@ -87,6 +88,14 @@ export default async function BestellungDetailPage({
       .eq("entity_id", id)
       .order("created_at", { ascending: true })
       .limit(500),
+    // 02.06.2026 (Pool Phase 3) — Besteller-Optionen für Reassign-Modal in
+    // OwnerLane. Admin + Besteller — buchhaltung wird ausgeschlossen, sie ist
+    // kein gültiges Reassign-Ziel.
+    supabase
+      .from("benutzer_rollen")
+      .select("kuerzel, name, rolle")
+      .in("rolle", ["besteller", "admin"])
+      .order("name"),
   ]);
 
   if (!bestellung) {
@@ -129,6 +138,9 @@ export default async function BestellungDetailPage({
         }}
         projekte={(projekte as ProjektOption[]) || []}
         profil={{ kuerzel: profil.kuerzel, rolle: profil.rolle, name: profil.name }}
+        bestellerOptions={
+          (bestellerOptions as { kuerzel: string; name: string }[] | null) ?? []
+        }
       />
 
       <BestelldetailShell

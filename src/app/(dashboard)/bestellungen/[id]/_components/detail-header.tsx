@@ -8,7 +8,7 @@ import {
   IconBuilding,
   IconAlertCircle,
 } from "@/components/ui/icons";
-import { OwnerLane } from "./owner-lane";
+import { OwnerLane, type BestellerOption } from "./owner-lane";
 import type { Bestellung, ProjektOption } from "./types";
 
 /**
@@ -25,6 +25,7 @@ export function DetailHeader({
   bestellung,
   projekte,
   profil,
+  bestellerOptions,
 }: {
   bestellung: Bestellung & {
     bestellnummer: string | null;
@@ -47,6 +48,12 @@ export function DetailHeader({
    * können soll (z.B. Print-Layouts) — dann wird die Lane einfach weggelassen.
    */
   profil?: { kuerzel: string; rolle: string; name: string };
+  /**
+   * 02.06.2026 (Pool Phase 3) — Reassign-Ziele. Wird im OwnerLane-Modal als
+   * Dropdown gerendert. Server lädt die Liste einmal pro Page (admin+besteller
+   * aus benutzer_rollen), die OwnerLane filtert intern den aktuellen Owner raus.
+   */
+  bestellerOptions?: BestellerOption[];
 }) {
   // 17.05.2026 — Gutschrift-Override: bei Rückerstattung wird statt
   // "Vollständig"/"Offen" der Gutschrift-Badge angezeigt, damit User die
@@ -224,6 +231,7 @@ export function DetailHeader({
                 vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
                 vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
                 profil={profil}
+                besteller_options={bestellerOptions ?? []}
               />
             )}
 

@@ -21,7 +21,14 @@ export type TimelineEventType =
   | "status_changed"
   | "archiviert"
   | "projekt_bestaetigt"
-  | "bestellungsart_geaendert";
+  | "bestellungsart_geaendert"
+  // 02.06.2026 (Pool Phase 3) — Pool-Events. Color-Wahl:
+  // pool_claim nutzt mr-red (Authority — jemand hat sich gebunden), pool_return
+  // text-secondary (neutral, "zurück geöffnet"), pool_reassign info-Token
+  // (Handover-Event, kein Abschluss). Konsistent mit Drei-Sprachen-Disziplin.
+  | "pool_claim"
+  | "pool_reassign"
+  | "pool_return";
 
 export const TIMELINE_EVENT_CONFIG: Record<
   TimelineEventType,
@@ -74,6 +81,18 @@ export const TIMELINE_EVENT_CONFIG: Record<
   bestellungsart_geaendert: {
     farbe: "var(--text-secondary)",
     kontext: "Bestellungsart manuell geändert (material/subunternehmer/abo)",
+  },
+  pool_claim: {
+    farbe: "var(--mr-red)",
+    kontext: "Aus Pool übernommen — Besteller hat sich der Bestellung verpflichtet",
+  },
+  pool_reassign: {
+    farbe: "var(--feedback-info)",
+    kontext: "Bestellung an anderen Besteller übertragen",
+  },
+  pool_return: {
+    farbe: "var(--text-secondary)",
+    kontext: "Zurück in den Pool gegeben — wieder offen für alle Besteller",
   },
 };
 
