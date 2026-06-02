@@ -122,24 +122,39 @@ export function DetailHeader({
               )}
             </div>
 
-            {/* Compact meta line */}
+            {/* Compact meta line — 02.06.2026 (UX-Polish): BestellerCell wird
+                NUR noch hier gerendert, wenn die OwnerLane unten NICHT greift
+                (= SU/Abo "Geteilt"-Anzeige, Freigegebene, Gutschriften). Bei
+                Material-Pool/Claimed übernimmt die OwnerLane die Owner-Info,
+                sonst hätten wir dieselbe Aussage zweimal im Header. */}
             <div className="flex items-center gap-2 mt-2 flex-wrap text-[12px] text-foreground-subtle">
               <span className="inline-flex items-center gap-1.5 font-medium text-foreground-muted">
                 <IconBuilding className="h-3.5 w-3.5 text-foreground-subtle" />
                 {bestellung.haendler_name || "–"}
               </span>
-              <span aria-hidden="true" className="text-line-strong">
-                ·
-              </span>
-
-              <BestellerCell
-                besteller_kuerzel={bestellung.besteller_kuerzel}
-                besteller_name={bestellung.besteller_name}
-                bestellungsart={bestellung.bestellungsart}
-                vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
-                vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
-                variant="with-name"
-              />
+              {(() => {
+                const ownerLaneTakesOver =
+                  art === "material" &&
+                  bestellung.status !== "freigegeben" &&
+                  !bestellung.ist_gutschrift &&
+                  !!profil;
+                if (ownerLaneTakesOver) return null;
+                return (
+                  <>
+                    <span aria-hidden="true" className="text-line-strong">
+                      ·
+                    </span>
+                    <BestellerCell
+                      besteller_kuerzel={bestellung.besteller_kuerzel}
+                      besteller_name={bestellung.besteller_name}
+                      bestellungsart={bestellung.bestellungsart}
+                      vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
+                      vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+                      variant="with-name"
+                    />
+                  </>
+                );
+              })()}
               <span aria-hidden="true" className="text-line-strong">
                 ·
               </span>
@@ -230,6 +245,7 @@ export function DetailHeader({
                 status={bestellung.status}
                 vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
                 vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+                istGutschrift={bestellung.ist_gutschrift}
                 profil={profil}
                 besteller_options={bestellerOptions ?? []}
               />

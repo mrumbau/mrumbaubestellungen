@@ -55,6 +55,13 @@ export interface OwnerLaneProps {
   status: string;
   vorschlag_kuerzel: string | null;
   vorschlag_konfidenz: number | null;
+  /**
+   * 02.06.2026 (UX-Polish): Gutschriften haben keinen Owner-Workflow —
+   * Rückerstattung geht direkt an die Buchhaltung, niemand muss übernehmen.
+   * Bei istGutschrift=true rendert die Lane null, damit der Sidebar-Hinweis
+   * „keine Freigabe nötig" nicht durch einen Übernehmen-CTA widersprochen wird.
+   */
+  istGutschrift?: boolean | null;
   /** Aktueller User. */
   profil: { kuerzel: string; rolle: string; name: string };
   /**
@@ -173,6 +180,10 @@ export function OwnerLane(props: OwnerLaneProps) {
   if (!isMaterial) return null;
   // Freigegeben: kein Owner-Workflow mehr nötig.
   if (isFreigegeben) return null;
+  // 02.06.2026 — Gutschriften haben keinen Owner-Workflow. Sidebar zeigt den
+  // dedizierten „Rückerstattung — keine Freigabe nötig"-Hinweis; ein Übernehmen-
+  // CTA würde dem widersprechen und User verwirren.
+  if (props.istGutschrift) return null;
 
   async function postPoolAction(
     endpoint: "pool-claim" | "pool-return" | "pool-reassign",

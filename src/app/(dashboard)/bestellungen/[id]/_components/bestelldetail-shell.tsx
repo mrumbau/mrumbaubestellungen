@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { BenutzerProfil } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -71,7 +71,17 @@ export function BestelldetailShell({
   });
 
   const dokTabs = DOKUMENT_CONFIG[bestellung.bestellungsart || "material"];
-  const [activeTab, setActiveTab] = useState<string>(dokTabs[0]?.typ || "bestellbestaetigung");
+  // 02.06.2026 (UX-Polish) — Smart-Default: erste Tab mit vorhandenem Dokument
+  // statt fester "bestellbestaetigung". User sieht beim Öffnen sofort das
+  // Wichtigste (z.B. Rechnung bei Gutschrift), nicht einen leeren Tab.
+  // Fallback: ersten Tab aus der Config falls noch nichts da.
+  const smartInitialTab = useMemo(() => {
+    const firstWithDok = dokTabs.find((tab) =>
+      dokumente.some((d) => d.typ === tab.typ),
+    );
+    return firstWithDok?.typ ?? dokTabs[0]?.typ ?? "bestellbestaetigung";
+  }, [dokTabs, dokumente]);
+  const [activeTab, setActiveTab] = useState<string>(smartInitialTab);
   const [mobileSection, setMobileSection] = useState<"dokumente" | "details" | "aktionen">(
     "dokumente",
   );

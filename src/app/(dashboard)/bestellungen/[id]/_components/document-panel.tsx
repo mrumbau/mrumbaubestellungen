@@ -107,8 +107,12 @@ export function DocumentPanel({
                   ? "text-brand bg-surface"
                   : dok
                     ? "text-foreground-muted hover:text-foreground hover:bg-surface-hover"
-                    : "text-foreground-subtle hover:text-foreground-muted",
+                    // 02.06.2026 (UX-Polish): fehlende Tabs deutlich gedimmter
+                    // (text-foreground-faint statt -subtle) damit auf einen Blick
+                    // klar ist welche Tabs bestückt sind und welche nicht.
+                    : "text-foreground-faint hover:text-foreground-subtle",
               )}
+              aria-label={`${tab.label} ${dok ? "vorhanden" : "fehlt"}`}
             >
               <IconComp
                 className={cn(
@@ -379,11 +383,24 @@ function EmptyDocument({
       </div>
       <p className="text-[14px] font-medium text-foreground-muted">Kein Dokument vorhanden</p>
       <p className="text-[12px] text-foreground-subtle mt-1 mb-4">
-        Wird automatisch angezeigt sobald ein Dokument per E-Mail eingeht.
+        Sobald ein Dokument per E-Mail eingeht, erscheint es hier automatisch.
+        <span className="block mt-1 text-foreground-faint">Oder direkt hinzufügen:</span>
       </p>
-      <div className="flex gap-2 justify-center">
-        <UploadButton onClick={onOpenCamera} disabled={scanLoading} label="Scannen" variant="camera" />
-        <UploadButton onClick={onOpenFile} disabled={scanLoading} label="Hochladen" variant="file" />
+      <div className="flex flex-col sm:flex-row gap-2 justify-center items-stretch sm:items-center">
+        <UploadButton
+          onClick={onOpenFile}
+          disabled={scanLoading}
+          label="Hochladen"
+          variant="file"
+          emphasis="primary"
+        />
+        <UploadButton
+          onClick={onOpenCamera}
+          disabled={scanLoading}
+          label="Scannen"
+          variant="camera"
+          emphasis="secondary"
+        />
       </div>
       {scanLoading && (
         <div className="flex items-center gap-2 mt-3 justify-center">
@@ -589,11 +606,19 @@ function UploadButton({
   disabled,
   label,
   variant,
+  emphasis = "secondary",
 }: {
   onClick: () => void;
   disabled: boolean;
   label: string;
   variant: "camera" | "file";
+  /**
+   * 02.06.2026 (UX-Polish im Empty-State): "primary" rendert den Button als
+   * Magnetic-Brand-CTA (Hochladen ist der häufigste Pfad, Mail-PDF), während
+   * "secondary" das alte Ghost-Brand-Token bleibt für Scannen-Camera-Pfad.
+   * Default "secondary" rückwärtskompatibel zu existing ExtractedDocument-CTAs.
+   */
+  emphasis?: "primary" | "secondary";
 }) {
   return (
     <button
@@ -601,8 +626,10 @@ function UploadButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium rounded-md",
-        "text-brand bg-brand/5 hover:bg-brand/10 transition-colors",
+        "inline-flex items-center justify-center gap-1.5 px-4 py-2 text-[12px] font-medium rounded-md min-h-[36px]",
+        emphasis === "primary"
+          ? "btn-primary text-foreground-inverse shadow-sm"
+          : "text-brand bg-brand/5 hover:bg-brand/10 border border-transparent transition-colors",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
       )}
