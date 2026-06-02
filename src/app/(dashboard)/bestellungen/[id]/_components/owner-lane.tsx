@@ -39,6 +39,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
+import { useBestellungPresence } from "@/lib/hooks/use-bestellung-presence";
+import { PresenceBanner } from "./presence-banner";
 
 export interface BestellerOption {
   kuerzel: string;
@@ -83,6 +85,16 @@ export function OwnerLane(props: OwnerLaneProps) {
   // durch andere User zu detektieren. Initial gleich dem Server-Zustand,
   // damit der erste Mount nicht als "Wechsel" zählt.
   const lastSeenOwnerRef = useRef(props.besteller_kuerzel);
+
+  // 02.06.2026 (Pool Phase 4) — Presence-Awareness. Hook IMMER aufrufen
+  // (Hook-Rules) — die Render-Entscheidung (welcher State braucht den Banner)
+  // passiert weiter unten. Auch bei SU/Abo + Freigegeben läuft die Subscription
+  // einmal kurz und wird sofort wieder geleert; akzeptierter Trade.
+  const presenceViewers = useBestellungPresence({
+    bestellungId: props.bestellungId,
+    selfKuerzel: props.profil.kuerzel,
+    selfName: props.profil.name,
+  });
 
   // 02.06.2026 (Pool Phase 3) — Owner-Change-Subscription. Abonniert events-
   // INSERT für diese Bestellung; bei pool_claim/reassign/return durch einen
@@ -295,7 +307,7 @@ export function OwnerLane(props: OwnerLaneProps) {
   if (isUnbekannt) {
     return (
       <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3 px-3 py-2.5 rounded-md bg-canvas border border-dashed border-line-strong">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
           <BestellerCell
             besteller_kuerzel={effectiveKuerzel}
             besteller_name={effectiveName}
@@ -314,6 +326,7 @@ export function OwnerLane(props: OwnerLaneProps) {
               )}
             </span>
           )}
+          <PresenceBanner viewers={presenceViewers} />
         </div>
         <button
           type="button"
@@ -360,7 +373,7 @@ export function OwnerLane(props: OwnerLaneProps) {
     return (
       <>
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3 px-3 py-2.5 rounded-md bg-canvas">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
             <BestellerCell
               besteller_kuerzel={effectiveKuerzel}
               besteller_name={effectiveName}
@@ -370,6 +383,7 @@ export function OwnerLane(props: OwnerLaneProps) {
             <span className="hidden sm:inline text-[12px] text-foreground-subtle">
               {isOwner ? "Übernommen — du bist dran" : "Zugeordnet"}
             </span>
+            <PresenceBanner viewers={presenceViewers} />
           </div>
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             {hasReassignTargets && (
