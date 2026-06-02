@@ -56,13 +56,45 @@ export type ExpensiveMail = {
   created_at: string;
 };
 
+// 22.05.2026 — Adversarial Second-Pass-Review-Stats. Zeigt
+//   - Reviewed in den letzten 7 Tagen (gesamt)
+//   - Davon agreed (KI #1 hatte recht: irrelevant) vs disagreed (Silent-Drop gerettet)
+//   - Pending (noch nicht reviewed, Cron wird sie holen)
+//   - Letzte Disagreements als Liste mit Link zur Bestellung (wenn Re-Run was angelegt hat)
+export type SecondReviewStats = {
+  reviewed_7d: number;
+  agreed_irrelevant_7d: number;
+  disagreed_7d: number;
+  rerun_success_7d: number;
+  pending_candidates: number;
+};
+
+export type SecondReviewDisagreement = {
+  internet_message_id: string;
+  subject: string | null;
+  sender: string | null;
+  second_review_at: string;
+  second_review_verdict: string | null;
+  second_review_reason: string | null;
+  second_review_rerun_outcome: string | null;
+  bestellung_id: string | null;
+  created_at: string;
+};
+
 export default async function PipelineQualityPage() {
   const supabase = await createServerSupabaseClient();
 
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: rows }, { data: incompleteData }, { data: expensiveData }] = await Promise.all([
+  const [
+    { data: rows },
+    { data: incompleteData },
+    { data: expensiveData },
+    { data: secondReviewAll },
+    { data: secondReviewDisagreementsData },
+    { count: pendingCount },
+  ] = await Promise.all([
     supabase
       .from("pipeline_quality_daily")
       .select("*")
@@ -89,13 +121,65 @@ export default async function PipelineQualityPage() {
       .gte("created_at", sevenDaysAgo)
       .order("openai_cost_eur", { ascending: false, nullsFirst: false })
       .limit(20),
+    // 22.05.2026 — Second-Review-Stats: Reviewed-Outcomes der letzten 7 Tage
+    supabase
+      .from("email_processing_log")
+      .select("second_review_agreed, second_review_rerun_outcome, bestellung_id")
+      .not("second_review_at", "is", null)
+      .gte("second_review_at", sevenDaysAgo),
+    // Disagreements für die Detail-Liste (max 10, neueste zuerst)
+    supabase
+      .from("email_processing_log")
+      .select(
+        "internet_message_id, subject, sender, second_review_at, second_review_verdict, second_review_reason, second_review_rerun_outcome, bestellung_id, created_at",
+      )
+      .eq("second_review_agreed", false)
+      .gte("second_review_at", sevenDaysAgo)
+      .order("second_review_at", { ascending: false })
+      .limit(10),
+    // Pending: Kandidaten die der Cron beim nächsten Tick reviewen wird
+    supabase
+      .from("email_processing_log")
+      .select("internet_message_id", { count: "exact", head: true })
+      .is("bestellung_id", null)
+      .is("second_review_at", null)
+      .eq("has_attachments", true)
+      .gte("created_at", sevenDaysAgo),
   ]);
+
+  // Stats-Aggregation aus rohem Result-Set (kompatibel ohne RPC).
+  // 22.05.2026 — Generated DB-Types kennen die neuen second_review_*-Spalten
+  // noch nicht (gen-types nicht gelaufen seit Migration). `unknown` Detour um
+  // den Cast-Fehler zu umgehen — funktional korrekt.
+  type ReviewRow = {
+    second_review_agreed: boolean | null;
+    second_review_rerun_outcome: string | null;
+    bestellung_id: string | null;
+  };
+  const allReviewed = (secondReviewAll ?? []) as unknown as ReviewRow[];
+  const reviewedAgreed = allReviewed.filter((r) => r.second_review_agreed === true).length;
+  const reviewedDisagreed = allReviewed.filter((r) => r.second_review_agreed === false).length;
+  const rerunSuccess = allReviewed.filter(
+    (r) => r.second_review_agreed === false && r.bestellung_id !== null,
+  ).length;
+
+  const secondReviewStats: SecondReviewStats = {
+    reviewed_7d: allReviewed.length,
+    agreed_irrelevant_7d: reviewedAgreed,
+    disagreed_7d: reviewedDisagreed,
+    rerun_success_7d: rerunSuccess,
+    pending_candidates: pendingCount ?? 0,
+  };
 
   return (
     <PipelineQualityClient
       rows={(rows || []) as PipelineQualityRow[]}
       incomplete={(incompleteData || []) as IncompleteBestellung[]}
       expensive={(expensiveData || []) as ExpensiveMail[]}
+      secondReviewStats={secondReviewStats}
+      secondReviewDisagreements={
+        (secondReviewDisagreementsData || []) as unknown as SecondReviewDisagreement[]
+      }
     />
   );
 }

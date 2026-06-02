@@ -8,7 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { IconActivity, IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
-import type { PipelineQualityRow, IncompleteBestellung, ExpensiveMail } from "./page";
+import type {
+  PipelineQualityRow,
+  IncompleteBestellung,
+  ExpensiveMail,
+  SecondReviewStats,
+  SecondReviewDisagreement,
+} from "./page";
 
 function formatPct(n: number | null): string {
   if (n == null) return "—";
@@ -46,10 +52,14 @@ export function PipelineQualityClient({
   rows,
   incomplete,
   expensive,
+  secondReviewStats,
+  secondReviewDisagreements,
 }: {
   rows: PipelineQualityRow[];
   incomplete: IncompleteBestellung[];
   expensive: ExpensiveMail[];
+  secondReviewStats: SecondReviewStats;
+  secondReviewDisagreements: SecondReviewDisagreement[];
 }) {
   const aggregates = useMemo(() => {
     const last7 = rows.slice(0, 7);
@@ -282,6 +292,105 @@ export function PipelineQualityClient({
             </SectionCard>
           )}
 
+          {/* 22.05.2026 — KI-Zweitmeinung: Silent-Drops der letzten 7 Tage durch
+              adversarialen 2. Pass (gpt-5.5 mit "First-Reviewer hat übersehen"-Frame).
+              Generisch statt Vendor-Parser. Stündlich via Cron. */}
+          <SectionCard
+            title="KI-Zweitmeinung (7 Tage)"
+            description="Adversarialer 2. Pass auf alle Mails mit Anhang die keine Bestellung erzeugt haben. Stoppt Silent-Drops wie das Engelhard-Pattern ohne Vendor-spezifischen Code."
+            padding="md"
+            headerBorder
+          >
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+              <StatBlock
+                label="Reviewed"
+                value={secondReviewStats.reviewed_7d}
+                tone="neutral"
+              />
+              <StatBlock
+                label="Bestätigt drop"
+                value={secondReviewStats.agreed_irrelevant_7d}
+                tone="neutral"
+                hint="KI #1 hatte recht"
+              />
+              <StatBlock
+                label="Widersprochen"
+                value={secondReviewStats.disagreed_7d}
+                tone={secondReviewStats.disagreed_7d > 0 ? "warning" : "neutral"}
+                hint="Silent-Drop verdacht"
+              />
+              <StatBlock
+                label="Gerettet"
+                value={secondReviewStats.rerun_success_7d}
+                tone={secondReviewStats.rerun_success_7d > 0 ? "success" : "neutral"}
+                hint="Bestellung nachträglich angelegt"
+              />
+              <StatBlock
+                label="Pending"
+                value={secondReviewStats.pending_candidates}
+                tone="neutral"
+                hint="Cron pickt sie als nächstes"
+              />
+            </div>
+
+            {secondReviewDisagreements.length > 0 ? (
+              <div className="border-t border-line-subtle pt-4">
+                <p className="text-[12px] uppercase tracking-wide text-foreground-subtle mb-2">
+                  Letzte Widersprüche
+                </p>
+                <ul className="space-y-2">
+                  {secondReviewDisagreements.map((d) => (
+                    <li
+                      key={d.internet_message_id}
+                      className="flex flex-col gap-1 p-3 rounded-md border border-line-subtle bg-canvas/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-medium text-foreground truncate">
+                            {d.subject || "(ohne Betreff)"}
+                          </p>
+                          <p className="text-[11px] text-foreground-subtle font-mono-amount truncate">
+                            {d.sender || "—"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {d.bestellung_id ? (
+                            <Link
+                              href={`/bestellungen/${d.bestellung_id}`}
+                              className="text-[11px] text-brand hover:text-brand-light font-medium"
+                            >
+                              Bestellung →
+                            </Link>
+                          ) : (
+                            <Badge tone="warning" size="sm">
+                              {d.second_review_rerun_outcome ?? "kein Bestellung"}
+                            </Badge>
+                          )}
+                          <span className="text-[10px] text-foreground-faint">
+                            {formatRelative(d.second_review_at)}
+                          </span>
+                        </div>
+                      </div>
+                      {d.second_review_reason && (
+                        <p className="text-[11px] text-foreground-muted italic">
+                          „{d.second_review_reason}"
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : secondReviewStats.reviewed_7d > 0 ? (
+              <p className="text-[12px] text-foreground-subtle">
+                Letzte 7 Tage: keine Widersprüche. KI #1 hat alle Drops korrekt eingestuft.
+              </p>
+            ) : (
+              <p className="text-[12px] text-foreground-subtle">
+                Noch keine Reviews. Cron läuft stündlich um :15 Min.
+              </p>
+            )}
+          </SectionCard>
+
           {/* Trends */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <TrendCard
@@ -377,6 +486,33 @@ function KpiCard({ label, value, tone }: { label: string; value: string; tone?: 
       <div className={`mt-1 text-[18px] font-headline font-semibold tabular-nums font-mono-amount ${valueClass}`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function StatBlock({
+  label,
+  value,
+  tone,
+  hint,
+}: {
+  label: string;
+  value: number;
+  tone: "neutral" | "success" | "warning" | "error";
+  hint?: string;
+}) {
+  const valueClass =
+    tone === "success" ? "text-success" :
+    tone === "warning" ? "text-warning" :
+    tone === "error" ? "text-error" :
+    "text-foreground";
+  return (
+    <div className="rounded-md border border-line-subtle bg-canvas/40 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-foreground-subtle">{label}</div>
+      <div className={`mt-0.5 text-[20px] font-headline font-semibold tabular-nums font-mono-amount ${valueClass}`}>
+        {value}
+      </div>
+      {hint && <div className="text-[10px] text-foreground-faint mt-0.5">{hint}</div>}
     </div>
   );
 }
