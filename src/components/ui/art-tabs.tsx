@@ -28,8 +28,16 @@ const DEFAULT_TABS: { key: ArtFilter; label: string }[] = [
 ];
 
 export function ArtTabs({ value, onChange, counts, tabs = DEFAULT_TABS }: ArtTabsProps) {
+  // 02.06.2026 (UI-Polish): Secondary-Tab-Style. Bewusst kleiner + leiser als
+  // ScopeTabs (Primary), damit die Hierarchie (Scope > Art) visuell klar ist.
+  // Ergebnis: pill-Container schmaler (h-9), Text-Größe runter auf 13px,
+  // Counter-Pill nur noch als Suffix mit Brand-Tint statt Solid-Background.
   return (
-    <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg shrink-0">
+    <div
+      className="inline-flex items-center gap-0.5 p-0.5 bg-canvas rounded-md shrink-0 h-9"
+      role="tablist"
+      aria-label="Bestellungsart"
+    >
       {tabs.map((tab) => {
         const isActive = value === tab.key;
         const count = tab.key ? counts[tab.key as keyof typeof counts] : 0;
@@ -37,20 +45,23 @@ export function ArtTabs({ value, onChange, counts, tabs = DEFAULT_TABS }: ArtTab
           <button
             key={tab.key}
             type="button"
+            role="tab"
             onClick={() => onChange(tab.key)}
             aria-pressed={isActive}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
+            aria-selected={isActive}
+            className={`inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-medium rounded-[6px] transition-[background-color,color,box-shadow] duration-150 ease-out whitespace-nowrap focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
               isActive
                 ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
             }`}
           >
-            {tab.label}
+            <span>{tab.label}</span>
             {tab.key && count > 0 && (
               <span
-                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
-                  isActive ? "bg-brand text-white" : "bg-line text-foreground-muted"
+                className={`font-mono-amount text-[10px] font-semibold tabular-nums ${
+                  isActive ? "text-brand" : "text-foreground-faint"
                 }`}
+                aria-label={`${count} Bestellungen`}
               >
                 {count}
               </span>

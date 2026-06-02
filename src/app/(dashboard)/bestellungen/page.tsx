@@ -199,8 +199,12 @@ export default async function BestellungenPage({
         </nav>
       )}
 
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      {/* 02.06.2026 (UI-Polish): Page-Header — Title links, subtile Eyebrow rechts.
+          Vorher prominentes "183 GELADEN" als 2-spaltiger Header → jetzt eine
+          kompakte Eyebrow-Zeile passend zur industrial-Aesthetic. Scope-Label
+          unter dem Titel kontextualisiert den aktuellen Tab.  */}
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="min-w-0">
           <h1 className="font-headline text-2xl text-foreground tracking-tight">Bestellungen</h1>
           <p className="text-foreground-subtle text-sm mt-1">
             {scope === "pool"
@@ -212,15 +216,22 @@ export default async function BestellungenPage({
                   : "Alle Bestellungen"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono-amount text-xs text-foreground-subtle">{total}</span>
-          <span className="text-[10px] text-foreground-faint uppercase tracking-wide">
-            {reachedCap ? `≥ ${HARD_CAP}` : "Geladen"}
+        <div
+          className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[10px] font-semibold tracking-widest uppercase text-foreground-subtle"
+          aria-live="polite"
+        >
+          <span className="font-mono-amount text-foreground text-xs tabular-nums">
+            {total.toLocaleString("de-DE")}
+          </span>
+          <span className="text-foreground-faint">
+            {reachedCap ? `≥ ${HARD_CAP}` : "geladen"}
           </span>
         </div>
       </div>
 
-      <div className="mb-6">
+      {/* ScopeTabs als Primary-Navigation. Underline-Style + border-b bildet
+          die klare Top-Hierarchie über alle Sub-Filter (ArtTabs, FilterBar).  */}
+      <div className="mb-5">
         <ScopeTabs
           active={scope}
           preservedSearchParams={projektIdParam ? { projekt_id: projektIdParam } : undefined}

@@ -400,8 +400,11 @@ export function BestellungenTabelle({
         </div>
       )}
 
-      {/* Art-Tabs + Search + Filters */}
-      <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Art-Tabs + Search + Filters — Secondary-Filter-Reihe.
+          02.06.2026 (UI-Polish): mt-6 → mt-5 weil ScopeTabs jetzt eine eigene
+          border-b zeichnen und der Sub-Filter visuell direkt anschließt
+          (kein Doppel-Spacer mehr). */}
+      <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <ArtTabs value={artFilter} onChange={setArtFilter} counts={artCounts} />
 
         <FilterBar

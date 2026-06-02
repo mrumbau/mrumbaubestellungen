@@ -2,20 +2,30 @@
 
 /**
  * useBestellungColumns — Column-Definitions für die Bestellungen-Tabelle.
- * Aus bestellungen-tabelle.tsx extrahiert (12.05.2026, F3.3 Decomposition).
+ *
+ * 02.06.2026 (UI-Polish nach Pool-Reform):
+ *   - **Primary-Spalte konsolidiert**: Bestellnummer + Händler + Projekt-Sub-Row
+ *     in EINER Spalte (analog GitHub-PR-Pattern). Vorher 3 separate Spalten
+ *     mit unbalanciertem Whitespace, Projekt fast immer leer.
+ *   - **Neue Besteller-Spalte**: BestellerCell pill-only — Pool-Reform endlich
+ *     in der Liste sichtbar. Pipeline-Vorschlag als Ghost-Pill direkt erkennbar.
+ *   - **4 Doku-Spalten → 1 DokumenteCell**: Inline-Slots mit B/L/R/V-Letters
+ *     spart ~210px Tabellen-Breite, gleiche Information.
+ *   - **Aktion-Header benannt**: vorher "" → "Aktion", Screen-Reader-fair.
  *
  * Closure-Deps:
- *   - projektFarbenMap: für Projekt-Farb-Dots in Händler-Cell + Projekt-Spalte
- *   - freigabeLoadingId: zum Disablen des Quick-Freigabe-Buttons während async
+ *   - projektFarbenMap: Projekt-Color-Dots
+ *   - freigabeLoadingId: Disable Quick-Freigabe während async
  *   - handlePreview / preloadPreview: PDF-Preview-Modal-Trigger
- *   - setFreigabeConfirmId: öffnet Quick-Freigabe-Confirm-Dialog
+ *   - setFreigabeConfirmId: Quick-Freigabe-Confirm-Dialog
  */
 
 import { useMemo } from "react";
 import Link from "next/link";
 import { formatDatum } from "@/lib/formatters";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
-import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
+import { BestellerCell } from "@/components/ui/cells/besteller-cell";
+import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { Badge, type DataTableColumn } from "@/components/ui";
@@ -40,50 +50,45 @@ export function useBestellungColumns({
   return useMemo(
     () => [
       {
+        // Primary-Spalte: Bestellnummer + Händler + (optional) Projekt-Sub-Row.
+        // GitHub-PR-Pattern: das Wichtigste oben, Kontext darunter. Spart eine
+        // separate Händler- und Projekt-Spalte.
         key: "bestellnummer",
-        label: "Bestellnr.",
+        label: "Bestellung",
         sortable: true,
         stopPropagation: true,
-        render: (b) => (
-          <Link
-            href={`/bestellungen/${b.id}`}
-            // 22.05.2026 (Perf) — prefetch={false}: Bestellungen-Liste zeigt 20+
-            // Rows mit je einem Link → default-Auto-Prefetch feuert 20+ parallele
-            // RSC-Fetches a 3-7s. Plus: wenn User klickt bevor Prefetch fertig,
-            // startet Next.js eine 2. Fetch für die Navigation (Doppel-Fetch
-            // sichtbar als zwei ?_rsc=...-Requests im Network-Tab). Click-Pfad
-            // bleibt normal schnell (~3s), kein Background-Storm.
-            prefetch={false}
-            onClick={(e) => e.stopPropagation()}
-            className="font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
-          >
-            {displayBestellnummer(b)}
-            {b.mahnung_am && (
-              <span
-                className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold"
-                title={`Mahnung eingegangen am ${new Date(b.mahnung_am).toLocaleDateString("de-DE")}`}
-              >
-                <IconAlertCircle className="w-3 h-3" />
-                {b.mahnung_count && b.mahnung_count > 1
-                  ? `${b.mahnung_count}. Mahnung`
-                  : "Mahnung"}
-              </span>
-            )}
-          </Link>
-        ),
-      },
-      {
-        key: "haendler_name",
-        label: "Händler / Firma",
-        sortable: true,
         render: (b) => {
           const artValue = b.bestellungsart || "material";
           const isSub = artValue === "subunternehmer";
           const isAbo = artValue === "abo";
+          const haendlerLabel = b.haendler_name || "–";
           return (
-            <>
-              <div className="flex items-center gap-2">
-                <span className="truncate max-w-[150px]">{b.haendler_name || "–"}</span>
+            <div className="flex flex-col gap-0.5 min-w-0 max-w-[280px]">
+              <Link
+                href={`/bestellungen/${b.id}`}
+                // 22.05.2026 (Perf) — kein RSC-Prefetch-Storm.
+                prefetch={false}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors truncate"
+                title={displayBestellnummer(b)}
+              >
+                <span className="truncate">{displayBestellnummer(b)}</span>
+                {b.mahnung_am && (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold shrink-0"
+                    title={`Mahnung eingegangen am ${new Date(b.mahnung_am).toLocaleDateString("de-DE")}`}
+                  >
+                    <IconAlertCircle className="w-3 h-3" />
+                    {b.mahnung_count && b.mahnung_count > 1
+                      ? `${b.mahnung_count}. Mahnung`
+                      : "Mahnung"}
+                  </span>
+                )}
+              </Link>
+              <div className="flex items-center gap-2 text-[12px] text-foreground-muted min-w-0">
+                <span className="truncate" title={haendlerLabel}>
+                  {haendlerLabel}
+                </span>
                 {isSub && (
                   <Badge tone="warning" size="sm">
                     SUB
@@ -96,40 +101,43 @@ export function useBestellungColumns({
                 )}
               </div>
               {b.projekt_name && (
-                <div className="lg:hidden mt-1 flex items-center gap-1.5 text-[12px] text-foreground-muted">
+                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-foreground-subtle min-w-0">
                   <span
+                    aria-hidden="true"
                     className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{
-                      background:
-                        projektFarbenMap.get(b.projekt_id!) || "var(--mr-red)",
+                      background: projektFarbenMap.get(b.projekt_id!) || "var(--mr-red)",
                     }}
                   />
-                  {b.projekt_name}
+                  <span className="truncate">{b.projekt_name}</span>
                 </div>
               )}
-            </>
+            </div>
           );
         },
       },
       {
-        key: "projekt_name",
-        label: "Projekt",
-        hideBelow: "lg",
-        render: (b) =>
-          b.projekt_name ? (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-foreground max-w-[120px]">
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{
-                  background:
-                    projektFarbenMap.get(b.projekt_id!) || "var(--mr-red)",
-                }}
-              />
-              <span className="truncate">{b.projekt_name}</span>
-            </span>
-          ) : (
-            <span className="text-line-strong text-[12px]">–</span>
-          ),
+        // 02.06.2026 (Pool-Reform sichtbar machen). Pill-only Variante bleibt
+        // kompakt; Drei-Sprachen-Disziplin trennt Owner / Vorschlag / Geteilt /
+        // Unzugeordnet visuell. Auf Mobile (hideBelow="md") versteckt — dort
+        // landet die Info im Sub-Detail-View. sortable: ja, damit der Pool
+        // direkt nach UNBEKANNT gruppiert werden kann.
+        key: "besteller_kuerzel",
+        label: "Besteller",
+        align: "center",
+        sortable: true,
+        hideBelow: "md",
+        stopPropagation: true,
+        render: (b) => (
+          <BestellerCell
+            besteller_kuerzel={b.besteller_kuerzel}
+            besteller_name={b.besteller_name}
+            bestellungsart={b.bestellungsart}
+            vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
+            vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
+            variant="pill-only"
+          />
+        ),
       },
       {
         key: "created_at",
@@ -152,128 +160,27 @@ export function useBestellungColumns({
         },
       },
       {
-        key: "hat_bestellbestaetigung",
-        label: "Best.",
-        align: "center",
-        hideBelow: "sm",
-        stopPropagation: true,
-        render: (b) => {
-          const artValue = b.bestellungsart || "material";
-          if (artValue === "subunternehmer" || artValue === "abo") {
-            return <span className="text-line-strong">–</span>;
-          }
-          return (
-            <div className="flex justify-center">
-              <DokumentIcon
-                vorhanden={b.hat_bestellbestaetigung}
-                onClick={
-                  b.hat_bestellbestaetigung
-                    ? (e) => {
-                        e.stopPropagation();
-                        handlePreview(b.id, "bestellbestaetigung");
-                      }
-                    : undefined
-                }
-                onMouseEnter={
-                  b.hat_bestellbestaetigung
-                    ? () => preloadPreview(b.id, "bestellbestaetigung")
-                    : undefined
-                }
-              />
-            </div>
-          );
-        },
-      },
-      {
-        key: "hat_lieferschein",
-        label: "LS",
-        align: "center",
-        hideBelow: "sm",
-        stopPropagation: true,
-        render: (b) => {
-          const artValue = b.bestellungsart || "material";
-          if (artValue === "subunternehmer" || artValue === "abo") {
-            return <span className="text-line-strong">–</span>;
-          }
-          return (
-            <div className="flex justify-center">
-              <DokumentIcon
-                vorhanden={b.hat_lieferschein}
-                onClick={
-                  b.hat_lieferschein
-                    ? (e) => {
-                        e.stopPropagation();
-                        handlePreview(b.id, "lieferschein");
-                      }
-                    : undefined
-                }
-                onMouseEnter={
-                  b.hat_lieferschein
-                    ? () => preloadPreview(b.id, "lieferschein")
-                    : undefined
-                }
-              />
-            </div>
-          );
-        },
-      },
-      {
+        // Konsolidiert die 4 Doku-Spalten (BB/LS/RE/VS) in eine inline-Slot-Cell.
+        // Spalt-Header bleibt sortierbar nach hat_rechnung (häufigste Sortierung
+        // bei Bulk-Freigabe-Workflow), B/L/V wird wie heute via Click-on-Slot
+        // direkt zur Vorschau geöffnet.
         key: "hat_rechnung",
-        label: "RE",
+        label: "Dokumente",
         align: "center",
+        sortable: true,
         hideBelow: "sm",
         stopPropagation: true,
         render: (b) => (
-          <div className="flex justify-center">
-            <DokumentIcon
-              vorhanden={b.hat_rechnung}
-              onClick={
-                b.hat_rechnung
-                  ? (e) => {
-                      e.stopPropagation();
-                      handlePreview(b.id, "rechnung");
-                    }
-                  : undefined
-              }
-              onMouseEnter={
-                b.hat_rechnung ? () => preloadPreview(b.id, "rechnung") : undefined
-              }
-            />
-          </div>
+          <DokumenteCell
+            hat_bestellbestaetigung={b.hat_bestellbestaetigung}
+            hat_lieferschein={b.hat_lieferschein}
+            hat_rechnung={b.hat_rechnung}
+            hat_versandbestaetigung={b.hat_versandbestaetigung}
+            bestellungsart={b.bestellungsart}
+            onPreview={(typ) => handlePreview(b.id, typ)}
+            onPreload={(typ) => preloadPreview(b.id, typ)}
+          />
         ),
-      },
-      {
-        key: "hat_versandbestaetigung",
-        label: "VS",
-        align: "center",
-        hideBelow: "sm",
-        stopPropagation: true,
-        render: (b) => {
-          const artValue = b.bestellungsart || "material";
-          if (artValue === "subunternehmer" || artValue === "abo") {
-            return <span className="text-line-strong">–</span>;
-          }
-          return (
-            <div className="flex justify-center">
-              <DokumentIcon
-                vorhanden={b.hat_versandbestaetigung ?? false}
-                onClick={
-                  b.hat_versandbestaetigung
-                    ? (e) => {
-                        e.stopPropagation();
-                        handlePreview(b.id, "versandbestaetigung");
-                      }
-                    : undefined
-                }
-                onMouseEnter={
-                  b.hat_versandbestaetigung
-                    ? () => preloadPreview(b.id, "versandbestaetigung")
-                    : undefined
-                }
-              />
-            </div>
-          );
-        },
       },
       {
         key: "status",
@@ -297,10 +204,12 @@ export function useBestellungColumns({
         ),
       },
       {
+        // 02.06.2026 — Header benannt für Screen-Reader-Fairness (vorher "").
+        // Quick-Freigabe nur sichtbar wenn semantisch sinnvoll; sonst leerer Slot.
         key: "actions",
-        label: "",
+        label: "Aktion",
         stopPropagation: true,
-        width: 48,
+        width: 56,
         align: "right",
         render: (b) => {
           const kannFreigeben = b.status !== "freigegeben" && b.hat_rechnung;

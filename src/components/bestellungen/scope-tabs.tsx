@@ -53,8 +53,8 @@ function buildHref(view: PoolScope, preserved?: Record<string, string | undefine
 export function ScopeTabs({ active, tabs, preservedSearchParams }: ScopeTabsProps) {
   const visible = tabs.filter((t) => !t.hidden);
   return (
-    <div
-      className="flex items-center gap-1 p-1 bg-canvas rounded-lg overflow-x-auto"
+    <nav
+      className="flex items-end gap-6 border-b border-line-subtle overflow-x-auto -mx-1 px-1"
       role="tablist"
       aria-label="Bestellungs-Sichten"
     >
@@ -66,29 +66,38 @@ export function ScopeTabs({ active, tabs, preservedSearchParams }: ScopeTabsProp
             href={buildHref(tab.key, preservedSearchParams)}
             role="tab"
             aria-selected={isActive}
-            // 02.06.2026 — keine RSC-Prefetch-Storms. Tab-Switches sind explizite
-            // User-Aktionen, der Klick lädt die neue View synchron.
             prefetch={false}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out whitespace-nowrap focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] ${
+            // Primary-Tab-Style (02.06.2026 UI-Polish): underline-style statt
+            // pill-container. Setzt klare Hierarchie über die Secondary-ArtTabs
+            // darunter und folgt dem editorial-Pattern aus Linear / GitHub.
+            className={`relative flex items-center gap-2 pb-3 pt-1 text-[15px] font-medium whitespace-nowrap transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded-t-sm ${
               isActive
-                ? "bg-surface text-foreground shadow-sm"
+                ? "text-foreground"
                 : "text-foreground-muted hover:text-foreground"
             }`}
           >
-            {tab.label}
+            <span>{tab.label}</span>
             {tab.count > 0 && (
               <span
-                className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full font-mono-amount tabular-nums ${
-                  isActive ? "bg-brand text-white" : "bg-line text-foreground-muted"
+                className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 text-[10px] font-bold rounded-full font-mono-amount tabular-nums transition-colors ${
+                  isActive
+                    ? "bg-brand text-foreground-inverse"
+                    : "bg-canvas text-foreground-muted"
                 }`}
                 aria-label={`${tab.count} Bestellungen`}
               >
                 {tab.count}
               </span>
             )}
+            {isActive && (
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-px left-0 right-0 h-[2px] bg-brand rounded-t"
+              />
+            )}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }
