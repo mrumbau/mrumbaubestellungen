@@ -146,13 +146,15 @@ export async function POST(request: NextRequest) {
             "──────────────────────────────────────────────",
             "Antwort-Aktionen (per Mail-Reply möglich):",
             "Antworte einfach auf diese Mail und schreibe z.B.:",
-            "    FREIGEBEN [REF:…]   – Bestellung freigeben",
-            "    BEZAHLT [REF:…]     – Rechnung als bezahlt markieren",
-            "    NEIN [REF:…]        – Bestellung als problematisch markieren",
+            "    FREIGEBEN [REF:…]    – Bestellung freigeben",
+            "    BEZAHLT [REF:…]      – Rechnung als bezahlt markieren",
+            "    UEBERNEHMEN [REF:…]  – Bestellung übernehmen (wenn jemand anderes sie hatte)",
+            "    NEIN [REF:…]         – Bestellung als problematisch markieren",
             "",
             "Tokens je Bestellung:",
             ...replyTokenZeilen,
             "──────────────────────────────────────────────",
+            "Hinweis: Jeder Token gilt nur für die ERSTE Aktion. Danach wird er deaktiviert.",
           ].join("\n")
         : "";
 

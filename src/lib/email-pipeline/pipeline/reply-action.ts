@@ -25,7 +25,7 @@ const ROUTE = "pipeline/reply-action";
 
 export const TOKEN_RE = /\[REF:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i;
 
-export type ReplyActionType = "freigeben" | "bezahlt" | "ablehnen";
+export type ReplyActionType = "freigeben" | "bezahlt" | "ablehnen" | "uebernehmen";
 
 export const ACTION_KEYWORDS: Record<ReplyActionType, RegExp[]> = {
   // Match nur am Anfang einer Zeile (gestrippter Reply-Header) für Quote-Resistance
@@ -37,6 +37,13 @@ export const ACTION_KEYWORDS: Record<ReplyActionType, RegExp[]> = {
   ],
   ablehnen: [
     /^\s*(ablehnen|abgelehnt|nein|reject(ed)?|stornieren|rejected)\b/im,
+  ],
+  // 02.06.2026 (Pool Phase 5) — UEBERNEHMEN signalisiert Pool-Claim. Für den
+  // Daily-Digest, der UNBEKANNT-Bestellungen auflistet, antwortet ein Besteller
+  // mit "UEBERNEHMEN [REF:xxx]" → besteller_kuerzel wird auf den Sender gesetzt.
+  // Keine Freigabe, nur Owner-Wechsel.
+  uebernehmen: [
+    /^\s*(übernehmen|uebernehmen|claim|nehme|nehmen|ich mach(e)?|machen wir)\b/im,
   ],
 };
 
@@ -61,15 +68,25 @@ export async function detectReplyAction(
 
   const token = tokenMatch[1].toLowerCase();
 
-  // Token gegen DB matchen
+  // Token gegen DB matchen. 02.06.2026 (Pool Phase 5) — auch
+  // reply_token_used_at mitselektieren: Defense gegen Hijacking, indem alte
+  // Tokens nach erster Action invalidiert werden. Wir loggen den Fund
+  // trotzdem (für Diagnose), brechen aber ab bevor wir die Action triggern.
   const { data: bestellung, error } = await supabase
     .from("bestellungen")
-    .select("id")
+    .select("id, reply_token_used_at")
     .eq("reply_token", token)
     .maybeSingle();
 
   if (error || !bestellung) {
     logInfo(ROUTE, "Reply-Token unbekannt — ignoriert", { token: token.slice(0, 8) + "…" });
+    return null;
+  }
+
+  if ((bestellung as { reply_token_used_at?: string | null }).reply_token_used_at) {
+    logInfo(ROUTE, "Reply-Token bereits verwendet — ignoriert (Replay-Schutz)", {
+      bestellung_id: bestellung.id,
+    });
     return null;
   }
 
@@ -219,16 +236,28 @@ export async function applyReplyAction(
   if (action === "bezahlt" && senderProfil.rolle !== "buchhaltung" && senderProfil.rolle !== "admin") {
     return { success: false, skipped: true, reason: "rolle_unzulaessig" };
   }
+  // 02.06.2026 (Pool Phase 5) — UEBERNEHMEN braucht besteller- oder admin-Rolle.
+  if (action === "uebernehmen" && senderProfil.rolle !== "besteller" && senderProfil.rolle !== "admin") {
+    return { success: false, skipped: true, reason: "rolle_unzulaessig" };
+  }
 
   // 3. Bestellung laden für Action-Validation
   const { data: bestellung } = await supabase
     .from("bestellungen")
-    .select("id, status, hat_rechnung, bezahlt_am")
+    .select("id, status, hat_rechnung, bezahlt_am, besteller_kuerzel, bestellungsart")
     .eq("id", bestellungId)
     .maybeSingle();
 
   if (!bestellung) {
     return { success: false, skipped: true, reason: "bestellung_nicht_gefunden" };
+  }
+
+  // Helper: Token nach jeder erfolgreichen Action invalidieren.
+  async function invalidateToken() {
+    await supabase
+      .from("bestellungen")
+      .update({ reply_token_used_at: new Date().toISOString() })
+      .eq("id", bestellungId);
   }
 
   // 4. Action ausführen
@@ -251,6 +280,7 @@ export async function applyReplyAction(
       logError(ROUTE, "freigeben_bestellung-RPC fehlgeschlagen", rpcErr);
       return { success: false, reason: rpcErr.message };
     }
+    await invalidateToken();
     logInfo(ROUTE, "Bestellung via Email-Reply freigegeben", {
       bestellung_id: bestellungId,
       sender: senderProfil.kuerzel,
@@ -284,6 +314,7 @@ export async function applyReplyAction(
       p_event_type: "bestellung_bezahlt",
       p_payload: { method: "email_reply", keyword: matchedKeyword },
     });
+    await invalidateToken();
     logInfo(ROUTE, "Bestellung via Email-Reply als bezahlt markiert", {
       bestellung_id: bestellungId,
       sender: senderProfil.kuerzel,
@@ -313,11 +344,81 @@ export async function applyReplyAction(
       p_event_type: "bestellung_abgelehnt",
       p_payload: { method: "email_reply", keyword: matchedKeyword },
     });
+    await invalidateToken();
     logInfo(ROUTE, "Bestellung via Email-Reply abgelehnt", {
       bestellung_id: bestellungId,
       sender: senderProfil.kuerzel,
     });
     return { success: true, newStatus: "abweichung" };
+  }
+
+  // 02.06.2026 (Pool Phase 5) — UEBERNEHMEN: Pool-Claim via E-Mail-Reply.
+  // Setzt besteller_kuerzel auf den Sender, race-safe via WHERE-Clause.
+  // Bei bereits-zugeordneter Bestellung silent skip (Token-Invalidierung
+  // verhindert ohnehin Replay).
+  if (action === "uebernehmen") {
+    const b = bestellung as {
+      besteller_kuerzel: string | null;
+      bestellungsart: string | null;
+      status: string | null;
+    };
+    if (b.bestellungsart !== "material") {
+      return { success: false, skipped: true, reason: "nicht_pool_faehig" };
+    }
+    if (b.status === "freigegeben") {
+      return { success: false, skipped: true, reason: "bereits_freigegeben" };
+    }
+    if (b.besteller_kuerzel && b.besteller_kuerzel !== "UNBEKANNT") {
+      return {
+        success: true,
+        skipped: true,
+        reason: "bereits_uebernommen",
+        newStatus: b.status ?? undefined,
+      };
+    }
+
+    // Race-safe Claim: nur wenn besteller_kuerzel weiterhin 'UNBEKANNT' ist.
+    const { data: updRow, error: updErr } = await supabase
+      .from("bestellungen")
+      .update({
+        besteller_kuerzel: senderProfil.kuerzel,
+        besteller_name: senderProfil.name,
+        zuordnung_methode: "pool_claim_via_reply",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", bestellungId)
+      .eq("besteller_kuerzel", "UNBEKANNT")
+      .select("id")
+      .maybeSingle();
+
+    if (updErr) {
+      logError(ROUTE, "Pool-Claim via Reply fehlgeschlagen", updErr);
+      return { success: false, reason: updErr.message };
+    }
+    if (!updRow) {
+      // Race verloren — andere User hat zwischen Check und UPDATE geclaimt.
+      return { success: true, skipped: true, reason: "race_lost" };
+    }
+
+    await supabase.rpc("log_event", {
+      p_actor: senderProfil.kuerzel,
+      p_entity_id: bestellungId,
+      p_entity_type: "bestellung",
+      p_event_type: "pool_claim",
+      p_payload: {
+        method: "email_reply",
+        keyword: matchedKeyword,
+        claimed_by_kuerzel: senderProfil.kuerzel,
+        claimed_by_name: senderProfil.name,
+        previous_owner: "UNBEKANNT",
+      },
+    });
+    await invalidateToken();
+    logInfo(ROUTE, "Bestellung via Email-Reply aus Pool übernommen", {
+      bestellung_id: bestellungId,
+      sender: senderProfil.kuerzel,
+    });
+    return { success: true, newStatus: b.status ?? undefined };
   }
 
   return { success: false, reason: "unknown_action" };

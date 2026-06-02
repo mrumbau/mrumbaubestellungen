@@ -205,10 +205,34 @@ describe("findActionKeyword", () => {
 
   it("priorisiert deterministisch wenn beide Keywords vorhanden (freigeben kommt zuerst in Iteration)", () => {
     // Beide am Zeilenanfang — Iteration über Object.entries respektiert Insertion-Order:
-    // freigeben → bezahlt → ablehnen. Erstes Match wins.
+    // freigeben → bezahlt → ablehnen → uebernehmen. Erstes Match wins.
     const body = "FREIGEBEN\nBEZAHLT\nNEIN";
     const result = findActionKeyword(body);
     expect(result?.action).toBe("freigeben");
+  });
+
+  it("erkennt UEBERNEHMEN-Varianten (Pool Phase 5)", () => {
+    expect(findActionKeyword("uebernehmen\nbla")?.action).toBe("uebernehmen");
+    expect(findActionKeyword("übernehmen\nbla")?.action).toBe("uebernehmen");
+    expect(findActionKeyword("UEBERNEHMEN\nbla")?.action).toBe("uebernehmen");
+    expect(findActionKeyword("claim\nbla")?.action).toBe("uebernehmen");
+    expect(findActionKeyword("nehme\nbla")?.action).toBe("uebernehmen");
+    expect(findActionKeyword("ich mache\nbla")?.action).toBe("uebernehmen");
+    expect(findActionKeyword("machen wir\nbla")?.action).toBe("uebernehmen");
+  });
+
+  it("UEBERNEHMEN matched nicht mitten im Wort (Word-Boundary)", () => {
+    // 02.06.2026 (Pool Phase 5) — Schutz gegen Substring-Treffer in
+    // beliebigen deutschen Body-Texten. "übernehmenswert" / "claimed" sollten
+    // NICHT triggern.
+    expect(findActionKeyword("übernehmenswert\nbla")).toBeNull();
+    expect(findActionKeyword("nehmenswert\nbla")).toBeNull();
+  });
+
+  it("UEBERNEHMEN matched nur am Zeilenanfang (kein Quote-Trigger)", () => {
+    // Token-Hint im Original-Footer darf nicht versehentlich triggern.
+    const body = "Antwort-Aktionen:\n  Bestellung X → UEBERNEHMEN [REF:abc]";
+    expect(findActionKeyword(body)).toBeNull();
   });
 });
 

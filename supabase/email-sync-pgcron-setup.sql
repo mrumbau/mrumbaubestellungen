@@ -93,6 +93,27 @@ SELECT cron.schedule(
 );
 
 -- ────────────────────────────────────────────────────────────────────────
+-- Pool-Phase 5 (02.06.2026) — zwei tägliche Erinnerungs-Tracks
+-- ────────────────────────────────────────────────────────────────────────
+-- Beide Jobs sind via Migration `pool_phase5_reply_tokens_and_cron_triggers`
+-- bereits in cron.job registriert (jobids 18 + 19). Hier nur als Referenz
+-- dokumentiert; nicht erneut SELECT cron.schedule() ausführen (würde
+-- Schedule überschreiben aber Logs reset).
+--
+-- Job 5: erinnerungen-pool (05:45 UTC = 07:45 CEST)
+--   Daily-Digest an alle aktiven Besteller (admin + besteller).
+--   Listet UNBEKANNT-Material-Pool mit UEBERNEHMEN-Tokens pro Bestellung.
+--   Pro Empfänger max 1 Mail pro Tag (Dedup via webhook_logs).
+--
+-- Job 6: erinnerungen-owner (06:00 UTC = 08:00 CEST)
+--   Per-Owner-Mahnung bei zugeordneten Bestellungen ohne Lieferschein > 5d.
+--   Tokens umfassen FREIGEBEN/BEZAHLT/UEBERNEHMEN/NEIN-Actions.
+--
+-- DEAKTIVIERUNG:
+--   SELECT cron.unschedule('erinnerungen-pool');
+--   SELECT cron.unschedule('erinnerungen-owner');
+
+-- ────────────────────────────────────────────────────────────────────────
 -- SCHRITT 3: Verifizierung
 -- ────────────────────────────────────────────────────────────────────────
 
