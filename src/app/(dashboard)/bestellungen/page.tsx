@@ -1,6 +1,20 @@
 import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
+import { ScopeTabs, type PoolScope } from "@/components/bestellungen/scope-tabs";
+
+const SCOPE_VALUES: ReadonlyArray<PoolScope> = ["pool", "mine-open", "mine-done", "all"];
+
+function parseScope(raw: string | undefined, rolle: string | undefined): PoolScope {
+  if (raw && (SCOPE_VALUES as readonly string[]).includes(raw)) {
+    const view = raw as PoolScope;
+    // `all` ist admin-only — Besteller fällt zurück auf `mine-open`.
+    if (view === "all" && rolle !== "admin") return "mine-open";
+    return view;
+  }
+  // Default per Rolle: admin sieht alles, Besteller startet auf eigene offene.
+  return rolle === "admin" ? "all" : "mine-open";
+}
 
 // 22.05.2026 (Perf Stufe 2.8) — Dynamic-Split für BestellungenTabelle zurückgenommen.
 // Grund: BestellungenTabelle hostet useRowReturnFlash (Spatial-Continuity-Afterglow
@@ -27,11 +41,12 @@ const HARD_CAP = 500;
 export default async function BestellungenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ projekt_id?: string }>;
+  searchParams: Promise<{ projekt_id?: string; view?: string }>;
 }) {
   const profil = await getBenutzerProfil();
   const supabase = await createServerSupabaseClient();
-  const { projekt_id: projektIdParam } = await searchParams;
+  const { projekt_id: projektIdParam, view: viewParam } = await searchParams;
+  const scope: PoolScope = parseScope(viewParam, profil?.rolle);
 
   // 21.05.2026 (Perf) — dokumente via FK-Embed statt sequentiellem 2. Roundtrip.
   // Vorher: Query 1 (bestellungen) parallel Query 2 (projekte), DANN Query 3
@@ -39,33 +54,100 @@ export default async function BestellungenPage({
   // bestellung-Query → 2 statt 3 Roundtrips, spart ~80-150ms.
   // Trade-off: Response wird ~30% größer (bei 500 Bestellungen × ~3 Dokus × 3
   // Nummern-Felder ≈ +50KB). Bei aktuell ~150 Bestellungen vernachlässigbar.
+  //
+  // 02.06.2026 (Pool Phase 2) — vorschlag_kuerzel + vorschlag_konfidenz mit
+  // selektiert. Die BestellerCell zeigt sie im Pool-State als Ghost-Pill.
   let dataQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer)",
+      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer)",
     )
     .is("archiviert_am", null)
     .order("created_at", { ascending: false })
     .limit(HARD_CAP);
 
-  // Besteller: eigene Material-Bestellungen + alle Abo/SU Bestellungen (Freigabe durch jeden Besteller möglich)
-  if (profil?.rolle === "besteller") {
-    dataQuery = dataQuery.or(
-      `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
-    );
+  // 02.06.2026 (Pool Phase 2) — Scope-Routing pro Tab.
+  //   pool       → UNBEKANNT-Material (alle Besteller dank Phase-1-RLS)
+  //   mine-open  → eigene + Abo/SU, status ≠ freigegeben (Default für Besteller)
+  //   mine-done  → eigene + Abo/SU, status = freigegeben
+  //   all        → kein Scope-Filter (admin-only, parseScope schützt)
+  if (scope === "pool") {
+    dataQuery = dataQuery
+      .eq("besteller_kuerzel", "UNBEKANNT")
+      .eq("bestellungsart", "material");
+  } else if (scope === "mine-open" && profil) {
+    if (profil.rolle === "besteller") {
+      dataQuery = dataQuery.or(
+        `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
+      );
+    }
+    dataQuery = dataQuery.neq("status", "freigegeben");
+  } else if (scope === "mine-done" && profil) {
+    if (profil.rolle === "besteller") {
+      dataQuery = dataQuery.or(
+        `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
+      );
+    }
+    dataQuery = dataQuery.eq("status", "freigegeben");
   }
+  // scope === "all" → keine zusätzlichen Filter; admin-only durch parseScope.
 
   if (projektIdParam) {
     dataQuery = dataQuery.eq("projekt_id", projektIdParam);
   }
 
-  const [{ data: bestellungen }, { data: projekte }] = await Promise.all([
+  // 02.06.2026 (Pool Phase 2) — Scope-Counts für die Tab-Pills.
+  // Vier head:true count-Queries laufen parallel — RLS filtert pro Rolle,
+  // also reflektieren die Counts die tatsächliche Sichtbarkeit des Users.
+  // Bei 200 Bestellungen <50ms zusätzlich, akzeptabler Trade für Pool-UX.
+  const poolCountQuery = supabase
+    .from("bestellungen")
+    .select("id", { count: "exact", head: true })
+    .is("archiviert_am", null)
+    .eq("besteller_kuerzel", "UNBEKANNT")
+    .eq("bestellungsart", "material");
+
+  let mineOpenCountQuery = supabase
+    .from("bestellungen")
+    .select("id", { count: "exact", head: true })
+    .is("archiviert_am", null)
+    .neq("status", "freigegeben");
+  let mineDoneCountQuery = supabase
+    .from("bestellungen")
+    .select("id", { count: "exact", head: true })
+    .is("archiviert_am", null)
+    .eq("status", "freigegeben");
+  if (profil?.rolle === "besteller") {
+    mineOpenCountQuery = mineOpenCountQuery.or(
+      `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
+    );
+    mineDoneCountQuery = mineDoneCountQuery.or(
+      `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
+    );
+  }
+  const allCountQuery = supabase
+    .from("bestellungen")
+    .select("id", { count: "exact", head: true })
+    .is("archiviert_am", null);
+
+  const [
+    { data: bestellungen },
+    { data: projekte },
+    { count: poolCount },
+    { count: mineOpenCount },
+    { count: mineDoneCount },
+    { count: allCount },
+  ] = await Promise.all([
     dataQuery,
     supabase
       .from("projekte")
       .select("id, name, farbe")
       .neq("status", "archiviert")
       .order("name"),
+    poolCountQuery,
+    mineOpenCountQuery,
+    mineDoneCountQuery,
+    allCountQuery,
   ]);
 
   // 07.05.2026 — Doku-Nummern für Such-Index aus eingebetteten dokumente-Rows
@@ -117,13 +199,17 @@ export default async function BestellungenPage({
         </nav>
       )}
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-headline text-2xl text-foreground tracking-tight">Bestellungen</h1>
           <p className="text-foreground-subtle text-sm mt-1">
-            {profil?.rolle === "admin"
-              ? "Alle Bestellungen"
-              : "Deine Bestellungen"}
+            {scope === "pool"
+              ? "Pool — alle Material-Bestellungen ohne Besteller"
+              : scope === "mine-open"
+                ? "Deine offenen Bestellungen"
+                : scope === "mine-done"
+                  ? "Von dir freigegebene Bestellungen"
+                  : "Alle Bestellungen"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -132,6 +218,24 @@ export default async function BestellungenPage({
             {reachedCap ? `≥ ${HARD_CAP}` : "Geladen"}
           </span>
         </div>
+      </div>
+
+      <div className="mb-6">
+        <ScopeTabs
+          active={scope}
+          preservedSearchParams={projektIdParam ? { projekt_id: projektIdParam } : undefined}
+          tabs={[
+            { key: "pool", label: "Pool", count: poolCount ?? 0 },
+            { key: "mine-open", label: "Meine offen", count: mineOpenCount ?? 0 },
+            { key: "mine-done", label: "Meine erledigt", count: mineDoneCount ?? 0 },
+            {
+              key: "all",
+              label: "Alle",
+              count: allCount ?? 0,
+              hidden: profil?.rolle !== "admin",
+            },
+          ]}
+        />
       </div>
 
       {reachedCap && (

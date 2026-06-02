@@ -181,8 +181,59 @@ export type Database = {
         }
         Relationships: []
       }
-      // 22.05.2026 — bestellung_signale entfernt (Chrome-Extension stillgelegt).
-      // DB-Tabelle separat per Migration droppen (siehe Memory perf_sprint_*).
+      bestellung_signale: {
+        Row: {
+          confidence: number | null
+          erkennung: string | null
+          haendler_domain: string
+          id: string
+          kuerzel: string
+          matched_bestellung_id: string | null
+          order_nummer: string | null
+          page_title: string | null
+          status: string | null
+          url_path: string | null
+          verarbeitet: boolean | null
+          zeitstempel: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          erkennung?: string | null
+          haendler_domain: string
+          id?: string
+          kuerzel: string
+          matched_bestellung_id?: string | null
+          order_nummer?: string | null
+          page_title?: string | null
+          status?: string | null
+          url_path?: string | null
+          verarbeitet?: boolean | null
+          zeitstempel?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          erkennung?: string | null
+          haendler_domain?: string
+          id?: string
+          kuerzel?: string
+          matched_bestellung_id?: string | null
+          order_nummer?: string | null
+          page_title?: string | null
+          status?: string | null
+          url_path?: string | null
+          verarbeitet?: boolean | null
+          zeitstempel?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bestellung_signale_matched_bestellung_id_fkey"
+            columns: ["matched_bestellung_id"]
+            isOneToOne: false
+            referencedRelation: "bestellungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bestellungen: {
         Row: {
           archiviert_am: string | null
@@ -234,6 +285,8 @@ export type Database = {
           updated_at: string | null
           versanddienstleister: string | null
           voraussichtliche_lieferung: string | null
+          vorschlag_konfidenz: number | null
+          vorschlag_kuerzel: string | null
           waehrung: string | null
           zuordnung_methode: string | null
         }
@@ -287,6 +340,8 @@ export type Database = {
           updated_at?: string | null
           versanddienstleister?: string | null
           voraussichtliche_lieferung?: string | null
+          vorschlag_konfidenz?: number | null
+          vorschlag_kuerzel?: string | null
           waehrung?: string | null
           zuordnung_methode?: string | null
         }
@@ -340,6 +395,8 @@ export type Database = {
           updated_at?: string | null
           versanddienstleister?: string | null
           voraussichtliche_lieferung?: string | null
+          vorschlag_konfidenz?: number | null
+          vorschlag_kuerzel?: string | null
           waehrung?: string | null
           zuordnung_methode?: string | null
         }
@@ -705,6 +762,12 @@ export type Database = {
           processed_at: string | null
           received_at: string | null
           retry_count: number
+          second_review_agreed: boolean | null
+          second_review_at: string | null
+          second_review_model: string | null
+          second_review_reason: string | null
+          second_review_rerun_outcome: string | null
+          second_review_verdict: string | null
           sender: string | null
           status: Database["public"]["Enums"]["email_processing_status"]
           subject: string | null
@@ -731,6 +794,12 @@ export type Database = {
           processed_at?: string | null
           received_at?: string | null
           retry_count?: number
+          second_review_agreed?: boolean | null
+          second_review_at?: string | null
+          second_review_model?: string | null
+          second_review_reason?: string | null
+          second_review_rerun_outcome?: string | null
+          second_review_verdict?: string | null
           sender?: string | null
           status?: Database["public"]["Enums"]["email_processing_status"]
           subject?: string | null
@@ -757,6 +826,12 @@ export type Database = {
           processed_at?: string | null
           received_at?: string | null
           retry_count?: number
+          second_review_agreed?: boolean | null
+          second_review_at?: string | null
+          second_review_model?: string | null
+          second_review_reason?: string | null
+          second_review_rerun_outcome?: string | null
+          second_review_verdict?: string | null
           sender?: string | null
           status?: Database["public"]["Enums"]["email_processing_status"]
           subject?: string | null
@@ -1581,6 +1656,22 @@ export type Database = {
             }
             Returns: string
           }
+      pool_claim_bestellung: {
+        Args: { p_bestellung_id: string }
+        Returns: Json
+      }
+      pool_reassign_bestellung: {
+        Args: {
+          p_bestellung_id: string
+          p_kommentar?: string
+          p_neuer_kuerzel: string
+        }
+        Returns: Json
+      }
+      pool_return_to_pool: {
+        Args: { p_bestellung_id: string; p_kommentar?: string }
+        Returns: Json
+      }
       refresh_dashboard_kpis: { Args: never; Returns: undefined }
       sync_one_flag: {
         Args: { p_bestellung_id: string; p_typ: string }
@@ -1588,6 +1679,7 @@ export type Database = {
       }
       trigger_discover_emails: { Args: never; Returns: number }
       trigger_retry_failed_emails: { Args: never; Returns: number }
+      trigger_second_review_emails: { Args: never; Returns: number }
       try_lock_message: {
         Args: { p_internet_message_id: string }
         Returns: boolean
@@ -1730,4 +1822,3 @@ export const Constants = {
     },
   },
 } as const
-

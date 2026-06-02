@@ -128,6 +128,7 @@ export default async function BestellungDetailPage({
           artikel_kategorien: Record<string, number> | null;
         }}
         projekte={(projekte as ProjektOption[]) || []}
+        profil={{ kuerzel: profil.kuerzel, rolle: profil.rolle, name: profil.name }}
       />
 
       <BestelldetailShell

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import type { BenutzerProfil } from "@/lib/auth";
 import { Logo } from "@/components/logo";
+import { useBestellungenListRealtime } from "@/lib/hooks/use-bestellung-realtime";
 
 function IconDashboard({ className }: { className?: string }) {
   return (
@@ -82,12 +83,18 @@ type NavItem = {
   label: string;
   Icon: (props: { className?: string }) => React.JSX.Element;
   requireDashboard?: boolean;
+  /**
+   * 02.06.2026 (Pool Phase 2) — Wenn gesetzt, wird hier ein dynamischer
+   * Counter-Badge (Pool-Count) angezeigt. Aktuell nur "bestellungen-pool"
+   * verwendet — falls weitere Counter dazukommen, hier als Schlüssel listen.
+   */
+  badge?: "bestellungen-pool";
 };
 
 const NAV_ITEMS: Record<string, NavItem[]> = {
   admin: [
     { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
-    { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen },
+    { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
     { href: "/todo", label: "Todo", Icon: IconTodo },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
     { href: "/kunden", label: "Kunden", Icon: IconKunden },
@@ -97,7 +104,7 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
   ],
   besteller: [
     { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
-    { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen },
+    { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
     { href: "/todo", label: "Todo", Icon: IconTodo },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
     { href: "/kunden", label: "Kunden", Icon: IconKunden },
@@ -111,13 +118,22 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
   ],
 };
 
-export function Sidebar({ profil }: { profil: BenutzerProfil }) {
+export function Sidebar({ profil, poolCount = 0 }: { profil: BenutzerProfil; poolCount?: number }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const items = (NAV_ITEMS[profil.rolle] || []).filter(
     (item) => !item.requireDashboard || profil.dashboardEnabled,
   );
+
+  // 02.06.2026 (Pool Phase 2) — Sidebar lebt im Layout und persistiert über
+  // alle Page-Mounts. Subscription auf bestellungen-Channel + events-INSERT
+  // triggert router.refresh() bei jedem Pool-Mutating-Event. Default-Debounce
+  // 800ms reicht — Burst-Updates (Pipeline-Backfills) bündeln sich.
+  // Pool-Counter ist Server-rendered (Layout-Query) → router.refresh() lädt
+  // ihn neu, der Badge updated sich quasi-live. Buchhaltung sieht RLS-gefiltert
+  // ohnehin nichts, akzeptiert leerlaufende Subscription für Hook-Konsistenz.
+  useBestellungenListRealtime();
 
   async function handleLogout() {
     const supabase = createBrowserSupabaseClient();
@@ -160,6 +176,9 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
       <nav className="flex-1 px-3 py-4 space-y-1 md:space-y-0.5 sidebar-scroll overflow-auto">
         {items.map((item) => {
           const active = pathname.startsWith(item.href);
+          // 02.06.2026 (Pool Phase 2) — Counter-Badge nur wenn Wert > 0.
+          // Brand-Aesthetik: Anker-Farbe MR-Red, ohne Pulse (industrial-tone).
+          const showBadge = item.badge === "bestellungen-pool" && poolCount > 0;
           return (
             <Link
               key={item.href}
@@ -176,7 +195,15 @@ export function Sidebar({ profil }: { profil: BenutzerProfil }) {
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-brand rounded-r-full" />
               )}
               <item.Icon className="w-[18px] h-[18px]" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {showBadge && (
+                <span
+                  aria-label={`${poolCount} Pool-Bestellungen`}
+                  className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-brand text-white text-[10px] font-bold font-mono-amount tabular-nums"
+                >
+                  {poolCount}
+                </span>
+              )}
             </Link>
           );
         })}

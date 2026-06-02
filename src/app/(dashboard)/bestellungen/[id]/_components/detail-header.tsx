@@ -8,6 +8,7 @@ import {
   IconBuilding,
   IconAlertCircle,
 } from "@/components/ui/icons";
+import { OwnerLane } from "./owner-lane";
 import type { Bestellung, ProjektOption } from "./types";
 
 /**
@@ -23,6 +24,7 @@ import type { Bestellung, ProjektOption } from "./types";
 export function DetailHeader({
   bestellung,
   projekte,
+  profil,
 }: {
   bestellung: Bestellung & {
     bestellnummer: string | null;
@@ -38,6 +40,13 @@ export function DetailHeader({
     artikel_kategorien: Record<string, number> | null;
   };
   projekte: ProjektOption[];
+  /**
+   * 02.06.2026 (Pool Phase 2) — Profil ist nötig für die OwnerLane (Übernehmen-
+   * CTA bei POOL-State, Reassign/Return-Workflow bei CLAIMED-State). Optional
+   * weil DetailHeader auch in Server-Contexts ohne Auth-Setup gerendert werden
+   * können soll (z.B. Print-Layouts) — dann wird die Lane einfach weggelassen.
+   */
+  profil?: { kuerzel: string; rolle: string; name: string };
 }) {
   // 17.05.2026 — Gutschrift-Override: bei Rückerstattung wird statt
   // "Vollständig"/"Offen" der Gutschrift-Badge angezeigt, damit User die
@@ -198,6 +207,24 @@ export function DetailHeader({
                 />
                 <span className="font-medium text-foreground">{bestellung.projekt_name}</span>
               </div>
+            )}
+
+            {/* 02.06.2026 (Pool Phase 2) — Owner-Lane: drei semantische States
+                (POOL/CLAIMED/FREIGEGEBEN). Lebt INNERHALB der card-Surface
+                damit visuell klar wird: Owner-Logic gehört zur Bestellung,
+                nicht zum Page-Chrome. Lane rendert sich selbst weg wenn nicht
+                relevant (SU/Abo, freigegeben, fremder Besteller). */}
+            {profil && (
+              <OwnerLane
+                bestellungId={bestellung.id}
+                besteller_kuerzel={bestellung.besteller_kuerzel}
+                besteller_name={bestellung.besteller_name}
+                bestellungsart={bestellung.bestellungsart}
+                status={bestellung.status}
+                vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
+                vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+                profil={profil}
+              />
             )}
 
             {/* 06.05.2026 — Extra-Kontext-Pills aus Mail/PDF: Kundennummer,
