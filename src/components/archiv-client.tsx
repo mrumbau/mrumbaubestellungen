@@ -11,7 +11,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { BulkToolbar, Button } from "@/components/ui";
+import { ActiveFilterPills, BulkToolbar, Button, type ActiveFilterPill } from "@/components/ui";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconTrash } from "@/components/ui/icons";
 import {
@@ -266,6 +266,45 @@ export function ArchivClient({
         filteredSU={filteredSU}
         selectedIds={selectedIds}
       />
+
+      {/* 03.06.2026 (Phase 4 Polish): Active-Filter-Pills — one-glance auf
+          aktive Suche / Datum. Render direkt unter Toolbar, vor Tab-Content. */}
+      {hasFilters && (
+        <div className="mt-3">
+          <ActiveFilterPills
+            pills={(() => {
+              const pills: ActiveFilterPill[] = [];
+              if (searchQuery) {
+                pills.push({
+                  key: "suche",
+                  label: "Suche",
+                  value: `„${searchQuery}“`,
+                  mono: true,
+                  onClear: () => setSearchQuery(""),
+                });
+              }
+              if (dateFrom) {
+                pills.push({
+                  key: "datumVon",
+                  label: "Ab",
+                  value: dateFrom,
+                  onClear: () => setDateFrom(""),
+                });
+              }
+              if (dateTo) {
+                pills.push({
+                  key: "datumBis",
+                  label: "Bis",
+                  value: dateTo,
+                  onClear: () => setDateTo(""),
+                });
+              }
+              return pills;
+            })()}
+            onResetAll={resetFilters}
+          />
+        </div>
+      )}
 
       {/* Tab Content */}
       <div className="mt-4">

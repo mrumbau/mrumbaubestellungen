@@ -18,6 +18,8 @@ import {
   BulkToolbar,
   Button,
   SavedViewsMenu,
+  ActiveFilterPills,
+  type ActiveFilterPill,
   type SortState,
 } from "@/components/ui";
 import {
@@ -517,6 +519,69 @@ export function BestellungenTabelle({
           mit duplizierten Status- + Projekt-Selects entfernt. FilterBar
           rendert sie jetzt selbst auf allen Viewports + stackt vertikal
           unter dem Search-Input auf Mobile. */}
+
+      {/* 03.06.2026 (Phase 4 Polish): Active-Filter-Pills — always-on wenn
+          ein Filter aktiv ist. Vorher waren die Pills nur im EmptyState-
+          Zero-Match-Fall sichtbar; bei "warum sind hier nur 3 Treffer?"
+          fehlte der one-glance-Hinweis. */}
+      {hasFilters && (
+        <div className="mt-3">
+          <ActiveFilterPills
+            pills={(() => {
+              const pills: ActiveFilterPill[] = [];
+              if (suche) {
+                pills.push({
+                  key: "suche",
+                  label: "Suche",
+                  value: `„${suche}“`,
+                  mono: true,
+                  onClear: () => setSuche(""),
+                });
+              }
+              if (statusFilter) {
+                const opt = STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter);
+                pills.push({
+                  key: "status",
+                  label: "Status",
+                  value: opt?.label ?? statusFilter,
+                  onClear: () => setStatusFilter(""),
+                });
+              }
+              if (artFilter) {
+                pills.push({
+                  key: "art",
+                  label: "Art",
+                  value: artFilter === "subunternehmer" ? "Subunternehmer" : artFilter === "abo" ? "Abo" : "Material",
+                  onClear: () => setArtFilter(""),
+                });
+              }
+              if (projektFilter) {
+                pills.push({
+                  key: "projekt",
+                  label: "Projekt",
+                  value: projekte.find((p) => p.id === projektFilter)?.name ?? "—",
+                  onClear: () => setProjektFilter(""),
+                });
+              }
+              if (faelligkeitsFilter && faelligkeitsFilter !== "alle") {
+                pills.push({
+                  key: "faelligkeit",
+                  label: "Fälligkeit",
+                  value:
+                    faelligkeitsFilter === "ueberfaellig"
+                      ? "Überfällig"
+                      : faelligkeitsFilter === "diese_woche"
+                        ? "Diese Woche"
+                        : faelligkeitsFilter,
+                  onClear: () => filters.setFaelligkeitsFilter("alle"),
+                });
+              }
+              return pills;
+            })()}
+            onResetAll={resetFilters}
+          />
+        </div>
+      )}
 
       {/* Bulk toolbar — sticky-top, Linear-Style */}
       <div className="mt-4">

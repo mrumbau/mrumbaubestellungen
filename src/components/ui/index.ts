@@ -24,6 +24,9 @@ export type { BadgeProps } from "./badge";
 
 export { EmptyState } from "./empty-state";
 
+export { ActiveFilterPills } from "./active-filter-pills";
+export type { ActiveFilterPill } from "./active-filter-pills";
+
 export { Spinner } from "./spinner";
 
 export { Modal } from "./modal";

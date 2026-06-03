@@ -54,14 +54,19 @@ export function BestellungenConfirmDialogs({
 
   return (
     <>
-      {/* Confirm Delete Dialog */}
+      {/* Bulk-Verwerfen Dialog — 03.06.2026 (Phase 4 Polish): domain-Sprache
+          analog zu Single-Verwerfen-Dialog im Bestelldetail. */}
       <ConfirmDialog
         open={showDeleteDialog}
         onCancel={onCloseDeleteDialog}
         onConfirm={onConfirmDelete}
-        title="Bestellungen entfernen"
-        message={`${selected.size} Bestellung${selected.size !== 1 ? "en" : ""} und alle zugehörigen Dokumente unwiderruflich löschen?`}
-        confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
+        title={selected.size === 1 ? "Bestellung verwerfen?" : `${selected.size} Bestellungen verwerfen?`}
+        message={
+          selected.size === 1
+            ? "Die Bestellung wird komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden."
+            : `Die ${selected.size} ausgewählten Bestellungen werden komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden.`
+        }
+        confirmLabel={deleteLoading ? "Verwerfe…" : "Verwerfen"}
         variant="danger"
         loading={deleteLoading}
       />
@@ -71,8 +76,8 @@ export function BestellungenConfirmDialogs({
         open={!!freigabeConfirmId}
         onCancel={onCloseFreigabeConfirm}
         onConfirm={() => freigabeConfirmId && onConfirmQuickFreigabe(freigabeConfirmId)}
-        title="Rechnung freigeben"
-        message="Soll die Rechnung an die Buchhaltung freigegeben werden?"
+        title="Rechnung freigeben?"
+        message="Die Rechnung wird an die Buchhaltung übermittelt."
         confirmLabel="Freigeben"
         variant="default"
       />
@@ -82,13 +87,13 @@ export function BestellungenConfirmDialogs({
         open={showFreigebenDialog}
         onCancel={onCloseFreigebenDialog}
         onConfirm={onConfirmBulkFreigeben}
-        title="Bestellungen freigeben"
+        title={freigabeFaehig === 1 ? "Rechnung freigeben?" : `${freigabeFaehig} Rechnungen freigeben?`}
         message={
           skipped > 0
-            ? `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben und an die Buchhaltung übermitteln. ${skipped} ausgewählte werden übersprungen (keine Rechnung oder bereits freigegeben).`
-            : `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben und an die Buchhaltung übermitteln?`
+            ? `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt. ${skipped} ausgewählte Bestellung${skipped === 1 ? "" : "en"} überspringen wir — keine Rechnung oder bereits freigegeben.`
+            : `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt.`
         }
-        confirmLabel={bulkFreigebenLoading ? "Gebe frei..." : "Freigeben"}
+        confirmLabel={bulkFreigebenLoading ? "Gebe frei…" : "Freigeben"}
         variant="default"
         loading={bulkFreigebenLoading}
       />
