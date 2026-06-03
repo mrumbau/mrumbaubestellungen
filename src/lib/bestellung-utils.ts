@@ -118,10 +118,56 @@ export function displayBestellnummer(b: {
 // =====================================================================
 
 /**
+ * Pool-Invariant — Material-Bestellungen ohne Besteller dürfen nicht in
+ * Workflow-Endzustände (`vollstaendig`, `freigegeben`) wandern.
+ *
+ * 03.06.2026 (Phase 3 Logik-Härtung): Drift-Vorbeugung nach Repair von 2
+ * Records am 03.06.2026, die das Symptom zeigten — Material-Bestellungen
+ * mit `besteller_kuerzel='UNBEKANNT'` standen auf `vollstaendig`. Effekt:
+ *   - Pool-Tab zeigte sie nicht (filtert nach UNBEKANNT, aber Workflow
+ *     erwartet sie schon abgeschlossen → Inkonsistenz).
+ *   - Buchhaltung sah Doku-vollständige Bestellungen ohne Besteller.
+ *   - Beim Claim wäre keine Status-Korrektur passiert.
+ *
+ * Regel: Pool-Items (Material + UNBEKANNT) sind workflow-mäßig immer offen
+ * (bzw. `abweichung`/`ls_fehlt` wenn Pipeline das ableitet). `vollstaendig`
+ * und `freigegeben` setzen einen claim'd Besteller voraus.
+ *
+ * Subunternehmer / Abo sind per Definition nicht claim-pflichtig — sie
+ * gehen direkt durch.
+ *
+ * Defense-in-Depth: DB-Trigger `enforce_pool_invariant` blockt zusätzlich
+ * jeden UPDATE/INSERT, der die Regel verletzt — falls künftiger Code-Pfad
+ * den Helper hier umgeht.
+ */
+export function enforcePoolInvariant(
+  art: string | null | undefined,
+  besteller_kuerzel: string | null | undefined,
+  gewuenschterStatus: BestellStatus,
+): { allowed: boolean; effectiveStatus: BestellStatus; reason?: string } {
+  const istPoolItem =
+    (art ?? "material") === "material" && besteller_kuerzel === "UNBEKANNT";
+  if (!istPoolItem) {
+    return { allowed: true, effectiveStatus: gewuenschterStatus };
+  }
+  if (gewuenschterStatus === "vollstaendig" || gewuenschterStatus === "freigegeben") {
+    return {
+      allowed: false,
+      effectiveStatus: "offen",
+      reason: `Pool-Invariant: Material-Bestellung ohne Besteller darf nicht auf '${gewuenschterStatus}' — capped auf 'offen'.`,
+    };
+  }
+  return { allowed: true, effectiveStatus: gewuenschterStatus };
+}
+
+/**
  * F5.1 Fix: Sicherer Status-Update für `bestellungen.status`.
  * Lädt aktuellen Status, validiert Übergang via `checkTransition`, und
  * UPDATEs nur wenn erlaubt. Bei freigegeben-Bestellungen passiert NICHTS
  * (kein Rollback). Loggt Verstöße via logError.
+ *
+ * 03.06.2026 — Plus Pool-Invariant: refuses Übergänge nach vollstaendig/
+ * freigegeben für UNBEKANNT-Material.
  *
  * Nutzen: an Stellen die bestellungen.status setzen, statt direkt
  * `update({status: X})` aufzurufen.
@@ -134,7 +180,7 @@ export async function safeUpdateStatus(
 ): Promise<{ updated: boolean; from?: string; reason?: string }> {
   const { data: row } = await supabase
     .from("bestellungen")
-    .select("status")
+    .select("status, bestellungsart, besteller_kuerzel")
     .eq("id", bestellungId)
     .maybeSingle();
 
@@ -144,6 +190,18 @@ export async function safeUpdateStatus(
 
   if (row.status === neuerStatus) {
     return { updated: true, from: row.status }; // idempotent
+  }
+
+  // Pool-Invariant zuerst — Refusal ist hier strikter als Status-Transition.
+  const pool = enforcePoolInvariant(row.bestellungsart, row.besteller_kuerzel, neuerStatus);
+  if (!pool.allowed) {
+    logError("status-machine", pool.reason ?? "pool_invariant_violation", {
+      bestellungId,
+      from: row.status,
+      to: neuerStatus,
+      context,
+    });
+    return { updated: false, from: row.status, reason: pool.reason };
   }
 
   const result = checkTransition(row.status as BestellStatus, neuerStatus, context);
@@ -163,6 +221,10 @@ export async function safeUpdateStatus(
  * Berechnet und aktualisiert den Status einer Bestellung
  * basierend auf vorhandenen Dokumenten und der Bestellungsart.
  * Wird in webhook/email und scan verwendet.
+ *
+ * 03.06.2026 — Pool-Invariant: UNBEKANNT-Material wird auf 'offen' gecapped
+ * auch wenn alle Dokumente da sind. Status springt auf 'vollstaendig' erst
+ * nach Pool-Claim (= besteller_kuerzel != 'UNBEKANNT').
  */
 export async function updateBestellungStatus(
   supabase: SupabaseClient,
@@ -170,7 +232,7 @@ export async function updateBestellungStatus(
 ): Promise<string> {
   const { data: bestellung } = await supabase
     .from("bestellungen")
-    .select("status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
+    .select("status, bestellungsart, besteller_kuerzel, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_aufmass, hat_leistungsnachweis, hat_versandbestaetigung")
     .eq("id", bestellungId)
     .maybeSingle();
 
@@ -192,7 +254,17 @@ export async function updateBestellungStatus(
     .filter((a) => a.erforderlich)
     .every((a) => bestellung[a.flag as keyof typeof bestellung] === true);
 
-  const neuerStatus = alleErfuellt ? "vollstaendig" : "offen";
+  let neuerStatus: BestellStatus = alleErfuellt ? "vollstaendig" : "offen";
+
+  // Pool-Invariant: UNBEKANNT-Material bleibt 'offen' auch bei vollständigen
+  // Dokumenten — der Claim muss zuerst erfolgen.
+  const pool = enforcePoolInvariant(art, bestellung.besteller_kuerzel, neuerStatus);
+  if (!pool.allowed) {
+    neuerStatus = pool.effectiveStatus;
+    // Bewusst KEIN logError — das ist erwartetes Verhalten für Pool-Items,
+    // kein Pipeline-Bug. Wenn jemand Diagnose will, schaut er auf
+    // besteller_kuerzel='UNBEKANNT'.
+  }
 
   // R3c/F5.1: Status-Übergang validieren + bei Verstoß loggen.
   // Wirft NICHT — Pipeline-Backward-Compat. DB-Trigger blockt dafür den

@@ -15,6 +15,7 @@ import {
   DOKUMENT_CONFIG,
   BESTELLUNGSART_LABELS,
   GEWERKE,
+  enforcePoolInvariant,
 } from "../bestellung-utils";
 
 describe("aggregatePipelineConfidence", () => {
@@ -120,6 +121,62 @@ describe("BESTELLUNGSART_LABELS — Schema-Konsistenz mit DB-CHECK", () => {
     for (const label of Object.values(BESTELLUNGSART_LABELS)) {
       expect(label.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("enforcePoolInvariant — Pool-Items dürfen nicht auf Workflow-End-Zustände", () => {
+  // 03.06.2026 — Drift-Repair am 03.06. fand 2 Material-Bestellungen mit
+  // besteller='UNBEKANNT' im Status 'vollstaendig'. Diese Tests schützen
+  // gegen Regression.
+
+  it("Material + UNBEKANNT + 'vollstaendig' → gecapped auf 'offen' mit reason", () => {
+    const r = enforcePoolInvariant("material", "UNBEKANNT", "vollstaendig");
+    expect(r.allowed).toBe(false);
+    expect(r.effectiveStatus).toBe("offen");
+    expect(r.reason).toMatch(/Pool-Invariant/);
+  });
+
+  it("Material + UNBEKANNT + 'freigegeben' → gecapped auf 'offen'", () => {
+    const r = enforcePoolInvariant("material", "UNBEKANNT", "freigegeben");
+    expect(r.allowed).toBe(false);
+    expect(r.effectiveStatus).toBe("offen");
+  });
+
+  it("Material + UNBEKANNT + 'offen' → durchgelassen (kein Workflow-End)", () => {
+    const r = enforcePoolInvariant("material", "UNBEKANNT", "offen");
+    expect(r.allowed).toBe(true);
+    expect(r.effectiveStatus).toBe("offen");
+  });
+
+  it("Material + UNBEKANNT + 'abweichung' / 'ls_fehlt' → durchgelassen", () => {
+    expect(enforcePoolInvariant("material", "UNBEKANNT", "abweichung").allowed).toBe(true);
+    expect(enforcePoolInvariant("material", "UNBEKANNT", "ls_fehlt").allowed).toBe(true);
+  });
+
+  it("Material + zugewiesener Besteller + 'vollstaendig' → durchgelassen", () => {
+    const r = enforcePoolInvariant("material", "MT", "vollstaendig");
+    expect(r.allowed).toBe(true);
+    expect(r.effectiveStatus).toBe("vollstaendig");
+  });
+
+  it("Subunternehmer + UNBEKANNT + 'vollstaendig' → durchgelassen (keine Claim-Pflicht)", () => {
+    const r = enforcePoolInvariant("subunternehmer", "UNBEKANNT", "vollstaendig");
+    expect(r.allowed).toBe(true);
+  });
+
+  it("Abo + UNBEKANNT + 'freigegeben' → durchgelassen (keine Claim-Pflicht)", () => {
+    const r = enforcePoolInvariant("abo", "UNBEKANNT", "freigegeben");
+    expect(r.allowed).toBe(true);
+  });
+
+  it("art=null → behandelt wie 'material' (Default-Branch)", () => {
+    const r = enforcePoolInvariant(null, "UNBEKANNT", "vollstaendig");
+    expect(r.allowed).toBe(false);
+  });
+
+  it("besteller_kuerzel=null → kein Pool-Item (kein Capping)", () => {
+    const r = enforcePoolInvariant("material", null, "vollstaendig");
+    expect(r.allowed).toBe(true);
   });
 });
 
