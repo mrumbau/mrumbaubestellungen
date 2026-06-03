@@ -275,8 +275,55 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       email_betreff,
       email_datum,
     });
-  const bestellerKuerzelMutable = bestellerKuerzel;
-  const zuordnungsMethodeMutable = zuordnungsMethode;
+  let bestellerKuerzelMutable = bestellerKuerzel;
+  let zuordnungsMethodeMutable = zuordnungsMethode;
+  let autoClaimEmitted: { target_kuerzel: string; reason: Record<string, unknown> } | null = null;
+
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Pipeline-Auto-Claim.
+  // Wenn `assignBesteller` UNBEKANNT zurückgegeben hat aber ein hochkonfidenter
+  // Pipeline-Vorschlag existiert, promoten wir den Vorschlag direkt zum
+  // verbindlichen Owner. Settings stehen in firma_einstellungen und sind
+  // admin-konfigurierbar:
+  //   pool_auto_claim_enabled (bool, default false)
+  //   pool_auto_claim_threshold (numeric, default 0.95)
+  // Whitelist-Check (Methode) wird im Cron erzwungen — hier ist die
+  // gate-Funktion bewusst nur enabled+threshold, weil die Pipeline-Vorschläge
+  // ohnehin selten 0.95+ erreichen und falls doch (z. B. starke Rule) eine
+  // ehrliche High-Confidence-Empfehlung sind.
+  if (bestellerKuerzelMutable === "UNBEKANNT" && vorschlagKuerzel && vorschlagKuerzel !== "UNBEKANNT" && vorschlagKonfidenz != null) {
+    try {
+      const { data: settings } = await supabase
+        .from("firma_einstellungen")
+        .select("schluessel, wert")
+        .in("schluessel", ["pool_auto_claim_enabled", "pool_auto_claim_threshold"]);
+      const settingsMap = new Map((settings ?? []).map((s) => [s.schluessel, s.wert] as const));
+      const enabled = (settingsMap.get("pool_auto_claim_enabled") ?? "false").toLowerCase() === "true";
+      const threshold = parseFloat(settingsMap.get("pool_auto_claim_threshold") ?? "0.95");
+
+      if (enabled && Number.isFinite(threshold) && vorschlagKonfidenz >= threshold) {
+        const originalMethode = zuordnungsMethodeMutable || "unbekannt";
+        bestellerKuerzelMutable = vorschlagKuerzel;
+        zuordnungsMethodeMutable = `auto_high_confidence:${originalMethode}`;
+        autoClaimEmitted = {
+          target_kuerzel: vorschlagKuerzel,
+          reason: {
+            source: "pipeline_inline",
+            methode: originalMethode,
+            konfidenz: vorschlagKonfidenz,
+            threshold,
+          },
+        };
+        logInfo("webhook/email", "Pool-Auto-Claim (Pipeline) ausgelöst", {
+          target_kuerzel: vorschlagKuerzel,
+          methode: originalMethode,
+          konfidenz: vorschlagKonfidenz,
+          threshold,
+        });
+      }
+    } catch (e) {
+      logError("webhook/email", "Auto-Claim-Settings-Lookup fehlgeschlagen (fail-open)", e);
+    }
+  }
 
   // Besteller-Name laden
   const { data: benutzer } = await supabase
@@ -347,6 +394,31 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   const bestellungNeuErstellt = findResult.bestellungNeuErstellt;
   haendlerName = findResult.haendlerName;
   bestellungsart = findResult.bestellungsart;
+
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Event emittieren falls
+  // Pipeline-Inline-Promotion stattgefunden hat (siehe oben). Wir tun das
+  // erst HIER weil log_event eine bestellung_id braucht — vor der Find-
+  // /Create-Stufe haben wir die noch nicht. Der eigentliche Owner-Wert
+  // wurde schon in den Persist-Pfad oben durchgereicht (bestellerKuerzelMutable
+  // wird beim Erstellen einer neuen Bestellung als besteller_kuerzel
+  // geschrieben).
+  if (autoClaimEmitted) {
+    try {
+      await supabase.rpc("log_event", {
+        p_entity_id: bestellungId,
+        p_entity_type: "bestellung",
+        p_event_type: "pool_auto_claim",
+        p_actor: "SYSTEM",
+        p_payload: {
+          target_kuerzel: autoClaimEmitted.target_kuerzel,
+          previous_owner: "UNBEKANNT",
+          reason: autoClaimEmitted.reason,
+        },
+      });
+    } catch (e) {
+      logError("webhook/email", "pool_auto_claim Event emittieren fehlgeschlagen", e);
+    }
+  }
 
   // 13. Dokumente speichern — siehe pipeline/dokument-persist.ts
   const persistResult = await persistAnhangDokumente(supabase, {

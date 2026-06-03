@@ -42,6 +42,13 @@ export interface Bestellung {
   // UNBEKANNT ist. Bleibt auch nach Claim erhalten (Audit-Anker).
   vorschlag_kuerzel?: string | null;
   vorschlag_konfidenz?: number | null;
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Pin + Score-Affinity.
+  // haendler_id wird für vw_user_vendor_affinity-Lookup gebraucht.
+  // zuordnung_methode startsWith `auto_high_confidence:` markiert
+  // Pipeline-Auto-Übernahmen — UI zeigt Roboter-Pin + 24h-Korrektur-CTA.
+  haendler_id?: string | null;
+  zuordnung_methode?: string | null;
+  updated_at?: string | null;
 }
 
 export interface ProjektOption {

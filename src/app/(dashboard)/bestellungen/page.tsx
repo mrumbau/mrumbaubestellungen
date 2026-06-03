@@ -62,7 +62,9 @@ export default async function BestellungenPage({
   let dataQuery = supabase
     .from("bestellungen")
     .select(
-      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer)",
+      // 03.06.2026 (Pool 2.0 Sprint 3) — haendler_id + zuordnung_methode
+      // zusätzlich für Score-Affinity bzw. Auto-Claim-Pin in der UI.
+      "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer)",
     )
     .is("archiviert_am", null)
     .order("created_at", { ascending: false })
@@ -140,6 +142,9 @@ export default async function BestellungenPage({
     { data: reservationRows },
     { data: haendlerRows },
     { data: userConfigRow },
+    { data: vendorAffRows },
+    { data: projektAffRows },
+    { data: poolScoreSettings },
     { count: poolCount },
     { count: mineOpenCount },
     { count: mineDoneCount },
@@ -188,6 +193,26 @@ export default async function BestellungenPage({
           .eq("user_id", profil.user_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // 03.06.2026 (Pool 2.0 Sprint 3) — Affinity-Views für Pool-Score.
+    // Schmale Maps (~10-30 Rows): pro Vendor/Projekt der Anteil dieses Users.
+    // Score-Lib in pool-inbox.tsx mischt sie mit Age/Urgency/Vorschlag.
+    profil
+      ? supabase
+          .from("vw_user_vendor_affinity")
+          .select("haendler_id, ratio")
+          .eq("besteller_kuerzel", profil.kuerzel)
+      : Promise.resolve({ data: [] }),
+    profil
+      ? supabase
+          .from("vw_user_projekt_affinity")
+          .select("projekt_id, ratio")
+          .eq("besteller_kuerzel", profil.kuerzel)
+      : Promise.resolve({ data: [] }),
+    // Score-Gewichte + Top-X-Schwelle aus firma_einstellungen.
+    supabase
+      .from("firma_einstellungen")
+      .select("schluessel, wert")
+      .in("schluessel", ["pool_score_weights", "pool_score_top_x_threshold"]),
     poolCountQuery,
     mineOpenCountQuery,
     mineDoneCountQuery,
@@ -276,13 +301,62 @@ export default async function BestellungenPage({
       ? bestellungenAngereichert.filter((b) => !snoozedActive.has(b.id as string))
       : bestellungenAngereichert;
 
+  // 03.06.2026 (Pool 2.0 Sprint 3) — pro-Bestellung haendler_id-Map +
+  // Auto-Claim-Set basierend auf zuordnung_methode.
+  const haendlerIdByBestellungId: Record<string, string | null> = {};
+  const isAutoClaimedById: Record<string, boolean> = {};
   for (const b of bestellungenAfterSnooze) {
     const bAny = b as Record<string, unknown>;
     const name = (bAny.haendler_name as string | null | undefined) ?? "";
     // Pipeline-Defensive entfernen für Match
     const cleanName = name.replace(/^Unbekannter Lieferant \((.+)\)$/, "$1").toLowerCase().trim();
     vendorDomainById[bAny.id as string] = haendlerDomainByName.get(cleanName) ?? null;
+    haendlerIdByBestellungId[bAny.id as string] = (bAny.haendler_id as string | null | undefined) ?? null;
+    const zMethode = (bAny.zuordnung_methode as string | null | undefined) ?? "";
+    isAutoClaimedById[bAny.id as string] = zMethode.startsWith("auto_high_confidence:");
   }
+
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Affinity-Maps für Pool-Score.
+  const vendorAffinity: Record<string, number> = {};
+  for (const row of (vendorAffRows ?? []) as Array<{ haendler_id: string | null; ratio: number | null }>) {
+    if (row.haendler_id && typeof row.ratio === "number") {
+      vendorAffinity[row.haendler_id] = row.ratio;
+    }
+  }
+  const projektAffinity: Record<string, number> = {};
+  for (const row of (projektAffRows ?? []) as Array<{ projekt_id: string | null; ratio: number | null }>) {
+    if (row.projekt_id && typeof row.ratio === "number") {
+      projektAffinity[row.projekt_id] = row.ratio;
+    }
+  }
+
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Score-Gewichte + Top-X-Threshold aus
+  // firma_einstellungen mit Defaults aus der Lib falls Settings leer.
+  const scoreSettingsMap = new Map(
+    ((poolScoreSettings ?? []) as Array<{ schluessel: string; wert: string }>).map(
+      (s) => [s.schluessel, s.wert] as const,
+    ),
+  );
+  let scoreWeights: import("@/lib/pool-score").PoolScoreWeights | undefined;
+  try {
+    const raw = scoreSettingsMap.get("pool_score_weights");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Nur known-Keys übernehmen, Rest defaultet aus der Lib
+      scoreWeights = {
+        age: typeof parsed.age === "number" ? parsed.age : 0.3,
+        urgency: typeof parsed.urgency === "number" ? parsed.urgency : 0.25,
+        vorschlag_konf: typeof parsed.vorschlag_konf === "number" ? parsed.vorschlag_konf : 0.2,
+        projekt_aff: typeof parsed.projekt_aff === "number" ? parsed.projekt_aff : 0.15,
+        vendor_aff: typeof parsed.vendor_aff === "number" ? parsed.vendor_aff : 0.1,
+      };
+    }
+  } catch {
+    // Defekte JSON → undefined → Lib-Defaults greifen
+  }
+  const scoreTopXThreshold = parseFloat(
+    scoreSettingsMap.get("pool_score_top_x_threshold") ?? "0.8",
+  );
 
   // 03.06.2026 (Pool 2.0 Sprint 2) — Layout-Pref aus dashboard_config lesen.
   const userConfig = (userConfigRow?.dashboard_config as { pool_layout?: PoolLayout } | null) ?? null;
@@ -364,6 +438,12 @@ export default async function BestellungenPage({
         poolUserStateById={userState}
         poolReservationsById={initialReservations}
         vendorDomainById={vendorDomainById}
+        haendlerIdByBestellungId={haendlerIdByBestellungId}
+        isAutoClaimedById={isAutoClaimedById}
+        scoreWeights={scoreWeights}
+        vendorAffinity={vendorAffinity}
+        projektAffinity={projektAffinity}
+        scoreTopXThreshold={Number.isFinite(scoreTopXThreshold) ? scoreTopXThreshold : 0.8}
       />
     </div>
   );

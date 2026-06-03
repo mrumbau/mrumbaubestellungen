@@ -45,6 +45,7 @@ import { agingWashFromCreatedAt } from "@/lib/pool-utils";
 import type { ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
 import type { BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
 import type { PoolLayout } from "@/components/bestellungen/inbox-layout-toggle";
+import type { PoolScoreWeights, AffinityMap } from "@/lib/pool-score";
 
 // Bestellung + ProjektOption Types: src/components/bestellungen/types.ts.
 // STATUS_FILTER_OPTIONS wird aus @/lib/status-config importiert.
@@ -62,6 +63,12 @@ export function BestellungenTabelle({
   poolUserStateById,
   poolReservationsById,
   vendorDomainById,
+  haendlerIdByBestellungId,
+  isAutoClaimedById,
+  scoreWeights,
+  vendorAffinity,
+  projektAffinity,
+  scoreTopXThreshold,
 }: {
   bestellungen: Bestellung[];
   projekte?: ProjektOption[];
@@ -110,6 +117,18 @@ export function BestellungenTabelle({
    * den VendorFavicon-Hero-Strip. Server-vorbereitet aus haendler-Tabelle.
    */
   vendorDomainById?: Record<string, string | null>;
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 3) — Score-Affinity + Auto-Claim-Pin.
+   * `haendlerIdByBestellungId` füttert Score-Vendor-Affinität.
+   * `isAutoClaimedById` markiert die BestellerCell mit Roboter-Pin.
+   * `scoreWeights` + Affinity-Maps sind admin-konfigurierbar.
+   */
+  haendlerIdByBestellungId?: Record<string, string | null>;
+  isAutoClaimedById?: Record<string, boolean>;
+  scoreWeights?: PoolScoreWeights;
+  vendorAffinity?: AffinityMap;
+  projektAffinity?: AffinityMap;
+  scoreTopXThreshold?: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -535,9 +554,15 @@ export function BestellungenTabelle({
           <PoolInbox
             bestellungen={bestellungen}
             vendorDomainById={vendorDomainById}
+            haendlerIdByBestellungId={haendlerIdByBestellungId}
             userStateById={poolUserStateById}
             initialReservations={poolReservationsById}
             selfKuerzel={profil.kuerzel}
+            scoreWeights={scoreWeights}
+            vendorAffinity={vendorAffinity}
+            projektAffinity={projektAffinity}
+            scoreTopXThreshold={scoreTopXThreshold}
+            isAutoClaimedById={isAutoClaimedById}
             onOpenDrawer={(id) => drawerStack.openDrawer(id)}
             onSnooze={handleSnooze}
             onDefer={handleDefer}

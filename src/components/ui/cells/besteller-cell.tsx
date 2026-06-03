@@ -39,6 +39,15 @@ export interface BestellerCellProps {
   /** Pipeline-Konfidenz 0..1. NUR als Tooltip. */
   vorschlag_konfidenz?: number | null;
   /**
+   * 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Pin.
+   * Bei zuordnung_methode === 'auto_high_confidence:*' rendert die
+   * BestellerCell ein kleines Roboter-Glyph oben rechts — der User sieht
+   * sofort, dass eine Maschine den Owner gesetzt hat (Drei-Sprachen-
+   * Disziplin: Auto-Claim ist eine eigene "Erzähler-Stimme", nicht der
+   * gleiche Owner-Status wie ein manueller Claim).
+   */
+  isAutoClaimed?: boolean;
+  /**
    * Render-Variante:
    *   - "pill-only" (Default): nur 20×20-Pill mit Kürzel. Für DataTable + Mobile.
    *   - "with-name":  Pill + Name daneben (`text-foreground-muted`). Für DetailHeader.
@@ -67,14 +76,38 @@ const PILL_BY_KIND: Record<BestellerCellKind, string> = {
 export function BestellerCell(props: BestellerCellProps) {
   const state = resolveBestellerState(props);
   const variant: BestellerVariant = props.variant ?? "pill-only";
+  // Auto-Claim-Pin nur dann sichtbar wenn der State tatsächlich Owner ist
+  // (sonst widerspricht der Pin der Drei-Sprachen-Disziplin).
+  const showAutoPin = !!props.isAutoClaimed && state.kind === "owner";
 
   const pill = (
-    <span
-      aria-hidden="true"
-      className={`${PILL_BASE} ${PILL_BY_KIND[state.kind]}`}
-      data-state={state.kind}
-    >
-      {state.kuerzel}
+    <span className="relative inline-flex shrink-0" data-state={state.kind}>
+      <span
+        aria-hidden="true"
+        className={`${PILL_BASE} ${PILL_BY_KIND[state.kind]}`}
+      >
+        {state.kuerzel}
+      </span>
+      {showAutoPin && (
+        <span
+          aria-hidden="true"
+          title="Auto-übernommen — von der Pipeline mit hoher Konfidenz gesetzt. Klicke auf Korrigieren falls falsch."
+          className="absolute -top-1 -right-1 inline-flex items-center justify-center h-3 w-3 rounded-full bg-canvas border border-line-strong text-foreground-muted"
+        >
+          <svg
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-[7px] w-[7px]"
+          >
+            <rect x="2.5" y="4" width="7" height="5" rx="1.3" />
+            <path d="M6 4V2.5M4.5 2h3M5 6.5h.01M7 6.5h.01" />
+          </svg>
+        </span>
+      )}
     </span>
   );
 

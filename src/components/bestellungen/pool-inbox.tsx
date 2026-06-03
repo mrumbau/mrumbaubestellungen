@@ -29,10 +29,17 @@ import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
 import { VendorFavicon } from "@/components/ui/cells/vendor-favicon";
 import { ReserveBadge } from "@/components/ui/cells/reserve-badge";
+import { ScoreBadge } from "@/components/ui/cells/score-badge";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import { agingWashFromCreatedAt, ageInDays, describeAge } from "@/lib/pool-utils";
 import { smartSnoozeOptions } from "@/lib/pool-inbox-state";
+import {
+  computeScore,
+  type AffinityMap,
+  type PoolScoreWeights,
+  type ScoreBreakdown,
+} from "@/lib/pool-score";
 import { usePoolSeenTracker } from "@/lib/hooks/use-pool-seen-tracker";
 import { usePoolReservationsRealtime, type ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
 import { cn } from "@/lib/cn";
@@ -42,12 +49,32 @@ export interface PoolInboxProps {
   bestellungen: Bestellung[];
   /** Vendor-Domain-Lookup pro bestellung.id (vom Server vorbereitet). */
   vendorDomainById?: Record<string, string | null>;
+  /** haendler_id-Lookup pro bestellung.id für Score-Affinity. */
+  haendlerIdByBestellungId?: Record<string, string | null>;
   /** Pool-User-State pro bestellung.id (seen + deferred). */
   userStateById?: Record<string, { seen: boolean; deferred: boolean }>;
   /** Initialer Reservations-Snapshot vom Server (Realtime patcht inkrementell). */
   initialReservations?: ReservationMap;
   /** Self-Kürzel um eigene Reservierungen zu erkennen. */
   selfKuerzel: string;
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 3) — Score-Konfiguration.
+   * `weights` aus firma_einstellungen.pool_score_weights (admin-tuned).
+   * `vendorAffinity` + `projektAffinity` Map vom Server für selfKuerzel.
+   * `topXThreshold` ist die Schwelle für die ScoreBadge-Sichtbarkeit.
+   */
+  scoreWeights?: PoolScoreWeights;
+  vendorAffinity?: AffinityMap;
+  projektAffinity?: AffinityMap;
+  scoreTopXThreshold?: number;
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Pin pro Bestellung.
+   * Server berechnet aus `zuordnung_methode` ob das Item via Pipeline
+   * promoted wurde. BestellerCell rendert dann das Roboter-Glyph oben rechts.
+   * Nur in claim'd Items (kein UNBEKANNT) sichtbar — BestellerCell gated
+   * intern auf state='owner'.
+   */
+  isAutoClaimedById?: Record<string, boolean>;
   /** Drawer öffnen. */
   onOpenDrawer: (bestellungId: string) => void;
   /** Snooze-Auswahl. */
@@ -59,9 +86,15 @@ export interface PoolInboxProps {
 export function PoolInbox({
   bestellungen,
   vendorDomainById = {},
+  haendlerIdByBestellungId = {},
   userStateById = {},
   initialReservations = {},
   selfKuerzel,
+  scoreWeights,
+  vendorAffinity = {},
+  projektAffinity = {},
+  scoreTopXThreshold = 0.8,
+  isAutoClaimedById = {},
   onOpenDrawer,
   onSnooze,
   onDefer,
@@ -79,17 +112,46 @@ export function PoolInbox({
 
   const seen = usePoolSeenTracker({ initialUnread: initialUnreadIds });
 
-  // Card-Sort: deferred ans Ende, sonst Server-Reihenfolge
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Score-Map einmalig berechnen
+  // (Pure Math; bei ~100 Items <1ms).
+  const scoreById = useMemo(() => {
+    const map: Record<string, ScoreBreakdown> = {};
+    for (const b of bestellungen) {
+      map[b.id] = computeScore(
+        {
+          created_at: b.created_at,
+          vorschlag_konfidenz: b.vorschlag_konfidenz ?? null,
+          mahnung_am: b.mahnung_am,
+          mahnung_count: b.mahnung_count ?? null,
+          faelligkeitsdatum: b.faelligkeitsdatum ?? null,
+          haendler_id: haendlerIdByBestellungId[b.id] ?? null,
+          projekt_id: b.projekt_id,
+        },
+        {
+          weights: scoreWeights,
+          vendorAffinity,
+          projektAffinity,
+        },
+      );
+    }
+    return map;
+  }, [bestellungen, haendlerIdByBestellungId, scoreWeights, vendorAffinity, projektAffinity]);
+
+  // Card-Sort: deferred ans Ende, sonst nach Score absteigend.
+  // Deferred-Items behalten ihren Score (für Hover-Tooltip), rutschen aber
+  // optisch ans Ende — bewusste UX: User hat das Item explizit deprioritisiert.
   const sortedBestellungen = useMemo(() => {
     const arr = [...bestellungen];
     arr.sort((a, b) => {
       const aDef = userStateById[a.id]?.deferred ?? false;
       const bDef = userStateById[b.id]?.deferred ?? false;
       if (aDef !== bDef) return aDef ? 1 : -1;
-      return 0;
+      const aScore = scoreById[a.id]?.total ?? 0;
+      const bScore = scoreById[b.id]?.total ?? 0;
+      return bScore - aScore;
     });
     return arr;
-  }, [bestellungen, userStateById]);
+  }, [bestellungen, userStateById, scoreById]);
 
   // Snooze-Optionen werden bei jedem Render frisch berechnet (relativ zu now)
   const snoozeOptions = useMemo(() => smartSnoozeOptions(), []);
@@ -105,6 +167,9 @@ export function PoolInbox({
           isDeferred={userStateById[b.id]?.deferred ?? false}
           reservation={reservationMap[b.id] ?? null}
           selfKuerzel={selfKuerzel}
+          score={scoreById[b.id]}
+          scoreTopXThreshold={scoreTopXThreshold}
+          isAutoClaimed={!!isAutoClaimedById[b.id]}
           registerSeen={seen.register}
           onOpenDrawer={onOpenDrawer}
           onSnooze={onSnooze}
@@ -128,6 +193,9 @@ interface PoolInboxCardProps {
   isDeferred: boolean;
   reservation: { user_kuerzel: string; user_name: string; expires_at: string } | null;
   selfKuerzel: string;
+  score?: ScoreBreakdown;
+  scoreTopXThreshold: number;
+  isAutoClaimed: boolean;
   registerSeen: (id: string, el: HTMLElement | null) => void;
   onOpenDrawer: (bestellungId: string) => void;
   onSnooze: (bestellungId: string, untilIso: string, label: string) => void;
@@ -142,6 +210,9 @@ function PoolInboxCard({
   isDeferred,
   reservation,
   selfKuerzel,
+  score,
+  scoreTopXThreshold,
+  isAutoClaimed,
   registerSeen,
   onOpenDrawer,
   onSnooze,
@@ -225,12 +296,16 @@ function PoolInboxCard({
               bestellungsart={b.bestellungsart}
               vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
               vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
+              isAutoClaimed={isAutoClaimed}
               variant="pill-only"
             />
             {b.mahnung_am && (
               <Badge tone="error" size="sm">
                 Mahnung
               </Badge>
+            )}
+            {score && (
+              <ScoreBadge score={score} threshold={scoreTopXThreshold} />
             )}
             {isDeferred && (
               <span className="text-[11px] italic text-foreground-subtle">Nicht heute</span>

@@ -56,6 +56,15 @@ export interface OwnerLaneProps {
   vorschlag_kuerzel: string | null;
   vorschlag_konfidenz: number | null;
   /**
+   * 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Provenance.
+   * `zuordnung_methode` startsWith `auto_high_confidence:` markiert ein
+   * von der Pipeline auto-übernommenes Item. `updated_at` bestimmt das
+   * 24h-Grace-Fenster — innerhalb dessen ein "Korrigieren"-CTA sichtbar ist,
+   * der das Item ohne Kommentar-Modal zurück in den Pool wirft.
+   */
+  zuordnung_methode?: string | null;
+  updated_at?: string | null;
+  /**
    * 02.06.2026 (UX-Polish): Gutschriften haben keinen Owner-Workflow —
    * Rückerstattung geht direkt an die Buchhaltung, niemand muss übernehmen.
    * Bei istGutschrift=true rendert die Lane null, damit der Sidebar-Hinweis
@@ -378,21 +387,89 @@ export function OwnerLane(props: OwnerLaneProps) {
     );
   }
 
+  // 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Detection + 24h-Grace.
+  const isAutoClaim =
+    typeof props.zuordnung_methode === "string" &&
+    props.zuordnung_methode.startsWith("auto_high_confidence:");
+  const originalMethode = isAutoClaim
+    ? (props.zuordnung_methode as string).slice("auto_high_confidence:".length)
+    : null;
+  const updatedAtTs = props.updated_at ? new Date(props.updated_at).getTime() : 0;
+  const graceActive =
+    isAutoClaim && updatedAtTs > 0 && Date.now() - updatedAtTs < 24 * 60 * 60 * 1000;
+
+  async function handleAutoClaimCorrect() {
+    // Wie pool-return aber ohne Kommentar-Modal: Quick-Korrektur direkt.
+    setIsReturning(true);
+    setOptimisticKuerzel("UNBEKANNT");
+    setOptimisticName("UNBEKANNT");
+    try {
+      const { ok, json } = await postPoolAction("pool-return");
+      if (!ok || json?.success !== true) {
+        rollbackOptimistic();
+        toast.warning(
+          typeof json?.message === "string" ? json.message : "Korrektur fehlgeschlagen.",
+        );
+        return;
+      }
+      toast.success("Auto-Übernahme korrigiert", {
+        description: "Zurück in den Pool, andere können sie übernehmen.",
+      });
+      startTransition(() => router.refresh());
+    } catch {
+      rollbackOptimistic();
+      toast.error("Verbindung fehlgeschlagen");
+    } finally {
+      setIsReturning(false);
+    }
+  }
+
   // CLAIMED-State: nur eigener Owner oder Admin sieht Sekundär-Aktionen
   if (isOwner || isAdmin) {
     const hasReassignTargets = reassignTargets.length > 0;
     return (
       <>
+        {graceActive && (
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 py-2 rounded-md border border-line-strong bg-canvas text-[12px]">
+            <span className="text-foreground-muted">
+              <span className="font-medium text-foreground">Auto-übernommen</span>
+              {originalMethode && (
+                <>
+                  {" "}
+                  <span className="text-foreground-subtle">via {originalMethode}</span>
+                </>
+              )}
+              {typeof props.vorschlag_konfidenz === "number" && (
+                <span className="ml-1 font-mono-amount text-foreground-subtle">
+                  · {Math.round(props.vorschlag_konfidenz * 100)} %
+                </span>
+              )}
+              <span className="ml-2 text-foreground-faint">— 24h-Korrekturfenster aktiv</span>
+            </span>
+            <button
+              type="button"
+              onClick={handleAutoClaimCorrect}
+              disabled={isReturning || pending}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-line bg-surface hover:bg-input transition-colors text-foreground disabled:opacity-50"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                <path d="M4 8h8M8 4l-4 4 4 4" />
+              </svg>
+              Falsch — zurück in Pool
+            </button>
+          </div>
+        )}
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3 px-3 py-2.5 rounded-md bg-canvas">
           <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
             <BestellerCell
               besteller_kuerzel={effectiveKuerzel}
               besteller_name={effectiveName}
               bestellungsart={props.bestellungsart}
+              isAutoClaimed={isAutoClaim}
               variant="with-name"
             />
             <span className="hidden sm:inline text-[12px] text-foreground-subtle">
-              {isOwner ? "Übernommen — du bist dran" : "Zugeordnet"}
+              {isAutoClaim ? "Auto-übernommen" : isOwner ? "Übernommen — du bist dran" : "Zugeordnet"}
             </span>
             <PresenceBanner viewers={presenceViewers} />
           </div>

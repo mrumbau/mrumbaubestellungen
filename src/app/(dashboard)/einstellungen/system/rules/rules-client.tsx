@@ -36,6 +36,10 @@ const CONDITION_TYPES: Array<{ value: string; label: string; example: string }> 
   { value: "absender_pattern", label: "Absender-Regex", example: "@hamdi-muhameti\\.de$" },
   { value: "subject_keyword", label: "Betreff enthält", example: "T-Mobile" },
   { value: "haendler_id", label: "Händler-UUID (exakt)", example: "abcd-1234-..." },
+  // 03.06.2026 (Pool 2.0 Sprint 3) — neue Condition-Types für Pool 2.0
+  { value: "betrag_min", label: "Betrag ≥ (EUR)", example: "500" },
+  { value: "betrag_max", label: "Betrag ≤ (EUR)", example: "10000" },
+  { value: "projekt_keyword", label: "Projekt-Name enthält", example: "Schule" },
 ];
 
 export function RulesClient({
@@ -402,19 +406,28 @@ function RuleForm({
             </select>
           </label>
           <label className="block">
-            <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1">
-              Konfidenz (0.0 – 1.0)
+            <span className="block text-[12px] font-semibold uppercase tracking-wider text-foreground-muted mb-1 flex items-center justify-between">
+              <span>Konfidenz</span>
+              <span className="font-mono-amount text-foreground">
+                {(confidence * 100).toFixed(0)} %
+              </span>
             </span>
+            {/* 03.06.2026 (Pool 2.0 Sprint 3): Number-Input → Slider mit
+                Live-Anzeige. Pool-Auto-Claim-Schwelle (default 0.95) ist hier
+                der relevante Vergleichswert — Regeln über 0.95 fließen in
+                Auto-Claim-Logik wenn aktiviert. */}
             <input
-              type="number"
-              inputMode="decimal"
+              type="range"
               value={confidence}
-              onChange={(e) => setConfidence(Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)))}
+              onChange={(e) => setConfidence(parseFloat(e.target.value))}
               step={0.05}
               min={0}
               max={1}
-              className="w-full px-3 py-2 text-[14px] border border-line rounded bg-surface font-mono-amount focus:shadow-[var(--shadow-focus-ring)] focus:outline-none"
+              className="w-full accent-brand"
             />
+            <span className="block text-[10px] text-foreground-faint mt-1">
+              Pool-Auto-Claim wertet Regeln ≥ Schwelle (default 95 %) automatisch aus.
+            </span>
           </label>
         </div>
 

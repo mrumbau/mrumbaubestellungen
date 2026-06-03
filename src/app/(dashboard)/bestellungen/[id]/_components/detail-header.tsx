@@ -40,6 +40,7 @@ export function DetailHeader({
     created_at: string;
     updated_at: string | null;
     artikel_kategorien: Record<string, number> | null;
+    zuordnung_methode?: string | null;
   };
   projekte: ProjektOption[];
   /**
@@ -262,6 +263,8 @@ export function DetailHeader({
                 status={bestellung.status}
                 vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
                 vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+                zuordnung_methode={bestellung.zuordnung_methode ?? null}
+                updated_at={bestellung.updated_at ?? null}
                 istGutschrift={bestellung.ist_gutschrift}
                 profil={profil}
                 besteller_options={bestellerOptions ?? []}

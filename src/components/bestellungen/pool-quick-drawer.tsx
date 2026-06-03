@@ -176,7 +176,8 @@ export function PoolQuickDrawer({
         </div>
       </div>
 
-      {/* Owner-Lane — Claim / Reassign / Return / Presence */}
+      {/* Owner-Lane — Claim / Reassign / Return / Presence
+          Bei Auto-Claim: 24h-Korrekturfenster + Roboter-Pin. */}
       <section aria-label="Besteller-Workflow">
         <OwnerLane
           bestellungId={bestellung.id}
@@ -186,6 +187,8 @@ export function PoolQuickDrawer({
           status={bestellung.status}
           vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
           vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+          zuordnung_methode={bestellung.zuordnung_methode ?? null}
+          updated_at={bestellung.updated_at ?? null}
           istGutschrift={bestellung.ist_gutschrift}
           profil={profil}
           besteller_options={bestellerOptions}

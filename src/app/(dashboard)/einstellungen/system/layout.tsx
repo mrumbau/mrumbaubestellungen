@@ -62,6 +62,11 @@ export default async function SystemLayout({
       icon: <IconShield />,
     },
     {
+      label: "Pool-Konfiguration",
+      href: "/einstellungen/system/pool-config",
+      icon: <IconShield />,
+    },
+    {
       label: "OpenAI-Kosten",
       href: "/einstellungen/system/openai-costs",
       icon: <IconKey />,

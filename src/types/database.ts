@@ -138,6 +138,7 @@ export type Database = {
       }
       besteller_rules: {
         Row: {
+          combiner: string
           condition: Json
           confidence: number
           created_at: string
@@ -152,6 +153,7 @@ export type Database = {
           target_kuerzel: string | null
         }
         Insert: {
+          combiner?: string
           condition: Json
           confidence?: number
           created_at?: string
@@ -166,6 +168,7 @@ export type Database = {
           target_kuerzel?: string | null
         }
         Update: {
+          combiner?: string
           condition?: Json
           confidence?: number
           created_at?: string
@@ -1568,6 +1571,38 @@ export type Database = {
         }
         Relationships: []
       }
+      vw_user_projekt_affinity: {
+        Row: {
+          besteller_kuerzel: string | null
+          projekt_id: string | null
+          ratio: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bestellungen_projekt_id_fkey"
+            columns: ["projekt_id"]
+            isOneToOne: false
+            referencedRelation: "projekte"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_user_vendor_affinity: {
+        Row: {
+          besteller_kuerzel: string | null
+          haendler_id: string | null
+          ratio: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bestellungen_haendler_id_fkey"
+            columns: ["haendler_id"]
+            isOneToOne: false
+            referencedRelation: "haendler"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       append_haendler_url_pattern: {
@@ -1668,10 +1703,12 @@ export type Database = {
       }
       match_besteller_rules: {
         Args: {
+          p_betrag?: number
           p_email_absender: string
           p_email_betreff: string
           p_haendler_domain: string
           p_haendler_id: string
+          p_projekt_name?: string
         }
         Returns: {
           confidence: number
@@ -1738,6 +1775,15 @@ export type Database = {
             }
             Returns: string
           }
+      pool_auto_claim_bestellung: {
+        Args: {
+          p_bestellung_id: string
+          p_reason: Json
+          p_target_kuerzel: string
+        }
+        Returns: Json
+      }
+      pool_auto_claim_cron: { Args: never; Returns: number }
       pool_claim_bestellung: {
         Args: { p_bestellung_id: string }
         Returns: Json
