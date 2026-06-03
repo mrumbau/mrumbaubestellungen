@@ -44,7 +44,7 @@ import { useDrawerStack } from "@/lib/hooks/use-drawer-stack";
 import { agingWashFromCreatedAt } from "@/lib/pool-utils";
 import type { ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
 import type { BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
-import type { PoolLayout } from "@/components/bestellungen/inbox-layout-toggle";
+import type { PoolLayout } from "@/components/bestellungen/lane-config";
 import type { PoolScoreWeights, AffinityMap } from "@/lib/pool-score";
 
 // Bestellung + ProjektOption Types: src/components/bestellungen/types.ts.
@@ -69,6 +69,7 @@ export function BestellungenTabelle({
   vendorAffinity,
   projektAffinity,
   scoreTopXThreshold,
+  embedded = false,
 }: {
   bestellungen: Bestellung[];
   projekte?: ProjektOption[];
@@ -129,6 +130,12 @@ export function BestellungenTabelle({
   vendorAffinity?: AffinityMap;
   projektAffinity?: AffinityMap;
   scoreTopXThreshold?: number;
+  /**
+   * 03.06.2026 (UX-R2) — Embedded-Modus für Lane-Workspaces.
+   * `true` = ArtTabs werden NICHT gerendert (Outer-Shell hat
+   * ArtFilterChips). Sonst Legacy-Modus für /bestellungen-Page.
+   */
+  embedded?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -580,7 +587,10 @@ export function BestellungenTabelle({
         "mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3",
         inboxMode && "hidden",
       )}>
-        <ArtTabs value={artFilter} onChange={setArtFilter} counts={artCounts} />
+        {/* 03.06.2026 (UX-R2): Im embedded-Modus rendert die Outer-Workspace-
+            Shell die ArtFilterChips — ArtTabs wären redundant. Sonst Legacy. */}
+        {!embedded && <ArtTabs value={artFilter} onChange={setArtFilter} counts={artCounts} />}
+        {embedded && <div />}
 
         <FilterBar
           suche={suche}

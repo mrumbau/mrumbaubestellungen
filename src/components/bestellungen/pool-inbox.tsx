@@ -22,7 +22,6 @@
 
 import { useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { StatusCell } from "@/components/ui/cells/status-cell";
@@ -234,6 +233,10 @@ function PoolInboxCard({
   const wash = agingWashFromCreatedAt(b.created_at);
   const isOwnReserve = reservation?.user_kuerzel === selfKuerzel;
   const showOtherReserve = !!reservation && !isOwnReserve;
+  const hasMahnung = !!b.mahnung_am;
+  const mahnungLabel = hasMahnung
+    ? `Mahnung${b.mahnung_count && b.mahnung_count > 1 ? ` ${b.mahnung_count}. Stufe` : ""}${b.mahnung_am ? ` seit ${describeAge(ageInDays(b.mahnung_am))}` : ""}`
+    : null;
 
   const menuItems: ActionMenuItem[] = [
     ...snoozeOptions.map((opt) => ({
@@ -256,83 +259,86 @@ function PoolInboxCard({
         onOpenDrawer(b.id);
       }}
       className={cn(
-        "relative group cursor-pointer rounded-lg border border-line bg-surface",
+        "relative group cursor-pointer rounded-lg border border-line bg-surface overflow-hidden",
         "transition-[transform,box-shadow,background-color] duration-150 ease-out",
         "hover:shadow-card hover:border-line-strong hover:-translate-y-px",
         isDeferred && "opacity-65",
         wash,
       )}
     >
-      {/* Unread-Dot oben links */}
+      {/* Read-Dot (Stufe 3, subtle): zeigt unseen-State. */}
       {isUnread && (
         <span
           aria-label="Neu im Pool"
           title="Du hast dieses Item noch nicht gesehen."
-          className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-brand"
+          className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full bg-brand z-10"
         />
+      )}
+
+      {/* Mahnung-Banner (Stufe 1, laut): full-width Strip über dem Hero
+          statt Pill in der Headline. Drei-Sprachen-Disziplin v2 — max 1
+          Stufe-1-Element pro Card, und Mahnung verdrängt Status. */}
+      {hasMahnung && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 border-b border-status-abweichung/30 bg-status-abweichung-bg px-4 py-1.5 text-meta text-status-abweichung-text"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            className="h-3.5 w-3.5 shrink-0"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 1.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17zm.75 4a.75.75 0 00-1.5 0V11a.75.75 0 001.5 0V5.5zm0 8.25a.75.75 0 00-1.5 0v.5a.75.75 0 001.5 0v-.5z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className="font-semibold uppercase tracking-[0.14em] text-eyebrow">
+            {mahnungLabel}
+          </span>
+        </div>
       )}
 
       <div className="flex items-start gap-3 p-3.5 pl-5">
         <VendorFavicon
           domain={domain}
           name={hd.name}
-          size={40}
+          size={44}
           className="mt-0.5"
         />
 
         <div className="flex-1 min-w-0">
-          {/* Headline-Row: Bestellnr + Vorschlag-Pill + Reserve-Awareness */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Hero-Headline: Vendor-Name in editorial Display-Schrift.
+              Drei-Sprachen-Disziplin v2: Vendor ist der visuelle Anker,
+              nicht die Bestellnr — sie ist Sub-Line. */}
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="font-headline text-lead leading-tight text-foreground truncate">
+              {hd.name}
+              {hd.isUnsicher && (
+                <span
+                  aria-hidden="true"
+                  title="Pipeline hat den Lieferanten nicht eindeutig erkannt."
+                  className="ml-2 inline-flex items-center justify-center h-4 w-4 rounded-full bg-warning-bg text-warning text-eyebrow font-bold font-mono-amount align-middle"
+                >
+                  ?
+                </span>
+              )}
+            </h3>
+          </div>
+
+          {/* Sub-Line: Bestellnr (mono) + Alter + Projekt. Bestellnr ist
+              Identitäts-Detail, nicht Hero — daher kleiner als der Vendor. */}
+          <div className="mt-0.5 flex items-center gap-2 text-meta text-foreground-muted">
             <Link
               href={`/bestellungen/${b.id}`}
               prefetch={false}
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 font-mono-amount font-semibold text-brand hover:text-brand-light transition-colors"
+              className="font-mono-amount font-medium text-brand/90 hover:text-brand transition-colors truncate"
             >
               {displayBestellnummer(b)}
             </Link>
-            <BestellerCell
-              besteller_kuerzel={b.besteller_kuerzel}
-              besteller_name={b.besteller_name}
-              bestellungsart={b.bestellungsart}
-              vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
-              vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
-              isAutoClaimed={isAutoClaimed}
-              variant="pill-only"
-            />
-            {b.mahnung_am && (
-              <Badge tone="error" size="sm">
-                Mahnung
-              </Badge>
-            )}
-            {score && (
-              <ScoreBadge score={score} threshold={scoreTopXThreshold} />
-            )}
-            {isDeferred && (
-              <span className="text-[11px] italic text-foreground-subtle">Nicht heute</span>
-            )}
-            {showOtherReserve && reservation && (
-              <ReserveBadge
-                reserverKuerzel={reservation.user_kuerzel}
-                reserverName={reservation.user_name}
-                expiresAtIso={reservation.expires_at}
-                variant="other"
-              />
-            )}
-          </div>
-
-          {/* Händler + Datum-Hint */}
-          <div className="mt-0.5 flex items-center gap-2 text-[12px] text-foreground-muted">
-            <span className="truncate" title={hd.name}>{hd.name}</span>
-            {hd.isUnsicher && (
-              <span
-                aria-hidden="true"
-                title="Pipeline hat den Lieferanten nicht eindeutig erkannt."
-                className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-warning-bg text-warning text-[8px] font-bold font-mono-amount"
-              >
-                ?
-              </span>
-            )}
             <span aria-hidden="true">·</span>
             <span title={`Im Pool ${describeAge(ageDays)}`}>{describeAge(ageDays)}</span>
             {b.projekt_name && (
@@ -343,7 +349,40 @@ function PoolInboxCard({
             )}
           </div>
 
-          {/* Status-Row: Doku-Strip + StatusCell */}
+          {/* Owner/Vorschlag + Reserve Row (Stufe 2, max 2 Elemente):
+              Identitätssprache wer kümmert sich. Status-Pill und
+              Doku-Strip kommen darunter. */}
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <BestellerCell
+              besteller_kuerzel={b.besteller_kuerzel}
+              besteller_name={b.besteller_name}
+              bestellungsart={b.bestellungsart}
+              vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
+              vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
+              isAutoClaimed={isAutoClaimed}
+              variant="pill-only"
+            />
+            {showOtherReserve && reservation && (
+              <ReserveBadge
+                reserverKuerzel={reservation.user_kuerzel}
+                reserverName={reservation.user_name}
+                expiresAtIso={reservation.expires_at}
+                variant="other"
+              />
+            )}
+            {/* Stufe-3-Elemente: Score-Pin + Deferred-Hinweis. */}
+            {score && (
+              <ScoreBadge score={score} threshold={scoreTopXThreshold} />
+            )}
+            {isDeferred && (
+              <span className="text-meta italic text-foreground-subtle">Nicht heute</span>
+            )}
+          </div>
+
+          {/* Status-Row (Stufe 1 wenn keine Mahnung, sonst Stufe-3):
+              Doku-Strip links, StatusCell rechts. Wenn Mahnung-Banner
+              oben aktiv ist, wird die StatusCell visuell zurückgenommen
+              (kein doppeltes "laut"). */}
           <div className="mt-2 flex items-center justify-between gap-3">
             <DokumenteCell
               hat_bestellbestaetigung={b.hat_bestellbestaetigung}
@@ -352,7 +391,9 @@ function PoolInboxCard({
               hat_versandbestaetigung={b.hat_versandbestaetigung}
               bestellungsart={b.bestellungsart}
             />
-            <StatusCell status={b.status} istGutschrift={b.ist_gutschrift} />
+            {!hasMahnung && (
+              <StatusCell status={b.status} istGutschrift={b.ist_gutschrift} />
+            )}
           </div>
         </div>
 
