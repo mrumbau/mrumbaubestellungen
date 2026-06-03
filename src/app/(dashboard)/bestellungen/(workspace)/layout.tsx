@@ -5,7 +5,11 @@ import { LaneNav } from "@/components/bestellungen/lane-nav";
 import { CmdKSearchTrigger } from "@/components/bestellungen/cmdk-search";
 import { loadLaneData } from "@/lib/bestellungen-lane-loader";
 
-export const runtime = "edge";
+// 03.06.2026 — Edge-Runtime auskommentiert nach Pool-Lane-Crash auf Production.
+// Sub-Queries (vw_user_*_affinity, firma_einstellungen) hatten möglicherweise
+// Edge-Compatibility-Issue. Node-Runtime ist stabil — bei Bedarf später wieder
+// auf Edge testen.
+// export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 /**
@@ -37,8 +41,21 @@ export default async function BestellungenWorkspaceLayout({
   const profil = await getBenutzerProfil();
   const supabase = await createServerSupabaseClient();
 
-  // Counts laden — eine Lane reicht, loadLaneData liefert immer alle 3.
-  const data = await loadLaneData(supabase, { lane: "pool" }, profil);
+  // 03.06.2026 — Defensive: bei Lane-Loader-Crash bleibt das Layout funktional,
+  // die Lane-Pages selbst werfen ggf. einen sichtbaren Error. So sehen wir
+  // LaneNav + PageHero auch wenn der counts-Query fehlschlägt.
+  let counts: { pool: number; "in-arbeit": number; archiv: number } = {
+    pool: 0,
+    "in-arbeit": 0,
+    archiv: 0,
+  };
+  try {
+    const data = await loadLaneData(supabase, { lane: "pool" }, profil);
+    counts = data.counts;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[workspace/layout] loadLaneData failed for counts:", err);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,7 +66,7 @@ export default async function BestellungenWorkspaceLayout({
         marks
         actions={<CmdKSearchTrigger />}
       />
-      <LaneNav counts={data.counts} />
+      <LaneNav counts={counts} />
       {children}
     </div>
   );

@@ -187,43 +187,67 @@ export async function loadLaneData(
     params.owner ?? null,
   );
 
-  // Pool-Sprint-2/3-Queries (nur relevant für die Pool-Lane)
+  // Pool-Sprint-2/3-Queries (nur relevant für die Pool-Lane). 03.06.2026 —
+  // Defensive: jede Sub-Query wird mit safeData() gewrapped damit eine
+  // fehlende Tabelle/View oder ein RLS-Fail nicht die komplette Pool-Lane
+  // killt. Promise.all rejected sonst hart, was zum error.tsx-Fallback führt
+  // und PageHero + LaneNav verschwinden lässt.
+  const safeData = <T>(p: PromiseLike<{ data: T | null }>): Promise<{ data: T | null }> =>
+    Promise.resolve(p).then(
+      (r) => r ?? { data: null },
+      (err) => {
+        // eslint-disable-next-line no-console
+        console.error("[lane-loader] sub-query failed:", err);
+        return { data: null };
+      },
+    );
+
   const isPool = lane === "pool";
-  const poolUserStateQuery =
+  const poolUserStateQuery: Promise<{ data: unknown }> =
     isPool && profil
-      ? supabase
-          .from("pool_user_state")
-          .select("bestellung_id, seen_at, snoozed_until, deferred_today")
-          .eq("user_id", profil.user_id)
+      ? safeData(
+          supabase
+            .from("pool_user_state")
+            .select("bestellung_id, seen_at, snoozed_until, deferred_today")
+            .eq("user_id", profil.user_id),
+        )
       : Promise.resolve({ data: [] });
-  const reservationQuery = isPool
-    ? supabase
-        .from("pool_reservations")
-        .select("bestellung_id, user_kuerzel, user_name, expires_at")
-        .gt("expires_at", new Date().toISOString())
+  const reservationQuery: Promise<{ data: unknown }> = isPool
+    ? safeData(
+        supabase
+          .from("pool_reservations")
+          .select("bestellung_id, user_kuerzel, user_name, expires_at")
+          .gt("expires_at", new Date().toISOString()),
+      )
     : Promise.resolve({ data: [] });
-  const haendlerQuery = isPool
-    ? supabase.from("haendler").select("name, domain")
+  const haendlerQuery: Promise<{ data: unknown }> = isPool
+    ? safeData(supabase.from("haendler").select("name, domain"))
     : Promise.resolve({ data: [] });
-  const vendorAffinityQuery =
+  const vendorAffinityQuery: Promise<{ data: unknown }> =
     isPool && profil
-      ? supabase
-          .from("vw_user_vendor_affinity")
-          .select("haendler_id, ratio")
-          .eq("besteller_kuerzel", profil.kuerzel)
+      ? safeData(
+          supabase
+            .from("vw_user_vendor_affinity")
+            .select("haendler_id, ratio")
+            .eq("besteller_kuerzel", profil.kuerzel),
+        )
       : Promise.resolve({ data: [] });
-  const projektAffinityQuery =
+  const projektAffinityQuery: Promise<{ data: unknown }> =
     isPool && profil
-      ? supabase
-          .from("vw_user_projekt_affinity")
-          .select("projekt_id, ratio")
-          .eq("besteller_kuerzel", profil.kuerzel)
+      ? safeData(
+          supabase
+            .from("vw_user_projekt_affinity")
+            .select("projekt_id, ratio")
+            .eq("besteller_kuerzel", profil.kuerzel),
+        )
       : Promise.resolve({ data: [] });
-  const scoreSettingsQuery = isPool
-    ? supabase
-        .from("firma_einstellungen")
-        .select("schluessel, wert")
-        .in("schluessel", ["pool_score_weights", "pool_score_top_x_threshold"])
+  const scoreSettingsQuery: Promise<{ data: unknown }> = isPool
+    ? safeData(
+        supabase
+          .from("firma_einstellungen")
+          .select("schluessel, wert")
+          .in("schluessel", ["pool_score_weights", "pool_score_top_x_threshold"]),
+      )
     : Promise.resolve({ data: [] });
 
   const [

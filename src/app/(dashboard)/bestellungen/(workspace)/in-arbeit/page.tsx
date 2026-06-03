@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { LaneWorkspace } from "@/components/bestellungen/lane-workspace";
 import { loadLaneData, HARD_CAP } from "@/lib/bestellungen-lane-loader";
 
-export const runtime = "edge";
+// Edge-Runtime testweise raus — siehe layout.tsx Begründung.
 export const dynamic = "force-dynamic";
 
 /**
