@@ -488,7 +488,13 @@ export function DataTable<TRow>({
               />
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={colSpanCount} className="px-4 py-16">
+                {/* 03.06.2026 (Phase 1 Quick Wins): wenn ein eigener emptyState
+                    durchgereicht wird (mit eigener Padding/Border), reicht ein
+                    schmaler Wrapper. Default-Fallback bleibt großzügig. */}
+                <td
+                  colSpan={colSpanCount}
+                  className={emptyState ? "px-4 py-6" : "px-4 py-16"}
+                >
                   {emptyState ?? (
                     <div className="text-center text-[14px] text-foreground-subtle">
                       Keine Daten.

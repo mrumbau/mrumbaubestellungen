@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { haendlerDisplay } from "@/lib/haendler-display";
 
 interface UnzugeordneteBestellung {
   id: string;
@@ -144,7 +145,9 @@ export function DashboardUnzugeordnet({
       )}
 
       <div className="space-y-2">
-        {items.map((b) => (
+        {items.map((b) => {
+          const hd = haendlerDisplay(b.haendler_name);
+          return (
           <div key={b.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-center justify-between">
               <Link
@@ -154,7 +157,16 @@ export function DashboardUnzugeordnet({
               >
                 <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors">
                   <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
-                  <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "Unbekannt"}</span>
+                  <span className="text-foreground-subtle font-normal"> – {hd.name === "–" ? "Unbekannt" : hd.name}</span>
+                  {hd.isUnsicher && (
+                    <span
+                      aria-hidden="true"
+                      title="Pipeline hat den Lieferanten nicht eindeutig erkannt."
+                      className="ml-1 inline-flex items-center justify-center h-3 w-3 rounded-full bg-warning-bg text-warning text-[8px] font-bold font-mono-amount align-middle"
+                    >
+                      ?
+                    </span>
+                  )}
                 </p>
                 <p className="text-[12px] text-foreground-faint">
                   {formatDatum(b.created_at)}
@@ -203,7 +215,7 @@ export function DashboardUnzugeordnet({
               ) : aktionId === b.id && aktionModus === "blockieren" ? (
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-error max-w-[120px] truncate">
-                    {b.haendler_name} blockieren?
+                    {hd.name} blockieren?
                   </span>
                   <button
                     onClick={() => blockieren(b.id, b.haendler_name || "")}
@@ -254,7 +266,8 @@ export function DashboardUnzugeordnet({
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

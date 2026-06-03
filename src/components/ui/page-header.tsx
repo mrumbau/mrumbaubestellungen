@@ -111,3 +111,39 @@ export function PageHeader({
     </header>
   );
 }
+
+/**
+ * PageHeaderCount — der konsistente Zähler-Eyebrow rechts neben Page-Titeln.
+ * Ersetzt das wiederholte `font-mono-amount text-[12px] text-foreground-muted
+ * hidden md:block`-Muster.
+ *
+ * Benutzung in `PageHeader.actions` ODER als Stand-alone-Span im Custom-Header
+ * (Übergangs-Codepfad bis alle Pages auf PageHeader migriert sind, Phase 2).
+ */
+export function PageHeaderCount({
+  count,
+  label,
+  pluralLabel,
+  className,
+}: {
+  count: number;
+  /** Singular-Label (z. B. "Eintrag"). */
+  label: string;
+  /** Plural-Label (z. B. "Einträge"). Default: label + "e". */
+  pluralLabel?: string;
+  className?: string;
+}) {
+  const word = count === 1 ? label : (pluralLabel ?? `${label}e`);
+  return (
+    <span
+      className={cn(
+        "font-mono-amount text-[12px] text-foreground-muted hidden md:inline-flex items-center gap-1 tabular-nums",
+        className,
+      )}
+      aria-label={`${count} ${word}`}
+    >
+      <span>{count}</span>
+      <span>{word}</span>
+    </span>
+  );
+}

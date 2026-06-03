@@ -9,6 +9,7 @@
  */
 
 import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { haendlerDisplay } from "@/lib/haendler-display";
 import { type BuchhaltungRow, isFaelligBald, isUeberfaellig } from "./types";
 
 export interface BuchhaltungTableProps {
@@ -162,7 +163,23 @@ export function BuchhaltungTable({
                 </td>
                 <td className="px-4 py-3.5 text-foreground">
                   <span className="flex items-center gap-1.5">
-                    {r.haendler_name || "–"}
+                    {(() => {
+                      const hd = haendlerDisplay(r.haendler_name);
+                      return (
+                        <>
+                          <span>{hd.name}</span>
+                          {hd.isUnsicher && (
+                            <span
+                              aria-hidden="true"
+                              title="Pipeline hat den Lieferanten nicht eindeutig erkannt."
+                              className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-warning-bg text-warning text-[8px] font-bold font-mono-amount"
+                            >
+                              ?
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                     {r.bestellungsart === "subunternehmer" && (
                       <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wide bg-bestellungsart-subunternehmer-bg text-bestellungsart-subunternehmer-text rounded">
                         SUB

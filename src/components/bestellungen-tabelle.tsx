@@ -166,6 +166,7 @@ export function BestellungenTabelle({
     applyFilterConfig: filters.applyConfig,
     setDensity,
     setSort,
+    scope,
   });
 
   // Async UI state — Hooks aus src/components/bestellungen/

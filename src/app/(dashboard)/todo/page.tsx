@@ -7,6 +7,7 @@ import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
 import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
 import { DashboardNeueSubunternehmer } from "@/components/dashboard-neue-subunternehmer";
 import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
+import { PageHeaderCount } from "@/components/ui/page-header";
 
 // 22.05.2026 — eigene /todo-Seite für die "Zu prüfen"-Widgets, die vorher
 // im Dashboard hingen. Für JEDE Rolle sichtbar (User-Wunsch). Buchhaltung
@@ -151,20 +152,14 @@ export default async function TodoPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-end justify-between">
+      <div className="mb-8 flex items-end justify-between gap-4">
         <div>
           <h1 className="font-headline text-2xl text-foreground tracking-tight">Todo</h1>
           <p className="text-foreground-subtle text-sm mt-1">
-            Stammdaten-Pflege und nicht zugeordnete Bestellungen. Jeder kann hier
-            mithelfen.
+            Stammdaten und offene Zuordnungen — alle Rollen helfen mit.
           </p>
         </div>
-        <span
-          className="font-mono-amount text-[12px] text-foreground-muted hidden md:block"
-          aria-label={`${totalCount} ${totalCount === 1 ? "Eintrag" : "Einträge"} zur Prüfung`}
-        >
-          {totalCount} {totalCount === 1 ? "Eintrag" : "Einträge"}
-        </span>
+        <PageHeaderCount count={totalCount} label="Eintrag" pluralLabel="Einträge" />
       </div>
 
       {totalCount === 0 ? (

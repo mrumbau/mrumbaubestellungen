@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { IconActivity, IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
+import { haendlerDisplay } from "@/lib/haendler-display";
 import type {
   PipelineQualityRow,
   IncompleteBestellung,
@@ -196,7 +197,7 @@ export function PipelineQualityClient({
                         {b.bestellnummer || "—"}
                       </Link>
                       <div className="text-[13px] text-foreground-subtle truncate">
-                        {b.haendler_name}
+                        {haendlerDisplay(b.haendler_name).name}
                         {b.besteller_name && <span className="text-foreground-faint"> · {b.besteller_name}</span>}
                       </div>
                       <div className="flex items-center gap-2 text-[12px] text-foreground-subtle">

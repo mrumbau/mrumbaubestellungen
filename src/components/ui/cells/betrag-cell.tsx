@@ -5,6 +5,11 @@
  *
  * Vorher in bestellungen-tabelle.tsx und archiv-client.tsx separat
  * implementiert (mit leichten Variationen beim netto-Badge).
+ *
+ * 03.06.2026 (Phase 1 Quick Wins): "0,00 €" wird jetzt visuell gedämpft
+ * gerendert + Tooltip — sonst nicht von "echtem" Betrag unterscheidbar.
+ * Ein "—" (null) bedeutet: noch nicht extrahiert. Ein "0,00 €" bedeutet:
+ * Pipeline hat 0 erkannt (z. B. Gratis-Sample, Gutschein-Eintrag).
  */
 
 import { formatBetrag } from "@/lib/formatters";
@@ -34,10 +39,33 @@ export function BetragCell({ betrag, waehrung, istNetto, istGutschrift }: Betrag
       </span>
     );
   }
+  if (numBetrag === 0) {
+    return (
+      <span
+        className="text-foreground-subtle"
+        title="Betrag wurde mit 0 erkannt (z. B. Gratis-Sample, Gutschein-Position) — kein fehlender Wert."
+      >
+        {formatBetrag(0, waehrung ?? undefined)}
+        {istNetto && (
+          <span className="text-[10px] text-foreground-faint ml-1">netto</span>
+        )}
+      </span>
+    );
+  }
+  if (numBetrag == null) {
+    return (
+      <span
+        className="text-foreground-faint"
+        title="Betrag wurde noch nicht aus dem Dokument extrahiert."
+      >
+        —
+      </span>
+    );
+  }
   return (
     <>
       {formatBetrag(numBetrag, waehrung ?? undefined)}
-      {istNetto && numBetrag != null && (
+      {istNetto && (
         <span className="text-[10px] text-foreground-subtle ml-1">netto</span>
       )}
     </>

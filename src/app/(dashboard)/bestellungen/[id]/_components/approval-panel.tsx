@@ -109,32 +109,41 @@ export function ApprovalPanel({
           )}
         </Card>
       ) : kannFreigeben && !istGutschrift ? (
-        <Card padding={isMobile ? "none" : "md"} className={isMobile ? "p-0 bg-transparent border-0 shadow-none" : ""}>
-          <Button
-            size={isMobile ? "lg" : "md"}
-            fullWidth
-            onClick={onOpenFreigabeDialog}
-            disabled={loading || !hatRechnung}
-            loading={loading}
-            iconLeft={<IconCheck />}
-            className={cn(
-              !hatRechnung && "bg-line text-foreground-subtle cursor-not-allowed hover:bg-line hover:translate-y-0 hover:shadow-none",
+        hatRechnung ? (
+          <Card padding={isMobile ? "none" : "md"} className={isMobile ? "p-0 bg-transparent border-0 shadow-none" : ""}>
+            <Button
+              size={isMobile ? "lg" : "md"}
+              fullWidth
+              onClick={onOpenFreigabeDialog}
+              disabled={loading}
+              loading={loading}
+              iconLeft={<IconCheck />}
+            >
+              Rechnung freigeben
+            </Button>
+            {freigabeError && (
+              <Alert tone="error" className="mt-2">
+                {freigabeError}
+              </Alert>
             )}
-            title={!hatRechnung ? "Rechnung muss zuerst vorhanden sein" : undefined}
-          >
-            {hatRechnung ? "Rechnung freigeben" : "Rechnung fehlt noch"}
-          </Button>
-          {!hatRechnung && !isMobile && (
-            <p className="text-[10px] text-foreground-subtle mt-2 text-center">
-              Die Freigabe wird möglich sobald eine Rechnung vorliegt.
-            </p>
-          )}
-          {freigabeError && (
-            <Alert tone="error" className="mt-2">
-              {freigabeError}
-            </Alert>
-          )}
-        </Card>
+          </Card>
+        ) : (
+          // 03.06.2026 (Phase 1 Quick Wins) — !hatRechnung war vorher als
+          // disabled fullWidth-Button mit Hero-Padding gerendert. In ~70% der
+          // Detail-Aufrufe ist gerade keine Rechnung da — das gab uns eine
+          // riesige tote Wand statt Status-Information. Jetzt: schlanker
+          // Info-Pill, der den Zustand benennt OHNE Action zu suggerieren.
+          // Auf Mobile entfällt die Pill ganz (mobile-bar gated bereits).
+          !isMobile && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-line-subtle bg-canvas text-[12px] text-foreground-muted">
+              <span
+                aria-hidden="true"
+                className="inline-block h-1.5 w-1.5 rounded-full bg-foreground-faint"
+              />
+              <span>Freigabe möglich, sobald eine Rechnung eingeht.</span>
+            </div>
+          )
+        )
       ) : null}
 
       {/* Mahnung quittieren */}

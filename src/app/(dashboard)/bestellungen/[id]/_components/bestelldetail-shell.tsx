@@ -359,9 +359,9 @@ export function BestelldetailShell({
       />
       <ConfirmDialog
         open={bd.showVerwerfenDialog}
-        title="Bestellung verwerfen"
-        message="Diese Bestellung und alle zugehörigen Dokumente, Abgleiche und Kommentare unwiderruflich löschen?"
-        confirmLabel="Endgültig löschen"
+        title="Bestellung verwerfen?"
+        message="Die Bestellung wird komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden."
+        confirmLabel="Verwerfen"
         variant="danger"
         loading={bd.verwerfenLoading}
         onConfirm={bd.handleVerwerfen}

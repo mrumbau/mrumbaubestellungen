@@ -77,6 +77,15 @@ export interface UseBestellungSavedViewsParams {
   }) => void;
   setDensity: (d: Density) => void;
   setSort: (s: SortState) => void;
+  /**
+   * 03.06.2026 (Phase 1 Quick Wins): SavedViews-Storage-Key ist jetzt pro
+   * Pool-Scope getrennt. Vorher: ein einziger `saved-views.bestellungen`
+   * Key — der "Überfällig"-Default schlug auf alle 4 Tabs durch und liess
+   * das Pool-Tab leer wirken (Pool-Items haben kein faelligkeitsdatum).
+   * Pool-Scope skippt zusätzlich das Auto-Apply komplett: dort soll der
+   * User die ungefilterte Liste sehen.
+   */
+  scope?: "pool" | "mine-open" | "mine-done" | "all";
 }
 
 export function useBestellungSavedViews({
@@ -90,8 +99,10 @@ export function useBestellungSavedViews({
   applyFilterConfig,
   setDensity,
   setSort,
+  scope,
 }: UseBestellungSavedViewsParams) {
-  const savedViews = useSavedViews<ViewConfig>("bestellungen", {
+  const tableKey = scope ? `bestellungen.${scope}` : "bestellungen";
+  const savedViews = useSavedViews<ViewConfig>(tableKey, {
     systemDefaults: SYSTEM_DEFAULTS,
   });
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -100,6 +111,13 @@ export function useBestellungSavedViews({
   const didApplyDefault = useRef(false);
   useEffect(() => {
     if (didApplyDefault.current) return;
+    // Pool-Scope: keine Default-View-Auto-Anwendung. Pool soll alle
+    // Pool-Items zeigen, nicht durch einen "Überfällig"-Filter ausgedünnt
+    // werden (Pool-Items haben i.d.R. noch kein Fälligkeitsdatum).
+    if (scope === "pool") {
+      didApplyDefault.current = true;
+      return;
+    }
     if (savedViews.defaultView) {
       const d = savedViews.defaultView;
       applyFilterConfig({

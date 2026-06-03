@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { DOKUMENT_CONFIG, displayBestellnummer } from "@/lib/bestellung-utils";
+import { haendlerDisplay } from "@/lib/haendler-display";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
 import type { Dokument, PaidBestellung } from "./types";
@@ -58,9 +59,26 @@ export function OrderRow({
         </td>
         <td className="px-4 py-3.5 text-foreground">
           <span className="flex items-center gap-1.5">
-            {type === "subunternehmer"
-              ? order.subunternehmer_firma || order.haendler_name || "–"
-              : order.haendler_name || "–"}
+            {(() => {
+              if (type === "subunternehmer") {
+                return order.subunternehmer_firma || haendlerDisplay(order.haendler_name).name;
+              }
+              const hd = haendlerDisplay(order.haendler_name);
+              return (
+                <>
+                  <span>{hd.name}</span>
+                  {hd.isUnsicher && (
+                    <span
+                      aria-hidden="true"
+                      title="Pipeline hat den Lieferanten nicht eindeutig erkannt."
+                      className="inline-flex items-center justify-center h-3 w-3 rounded-full bg-warning-bg text-warning text-[8px] font-bold font-mono-amount"
+                    >
+                      ?
+                    </span>
+                  )}
+                </>
+              );
+            })()}
             {type === "subunternehmer" && order.subunternehmer_gewerk && (
               <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wide bg-warning-bg text-warning rounded uppercase">
                 {order.subunternehmer_gewerk}

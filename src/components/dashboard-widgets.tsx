@@ -6,6 +6,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { TimeRangePicker, type TimeRange } from "@/components/ui/time-range-picker";
 import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
+import { haendlerDisplay } from "@/lib/haendler-display";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 // 22.05.2026 — "Zu prüfen"-Widgets (DashboardUnzugeordnet, DashboardNeueHaendler,
@@ -805,7 +806,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-surface rounded-lg border border-error-border/60 hover:border-error-border transition-colors text-sm">
                 <span className="flex items-center gap-2">
                   <span className="font-mono-amount font-semibold text-brand">{m.bestellnummer || "–"}</span>
-                  <span className="text-foreground-muted">{m.haendler_name}</span>
+                  <span className="text-foreground-muted">{haendlerDisplay(m.haendler_name).name}</span>
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
@@ -866,7 +867,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                               <span className="font-mono-amount">{displayBestellnummer(b)}</span>
-                              <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
+                              <span className="text-foreground-subtle font-normal"> – {haendlerDisplay(b.haendler_name).name}</span>
                             </p>
                             <p className="text-[12px] text-foreground-faint flex items-center gap-1.5 flex-wrap mt-0.5">
                               <BestellerCell
@@ -934,7 +935,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                             <span className="font-mono-amount">{displayBestellnummer(b)}</span>
-                            <span className="text-foreground-subtle font-normal"> – {b.haendler_name || "–"}</span>
+                            <span className="text-foreground-subtle font-normal"> – {haendlerDisplay(b.haendler_name).name}</span>
                           </p>
                           <p className="text-[12px] text-foreground-faint">{b.besteller_name} · {formatDatum(b.created_at)}</p>
                         </div>
