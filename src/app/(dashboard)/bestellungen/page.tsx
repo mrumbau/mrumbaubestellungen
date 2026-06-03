@@ -2,6 +2,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
 import { ScopeTabs, type PoolScope } from "@/components/bestellungen/scope-tabs";
+import { PageHeader, PageHeaderCount } from "@/components/ui/page-header";
 
 const SCOPE_VALUES: ReadonlyArray<PoolScope> = ["pool", "mine-open", "mine-done", "all"];
 
@@ -181,57 +182,42 @@ export default async function BestellungenPage({
     ? (projekte || []).find((p) => p.id === projektIdParam)?.name || null
     : null;
 
-  const aktiverProjektFarbe = projektIdParam
-    ? (projekte || []).find((p) => p.id === projektIdParam)?.farbe || "#570006"
-    : null;
+  const scopeDescription =
+    scope === "pool"
+      ? "Pool — Material-Bestellungen ohne Besteller. Jeder kann übernehmen."
+      : scope === "mine-open"
+        ? "Deine offenen Bestellungen"
+        : scope === "mine-done"
+          ? "Von dir freigegebene Bestellungen"
+          : "Alle Bestellungen";
+
+  const breadcrumbs =
+    projektIdParam && aktiverProjektName
+      ? [
+          { label: "Bestellungen", href: "/bestellungen" },
+          { label: aktiverProjektName },
+        ]
+      : undefined;
 
   return (
-    <div>
-      {/* Breadcrumb bei Projekt-Filter */}
-      {projektIdParam && aktiverProjektName && (
-        <nav className="flex items-center gap-1.5 text-sm mb-4">
-          <a href="/bestellungen" className="text-foreground-subtle hover:text-brand transition-colors">Bestellungen</a>
-          <svg className="w-3.5 h-3.5 text-foreground-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: aktiverProjektFarbe || "#570006" }} />
-            {aktiverProjektName}
-          </span>
-        </nav>
-      )}
-
-      {/* 02.06.2026 (UI-Polish): Page-Header — Title links, subtile Eyebrow rechts.
-          Vorher prominentes "183 GELADEN" als 2-spaltiger Header → jetzt eine
-          kompakte Eyebrow-Zeile passend zur industrial-Aesthetic. Scope-Label
-          unter dem Titel kontextualisiert den aktuellen Tab.  */}
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div className="min-w-0">
-          <h1 className="font-headline text-2xl text-foreground tracking-tight">Bestellungen</h1>
-          <p className="text-foreground-subtle text-sm mt-1">
-            {scope === "pool"
-              ? "Pool — alle Material-Bestellungen ohne Besteller"
-              : scope === "mine-open"
-                ? "Deine offenen Bestellungen"
-                : scope === "mine-done"
-                  ? "Von dir freigegebene Bestellungen"
-                  : "Alle Bestellungen"}
-          </p>
-        </div>
-        <div
-          className="hidden md:flex items-baseline gap-1.5 shrink-0 text-[10px] font-semibold tracking-widest uppercase text-foreground-subtle"
-          aria-live="polite"
-        >
-          <span className="font-mono-amount text-foreground text-xs tabular-nums">
-            {total.toLocaleString("de-DE")}
-          </span>
-          <span className="text-foreground-faint">
-            {reachedCap ? `≥ ${HARD_CAP}` : "geladen"}
-          </span>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Workflow"
+        title="Bestellungen"
+        description={scopeDescription}
+        breadcrumbs={breadcrumbs}
+        actions={
+          <PageHeaderCount
+            count={total}
+            label={reachedCap ? `≥ ${HARD_CAP} geladen` : "geladen"}
+            pluralLabel={reachedCap ? `≥ ${HARD_CAP} geladen` : "geladen"}
+          />
+        }
+      />
 
       {/* ScopeTabs als Primary-Navigation. Underline-Style + border-b bildet
           die klare Top-Hierarchie über alle Sub-Filter (ArtTabs, FilterBar).  */}
-      <div className="mb-5">
+      <div>
         <ScopeTabs
           active={scope}
           preservedSearchParams={projektIdParam ? { projekt_id: projektIdParam } : undefined}

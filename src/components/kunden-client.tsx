@@ -19,6 +19,7 @@ import {
   type Density,
 } from "@/components/ui";
 import { Modal } from "@/components/ui/modal";
+import { PageHeader } from "@/components/ui/page-header";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
 import { IconCheck, IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
@@ -422,15 +423,13 @@ export function KundenClient({
   ];
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
-        <div>
-          <h1 className="font-headline text-2xl text-foreground tracking-tight">Kunden</h1>
-          <p className="text-foreground-subtle text-sm mt-1">
-            {kunden.length} Auftraggeber{unbestaetigt.length > 0 ? ` · ${unbestaetigt.length} unbestätigt` : ""}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Stammdaten"
+        title="Kunden"
+        description={`${kunden.length} Auftraggeber${unbestaetigt.length > 0 ? ` · ${unbestaetigt.length} unbestätigt` : ""}`}
+        separator={false}
+        actions={
         <div className="flex items-center gap-2 flex-wrap">
           {/* View-Mode Toggle */}
           <div
@@ -533,11 +532,12 @@ export function KundenClient({
             </button>
           )}
         </div>
-      </div>
+        }
+      />
 
       {/* Error banner */}
       {error && !showForm && (
-        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
           <span>{error}</span>
           <button type="button" onClick={() => setError("")} aria-label="Fehlermeldung schließen" className="text-error/70 hover:text-error shrink-0">
             <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

@@ -7,6 +7,7 @@ import type { Rolle } from "@/lib/auth";
 import { DatevExportModal } from "@/components/buchhaltung/datev-export-modal";
 import { BuchhaltungSummaryCards } from "@/components/buchhaltung/summary-cards";
 import { BuchhaltungTable } from "@/components/buchhaltung/buchhaltung-table";
+import { PageHeader } from "@/components/ui/page-header";
 import type { BuchhaltungRow } from "@/components/buchhaltung/types";
 
 // BuchhaltungRow + isFaelligBald + isUeberfaellig sind nach
@@ -323,10 +324,10 @@ export function BuchhaltungClient({
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Bezahlt error banner */}
       {bezahltError && (
-        <div className="mb-4 flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
           <span>{bezahltError}</span>
           <button type="button" onClick={() => setBezahltError(null)} className="text-error/70 hover:text-error shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -341,37 +342,36 @@ export function BuchhaltungClient({
         projekte={projekte}
       />
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-headline text-2xl text-foreground tracking-tight">Buchhaltung</h1>
-          <p className="text-foreground-subtle text-sm mt-1">
-            {rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen" : "Freigegebene Rechnungen"}
-          </p>
-        </div>
-        {kannBezahlen && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowDatev(true)}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
-            >
-              <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              DATEV Export
-            </button>
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              CSV Export
-            </button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Rechnungswesen"
+        title="Buchhaltung"
+        description={rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen" : "Freigegebene Rechnungen"}
+        separator={false}
+        actions={
+          kannBezahlen && (
+            <>
+              <button
+                onClick={() => setShowDatev(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
+              >
+                <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                DATEV Export
+              </button>
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                CSV Export
+              </button>
+            </>
+          )
+        }
+      />
 
       {/* Summary Cards — eigene Komponente */}
       <BuchhaltungSummaryCards
@@ -385,10 +385,10 @@ export function BuchhaltungClient({
 
       {/* Industrial-Line zwischen Summary-Snapshot und Tabs+Tabelle.
           12.05.2026 (DESIGN-Critique #6) — markiert Section-Wechsel. */}
-      <div className="industrial-line mt-6" aria-hidden="true" />
+      <div className="industrial-line" aria-hidden="true" />
 
       {/* Tabs + Suche */}
-      <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg">
           <button
             onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}

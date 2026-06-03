@@ -12,6 +12,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { BulkToolbar, Button } from "@/components/ui";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconTrash } from "@/components/ui/icons";
 import {
   groupByMonth as _groupByMonth, // re-import to keep tree-shaking happy in IDEs
@@ -227,23 +228,20 @@ export function ArchivClient({
   };
 
   return (
-    <div>
-      {/* Header — matches Buchhaltung/Bestellungen pattern */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-headline text-2xl text-foreground tracking-tight">Archiv</h1>
-          <p className="text-foreground-subtle text-sm mt-1">
-            Abgeschlossene Projekte und archivierte Rechnungen
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Historie"
+        title="Archiv"
+        description="Abgeschlossene Projekte und archivierte Rechnungen"
+        separator={false}
+      />
 
       {/* Summary Stats */}
       <ArchivStatsCards summary={summary} />
 
       {/* Industrial-Line zwischen Stats-Snapshot und Toolbar+Content.
           12.05.2026 (DESIGN-Critique #6). */}
-      <div className="industrial-line mt-6" aria-hidden="true" />
+      <div className="industrial-line" aria-hidden="true" />
 
       {/* Tabs + Search + Date + Selection-Mode + CSV */}
       <ArchivToolbar

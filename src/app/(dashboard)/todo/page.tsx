@@ -1,21 +1,23 @@
-import type React from "react";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
-import { DashboardUnzugeordnet } from "@/components/dashboard-unzugeordnet";
 import { DashboardKiVorschlaege } from "@/components/dashboard-ki-vorschlaege";
 import { DashboardNeueKunden } from "@/components/dashboard-neue-kunden";
 import { DashboardNeueSubunternehmer } from "@/components/dashboard-neue-subunternehmer";
 import { DashboardNeueHaendler } from "@/components/dashboard-neue-haendler";
-import { PageHeaderCount } from "@/components/ui/page-header";
+import { PageHeader, PageHeaderCount } from "@/components/ui/page-header";
 
 // 22.05.2026 — eigene /todo-Seite für die "Zu prüfen"-Widgets, die vorher
 // im Dashboard hingen. Für JEDE Rolle sichtbar (User-Wunsch). Buchhaltung
 // redirected auf /buchhaltung (kein Bezug zu Stammdaten-Pflege).
 //
-// Edge-Runtime + force-dynamic analog zu /dashboard. Nur 5 leichte Queries
-// (kein KPI/Sparkline/Volumen-Heavy-Stuff) → Page lädt in ~500ms statt
-// 3-5s wie das alte Dashboard.
+// 03.06.2026 (Phase 2 Architektur) — `DashboardUnzugeordnet` wurde hier
+// entfernt. Pool-Bestellungen leben jetzt ausschließlich unter
+// `/bestellungen?scope=pool` (Tab + Hero-Card auf /dashboard). /todo
+// fokussiert auf reine Stammdaten-Aufgaben: KI-Projekt-Vorschläge, neue
+// Kunden / Subunternehmer / Händler.
+//
+// Edge-Runtime + force-dynamic analog zu /dashboard.
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
@@ -39,25 +41,12 @@ export default async function TodoPage() {
   }
 
   const [
-    { data: unzugeordnetRaw },
     { data: kiVorschlaegeRoh },
     { data: neueKundenRoh },
     { data: neueSubunternehmerRoh },
     { data: neueHaendlerRoh },
     { data: aktiveProjekte },
-    { data: bestellerRollen },
   ] = await Promise.all([
-    // Nicht zugeordnet: alle Material-Bestellungen mit besteller_kuerzel='UNBEKANNT'.
-    // Vorher admin-only — jetzt sieht JEDER alle. Operationsmodus "kollektives
-    // Stammdaten-Aufräumen". Abo/SU sind per Definition nicht zuordenbar.
-    supabase
-      .from("bestellungen")
-      .select(
-        "id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at",
-      )
-      .eq("besteller_kuerzel", "UNBEKANNT")
-      .not("bestellungsart", "in", "(abo,subunternehmer)")
-      .order("created_at", { ascending: false }),
     // KI-Projekt-Vorschläge — eigene scope für Besteller, alle für Admin
     eigene(
       supabase
@@ -95,13 +84,7 @@ export default async function TodoPage() {
       .select("id, name, farbe")
       .in("status", ["aktiv", "pausiert"])
       .order("name"),
-    // Besteller-Liste für die Zuordnen-Buttons (alle Rollen brauchen die Liste)
-    supabase.from("benutzer_rollen").select("kuerzel, name").eq("rolle", "besteller"),
   ]);
-
-  type UnzugeordneteRow = React.ComponentProps<typeof DashboardUnzugeordnet>["bestellungen"][number];
-  const unzugeordnet = (unzugeordnetRaw || []) as UnzugeordneteRow[];
-  const bestellerListe = (bestellerRollen || []) as { kuerzel: string; name: string }[];
 
   // KI-Vorschläge mit Projekt-Namen/Farben anreichern (gleicher Pattern wie Dashboard)
   type KiVorschlagRaw = {
@@ -144,23 +127,19 @@ export default async function TodoPage() {
   }[];
 
   const totalCount =
-    unzugeordnet.length +
     kiVorschlaege.length +
     neueKunden.length +
     neueSubunternehmer.length +
     neueHaendler.length;
 
   return (
-    <div>
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-headline text-2xl text-foreground tracking-tight">Todo</h1>
-          <p className="text-foreground-subtle text-sm mt-1">
-            Stammdaten und offene Zuordnungen — alle Rollen helfen mit.
-          </p>
-        </div>
-        <PageHeaderCount count={totalCount} label="Eintrag" pluralLabel="Einträge" />
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Stammdaten"
+        title="Todo"
+        description="KI-Vorschläge, neue Kunden, Subunternehmer und Händler — alle Rollen helfen mit."
+        actions={<PageHeaderCount count={totalCount} label="Eintrag" pluralLabel="Einträge" />}
+      />
 
       {totalCount === 0 ? (
         <div className="card p-12 text-center">
@@ -177,14 +156,11 @@ export default async function TodoPage() {
           </div>
           <h2 className="font-headline text-lg text-foreground mb-1">Alles erledigt</h2>
           <p className="text-foreground-subtle text-sm">
-            Keine offenen Stammdaten- oder Zuordnungs-Aufgaben.
+            Keine offenen Stammdaten-Aufgaben.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {unzugeordnet.length > 0 && (
-            <DashboardUnzugeordnet bestellungen={unzugeordnet} besteller={bestellerListe} />
-          )}
           {kiVorschlaege.length > 0 && <DashboardKiVorschlaege vorschlaege={kiVorschlaege} />}
           {neueKunden.length > 0 && <DashboardNeueKunden kunden={neueKunden} />}
           {neueSubunternehmer.length > 0 && (

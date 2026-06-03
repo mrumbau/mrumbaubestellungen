@@ -5,6 +5,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { parseTimeRange, computeRangeBounds, sparklineBuckets } from "@/lib/time-range";
 import { PoolHeroCard } from "@/components/dashboard/pool-hero-card";
+import { PageHeader } from "@/components/ui/page-header";
 
 // 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1144-LOC-Mega-Component.
 // SSR bleibt aktiv (Default), nur der JS-Chunk wird lazy gesplittet → kleinerer
@@ -298,28 +299,20 @@ export default async function DashboardPage({
   }
 
   return (
-    <div>
-      <div className="mb-8 flex items-end justify-between">
-        <div>
-          <h1 className="font-headline text-2xl text-foreground tracking-tight">Dashboard</h1>
-          <p className="text-foreground-subtle text-sm mt-1">Willkommen, {profil.name}.</p>
-        </div>
-        <div className="hidden md:block">
-          <svg width="48" height="32" viewBox="0 0 48 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.08]">
-            <line x1="0" y1="31" x2="48" y2="31" stroke="#570006" strokeWidth="1" />
-            <line x1="47" y1="0" x2="47" y2="32" stroke="#570006" strokeWidth="1" />
-            <line x1="40" y1="31" x2="48" y2="23" stroke="#570006" strokeWidth="0.75" />
-            <rect x="44" y="28" width="3" height="3" fill="#570006" opacity="0.5" />
-          </svg>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Übersicht"
+        title="Dashboard"
+        description={`Willkommen, ${profil.name}.`}
+        separator={false}
+      />
 
       {/* 02.06.2026 (Pool Phase 6) — Pool-HeroStatCard als asymmetrische
           Bento-Karte VOR den Standard-Widgets. Lädt eigene Daten via Server-
           Component; rendert null wenn Pool leer ist (keine Card → kein Lärm).
           Brand-Anker (MR-Red border-top) verankert sie visuell als Top-Card
           ohne den Status-Snapshot in den Standard-Widgets zu verdrängen. */}
-      <div className="mb-6">
+      <div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <PoolHeroCard />
         </div>
