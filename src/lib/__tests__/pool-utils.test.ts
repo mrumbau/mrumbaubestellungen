@@ -58,23 +58,22 @@ describe("bucketAge — 4-state aging classification", () => {
   });
 });
 
-describe("agingWashClass — Drei-Sprachen-Disziplin (Wash maxt bei /40)", () => {
+describe("agingWashClass — Drei-Sprachen-Disziplin v2 (Token-basierte Aging-Wash)", () => {
   it("fresh + ripening → kein Wash (null)", () => {
     expect(agingWashClass("fresh")).toBeNull();
     expect(agingWashClass("ripening")).toBeNull();
   });
 
-  it("stale → amber-50/40 mit dark-mode-Variant", () => {
-    const cls = agingWashClass("stale");
-    expect(cls).toContain("amber");
-    expect(cls).toContain("/40");
-    expect(cls).toContain("dark:");
+  // UX-R1 (03.06.2026): Wash wurde von amber-50/40 + rose-50/40 (Tailwind-
+  // Defaults) auf semantische Tokens (bg-aging-stale, bg-aging-rotting) in
+  // globals.css migriert. Tests prüfen jetzt die Token-Klassen statt der
+  // Default-Color-Namen.
+  it("stale → bg-aging-stale Token (Stufe 3)", () => {
+    expect(agingWashClass("stale")).toBe("bg-aging-stale");
   });
 
-  it("rotting → rose-50/40 (urgent)", () => {
-    const cls = agingWashClass("rotting");
-    expect(cls).toContain("rose");
-    expect(cls).toContain("/40");
+  it("rotting → bg-aging-rotting Token (Stufe 3, urgent)", () => {
+    expect(agingWashClass("rotting")).toBe("bg-aging-rotting");
   });
 });
 
@@ -83,14 +82,12 @@ describe("agingWashFromCreatedAt — End-to-End", () => {
     expect(agingWashFromCreatedAt(daysAgo(1), NOW)).toBeNull();
   });
 
-  it("8 Tage alt → amber stale-wash", () => {
-    const cls = agingWashFromCreatedAt(daysAgo(8), NOW);
-    expect(cls).toContain("amber");
+  it("8 Tage alt → bg-aging-stale", () => {
+    expect(agingWashFromCreatedAt(daysAgo(8), NOW)).toBe("bg-aging-stale");
   });
 
-  it("20 Tage alt → rose rotting-wash", () => {
-    const cls = agingWashFromCreatedAt(daysAgo(20), NOW);
-    expect(cls).toContain("rose");
+  it("20 Tage alt → bg-aging-rotting", () => {
+    expect(agingWashFromCreatedAt(daysAgo(20), NOW)).toBe("bg-aging-rotting");
   });
 
   it("null Input → null", () => {

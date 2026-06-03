@@ -2,6 +2,10 @@
 
 > "Linear meets Handwerk-Industrie" — präzises Tool-Design mit industriellem Material-Bewusstsein.
 
+## Changelog
+
+- **v2 (03.06.2026, UX-R1 → UX-R6):** Editorial-Industrial-Versprechen vom Login zieht ins Innere. Neue Foundation-Primitives `EditorialSection` + `PageHero` + `BestellnummerHero`. Drei-Sprachen-Disziplin verschärft um Visual-Weight-Stufen 1-3 — max 1 lautes Element pro Card. Aging-Wash auf Tokens (`bg-aging-stale`, `bg-aging-rotting`) statt Tailwind-Defaults. Type-Scale-Migration via Codemod (270 Stellen). Plan: `.claude/plans/noble-sparking-stallman.md`. Sections 3-6 (Detail-Page, Modal/Drawer-Heuristik, CTA-Hierarchie) folgen in Welle 3+5+6.
+
 ## Color Strategy
 
 **Restrained mit ausgewählten Brand-Momenten.**
@@ -82,14 +86,50 @@ Dezente SVG-Patterns auf Hero-Surfaces:
 - `bg-dot-grid` — dot-pattern für CardScan/Sub-Brand
 - `corner-marks` — 4 Eck-Markierungen (Werkzeug-Anmutung)
 - `industrial-line` — 1px brand-tinted Separator mit kleinen Metalldetails
+- `film-grain` / `film-grain-light` — fraktale SVG-Noise (6% / 18%) als Papier-Textur
 
 Wo eingesetzt:
 - Root `/` Brand-Landing (Split-Screen Modul 01 + 02)
 - Login (kontextabhängig MR-Red vs. CardScan-Dark)
-- PageHeader-Separator
+- 404 (Editorial Centered)
+- PageHero / EditorialSection (UX-R1) — Hot-Path-Pages innen
 - Hero-StatCard im Dashboard
 
-Wo NICHT: in normalen Listen, Forms, Modals. Texturen sind Brand-Marker, kein Pflicht-Hintergrund.
+Wo NICHT: in Settings/System/Stammdaten-Listen, Forms, Modals (außer als Editorial-Statement bei PageHero `grain="subtle"`).
+
+### Editorial-Foundation-Primitives (UX-R1, 03.06.2026)
+
+Schließt die Lücke zwischen Brand-Surfaces (Login/Landing/404, editorial-luxury) und dem Inneren der App (heute Standard-Dashboard). Drei Primitives sitzen über den Texturen oben und sind die kanonische Einsatzart für Hot-Path-Pages:
+
+**`<EditorialSection>` (`@/components/ui/editorial-section.tsx`)** — Foundation-Wrapper. Kapselt `corner-marks` + `industrial-line` + `film-grain` zu einer Komponente mit Props:
+
+| Prop | Werte | Wirkung |
+|---|---|---|
+| `tone` | `brand` / `neutral` | brand schaltet `corner-marks` frei, neutral lässt sie aus |
+| `marks` | `boolean` | corner-marks an Ecken (nur bei `tone=brand`) |
+| `lineTop` / `lineBottom` | `boolean` | industrial-line als Separator |
+| `grain` | `false` / `subtle` / `light` | film-grain Overlay |
+| `padding` | `none` / `compact` / `relaxed` | Skala |
+| `as` | `section` / `header` / `article` / `div` | Semantik |
+
+Default ist ruhig (border + bg-card). Editorial-Ornamentik wird gezielt zugeschaltet. Niemals nested EditorialSection in EditorialSection — wenn ein Block Sub-Sections braucht, nutze `industrial-line` als Separator innerhalb.
+
+**`<PageHero>` (`@/components/ui/page-hero.tsx`)** — spezialisierte EditorialSection für Page-Heros auf Hot-Path-Routen. Eyebrow + Display-Headline (`text-display-section` in Barlow Condensed clamp 28-40px) + Description + Actions. Default `tone=brand` mit `marks` und `lineBottom`. Wird in `/bestellungen/{lane}`, `/bestelldetail`, `/dashboard`, `/buchhaltung`, `/archiv` eingesetzt.
+
+**`<PageHeader>` (`@/components/ui/page-header.tsx`)** — funktional, unauffällig. Bleibt das Default für `/einstellungen`, `/einstellungen/system/*`, Stammdaten-Pages. Hot-Path-First — Settings folgen nicht der editorial-Hand.
+
+**`<BestellnummerHero>` (`@/components/ui/bestellnummer-hero.tsx`)** — Display-Numeral für Bestelldetail. Skala `text-display-numeral` clamp(36-64px) in Barlow Condensed mit `tabular-nums`. Halluzinations-Schutz: wenn `displayBestellnummer` "Ohne Nr." liefert, rendert die Komponente einen Internal-ID-Fallback (`BNi-{8char}`) mit Eyebrow "BN unbekannt". Wird ausschließlich auf der Detail-Page eingesetzt — Listen nutzen weiter `font-mono-amount + text-h2`.
+
+**Sandbox:** `/einstellungen/system/patterns` (admin-only) zeigt alle Varianten + Type-Scale + Display-Skalen. Visual-Drift fängt man dort früh ab.
+
+### Display-Skalen für Editorial-Hero (UX-R1)
+
+Erweitert die kanonische Type-Scale um zwei clamp-basierte Hero-Größen. Beide erben `font-headline` (Barlow Condensed) wenn der Container die Klasse trägt.
+
+| Klasse | Skala | Einsatz |
+|---|---|---|
+| `.text-display-section` | clamp(28, 4vw, 40) | PageHero Headline |
+| `.text-display-numeral` | clamp(36, 5vw, 64) | BestellnummerHero (Detail-Page) |
 
 ## Status System (6 Workflow-States)
 
@@ -106,18 +146,34 @@ Jeder Status hat 3-Part-Color + Icon (`status-config.ts`):
 
 **Render:** `<StatusCell>` als Pill mit Icon + Label + Color-Bar links. Color-not-only erfüllt.
 
-## Pool-Modell — Drei-Sprachen-Disziplin (02.06.2026)
+## Pool-Modell — Drei-Sprachen-Disziplin (02.06.2026, verschärft UX-R1 03.06.2026)
 
-UNBEKANNT-Material-Bestellungen liegen in einem geteilten Pool, sichtbar für alle Besteller (RLS Phase 1). Wer freigibt = echter Owner. Die UI muss drei semantische Layer **strikt visuell trennen**, sonst entsteht „Maschine hat schon entschieden"-Fehlinterpretation.
+UNBEKANNT-Material-Bestellungen liegen in einem geteilten Pool, sichtbar für alle Besteller (RLS Phase 1). Wer freigibt = echter Owner. Die UI muss alle semantischen Layer **strikt visuell trennen**, sonst entsteht „Maschine hat schon entschieden"-Fehlinterpretation oder Pill-Inflation (sechs gleichlaute Indikatoren auf einer Card).
 
-| Layer | Sprache | Token-Set | Beispiel |
+### Visual-Weight-Stufen v2 (UX-R1)
+
+Drei Stufen ordnen die Indikatoren so, dass die Wand aus Pills aufhört. Stufe sagt **wie laut** das Element sein darf, nicht **wo** es hin gehört.
+
+| Sprache | Stufe | Token-Set | Beispiel |
 |---|---|---|---|
-| **Pipeline-Vorschlag** (Maschine denkt) | Eyebrow + ghost-style + dashed border | `bg-canvas` + `border-dashed border-line-strong` + dotted-underline auf Kürzel | „VORSCHLAG MT · Konfidenz 89 %" |
-| **Workflow-Status** (Dokumentenlage) | Color + Icon + Label | Status-Token-Triplet (s.o.) | StatusCell (offen / vollständig / …) |
-| **Owner-Binding** (Mensch hat sich verpflichtet) | Solid Brand + tabular-nums | `bg-brand text-foreground-inverse` (Authority-Signal) | „[MT] Übernommen von Marlon Tschon" |
-| **Presence** (anderer User schaut gerade) | Neutral muted + statischer Live-Dot | `text-foreground-subtle` + `bg-success` 6px Dot, **kein Pulse** | „CR schaut seit 2 Min." |
+| **Status (Workflow)** | 1 (laut) | Status-Triplet `--status-*-bg/-text/-main` | OFFEN / VOLLSTÄNDIG / ABWEICHUNG |
+| **Mahnung-Banner** | 1 (laut) | Status-Triplet warning, full-width Strip über dem Card-Hero | „Mahnung 2. Stufe seit 6 Tagen" |
+| **Owner-Identität** | 2 (mittel) | Brand-solid pill `bg-brand text-foreground-inverse` | „[MT] Übernommen von Marlon" |
+| **Pipeline-Vorschlag** | 2 (mittel) | Eyebrow ghost + dashed `bg-canvas border-dashed border-line-strong` + dotted-underline | „VORSCHLAG MT · 89 %" |
+| **Reserve (anderer)** | 2 (mittel) | Neutral pill + Uhr-Glyph + Countdown `tabular-nums` | „CR bearbeitet · 9:42" |
+| **Read-Dot** | 3 (subtle) | 6px `bg-brand` top-left | • |
+| **Score-Pin** | 3 (subtle) | Subtle pill `border-line-strong bg-canvas` + ↑-Glyph | „↑ Priorität" |
+| **Auto-Claim-Pin** | 3 (subtle) | Mini-Robot-Glyph oben rechts der Owner-Pille | (Robot-Glyph) |
+| **Aging-Wash** | 3 (subtle) | `bg-aging-stale` (≥7d) / `bg-aging-rotting` (≥14d) | (card-tint) |
+| **Presence-Strip** | 3 (subtle) | Avatar-Stack + neutral muted + 6px static dot | „Im Pool: MT, CR" |
 
-**Regel:** Niemand darf zwei Layer auf dieselbe Token-Familie mappen. Insbesondere: Pipeline-Vorschlag bekommt **niemals** den Status-Pill-Stil (sonst wirkt es wie eine Workflow-Aussage).
+**Verschärfte Regeln:**
+
+- **Max 1 Stufe-1-Element pro Card.** Status ODER Mahnung-Banner, nie beide laut. Wenn eine Mahnung aktiv ist, wird sie zum full-width Strip über dem Hero und die Status-Pill bleibt sekundär (kleiner, neben dem Vendor-Namen).
+- **Max 2 Stufe-2-Elemente pro Card.** Owner + Reserve geht (eigenes Item, anderer User dran). Owner + Vorschlag geht NICHT (semantisch falsch — wenn Owner da ist, ist der Vorschlag obsolet). Vorschlag + Reserve geht (Pool-Item, jemand schaut grad rein).
+- **Stufe-3-Elemente dürfen nicht stufe-2 aussehen.** Aging-Wash maxt bei /40 Opacity. Score-Pin nie brand-solid. Robot-Pin nie groß. Wenn ein Stufe-3-Element wachsen will, gehört es in Stufe 2 und braucht eine bewusste Entscheidung.
+
+**Tokens:** `bg-aging-stale` / `bg-aging-rotting` (UX-R1) ersetzen Tailwind-Defaults `bg-amber-50/40` / `bg-rose-50/40` an allen Stellen. Werte in `globals.css` als CSS-Variablen.
 
 **Conflict-Resolution-Pattern (race-safe Optimistic):**
 - Bei `pool_claim` → RPC `WHERE besteller_kuerzel = 'UNBEKANNT'` als Race-Schutz
@@ -227,7 +283,13 @@ Aus dem heutigen UI-Audit identifiziert und bewusst eliminiert:
 - ❌ Mobile DataTable Compact <44px (→ auto-lift)
 - ❌ Color-only Status (→ Icon+Color+Text)
 - ❌ Doppel-Widget Timeline + Audit-Trail (→ Timeline mit Filter)
+- ❌ **Tab-Redundanz Pool/Meine offen/Meine erledigt/Alle** (UX-R2 → 3 Lanes)
+- ❌ **Pill-Inflation auf einer Card** (UX-R1 → Visual-Weight-Stufen, max 1 Stufe-1-Element)
+- ❌ **Tailwind-Default-Colors als Token-Bypass** (UX-R1 → ESLint-Rule blockt `bg-(slate|gray|emerald|...)-(50..900)` außerhalb /cardscan)
+- ❌ **`transition-all` ohne spezifische Property** (UX-R1 → `transition-colors`, `transition-[width,background]`, etc., Emil-Performance-Regel)
+- ❌ **Arbitrary Text-Skalen `text-xs/sm/lg/xl/2xl`** (UX-R1 → Codemod migriert auf `.text-meta/.text-body-sm/.text-lead/.text-h2`, 270 Stellen)
 
 Bleibt erlaubt aus funktionalen Gründen:
 - Side-Stripe-Border 3-4px für **Projekt-Identity** (Cards) und **Status-Pills** (functional, nicht decorative)
 - Cards als primäre Affordance — bei Projekten und KPI-Tiles eigenes Werkzeug
+- `text-xs/sm` auf Brand-Surfaces (Login/Landing/404, `/cardscan`) — bewusst editorial-tier mit eigenen Skalen, vom Codemod ausgenommen

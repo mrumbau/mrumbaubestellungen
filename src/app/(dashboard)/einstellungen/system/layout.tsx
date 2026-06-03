@@ -81,6 +81,11 @@ export default async function SystemLayout({
       href: "/einstellungen/system/testdaten",
       icon: <IconTool />,
     },
+    {
+      label: "Patterns",
+      href: "/einstellungen/system/patterns",
+      icon: <IconSettings />,
+    },
   ];
 
   return (
