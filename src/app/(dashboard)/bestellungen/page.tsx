@@ -277,10 +277,11 @@ export default async function BestellungenPage({
       : bestellungenAngereichert;
 
   for (const b of bestellungenAfterSnooze) {
-    const name = (b.haendler_name as string | null | undefined) ?? "";
+    const bAny = b as Record<string, unknown>;
+    const name = (bAny.haendler_name as string | null | undefined) ?? "";
     // Pipeline-Defensive entfernen für Match
     const cleanName = name.replace(/^Unbekannter Lieferant \((.+)\)$/, "$1").toLowerCase().trim();
-    vendorDomainById[b.id as string] = haendlerDomainByName.get(cleanName) ?? null;
+    vendorDomainById[bAny.id as string] = haendlerDomainByName.get(cleanName) ?? null;
   }
 
   // 03.06.2026 (Pool 2.0 Sprint 2) — Layout-Pref aus dashboard_config lesen.
