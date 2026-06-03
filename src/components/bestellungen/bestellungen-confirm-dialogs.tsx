@@ -7,9 +7,11 @@
  *   - Bulk-Freigabe (mit Skipped-Hinweis)
  *
  * Aus bestellungen-tabelle.tsx extrahiert (12.05.2026, F3.3 Sprint 3).
+ * 03.06.2026: Migration von ConfirmDialog auf <Modal variant="..."> (UX-R5).
  */
 
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 import type { Bestellung } from "./types";
 
 export interface BestellungenConfirmDialogsProps {
@@ -56,47 +58,99 @@ export function BestellungenConfirmDialogs({
     <>
       {/* Bulk-Verwerfen Dialog — 03.06.2026 (Phase 4 Polish): domain-Sprache
           analog zu Single-Verwerfen-Dialog im Bestelldetail. */}
-      <ConfirmDialog
+      <Modal
         open={showDeleteDialog}
-        onCancel={onCloseDeleteDialog}
-        onConfirm={onConfirmDelete}
+        onClose={onCloseDeleteDialog}
+        size="sm"
+        variant="destructive"
         title={selected.size === 1 ? "Bestellung verwerfen?" : `${selected.size} Bestellungen verwerfen?`}
-        message={
-          selected.size === 1
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={onCloseDeleteDialog}
+              disabled={deleteLoading}
+              data-modal-cancel
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onConfirmDelete}
+              loading={deleteLoading}
+            >
+              {deleteLoading ? "Verwerfe…" : "Verwerfen"}
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {selected.size === 1
             ? "Die Bestellung wird komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden."
-            : `Die ${selected.size} ausgewählten Bestellungen werden komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden.`
-        }
-        confirmLabel={deleteLoading ? "Verwerfe…" : "Verwerfen"}
-        variant="danger"
-        loading={deleteLoading}
-      />
+            : `Die ${selected.size} ausgewählten Bestellungen werden komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden.`}
+        </p>
+      </Modal>
 
       {/* Quick-Freigabe Bestätigung */}
-      <ConfirmDialog
+      <Modal
         open={!!freigabeConfirmId}
-        onCancel={onCloseFreigabeConfirm}
-        onConfirm={() => freigabeConfirmId && onConfirmQuickFreigabe(freigabeConfirmId)}
-        title="Rechnung freigeben?"
-        message="Die Rechnung wird an die Buchhaltung übermittelt."
-        confirmLabel="Freigeben"
+        onClose={onCloseFreigabeConfirm}
+        size="sm"
         variant="default"
-      />
+        title="Rechnung freigeben?"
+        footer={(
+          <>
+            <Button variant="secondary" onClick={onCloseFreigabeConfirm}>
+              Abbrechen
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => freigabeConfirmId && onConfirmQuickFreigabe(freigabeConfirmId)}
+              autoFocus
+            >
+              Freigeben
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          Die Rechnung wird an die Buchhaltung übermittelt.
+        </p>
+      </Modal>
 
       {/* Bulk-Freigabe Bestätigung */}
-      <ConfirmDialog
+      <Modal
         open={showFreigebenDialog}
-        onCancel={onCloseFreigebenDialog}
-        onConfirm={onConfirmBulkFreigeben}
-        title={freigabeFaehig === 1 ? "Rechnung freigeben?" : `${freigabeFaehig} Rechnungen freigeben?`}
-        message={
-          skipped > 0
-            ? `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt. ${skipped} ausgewählte Bestellung${skipped === 1 ? "" : "en"} überspringen wir — keine Rechnung oder bereits freigegeben.`
-            : `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt.`
-        }
-        confirmLabel={bulkFreigebenLoading ? "Gebe frei…" : "Freigeben"}
+        onClose={onCloseFreigebenDialog}
+        size="sm"
         variant="default"
-        loading={bulkFreigebenLoading}
-      />
+        title={freigabeFaehig === 1 ? "Rechnung freigeben?" : `${freigabeFaehig} Rechnungen freigeben?`}
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={onCloseFreigebenDialog}
+              disabled={bulkFreigebenLoading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="primary"
+              onClick={onConfirmBulkFreigeben}
+              loading={bulkFreigebenLoading}
+              autoFocus
+            >
+              {bulkFreigebenLoading ? "Gebe frei…" : "Freigeben"}
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {skipped > 0
+            ? `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt. ${skipped} ausgewählte Bestellung${skipped === 1 ? "" : "en"} überspringen wir — keine Rechnung oder bereits freigegeben.`
+            : `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt.`}
+        </p>
+      </Modal>
     </>
   );
 }

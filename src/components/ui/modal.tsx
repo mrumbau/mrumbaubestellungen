@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/cn";
+import { Textarea } from "./textarea";
 
 /**
  * Modal — thin wrapper around the native <dialog> element.
@@ -17,9 +18,22 @@ import { cn } from "@/lib/cn";
  * - Accessible labelling via aria-labelledby when `title` is provided
  * - Body scroll-freeze fallback for browsers that don't lock body on showModal
  * - Size variants aligned with the layout grid
+ *
+ * Variants (UX-R5 consolidation, 2026-06):
+ * - "default"     — neutral structural shell (existing behavior)
+ * - "destructive" — hint to footer wrapper that the primary CTA represents an
+ *                   irreversible action. Caller-provided `footer` is rendered
+ *                   as-is (variant is a hint, not a hard override). Auto-focus
+ *                   shifts to the closest [data-modal-cancel] element so ENTER
+ *                   does not fire the dangerous action by accident.
+ * - "confirm"     — wraps the body with an optional comment textarea (above
+ *                   children). State is hosted by the caller via
+ *                   `onCommentChange`. Combine with `destructive` boolean for
+ *                   confirm-then-destroy patterns (e.g. „Bestellung verwerfen").
  */
 
 type ModalSize = "sm" | "md" | "lg" | "xl" | "2xl";
+type ModalVariant = "default" | "destructive" | "confirm";
 
 const sizeClasses: Record<ModalSize, string> = {
   sm: "max-w-sm",
@@ -44,6 +58,14 @@ export function Modal({
   bodyClassName,
   labelledBy,
   describedBy,
+  variant = "default",
+  destructive = false,
+  commentLabel,
+  commentPlaceholder,
+  commentValue,
+  onCommentChange,
+  commentRows = 3,
+  commentMaxLength,
 }: {
   open: boolean;
   onClose: () => void;
@@ -60,20 +82,61 @@ export function Modal({
   bodyClassName?: string;
   labelledBy?: string;
   describedBy?: string;
+  /**
+   * Variant hint. Default is structurally neutral.
+   * - "destructive" wraps the footer so a `<Button variant="primary">` inside
+   *   is visually demoted to brand-error styling (only when the variant hint
+   *   matches — caller-rendered Buttons remain authoritative).
+   * - "confirm" enables the optional comment textarea via `commentLabel`.
+   */
+  variant?: ModalVariant;
+  /**
+   * Combine with variant="confirm" to apply destructive styling to the
+   * confirm CTA. Ignored on variant="default" (use variant="destructive"
+   * directly there).
+   */
+  destructive?: boolean;
+  /**
+   * Renders a `<Textarea>` above `children` when variant="confirm".
+   * If absent, no comment input is shown even on the confirm variant.
+   */
+  commentLabel?: React.ReactNode;
+  commentPlaceholder?: string;
+  /** Controlled value. Caller hosts state. */
+  commentValue?: string;
+  /** Controlled change callback. Caller hosts state. */
+  onCommentChange?: (value: string) => void;
+  commentRows?: number;
+  commentMaxLength?: number;
 }) {
   const dialogRef = React.useRef<HTMLDialogElement>(null);
   const titleId = React.useId();
   const descId = React.useId();
+  const isDestructive = variant === "destructive" || (variant === "confirm" && destructive);
+  const isConfirm = variant === "confirm";
+  const showCommentField = isConfirm && commentLabel !== undefined;
 
   React.useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {
       dialog.showModal();
+      // Safety-default for destructive variants: shift focus to the cancel
+      // affordance so an accidental ENTER does not fire the dangerous action.
+      // Caller can override by adding autoFocus to their own primary CTA.
+      if (isDestructive) {
+        // defer to next microtask so the dialog has actually mounted children
+        queueMicrotask(() => {
+          const cancelEl = dialog.querySelector<HTMLElement>(
+            "[data-modal-cancel]",
+          );
+          cancelEl?.focus();
+        });
+      }
     } else if (!open && dialog.open) {
       dialog.close();
     }
-  }, [open]);
+  }, [open, isDestructive]);
 
   // Escape key triggers the dialog's `cancel` event → route through onClose.
   const handleCancel = React.useCallback(
@@ -160,9 +223,37 @@ export function Modal({
             )}
           </div>
         )}
-        <div className={cn("flex-1 overflow-y-auto px-5 pb-5", bodyClassName)}>{children}</div>
+        <div className={cn("flex-1 overflow-y-auto px-5 pb-5", bodyClassName)}>
+          {showCommentField && (
+            <div className="mb-4">
+              <Textarea
+                label={commentLabel}
+                placeholder={commentPlaceholder}
+                value={commentValue ?? ""}
+                onChange={(e) => onCommentChange?.(e.target.value)}
+                rows={commentRows}
+                maxLength={commentMaxLength}
+              />
+            </div>
+          )}
+          {children}
+        </div>
         {footer && (
-          <div className="shrink-0 border-t border-line-subtle bg-canvas px-5 py-3 flex items-center justify-end gap-2">
+          <div
+            data-modal-variant={variant}
+            data-modal-destructive={isDestructive || undefined}
+            className={cn(
+              "shrink-0 border-t border-line-subtle bg-canvas px-5 py-3 flex items-center justify-end gap-2",
+              // Variant hint: when the caller drops a `<Button variant="primary">`
+              // into a destructive modal footer, repaint it as brand-error so the
+              // intent matches the action without forcing every call-site to
+              // switch variant. Caller-rendered `variant="destructive"` buttons
+              // are unaffected (already error-styled). Cancel-tier buttons are
+              // unaffected because they use `variant="secondary"` / `ghost`.
+              isDestructive &&
+                "[&_.btn-primary]:bg-error [&_.btn-primary]:hover:bg-error-hover [&_.btn-primary]:text-foreground-inverse",
+            )}
+          >
             {footer}
           </div>
         )}

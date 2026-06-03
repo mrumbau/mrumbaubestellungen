@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 
 interface NeuerHaendler {
   id: string;
@@ -126,19 +127,37 @@ export function DashboardNeueHaendler({
         ))}
       </div>
 
-      <ConfirmDialog
+      <Modal
         open={!!verwerfenId}
-        onCancel={() => setVerwerfenId(null)}
-        onConfirm={() => verwerfenId && verwerfen(verwerfenId)}
+        onClose={() => setVerwerfenId(null)}
+        size="sm"
         title="Händler-Erkennung verwerfen"
-        message={
-          verwerfenItem
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setVerwerfenId(null)}
+              disabled={!!loading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => verwerfenId && verwerfen(verwerfenId)}
+              loading={!!loading}
+            >
+              Verwerfen
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {verwerfenItem
             ? `"${verwerfenItem.name}" (${verwerfenItem.domain}) wurde fälschlich als Händler erkannt — Eintrag löschen?`
-            : ""
-        }
-        confirmLabel="Verwerfen"
-        variant="danger"
-      />
+            : ""}
+        </p>
+      </Modal>
     </div>
   );
 }

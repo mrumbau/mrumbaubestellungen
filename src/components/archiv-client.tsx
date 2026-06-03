@@ -10,8 +10,8 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ActiveFilterPills, BulkToolbar, Button, type ActiveFilterPill } from "@/components/ui";
+import { Modal } from "@/components/ui/modal";
 import { PageHero } from "@/components/ui/page-hero";
 import { IconTrash } from "@/components/ui/icons";
 import {
@@ -403,36 +403,82 @@ export function ArchivClient({
       )}
 
       {/* Confirm Delete Dialog */}
-      <ConfirmDialog
+      <Modal
         open={showDeleteDialog}
-        onCancel={() => {
+        onClose={() => {
           setShowDeleteDialog(false);
           setDeleteLoading(false);
         }}
-        onConfirm={handleBulkDelete}
+        size="sm"
         title={activeTab === "projekte" ? "Projekte löschen" : "Archivierte Einträge löschen"}
-        message={
-          activeTab === "projekte"
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              data-modal-cancel
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeleteLoading(false);
+              }}
+              disabled={deleteLoading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              loading={deleteLoading}
+            >
+              {deleteLoading ? "Lösche..." : "Endgültig löschen"}
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {activeTab === "projekte"
             ? `${selectedIds.size} ${selectedIds.size === 1 ? "Projekt" : "Projekte"} endgültig archivieren? Die zugehörigen Bestellungen bleiben erhalten.`
-            : `${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} und alle zugehörigen Dokumente unwiderruflich löschen?`
-        }
-        confirmLabel={deleteLoading ? "Lösche..." : "Endgültig löschen"}
-        variant="danger"
-      />
+            : `${selectedIds.size} ${selectedIds.size === 1 ? "Eintrag" : "Einträge"} und alle zugehörigen Dokumente unwiderruflich löschen?`}
+        </p>
+      </Modal>
 
       {/* Confirm Reactivate Dialog */}
-      <ConfirmDialog
+      <Modal
         open={showReactivateDialog}
-        onCancel={() => {
+        onClose={() => {
           setShowReactivateDialog(false);
           setReactivateLoading(false);
         }}
-        onConfirm={handleBulkReactivate}
+        size="sm"
         title="Projekte reaktivieren"
-        message={`${selectedIds.size} ${selectedIds.size === 1 ? "Projekt" : "Projekte"} wieder auf „Aktiv" setzen?`}
-        confirmLabel={reactivateLoading ? "..." : "Reaktivieren"}
         variant="default"
-      />
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowReactivateDialog(false);
+                setReactivateLoading(false);
+              }}
+              disabled={reactivateLoading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleBulkReactivate}
+              loading={reactivateLoading}
+              autoFocus
+            >
+              {reactivateLoading ? "..." : "Reaktivieren"}
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {`${selectedIds.size} ${selectedIds.size === 1 ? "Projekt" : "Projekte"} wieder auf „Aktiv" setzen?`}
+        </p>
+      </Modal>
     </div>
   );
 }

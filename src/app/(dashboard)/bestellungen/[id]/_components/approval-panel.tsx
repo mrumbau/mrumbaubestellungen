@@ -19,7 +19,7 @@ import type { BenutzerProfil } from "@/lib/auth";
  *     Pflege-Aktion, nicht Workflow-Abschluss.
  *   - **Ghost / Destructive** = Bestellung verwerfen. Ghost-Style mit
  *     hover:error Affordance, durch industrial-line vom Rest abgetrennt.
- *     ConfirmDialog (destructive) ist die echte Sicherheits-Brücke.
+ *     Modal (variant="destructive") ist die echte Sicherheits-Brücke.
  *
  * Drei-Sprachen-Disziplin: max 1 Primary CTA pro Surface. Wenn freigegeben:
  * Statt-CTA = Success-State-Card. Wenn !hatRechnung: Statt-CTA = ruhiger
@@ -171,7 +171,7 @@ export function ApprovalPanel({
 
       {/* Ghost/Destructive — Bestellung verwerfen. Durch industrial-line
           vom Rest getrennt. Ghost-Style mit hover:error Affordance.
-          ConfirmDialog (variant=danger) ist die echte Sicherheits-Brücke. */}
+          Modal (variant="destructive") ist die echte Sicherheits-Brücke. */}
       {showVerwerfen && (
         <>
           <div className="industrial-line my-1" aria-hidden="true" />

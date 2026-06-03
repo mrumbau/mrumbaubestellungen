@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import { IconPlus, IconEdit, IconTrash, IconCheck, IconX } from "@/components/ui/icons";
 
 export type Rule = {
@@ -257,15 +257,30 @@ export function RulesClient({
         />
       )}
 
-      <ConfirmDialog
+      <Modal
         open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        size="sm"
         title="Regel löschen?"
-        message="Die Regel wird permanent entfernt. Pipeline nutzt für künftige Mails wieder die Standard-5-Stufen-Logik."
-        confirmLabel="Löschen"
-        variant="danger"
-        onConfirm={() => { if (deleteId) deleteRule(deleteId); }}
-        onCancel={() => setDeleteId(null)}
-      />
+        variant="destructive"
+        footer={(
+          <>
+            <Button variant="secondary" onClick={() => setDeleteId(null)}>
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => { if (deleteId) deleteRule(deleteId); }}
+            >
+              Löschen
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          Die Regel wird permanent entfernt. Pipeline nutzt für künftige Mails wieder die Standard-5-Stufen-Logik.
+        </p>
+      </Modal>
     </div>
   );
 }

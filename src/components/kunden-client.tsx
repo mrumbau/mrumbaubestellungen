@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { formatBetrag, formatDatum } from "@/lib/formatters";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   DataTable,
   DensityToggle,
@@ -903,15 +902,27 @@ export function KundenClient({
       )}
 
       {/* Delete Confirm */}
-      <ConfirmDialog
+      <Modal
         open={!!deleteConfirm}
-        onCancel={() => setDeleteConfirm(null)}
-        onConfirm={handleDelete}
+        onClose={() => setDeleteConfirm(null)}
+        size="sm"
         title="Kunde löschen?"
-        message={`„${deleteConfirm?.name}" wird gelöscht. Kunden mit zugeordneten Projekten oder Bestellungen können nicht gelöscht werden — zuerst die Zuordnungen entfernen.`}
-        confirmLabel="Löschen"
-        variant="danger"
-      />
+        variant="destructive"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>
+              Abbrechen
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Löschen
+            </Button>
+          </>
+        }
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {`„${deleteConfirm?.name}" wird gelöscht. Kunden mit zugeordneten Projekten oder Bestellungen können nicht gelöscht werden — zuerst die Zuordnungen entfernen.`}
+        </p>
+      </Modal>
     </div>
   );
 }

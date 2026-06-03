@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import type { BenutzerProfil } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/cn";
 import { useIsDesktop } from "@/lib/hooks/use-is-desktop";
 import { useBestelldetail } from "./use-bestelldetail";
@@ -364,25 +365,67 @@ export function BestelldetailShell({
       )}
 
       {/* Dialogs */}
-      <ConfirmDialog
+      <Modal
         open={bd.showFreigabeDialog}
+        onClose={() => bd.setShowFreigabeDialog(false)}
+        size="sm"
         title="Rechnung freigeben"
-        message="Soll diese Rechnung wirklich freigegeben werden? Sie wird danach für die Buchhaltung sichtbar."
-        confirmLabel="Freigeben"
-        loading={bd.loading}
-        onConfirm={bd.handleFreigabe}
-        onCancel={() => bd.setShowFreigabeDialog(false)}
-      />
-      <ConfirmDialog
+        variant="default"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => bd.setShowFreigabeDialog(false)}
+              disabled={bd.loading}
+              data-modal-cancel
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="primary"
+              onClick={bd.handleFreigabe}
+              loading={bd.loading}
+              autoFocus
+            >
+              Freigeben
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          Soll diese Rechnung wirklich freigegeben werden? Sie wird danach für die Buchhaltung sichtbar.
+        </p>
+      </Modal>
+      <Modal
         open={bd.showVerwerfenDialog}
+        onClose={() => bd.setShowVerwerfenDialog(false)}
+        size="sm"
         title="Bestellung verwerfen?"
-        message="Die Bestellung wird komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden."
-        confirmLabel="Verwerfen"
-        variant="danger"
-        loading={bd.verwerfenLoading}
-        onConfirm={bd.handleVerwerfen}
-        onCancel={() => bd.setShowVerwerfenDialog(false)}
-      />
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => bd.setShowVerwerfenDialog(false)}
+              disabled={bd.verwerfenLoading}
+              data-modal-cancel
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={bd.handleVerwerfen}
+              loading={bd.verwerfenLoading}
+            >
+              Verwerfen
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          Die Bestellung wird komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden.
+        </p>
+      </Modal>
     </>
   );
 }

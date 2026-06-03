@@ -28,7 +28,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { useToast } from "@/components/ui/toast";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -532,17 +531,37 @@ export function OwnerStatement(props: OwnerStatementProps) {
           </div>
         </div>
 
-        <ConfirmDialog
+        <Modal
           open={returnDialogOpen}
+          onClose={() => {
+            if (!isReturning) setReturnDialogOpen(false);
+          }}
+          size="sm"
           title="Zurück in den Pool legen?"
-          message="Andere Besteller sehen sie wieder als nicht zugeordnet und können sie übernehmen. Bisherige Dokumente und Kommentare bleiben erhalten."
-          confirmLabel="Zurücklegen"
-          cancelLabel="Abbrechen"
-          variant="danger"
-          loading={isReturning}
-          onConfirm={handleReturn}
-          onCancel={() => setReturnDialogOpen(false)}
-        />
+          variant="destructive"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setReturnDialogOpen(false)}
+                disabled={isReturning}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleReturn}
+                loading={isReturning}
+              >
+                Zurücklegen
+              </Button>
+            </>
+          }
+        >
+          <p className="text-body-sm text-foreground-muted">
+            Andere Besteller sehen sie wieder als nicht zugeordnet und können sie übernehmen. Bisherige Dokumente und Kommentare bleiben erhalten.
+          </p>
+        </Modal>
 
         <Modal
           open={reassignDialogOpen}

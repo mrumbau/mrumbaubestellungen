@@ -8,6 +8,7 @@
 - **UX-R2 (03.06.2026):** Posteingang mit Lanes statt 4 Owner-Tabs. `/bestellungen/pool`, `/in-arbeit`, `/archiv` mit gemeinsamem Workspace-Layout. Quick-Filter-Chips für Art statt ArtTabs. Layout-Toggle entfernt (Lane bestimmt DNA). Pool-Card refactored: Mahnung als Stufe-1 Banner, Vendor als Hero-Headline. Cmd+K Cross-Lane-Search Foundation.
 - **UX-R3 (03.06.2026):** Detail-Page als editoriale Akte. `BestellnummerHero` als Display-Numeral im PageHero-Wrap. Mahnung als full-width Banner statt Pill. `OwnerStatement` ersetzt `OwnerLane` (3 Render-Pfade mit editorial-DNA, Magnetic-CTA für Pool/Vorschlag). Sidebar 7 Cards → 3 Blöcke (Aktion / Meta / Aktivität). CTA-Hierarchie verschärft: Verwerfen = ghost destructive durch industrial-line getrennt, Mahnung quittieren = secondary.
 - **UX-R4 (03.06.2026):** PageHero auf Hot-Path-Pages (Dashboard, Buchhaltung, Archiv) und Stammdaten (Kunden, Projekte). Neue `UnifiedListCard`-Primitive als Foundation für künftige Listen (3 Variants: vendor-strip / title-strip / table-row). ProjektCard/KundenCard bleiben vorerst mit `borderLeft`-Brand-Identity — Migration braucht UnifiedListCard `accent-color`-Override. Settings/System-Pages behalten `PageHeader`. Build clean, 644/644 Tests grün, keine Token-Leaks.
+- **UX-R5 (03.06.2026):** Modal-Drawer-Heuristik: vier konkurrierende Patterns (Modal/Drawer/ConfirmDialog/Inline) auf zwei konsolidiert. Modal um Variants `destructive` + `confirm` (mit optional Comment-Input) erweitert. 14 ConfirmDialog-Usages migriert. Build clean.
 
 ## Color Strategy
 
@@ -275,6 +276,45 @@ Active-State (`isActive=true`) → `ring-1 ring-brand/40` für strip-Variants, `
 **Settings-Exception:** `/einstellungen` (Hub) und `/einstellungen/system/*` bleiben bei `PageHeader` + nativen Listen. Begründung: Admin-Tooling ist informationsdicht, kein Storytelling. PageHero würde Vertical-Space schlucken ohne Mehrwert zu liefern; UnifiedListCard würde DataTable-Density-Vorteile auflösen.
 
 **Anti-Pattern (vorher):** jede Liste deklarierte `<div class="card card-hover">` mit eigener Padding-Logik und eigenen Hover-Properties → 5 Listen, 5 Mikro-Inkonsistenzen. Jetzt: Foundation-Primitive mit drei semantischen Variants + dokumentierte Override-Stellen für brand-color-Identities.
+
+## Modal- und Drawer-Heuristik (UX-R5, 03.06.2026)
+
+**Audit-Wurzel:** Vier konkurrierende Patterns (`Modal`, `Drawer`, `ConfirmDialog`, Inline-Form) ohne klare Heuristik führten zu Pattern-Drift. Gleiche Intent (z.B. Bestätigungs-Frage) wurde mal als Modal, mal als ConfirmDialog, mal als inline `<dialog>` umgesetzt — abhängig davon welche Page zuerst gebaut wurde. Konsolidiert auf zwei Primitives (`Modal` + `Drawer`) plus Inline-Forms als bewusste dritte Stufe.
+
+### Wann was
+
+**Modal** — blockierende Entscheidung, der User MUSS antworten:
+- Confirm-Dialoge (Verwerfen-Bestätigung, Bezahlt-Bestätigung, Löschen)
+- Setup-Forms (Kunde anlegen, Projekt anlegen, Vendor-Regel anlegen)
+- Destructive-Aktionen mit Bestätigung (Verwerfen mit optionalem Grund-Kommentar)
+- DATEV-Export-Konfiguration (Single-Task-Form ohne Page-Kontext)
+
+**Drawer** — context-bewahrende Aktion, User SOLL Detail-Page/Liste noch sehen können:
+- Quick-Preview (PDF-Vorschau aus Liste ohne Navigation)
+- Reassign (Owner-Zuweisung aus Pool)
+- Side-Quest (Filter-Detail, Saved-View-Editor)
+- Slide-in-Forms wo Kontext relevant bleibt
+
+**Inline-Form** — triviale single-input-Aktion, kein Modal-Overhead gerechtfertigt:
+- Kommentar hinzufügen (direkt in Activity-Block)
+- Status togglen (direkt in Aktion-Card)
+- Einzeiler-Edits mit Direkt-Save
+
+### Modal-Variants
+
+| Variant | Header-Treatment | Footer-CTA | Einsatz |
+|---|---|---|---|
+| `default` | Title + optional Subtitle | Primary + Secondary (Cancel) | Setup-Forms, Edit-Forms, neutrale Tasks |
+| `confirm` | Title + Body-Frage | Primary "Bestätigen" + Ghost "Abbrechen" + optional Comment-Input | Bestätigungs-Fragen ohne Daten-Loss-Risk (Bezahlt-markieren, Freigeben) |
+| `destructive` | Title + Body-Warnung (red-tinted Border-Top) | Destructive-CTA + Ghost "Abbrechen" + optional Comment-Input | Daten-Loss oder unrevertable Aktion (Verwerfen, Löschen) |
+
+Die `confirm`- und `destructive`-Variants akzeptieren optional ein `commentLabel`-Prop — wenn gesetzt rendert das Modal ein Textarea-Input direkt unter der Frage. Damit ersetzt ein Modal-Call zwei vorherige Patterns (`ConfirmDialog` + Comment-Modal).
+
+### Migration-Status
+
+- **Migriert:** 14 ConfirmDialog-Usages auf `Modal`-`confirm`/`destructive`-Variant. Betroffene Pages: Bestelldetail (Verwerfen, Bezahlt-markieren, Freigeben, Mahnung quittieren), Buchhaltung (Bulk-Bezahlt, Bulk-DATEV-Export), Kunden/Projekte (Löschen), Rules-Engine (Regel löschen), Subunternehmer (Löschen), Archiv (Bulk-Wiederherstellen).
+- **Skipped (bewusst):** Drawer-Usages bleiben (PDF-Preview-Drawer, Reassign-Drawer) — sind context-preserving und gehören nicht in die Modal-Konsolidierung. Inline-Forms (Kommentar-Composer, Status-Toggle) bleiben — Modal-Overhead nicht gerechtfertigt.
+- **Anti-Pattern eliminiert:** kein ConfirmDialog-Primitive mehr als separate Komponente — die zwei Patterns (Bestätigen + Bestätigen-mit-Comment) sind jetzt Modal-Variants statt eigene Komponente mit eigenem Look.
 
 ## Motion
 

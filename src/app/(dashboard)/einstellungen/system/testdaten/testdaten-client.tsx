@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { IconPlus, IconTrash } from "@/components/ui/icons";
 
@@ -94,20 +94,38 @@ export function TestdatenClient({
         </div>
       </SectionCard>
 
-      <ConfirmDialog
+      <Modal
         open={confirm !== null}
+        onClose={() => setConfirm(null)}
+        size="sm"
         title={confirm === "create" ? "Testdaten anlegen?" : "Testdaten löschen?"}
-        message={
-          confirm === "create"
+        variant={confirm === "delete" ? "destructive" : "default"}
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirm(null)}
+              disabled={loading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant={confirm === "delete" ? "destructive" : "primary"}
+              onClick={() => confirm && run(confirm)}
+              loading={loading}
+              autoFocus={confirm !== "delete"}
+            >
+              {confirm === "create" ? "Anlegen" : "Löschen"}
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {confirm === "create"
             ? "Es werden mehrere Bestellungen, Projekte und Kunden mit TEST-Präfix angelegt. Kein Risiko für Produktivdaten."
-            : "Alle Einträge mit TEST-Präfix werden unwiderruflich gelöscht."
-        }
-        confirmLabel={confirm === "create" ? "Anlegen" : "Löschen"}
-        variant={confirm === "create" ? "default" : "danger"}
-        loading={loading}
-        onConfirm={() => confirm && run(confirm)}
-        onCancel={() => setConfirm(null)}
-      />
+            : "Alle Einträge mit TEST-Präfix werden unwiderruflich gelöscht."}
+        </p>
+      </Modal>
     </div>
   );
 }

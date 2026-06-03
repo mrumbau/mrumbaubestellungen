@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import {
   IconPlus,
   IconEdit,
@@ -218,20 +218,33 @@ export function HaendlerClient({
         </SectionCard>
       )}
 
-      <ConfirmDialog
+      <Modal
         open={list.deleteConfirm !== null}
+        onClose={list.closeDeleteConfirm}
+        size="sm"
         title="Händler löschen?"
-        message={
-          list.deleteConfirm
+        variant="destructive"
+        footer={(
+          <>
+            <Button variant="secondary" onClick={list.closeDeleteConfirm} disabled={list.loading}>
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
+              loading={list.loading}
+            >
+              Löschen
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {list.deleteConfirm
             ? `Der Händler "${list.deleteConfirm.item.name}" wird endgültig gelöscht. Bereits zugeordnete Bestellungen bleiben erhalten, verlieren aber die Händler-Referenz.`
-            : ""
-        }
-        confirmLabel="Löschen"
-        variant="danger"
-        loading={list.loading}
-        onConfirm={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
-        onCancel={list.closeDeleteConfirm}
-      />
+            : ""}
+        </p>
+      </Modal>
     </div>
   );
 }

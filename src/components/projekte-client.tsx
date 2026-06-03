@@ -21,7 +21,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatBetrag, formatDatum } from "@/lib/formatters";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import {
   DataTable,
   DensityToggle,
@@ -681,14 +681,36 @@ export function ProjekteClient({
       )}
 
       {/* Archiv Confirm */}
-      <ConfirmDialog
+      <Modal
         open={!!archivConfirmId}
-        onCancel={() => setArchivConfirmId(null)}
-        onConfirm={handleArchivConfirm}
+        onClose={() => setArchivConfirmId(null)}
+        size="sm"
         title="Projekt archivieren?"
-        message="Das Projekt wird archiviert und erscheint im Archiv. Bestehende Bestellungen behalten ihre Zuordnung. Du kannst den Status jederzeit zurücksetzen."
-        confirmLabel="Archivieren"
-      />
+        variant="default"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setArchivConfirmId(null)}
+              disabled={statusUpdating === archivConfirmId}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleArchivConfirm}
+              loading={statusUpdating === archivConfirmId}
+              autoFocus
+            >
+              Archivieren
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          Das Projekt wird archiviert und erscheint im Archiv. Bestehende Bestellungen behalten ihre Zuordnung. Du kannst den Status jederzeit zurücksetzen.
+        </p>
+      </Modal>
     </div>
   );
 }

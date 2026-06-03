@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import {
@@ -272,20 +272,37 @@ export function BlacklistClient({ initialListe }: { initialListe: BlacklistEntry
         </div>
       </details>
 
-      <ConfirmDialog
+      <Modal
         open={deleteMuster !== null}
+        onClose={() => setDeleteMuster(null)}
+        size="sm"
         title="Muster entsperren?"
-        message={
-          deleteMuster
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteMuster(null)}
+              disabled={loading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteMuster && handleDelete(deleteMuster)}
+              loading={loading}
+            >
+              Entsperren
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {deleteMuster
             ? `"${deleteMuster}" wird wieder zugelassen. Neue E-Mails von dieser Adresse werden wieder als Bestellung verarbeitet.`
-            : ""
-        }
-        confirmLabel="Entsperren"
-        variant="danger"
-        loading={loading}
-        onConfirm={() => deleteMuster && handleDelete(deleteMuster)}
-        onCancel={() => setDeleteMuster(null)}
-      />
+            : ""}
+        </p>
+      </Modal>
     </div>
   );
 }

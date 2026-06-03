@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import {
   IconPlus,
@@ -373,20 +373,38 @@ export function SubunternehmerClient({
         </SectionCard>
       )}
 
-      <ConfirmDialog
+      <Modal
         open={list.deleteConfirm !== null}
+        onClose={list.closeDeleteConfirm}
+        size="sm"
         title="Subunternehmer löschen?"
-        message={
-          list.deleteConfirm
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={list.closeDeleteConfirm}
+              disabled={list.loading}
+              data-modal-cancel
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
+              loading={list.loading}
+            >
+              Löschen
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {list.deleteConfirm
             ? `"${list.deleteConfirm.item.firma}" wird endgültig gelöscht. Bereits zugeordnete Rechnungen bleiben erhalten.`
-            : ""
-        }
-        confirmLabel="Löschen"
-        variant="danger"
-        loading={list.loading}
-        onConfirm={() => list.deleteConfirm && list.remove(list.deleteConfirm.id)}
-        onCancel={list.closeDeleteConfirm}
-      />
+            : ""}
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import {
@@ -370,20 +370,37 @@ export function ProjekteClient({
         </details>
       )}
 
-      <ConfirmDialog
+      <Modal
         open={archivConfirm !== null}
+        onClose={() => setArchivConfirm(null)}
+        size="sm"
         title="Projekt archivieren?"
-        message={
-          archivConfirm
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setArchivConfirm(null)}
+              disabled={archivLoading}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => archivConfirm && handleArchiv(archivConfirm.id)}
+              loading={archivLoading}
+            >
+              Archivieren
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted">
+          {archivConfirm
             ? `"${archivConfirm.name}" wird archiviert. Wenn noch keine Bestellungen zugeordnet sind, wird es endgültig gelöscht. Bereits zugeordnete Bestellungen bleiben erhalten.`
-            : ""
-        }
-        confirmLabel="Archivieren"
-        variant="danger"
-        loading={archivLoading}
-        onConfirm={() => archivConfirm && handleArchiv(archivConfirm.id)}
-        onCancel={() => setArchivConfirm(null)}
-      />
+            : ""}
+        </p>
+      </Modal>
     </div>
   );
 }
