@@ -68,7 +68,7 @@ export function ProjektFormModal({
       >
         <div className="p-6 border-b border-line">
           <div className="flex items-center justify-between">
-            <h2 className="font-headline text-lg text-foreground tracking-tight">
+            <h2 className="font-headline text-lead text-foreground tracking-tight">
               {editMode ? "Projekt bearbeiten" : "Neues Projekt"}
             </h2>
             <button
@@ -97,7 +97,7 @@ export function ProjektFormModal({
             <input
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
               placeholder="z.B. Umbau Müller Garage"
               autoFocus
             />
@@ -111,7 +111,7 @@ export function ProjektFormModal({
               value={formBeschreibung}
               onChange={(e) => setFormBeschreibung(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
               placeholder="Optionale Beschreibung..."
             />
           </div>
@@ -126,7 +126,7 @@ export function ProjektFormModal({
                   key={f.hex}
                   type="button"
                   onClick={() => setFormFarbe(f.hex)}
-                  className={`w-8 h-8 rounded-lg transition-all ${
+                  className={`w-8 h-8 rounded-lg transition-[transform,box-shadow] ${
                     formFarbe === f.hex ? "ring-2 ring-offset-2" : "hover:scale-110"
                   }`}
                   style={{
@@ -148,7 +148,7 @@ export function ProjektFormModal({
             <select
               value={formKundenId || ""}
               onChange={(e) => setFormKundenId(e.target.value || null)}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
             >
               <option value="">Kein Kunde zugeordnet</option>
               {kunden.map((k) => (
@@ -168,27 +168,27 @@ export function ProjektFormModal({
               inputMode="decimal"
               value={formBudget}
               onChange={(e) => setFormBudget(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground font-mono-amount focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground font-mono-amount focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
               placeholder="Optional"
               min="0"
               step="0.01"
             />
           </div>
 
-          {error && <p className="text-error text-sm">{error}</p>}
+          {error && <p className="text-error text-body-sm">{error}</p>}
         </div>
 
         <div className="p-6 border-t border-line flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
+            className="px-4 py-2 text-body-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
           >
             Abbrechen
           </button>
           <button
             onClick={onSave}
             disabled={saving}
-            className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary px-4 py-2 rounded-lg text-body-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Speichert..." : editMode ? "Änderungen speichern" : "Projekt anlegen"}
           </button>

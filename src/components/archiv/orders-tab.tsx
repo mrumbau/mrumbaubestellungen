@@ -50,17 +50,17 @@ export function OrdersTab({
           {/* Month header — clean separator */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h3 className="font-headline text-sm text-foreground-muted">{group.label}</h3>
+              <h3 className="font-headline text-body-sm text-foreground-muted">{group.label}</h3>
               <span className="text-[10px] text-foreground-faint">{group.items.length} Einträge</span>
             </div>
-            <span className="font-mono-amount text-sm font-semibold text-foreground">
+            <span className="font-mono-amount text-body-sm font-semibold text-foreground">
               {formatBetrag(group.subtotal)}
             </span>
           </div>
 
           {/* Table — consistent with Buchhaltung */}
           <div className="card overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full text-body-sm">
               <thead>
                 <tr className="bg-input border-b border-line">
                   {selectionMode && (
@@ -140,13 +140,13 @@ export function OrdersTab({
 
       {/* Limit hint */}
       {limitReached && (
-        <p className="text-foreground-subtle text-sm text-center py-4">
+        <p className="text-foreground-subtle text-body-sm text-center py-4">
           Maximal 100 Einträge geladen. Ältere Einträge über die Suche finden.
         </p>
       )}
 
       {/* Sum footer */}
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-body-sm">
         <span className="text-foreground-subtle">{orders.length} archiviert</span>
         <span className="font-mono-amount font-semibold text-foreground">
           Summe:{" "}

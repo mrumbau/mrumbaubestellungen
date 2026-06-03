@@ -64,7 +64,7 @@ export function ProjekteTab({
                       className="w-4 h-4 mt-0.5 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer shrink-0"
                     />
                   )}
-                  <h3 className="font-headline text-base text-foreground leading-tight pr-2">{p.name}</h3>
+                  <h3 className="font-headline text-body text-foreground leading-tight pr-2">{p.name}</h3>
                 </div>
                 <span className="inline-flex items-center gap-1 bg-success-bg border border-success-border text-success text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap uppercase tracking-wide">
                   Abgeschlossen
@@ -73,23 +73,23 @@ export function ProjekteTab({
 
               {/* Description */}
               {p.beschreibung && (
-                <p className="text-xs text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
+                <p className="text-meta text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
               )}
 
               {/* Stats row */}
               <div className="flex items-center gap-3 mb-3">
                 {stats ? (
                   <>
-                    <span className="text-xs text-foreground-muted">
+                    <span className="text-meta text-foreground-muted">
                       {stats.count} Bestellung{stats.count !== 1 ? "en" : ""}
                     </span>
                     <div className="h-3 w-px bg-line" />
-                    <span className="font-mono-amount text-sm font-semibold text-foreground">
+                    <span className="font-mono-amount text-body-sm font-semibold text-foreground">
                       {formatBetrag(stats.volumen)}
                     </span>
                   </>
                 ) : (
-                  <span className="text-xs text-foreground-faint">Keine bezahlten Bestellungen</span>
+                  <span className="text-meta text-foreground-faint">Keine bezahlten Bestellungen</span>
                 )}
               </div>
 
@@ -114,7 +114,7 @@ export function ProjekteTab({
                   </div>
                   <div className="w-full h-1.5 bg-line rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-700"
+                      className="h-full rounded-full transition-[width,background-color] duration-700"
                       style={{
                         width: `${Math.min(100, budgetPercent)}%`,
                         backgroundColor:
@@ -136,7 +136,7 @@ export function ProjekteTab({
                   <button
                     type="button"
                     onClick={() => toggleExpand(p.id)}
-                    className="flex items-center gap-1 text-xs text-brand hover:text-brand-light font-medium transition-colors"
+                    className="flex items-center gap-1 text-meta text-brand hover:text-brand-light font-medium transition-colors"
                   >
                     <svg
                       className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
@@ -163,7 +163,7 @@ export function ProjekteTab({
                         key={o.id}
                         href={`/bestellungen/${o.id}`}
                         prefetch={false}
-                        className={`group/row flex items-center justify-between py-2.5 px-2.5 -mx-0.5 rounded-lg hover:bg-line-subtle/60 transition-all ${
+                        className={`group/row flex items-center justify-between py-2.5 px-2.5 -mx-0.5 rounded-lg hover:bg-line-subtle/60 transition-colors ${
                           i < projektOrders.length - 1 ? "border-b border-canvas" : ""
                         }`}
                       >
@@ -173,10 +173,10 @@ export function ProjekteTab({
                               o.bestellungsart === "subunternehmer" ? "bg-warning" : "bg-info"
                             }`}
                           />
-                          <span className="font-mono-amount text-xs font-semibold text-foreground group-hover/row:text-brand transition-colors">
+                          <span className="font-mono-amount text-meta font-semibold text-foreground group-hover/row:text-brand transition-colors">
                             {displayBestellnummer(o)}
                           </span>
-                          <span className="text-xs text-foreground-muted truncate">
+                          <span className="text-meta text-foreground-muted truncate">
                             {o.haendler_name || o.subunternehmer_firma || ""}
                           </span>
                           {o.bestellungsart === "subunternehmer" && (
@@ -186,7 +186,7 @@ export function ProjekteTab({
                           )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-mono-amount text-xs font-medium text-foreground">
+                          <span className="font-mono-amount text-meta font-medium text-foreground">
                             {formatBetrag(Number(o.betrag))}
                           </span>
                           <span className="text-[10px] text-foreground-faint hidden sm:inline">

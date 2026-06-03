@@ -560,7 +560,7 @@ export function ProjekteClient({
           {istAdmin && (
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
+              className="btn-primary px-4 py-2.5 rounded-lg text-body-sm flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -574,7 +574,7 @@ export function ProjekteClient({
 
       {/* Error banner */}
       {error && !showForm && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-meta text-error">
           <span>{error}</span>
           <button type="button" onClick={() => setError("")} aria-label="Fehlermeldung schließen" className="text-error/70 hover:text-error shrink-0">
             <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -667,7 +667,7 @@ export function ProjekteClient({
         <div className="mt-8">
           <Link
             href="/archiv"
-            className="flex items-center gap-2 text-sm text-foreground-subtle hover:text-brand transition-colors group"
+            className="flex items-center gap-2 text-body-sm text-foreground-subtle hover:text-brand transition-colors group"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />

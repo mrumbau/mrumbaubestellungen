@@ -518,7 +518,7 @@ export function BestellungenTabelle({
     <>
       {/* Projekt-Filter Banner */}
       {aktiverProjektName && aktiverProjektFilter && (
-        <div className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-input border border-line rounded-lg text-sm">
+        <div className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-input border border-line rounded-lg text-body-sm">
           <svg
             className="w-4 h-4 text-foreground-subtle shrink-0"
             fill="none"
@@ -874,7 +874,7 @@ export function BestellungenTabelle({
           Im Inbox-Mode versteckt — Pagination kommt in Sprint 3 für die
           Inbox separat falls > 50 Items im Pool. */}
       {totalPages > 1 && !inboxMode && (
-        <div className="mt-4 flex items-center justify-between text-sm">
+        <div className="mt-4 flex items-center justify-between text-body-sm">
           <span className="text-foreground-subtle">
             {sorted.length === totalCount
               ? <>{totalCount} Bestellung{totalCount !== 1 ? "en" : ""} gesamt</>
@@ -885,7 +885,7 @@ export function BestellungenTabelle({
               onClick={() => goToPage(safeCurrentPage - 1)}
               disabled={safeCurrentPage <= 1}
               aria-label="Vorherige Seite"
-              className="p-2 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-2 text-body-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Vorherige Seite"
             >
               <svg
@@ -903,14 +903,14 @@ export function BestellungenTabelle({
                 />
               </svg>
             </button>
-            <span className="text-foreground-muted font-medium px-3 font-mono-amount text-xs">
+            <span className="text-foreground-muted font-medium px-3 font-mono-amount text-meta">
               {safeCurrentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(safeCurrentPage + 1)}
               disabled={safeCurrentPage >= totalPages}
               aria-label="Nächste Seite"
-              className="p-2 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="p-2 text-body-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Nächste Seite"
             >
               <svg

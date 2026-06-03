@@ -60,11 +60,11 @@ export function DashboardKiVorschlaege({
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
-          <h3 className="font-headline text-sm text-foreground tracking-tight">KI-Projekt-Vorschläge</h3>
+          <h3 className="font-headline text-body-sm text-foreground tracking-tight">KI-Projekt-Vorschläge</h3>
         </div>
       </div>
 
-      <p className="text-xs text-foreground-subtle mb-3">
+      <p className="text-meta text-foreground-subtle mb-3">
         Diese Bestellungen wurden automatisch einem Projekt zugeordnet. Bitte prüfen und bestätigen.
       </p>
 
@@ -77,7 +77,7 @@ export function DashboardKiVorschlaege({
                   <Link
                     href={`/bestellungen/${v.id}`}
                     prefetch={false}
-                    className="text-sm font-medium text-foreground hover:text-brand transition-colors"
+                    className="text-body-sm font-medium text-foreground hover:text-brand transition-colors"
                   >
                     {v.bestellnummer || "–"}
                   </Link>
@@ -90,7 +90,7 @@ export function DashboardKiVorschlaege({
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ background: v.vorschlag_projekt_farbe || "#570006" }}
                   />
-                  <span className="text-xs font-medium text-foreground-muted">
+                  <span className="text-meta font-medium text-foreground-muted">
                     {v.vorschlag_projekt_name || "–"}
                   </span>
                   <span className="font-mono-amount text-[10px] text-brand font-bold">
@@ -109,7 +109,7 @@ export function DashboardKiVorschlaege({
                 <button
                   onClick={() => handleAktion(v.id, "bestaetigen")}
                   disabled={loading === v.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -119,7 +119,7 @@ export function DashboardKiVorschlaege({
                 <button
                   onClick={() => handleAktion(v.id, "ablehnen")}
                   disabled={loading === v.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors disabled:opacity-50"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -128,7 +128,7 @@ export function DashboardKiVorschlaege({
                 <Link
                   href={`/bestellungen/${v.id}`}
                   prefetch={false}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

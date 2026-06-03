@@ -17,7 +17,7 @@ export function ReviewActions({
     <div className="flex gap-3 mt-6">
       <button
         onClick={onDiscard}
-        className="flex-1 py-3 px-4 rounded-md border border-line text-foreground-muted text-sm font-medium hover:bg-input transition-colors"
+        className="flex-1 py-3 px-4 rounded-md border border-line text-foreground-muted text-body-sm font-medium hover:bg-input transition-colors"
         disabled={saving}
         aria-label="Kontakt verwerfen"
       >
@@ -26,7 +26,7 @@ export function ReviewActions({
       <button
         onClick={onConfirm}
         disabled={saving || !canSubmit}
-        className="flex-1 py-3 px-4 rounded-md btn-primary text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="flex-1 py-3 px-4 rounded-md btn-primary text-body-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         aria-label="Kontakt bestätigen und im CRM anlegen"
       >
         {saving ? (

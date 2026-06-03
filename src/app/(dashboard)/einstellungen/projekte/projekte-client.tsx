@@ -414,7 +414,7 @@ function FarbePicker({
               aria-label={`Farbe ${farbe}`}
               onClick={() => onChange(farbe)}
               className={cn(
-                "h-7 w-7 rounded-md transition-all",
+                "h-7 w-7 rounded-md transition-[transform,box-shadow]",
                 "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
                 active
                   ? "ring-2 ring-offset-2 ring-foreground scale-110"

@@ -93,7 +93,7 @@ export function DatevExportModal({
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-body-sm font-medium text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
           >
             Abbrechen
           </button>
@@ -118,7 +118,7 @@ export function DatevExportModal({
               type="date"
               value={von}
               onChange={(e) => setVon(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
             />
           </div>
           <div>
@@ -129,7 +129,7 @@ export function DatevExportModal({
               type="date"
               value={bis}
               onChange={(e) => setBis(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
             />
           </div>
         </div>
@@ -161,7 +161,7 @@ export function DatevExportModal({
           <select
             value={datumBasis}
             onChange={(e) => setDatumBasis(e.target.value as "freigabe" | "faelligkeit" | "bestellung")}
-            className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+            className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
           >
             <option value="freigabe">Freigabe-Datum (Standard)</option>
             <option value="faelligkeit">Fälligkeitsdatum (nur Bestellungen mit Fälligkeit)</option>
@@ -188,7 +188,7 @@ export function DatevExportModal({
             <select
               value={projekt}
               onChange={(e) => setProjekt(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
             >
               <option value="">Alle Projekte</option>
               {projekte.map((p) => (
@@ -241,7 +241,7 @@ export function DatevExportModal({
                     onChange={(e) => setBeraterNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
                     maxLength={7}
                     placeholder="231925"
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
                 <div>
@@ -255,7 +255,7 @@ export function DatevExportModal({
                     onChange={(e) => setMandantenNr(e.target.value.replace(/\D/g, "").slice(0, 7))}
                     maxLength={7}
                     placeholder="30086"
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
               </div>
@@ -271,7 +271,7 @@ export function DatevExportModal({
                     onChange={(e) => setGegenKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     maxLength={4}
                     placeholder="4980"
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
                 <div>
@@ -285,7 +285,7 @@ export function DatevExportModal({
                     onChange={(e) => setAufwandsKonto(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     maxLength={4}
                     placeholder="Optional"
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm font-mono-amount text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
               </div>
@@ -294,7 +294,7 @@ export function DatevExportModal({
         </div>
 
         {error && (
-          <div className="p-3 bg-error-bg border border-error-border rounded-lg text-sm text-error" role="alert">
+          <div className="p-3 bg-error-bg border border-error-border rounded-lg text-body-sm text-error" role="alert">
             {error}
           </div>
         )}

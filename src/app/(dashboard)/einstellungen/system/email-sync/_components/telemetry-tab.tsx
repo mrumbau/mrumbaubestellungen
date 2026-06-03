@@ -1,3 +1,4 @@
+// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-xl→text-h2 (war 20px, jetzt 24px)
 "use client";
 
 /**
@@ -89,9 +90,9 @@ export function TelemetryTab({
       {/* Vendor-Breakdown */}
       {data.parser && Object.keys(data.parser.by_vendor).length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-3">Vendor-Parser-Treffer (30 Tage)</h3>
+          <h3 className="text-body-sm font-semibold mb-3">Vendor-Parser-Treffer (30 Tage)</h3>
           <div className="rounded-lg border border-line-subtle overflow-hidden">
-            <table className="w-full text-xs">
+            <table className="w-full text-meta">
               <thead className="bg-canvas border-b border-line-subtle">
                 <tr>
                   <th className="text-left px-3 py-2 uppercase tracking-wider text-foreground-subtle">Parser</th>
@@ -123,9 +124,9 @@ export function TelemetryTab({
 
       {/* Folder-Health */}
       <div>
-        <h3 className="text-sm font-semibold mb-3">Folder-Health</h3>
+        <h3 className="text-body-sm font-semibold mb-3">Folder-Health</h3>
         <div className="rounded-lg border border-line-subtle overflow-hidden">
-          <table className="w-full text-xs">
+          <table className="w-full text-meta">
             <thead className="bg-canvas border-b border-line-subtle">
               <tr>
                 <th className="text-left px-3 py-2 uppercase tracking-wider text-foreground-subtle">Folder</th>
@@ -167,9 +168,9 @@ export function TelemetryTab({
       {/* Top-10 Costly */}
       {data.top_costly.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-3">Top 10 teuerste Mails (30 Tage)</h3>
+          <h3 className="text-body-sm font-semibold mb-3">Top 10 teuerste Mails (30 Tage)</h3>
           <div className="rounded-lg border border-line-subtle overflow-hidden">
-            <table className="w-full text-xs">
+            <table className="w-full text-meta">
               <thead className="bg-canvas border-b border-line-subtle">
                 <tr>
                   <th className="text-left px-3 py-2 uppercase tracking-wider text-foreground-subtle">Zeit</th>
@@ -218,7 +219,7 @@ function Stat({
       </div>
       <div
         className={cn(
-          "text-xl font-semibold font-mono-amount",
+          "text-h2 font-semibold font-mono-amount",
           tone === "warning" && "text-warning",
           tone === "success" && "text-success",
         )}

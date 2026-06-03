@@ -50,7 +50,7 @@ export function ProjektCard({
         {/* Header */}
         <div className="flex items-start justify-between mb-1">
           <div className="min-w-0 flex-1">
-            <h3 className="font-headline text-base text-foreground truncate">{p.name}</h3>
+            <h3 className="font-headline text-body text-foreground truncate">{p.name}</h3>
           </div>
           <div className="flex items-center gap-1.5 ml-2 shrink-0">
             {istAdmin ? (
@@ -98,7 +98,7 @@ export function ProjektCard({
 
         {/* Description */}
         {p.beschreibung && (
-          <p className="text-xs text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
+          <p className="text-meta text-foreground-muted line-clamp-2 mb-3">{p.beschreibung}</p>
         )}
 
         {/* Stats — structured grid */}
@@ -107,7 +107,7 @@ export function ProjektCard({
             <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">
               Bestell.
             </p>
-            <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">
+            <p className="font-mono-amount text-body-sm font-semibold text-foreground mt-0.5">
               {s.gesamt}
             </p>
           </div>
@@ -115,7 +115,7 @@ export function ProjektCard({
             <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">
               Volumen
             </p>
-            <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">
+            <p className="font-mono-amount text-body-sm font-semibold text-foreground mt-0.5">
               {formatBetrag(s.volumen)}
             </p>
           </div>
@@ -124,7 +124,7 @@ export function ProjektCard({
               Offen
             </p>
             <p
-              className={`font-mono-amount text-sm font-semibold mt-0.5 ${s.offen > 0 ? "text-brand" : "text-foreground-faint"}`}
+              className={`font-mono-amount text-body-sm font-semibold mt-0.5 ${s.offen > 0 ? "text-brand" : "text-foreground-faint"}`}
             >
               {s.offen}
             </p>
@@ -144,7 +144,7 @@ export function ProjektCard({
             </div>
             <div className="h-1.5 bg-line rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-700"
+                className="h-full rounded-full transition-[width,background] duration-700"
                 style={{
                   width: `${budgetPercent}%`,
                   background: getBudgetColor(budgetPercent),
@@ -159,7 +159,7 @@ export function ProjektCard({
           <span className="text-[10px] text-foreground-faint">{formatDatum(p.created_at)}</span>
           <Link
             href={`/bestellungen?projekt_id=${p.id}`}
-            className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-light font-medium transition-colors group/link"
+            className="inline-flex items-center gap-1 text-meta text-brand hover:text-brand-light font-medium transition-colors group/link"
           >
             Bestellungen
             <svg

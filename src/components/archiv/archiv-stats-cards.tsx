@@ -1,3 +1,4 @@
+// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-3xl→text-h1 (war 30px, jetzt 28px)
 /**
  * 4 Summary-Cards (Projekte / Material / SU / Volumen) — Bento-Layout.
  *
@@ -55,7 +56,7 @@ export function ArchivStatsCards({ summary }: { summary: ArchivStatsSummary }) {
             <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
               {card.label}
             </p>
-            <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
+            <p className="font-mono-amount text-h1 font-bold text-foreground mt-2 relative">
               {value}
             </p>
           </div>

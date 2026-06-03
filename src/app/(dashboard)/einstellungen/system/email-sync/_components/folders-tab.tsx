@@ -53,7 +53,7 @@ function HealthCard() {
 
   if (loading || !data) {
     return (
-      <div className="rounded-lg border border-line-subtle bg-canvas p-3 text-xs text-foreground-subtle">
+      <div className="rounded-lg border border-line-subtle bg-canvas p-3 text-meta text-foreground-subtle">
         Health wird geladen…
       </div>
     );
@@ -84,7 +84,7 @@ function HealthCard() {
           <Badge tone={tone} size="md">
             Sync-Status: {es.status === "inactive" ? "inaktiv" : es.status}
           </Badge>
-          <span className="text-xs text-foreground-muted">
+          <span className="text-meta text-foreground-muted">
             {es.active_folders} aktive Folder
             {es.pending_in_queue > 0 && ` · ${es.pending_in_queue} in Queue`}
             {es.stale_pending > 0 && ` (${es.stale_pending} stale)`}
@@ -100,7 +100,7 @@ function HealthCard() {
         )}
       </div>
       {es.warnings.length > 0 && (
-        <ul className="text-xs space-y-0.5">
+        <ul className="text-meta space-y-0.5">
           {es.warnings.map((w, i) => (
             <li key={i} className="text-foreground-muted">
               · {w}
@@ -200,7 +200,7 @@ function SubscriptionCard({
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-line-subtle bg-canvas p-3 text-xs text-foreground-subtle">
+      <div className="rounded-lg border border-line-subtle bg-canvas p-3 text-meta text-foreground-subtle">
         Push-Subscriptions werden geladen…
       </div>
     );
@@ -239,17 +239,17 @@ function SubscriptionCard({
             Push-Subscriptions: {activeSubs.length} / {activeFolders} aktiv
           </Badge>
           {missing > 0 && (
-            <span className="text-xs text-foreground-muted">
+            <span className="text-meta text-foreground-muted">
               {missing} Folder ohne Subscription · läuft auf Polling (~60s Latenz)
             </span>
           )}
           {expiredOrBroken.length > 0 && (
-            <span className="text-xs text-error">
+            <span className="text-meta text-error">
               {expiredOrBroken.length} expired oder mit Fehler · graph-rescue heilt automatisch
             </span>
           )}
           {activeSubs.length > 0 && missing === 0 && expiredOrBroken.length === 0 && (
-            <span className="text-xs text-foreground-muted">
+            <span className="text-meta text-foreground-muted">
               Real-Time-Empfang aktiv · Renewal alle 12h via Cron
             </span>
           )}
@@ -408,7 +408,7 @@ export function FoldersTab({
       <HealthCard />
       <SubscriptionCard activeFolders={activeFolderCount} toast={toast} />
       <div className="flex items-center justify-between">
-        <p className="text-sm text-foreground-muted">
+        <p className="text-body-sm text-foreground-muted">
           Konfigurierte Outlook-Folder. Cron iteriert nur aktive Folder. Der Folder-Hint hilft der KI bei
           Klassifikation, kann aber von ihr überschrieben werden.
         </p>
@@ -432,7 +432,7 @@ export function FoldersTab({
         />
       ) : (
         <div className="rounded-lg border border-line-subtle overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-body-sm">
             <thead className="bg-canvas border-b border-line-subtle">
               <tr>
                 <th className="text-left px-4 py-2.5 text-[12px] font-semibold tracking-wider uppercase text-foreground-subtle">
@@ -463,7 +463,7 @@ export function FoldersTab({
                     <Select
                       value={f.document_hint ?? ""}
                       onChange={(e) => changeHint(f, e.target.value)}
-                      className="text-xs"
+                      className="text-meta"
                     >
                       <option value="">— kein Hint —</option>
                       <option value="rechnung">Rechnung</option>
@@ -611,8 +611,8 @@ function FolderAddModal({
   return (
     <Modal open onClose={onClose} title="Outlook-Folder hinzufügen" size="lg">
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-foreground-muted">
-          Wähle einen Folder aus dem Outlook-Postfach <code className="font-mono-amount text-xs bg-canvas px-1 py-0.5 rounded">info@mrumbau.de</code>.
+        <p className="text-body-sm text-foreground-muted">
+          Wähle einen Folder aus dem Outlook-Postfach <code className="font-mono-amount text-meta bg-canvas px-1 py-0.5 rounded">info@mrumbau.de</code>.
           Bereits konfigurierte Folder werden ausgeblendet.
         </p>
 
@@ -623,13 +623,13 @@ function FolderAddModal({
         )}
 
         {error && (
-          <div className="rounded-md bg-error-bg border border-error-border p-3 text-sm text-error">
+          <div className="rounded-md bg-error-bg border border-error-border p-3 text-body-sm text-error">
             {error}
           </div>
         )}
 
         {graphFolders && graphFolders.length === 0 && !loading && (
-          <p className="text-sm text-foreground-subtle italic">
+          <p className="text-body-sm text-foreground-subtle italic">
             Alle verfügbaren Folder sind bereits konfiguriert.
           </p>
         )}
@@ -642,7 +642,7 @@ function FolderAddModal({
                 type="button"
                 onClick={() => setSelected(gf)}
                 className={cn(
-                  "w-full text-left px-3 py-2 text-sm border-b border-line-subtle last:border-0 hover:bg-canvas transition-colors",
+                  "w-full text-left px-3 py-2 text-body-sm border-b border-line-subtle last:border-0 hover:bg-canvas transition-colors",
                   selected?.id === gf.id && "bg-canvas",
                 )}
               >
@@ -657,7 +657,7 @@ function FolderAddModal({
 
         {selected && (
           <div className="rounded-md bg-canvas border border-line-subtle p-3">
-            <div className="text-xs font-semibold mb-2">Document-Hint (optional)</div>
+            <div className="text-meta font-semibold mb-2">Document-Hint (optional)</div>
             <Select value={hint} onChange={(e) => setHint(e.target.value)}>
               <option value="">— kein Hint —</option>
               <option value="rechnung">Rechnung</option>

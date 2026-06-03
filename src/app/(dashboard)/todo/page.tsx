@@ -154,8 +154,8 @@ export default async function TodoPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="font-headline text-lg text-foreground mb-1">Alles erledigt</h2>
-          <p className="text-foreground-subtle text-sm">
+          <h2 className="font-headline text-lead text-foreground mb-1">Alles erledigt</h2>
+          <p className="text-foreground-subtle text-body-sm">
             Keine offenen Stammdaten-Aufgaben.
           </p>
         </div>

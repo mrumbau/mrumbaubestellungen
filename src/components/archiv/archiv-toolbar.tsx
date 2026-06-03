@@ -86,7 +86,7 @@ export function ArchivToolbar({
           <button
             key={tab.key}
             onClick={() => onTabChange(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
+            className={`flex items-center gap-2 px-4 py-2 text-body-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               activeTab === tab.key
                 ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
@@ -127,7 +127,7 @@ export function ArchivToolbar({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Projekt, Bestellnummer, Händler..."
-            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-lg text-body-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
           />
         </div>
         <input
@@ -135,14 +135,14 @@ export function ArchivToolbar({
           value={dateFrom}
           onChange={(e) => onDateFromChange(e.target.value)}
           title="Von"
-          className="w-full sm:w-auto px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+          className="w-full sm:w-auto px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
         />
         <input
           type="date"
           value={dateTo}
           onChange={(e) => onDateToChange(e.target.value)}
           title="Bis"
-          className="w-full sm:w-auto px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+          className="w-full sm:w-auto px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
         />
         {hasFilters && (
           <button

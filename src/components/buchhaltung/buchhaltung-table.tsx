@@ -52,7 +52,7 @@ export function BuchhaltungTable({
 }: BuchhaltungTableProps) {
   return (
     <div className="mt-4 card overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[640px] text-body-sm">
         <thead>
           <tr className="bg-input border-b border-line sticky top-0 z-10">
             {selectionMode && (
@@ -197,7 +197,7 @@ export function BuchhaltungTable({
                 </td>
                 <td className="px-4 py-3.5 text-center">
                   {r.bestellungsart === "subunternehmer" ? (
-                    <span className="text-line-strong text-xs">–</span>
+                    <span className="text-line-strong text-meta">–</span>
                   ) : r.hat_bestellbestaetigung ? (
                     <svg
                       className="w-4 h-4 text-success mx-auto"
@@ -214,7 +214,7 @@ export function BuchhaltungTable({
                 </td>
                 <td className="px-4 py-3.5 text-center">
                   {r.bestellungsart === "subunternehmer" ? (
-                    <span className="text-line-strong text-xs">–</span>
+                    <span className="text-line-strong text-meta">–</span>
                   ) : r.hat_lieferschein ? (
                     <svg
                       className="w-4 h-4 text-success mx-auto"
@@ -240,17 +240,17 @@ export function BuchhaltungTable({
                   </span>
                 </td>
                 <td className="px-4 py-3.5 text-foreground-muted">{r.freigegeben_von}</td>
-                <td className="px-4 py-3.5 text-foreground-subtle text-xs">
+                <td className="px-4 py-3.5 text-foreground-subtle text-meta">
                   {formatDatum(r.freigegeben_am)}
                 </td>
                 <td className="px-4 py-3.5">
                   <span
                     className={
                       isUeberfaellig(r.faelligkeitsdatum)
-                        ? "text-error font-semibold font-mono-amount text-xs pulse-urgent"
+                        ? "text-error font-semibold font-mono-amount text-meta pulse-urgent"
                         : isFaelligBald(r.faelligkeitsdatum)
-                          ? "text-warning font-semibold font-mono-amount text-xs"
-                          : "text-foreground-subtle text-xs"
+                          ? "text-warning font-semibold font-mono-amount text-meta"
+                          : "text-foreground-subtle text-meta"
                     }
                   >
                     {formatDatum(r.faelligkeitsdatum)}
@@ -319,7 +319,7 @@ export function BuchhaltungTable({
                       type="button"
                       onClick={() => onToggleBezahlt(r.id, false)}
                       disabled={bezahltLoading === r.id}
-                      className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all border-line-strong hover:border-success text-transparent hover:text-success ${
+                      className={`inline-flex items-center justify-center w-6 h-6 rounded-md border-2 transition-colors border-line-strong hover:border-success text-transparent hover:text-success ${
                         bezahltLoading === r.id ? "opacity-50 cursor-wait" : "cursor-pointer"
                       }`}
                       title="Als bezahlt markieren"

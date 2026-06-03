@@ -141,6 +141,17 @@
      Info-events (dok, kommentar) reference the neutral text-* tokens directly —
      no dedicated timeline tokens, since they would be mere aliases. */
 
+  /* Aging-Wash (UX-R1, 03.06.2026) — Drei-Sprachen-Disziplin v2 Stufe 3.
+     Pool-Cards bekommen subtile Hintergrund-Tönung bei zunehmendem Alter.
+     `stale` (≥7 Tage) = amber, `rotting` (≥14 Tage) = rose. Beide hellgenug
+     dass Owner-Pill (brand) + Status-Pill (status-tokens) lesbar bleiben.
+     Werte entsprechen amber-50/40 + rose-50/40 (so wie sie heute eingesetzt
+     wurden), jetzt als Token zentralisiert. Dark-mode-Pendants extra. */
+  --aging-stale-bg: rgba(255, 251, 235, 0.4);    /* amber-50 / 40% */
+  --aging-rotting-bg: rgba(255, 241, 242, 0.4);  /* rose-50 / 40% */
+  --aging-stale-bg-dark: rgba(120, 53, 15, 0.15);   /* amber-900 / 15% */
+  --aging-rotting-bg-dark: rgba(136, 19, 55, 0.15); /* rose-900 / 15% */
+
   /* Bestellungsart — material/subunternehmer/abo Sub-Categories.
    * Visual hint in tables and badges to distinguish workflow types.
    */
@@ -345,6 +356,10 @@
   --color-bestellungsart-abo-bg: var(--bestellungsart-abo-bg);
   --color-bestellungsart-abo-text: var(--bestellungsart-abo-text);
 
+  /* Aging-Wash (UX-R1) — Pool-Card-Background-Tönung nach Alter */
+  --color-aging-stale: var(--aging-stale-bg);
+  --color-aging-rotting: var(--aging-rotting-bg);
+
   /* CardScan-Sub-Brand */
   --color-cs-accent: var(--cs-accent);
   --color-cs-accent-light: var(--cs-accent-light);
@@ -545,6 +560,13 @@ body {
 .text-lead    { font-size: var(--text-lead);    line-height: 1.5; }
 .text-h2      { font-size: var(--text-h2);      line-height: 1.2; }
 .text-h1      { font-size: var(--text-h1);      line-height: 1.15; }
+
+/* Editorial Display-Skalen (UX-R1, 03.06.2026) — clamp-basiert für PageHero
+   und BestellnummerHero. Erbt `font-headline` (Barlow Condensed) wenn ein
+   übergeordneter Container die Klasse trägt. Bewusst keine Token-CSS-Vars
+   weil clamp-Werte selbst die Skala sind. */
+.text-display-section { font-size: clamp(28px, 4vw, 40px); line-height: 1.05; letter-spacing: -0.01em; }
+.text-display-numeral { font-size: clamp(36px, 5vw, 64px); line-height: 1; letter-spacing: -0.02em; }
 
 /* ============================================
    Custom Scrollbar

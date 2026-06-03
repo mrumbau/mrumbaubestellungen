@@ -59,7 +59,7 @@ export function ContactFieldsCard({
 
   return (
     <div className="card p-4 mb-4">
-      <h2 className="text-sm font-medium text-foreground-muted uppercase tracking-wider mb-4">
+      <h2 className="text-body-sm font-medium text-foreground-muted uppercase tracking-wider mb-4">
         Kontaktdaten
       </h2>
       <div className="space-y-3">
@@ -71,14 +71,14 @@ export function ContactFieldsCard({
           if (field.type === "select") {
             return (
               <label key={field.key} className="block">
-                <span className="text-xs text-foreground-muted flex items-center">
+                <span className="text-meta text-foreground-muted flex items-center">
                   {field.label}
                   <ConfidenceBadge score={conf} />
                 </span>
                 <select
                   value={value}
                   onChange={(e) => onChange(field.key, e.target.value)}
-                  className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                  className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 >
                   {field.options?.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -92,7 +92,7 @@ export function ContactFieldsCard({
 
           return (
             <label key={field.key} className="block">
-              <span className="text-xs text-foreground-muted flex items-center">
+              <span className="text-meta text-foreground-muted flex items-center">
                 {field.label}
                 <ConfidenceBadge score={conf} />
               </span>
@@ -100,7 +100,7 @@ export function ContactFieldsCard({
                 type="text"
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
-                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 placeholder={`${field.label}…`}
               />
             </label>

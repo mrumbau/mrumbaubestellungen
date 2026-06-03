@@ -73,13 +73,13 @@ export function ConfidenceOverview({ overall }: ConfidenceOverviewProps) {
         className={`w-10 h-10 rounded-md flex flex-col items-center justify-center text-white ${bgColor} relative`}
       >
         <Icon className="w-3.5 h-3.5 absolute top-1 right-1 opacity-80" aria-hidden="true" />
-        <span className="text-sm font-bold leading-none">{percent}%</span>
+        <span className="text-body-sm font-bold leading-none">{percent}%</span>
       </div>
       <div>
-        <p className="text-sm font-medium text-foreground">
+        <p className="text-body-sm font-medium text-foreground">
           Gesamt-Konfidenz
         </p>
-        <p className="text-xs text-foreground-subtle">{description}</p>
+        <p className="text-meta text-foreground-subtle">{description}</p>
       </div>
     </div>
   );

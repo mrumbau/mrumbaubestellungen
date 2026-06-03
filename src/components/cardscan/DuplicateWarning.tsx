@@ -32,12 +32,12 @@ export function DuplicateWarning({
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-warning">
+          <p className="text-body-sm font-medium text-warning">
             Möglicherweise bereits vorhanden ({scorePercent}% Übereinstimmung)
           </p>
           <div className="mt-2 space-y-1.5">
             {matches.slice(0, 3).map((m, i) => (
-              <div key={i} className="text-xs text-warning bg-warning-bg/50 rounded px-2 py-1">
+              <div key={i} className="text-meta text-warning bg-warning-bg/50 rounded px-2 py-1">
                 <span className="font-medium uppercase text-[10px] mr-1.5">
                   {CRM_LABELS[m.crm]}
                 </span>
@@ -53,25 +53,25 @@ export function DuplicateWarning({
             <div className="mt-3 flex gap-3">
               <button
                 onClick={() => onUpdate(bestMatch)}
-                className="text-xs font-medium px-4 py-3 rounded-md bg-warning text-white hover:bg-warning/90 active:bg-warning/80 transition-colors min-h-[44px]"
+                className="text-meta font-medium px-4 py-3 rounded-md bg-warning text-white hover:bg-warning/90 active:bg-warning/80 transition-colors min-h-[44px]"
               >
                 Daten ergänzen
               </button>
               <button
                 onClick={onOverride}
-                className="text-xs font-medium text-warning hover:text-warning/80 active:text-warning/70 underline transition-colors min-h-[44px] flex items-center"
+                className="text-meta font-medium text-warning hover:text-warning/80 active:text-warning/70 underline transition-colors min-h-[44px] flex items-center"
               >
                 Trotzdem neu anlegen
               </button>
             </div>
           )}
           {action === "update" && (
-            <p className="mt-2 text-xs text-warning font-medium">
+            <p className="mt-2 text-meta text-warning font-medium">
               Bestehender Kunde wird aktualisiert
             </p>
           )}
           {action === "override" && (
-            <p className="mt-2 text-xs text-warning font-medium">
+            <p className="mt-2 text-meta text-warning font-medium">
               Wird trotz Duplikat neu angelegt
             </p>
           )}

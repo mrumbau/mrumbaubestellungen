@@ -18,14 +18,14 @@ export function ErrorBadgeLink({ isAdmin = false }: { isAdmin?: boolean }) {
     <div className="flex items-center justify-between">
       <Link
         href="/cardscan/history"
-        className="text-xs text-foreground-subtle hover:text-foreground-muted transition-colors py-2"
+        className="text-meta text-foreground-subtle hover:text-foreground-muted transition-colors py-2"
       >
         Letzte Scans →
       </Link>
       {isAdmin && errorCount > 0 && (
         <Link
           href="/cardscan/errors"
-          className="flex items-center gap-1.5 text-xs text-error hover:text-error/80 active:text-error/70 transition-colors py-2"
+          className="flex items-center gap-1.5 text-meta text-error hover:text-error/80 active:text-error/70 transition-colors py-2"
         >
           <span className="rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center leading-none" style={{ width: 18, height: 18 }}>
             {errorCount}

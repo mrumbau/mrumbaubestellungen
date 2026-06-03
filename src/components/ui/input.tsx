@@ -19,7 +19,7 @@ export const inputBase =
   "focus:outline-none focus:border-brand focus:bg-surface focus:shadow-[var(--shadow-focus-ring)] " +
   "disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-canvas " +
   "aria-[invalid=true]:border-error aria-[invalid=true]:focus:shadow-[0_0_0_3px_rgba(220,38,38,0.18)] " +
-  "text-base md:text-sm";
+  "text-body md:text-sm";
 
 export const inputSizeVariants = cva("", {
   variants: {

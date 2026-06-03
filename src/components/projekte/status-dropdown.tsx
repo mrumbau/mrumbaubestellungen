@@ -84,7 +84,7 @@ export function StatusDropdown({
           setOpen(!open);
         }}
         disabled={disabled}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border transition-all ${cfg.bg} ${cfg.text} ${cfg.border} ${disabled ? "opacity-50 cursor-not-allowed" : "hover:shadow-sm cursor-pointer"}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded border transition-[box-shadow,background-color,border-color] ${cfg.bg} ${cfg.text} ${cfg.border} ${disabled ? "opacity-50 cursor-not-allowed" : "hover:shadow-sm cursor-pointer"}`}
       >
         <StatusIcon type={cfg.icon} className="w-2.5 h-2.5" />
         {cfg.value === "archiviert" ? "Archiviert" : cfg.label}
@@ -113,7 +113,7 @@ export function StatusDropdown({
                   setOpen(false);
                   if (!isActive) onSelect(opt.value);
                 }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left text-meta transition-colors ${
                   isActive
                     ? "bg-input font-semibold text-foreground"
                     : opt.value === "archiviert"

@@ -523,7 +523,7 @@ export function KundenClient({
           {istAdmin && (
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2"
+              className="btn-primary px-4 py-2.5 rounded-lg text-body-sm flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -537,7 +537,7 @@ export function KundenClient({
 
       {/* Error banner */}
       {error && !showForm && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-meta text-error">
           <span>{error}</span>
           <button type="button" onClick={() => setError("")} aria-label="Fehlermeldung schließen" className="text-error/70 hover:text-error shrink-0">
             <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -552,17 +552,17 @@ export function KundenClient({
             <svg className="w-4 h-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <h2 className="font-headline text-sm text-foreground">Auto-erkannte Kunden</h2>
+            <h2 className="font-headline text-body-sm text-foreground">Auto-erkannte Kunden</h2>
             <span className="text-[10px] font-bold text-warning bg-warning-bg px-2 py-0.5 rounded">{unbestaetigt.length}</span>
           </div>
-          <p className="text-xs text-foreground-subtle mb-3">Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.</p>
+          <p className="text-meta text-foreground-subtle mb-3">Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.</p>
           <div className="space-y-2">
             {unbestaetigt.map((k) => (
               <div key={k.id} className="flex items-center justify-between p-3 bg-warning-bg/50 rounded-lg">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-3 h-3 rounded-full shrink-0" style={{ background: k.farbe }} />
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-foreground">{k.name}</span>
+                    <span className="text-body-sm font-medium text-foreground">{k.name}</span>
                     {k.keywords.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {k.keywords.map((kw, i) => (
@@ -576,7 +576,7 @@ export function KundenClient({
                   <button
                     onClick={() => handleBestaetigen(k.id)}
                     disabled={confirmLoading === k.id}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg rounded-lg hover:bg-success-border/40 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-success bg-success-bg rounded-lg hover:bg-success-border/40 disabled:opacity-50 transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -585,7 +585,7 @@ export function KundenClient({
                   </button>
                   <button
                     onClick={() => openEdit(k)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -612,14 +612,14 @@ export function KundenClient({
             <button
               onClick={resetForm}
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-body-sm font-medium text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
             >
               Abbrechen
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary px-4 py-2 rounded-lg text-body-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? "Speichert..." : editId ? "Änderungen speichern" : "Kunde anlegen"}
             </button>
@@ -633,7 +633,7 @@ export function KundenClient({
                   <input
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                     placeholder="z.B. Familie Müller"
                     autoFocus
                   />
@@ -643,7 +643,7 @@ export function KundenClient({
                   <input
                     value={formKuerzel}
                     onChange={(e) => setFormKuerzel(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                     placeholder="z.B. MUE"
                   />
                 </div>
@@ -654,7 +654,7 @@ export function KundenClient({
                 <input
                   value={formAdresse}
                   onChange={(e) => setFormAdresse(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   placeholder="Straße Nr, PLZ Ort"
                 />
               </div>
@@ -668,7 +668,7 @@ export function KundenClient({
                     autoComplete="email"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
                 <div>
@@ -679,7 +679,7 @@ export function KundenClient({
                     autoComplete="tel"
                     value={formTelefon}
                     onChange={(e) => setFormTelefon(e.target.value)}
-                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                    className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   />
                 </div>
               </div>
@@ -690,7 +690,7 @@ export function KundenClient({
                   value={formNotizen}
                   onChange={(e) => setFormNotizen(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] resize-none"
                   placeholder="Interne Notizen..."
                 />
               </div>
@@ -711,7 +711,7 @@ export function KundenClient({
                   value={formKeywordInput}
                   onChange={(e) => setFormKeywordInput(e.target.value)}
                   onKeyDown={handleKeywordAdd}
-                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
+                  className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)]"
                   placeholder="Keyword eingeben + Enter"
                 />
               </div>
@@ -724,7 +724,7 @@ export function KundenClient({
                       key={f.hex}
                       type="button"
                       onClick={() => setFormFarbe(f.hex)}
-                      className={`w-8 h-8 rounded-lg transition-all ${
+                      className={`w-8 h-8 rounded-lg transition-[transform,box-shadow] ${
                         formFarbe === f.hex ? "ring-2 ring-offset-2" : "hover:scale-110"
                       }`}
                       style={{
@@ -738,7 +738,7 @@ export function KundenClient({
               </div>
 
           {error && (
-            <p className="text-error text-sm" role="alert">
+            <p className="text-error text-body-sm" role="alert">
               {error}
             </p>
           )}
@@ -807,7 +807,7 @@ export function KundenClient({
                   {/* Header */}
                   <div className="flex items-start justify-between mb-1">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-headline text-base text-foreground truncate">{k.name}</h3>
+                      <h3 className="font-headline text-body text-foreground truncate">{k.name}</h3>
                       {k.kuerzel && (
                         <span className="text-[10px] text-foreground-faint font-mono">{k.kuerzel}</span>
                       )}
@@ -838,7 +838,7 @@ export function KundenClient({
 
                   {/* Adresse + Kontakt */}
                   {k.adresse && (
-                    <p className="text-xs text-foreground-muted truncate mt-1">{k.adresse}</p>
+                    <p className="text-meta text-foreground-muted truncate mt-1">{k.adresse}</p>
                   )}
                   {(k.email || k.telefon) && (
                     <div className="flex items-center gap-3 mt-1.5 text-[12px] text-foreground-subtle">
@@ -865,15 +865,15 @@ export function KundenClient({
                   <div className="grid grid-cols-3 gap-2 mt-3 p-3 bg-input rounded-lg border border-line-subtle min-w-0">
                     <div>
                       <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Projekte</p>
-                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.projekte}</p>
+                      <p className="font-mono-amount text-body-sm font-semibold text-foreground mt-0.5">{s.projekte}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Bestell.</p>
-                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{s.bestellungen}</p>
+                      <p className="font-mono-amount text-body-sm font-semibold text-foreground mt-0.5">{s.bestellungen}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-foreground-subtle uppercase tracking-wider font-semibold">Volumen</p>
-                      <p className="font-mono-amount text-sm font-semibold text-foreground mt-0.5">{formatBetrag(s.volumen)}</p>
+                      <p className="font-mono-amount text-body-sm font-semibold text-foreground mt-0.5">{formatBetrag(s.volumen)}</p>
                     </div>
                   </div>
 

@@ -356,7 +356,7 @@ function DsgvoErasureModal({
             disabled={isPending}
             autoComplete="off"
             spellCheck={false}
-            className="px-3 py-2 rounded-md border border-line-strong bg-input text-foreground font-mono-amount text-sm focus:outline-none focus:shadow-[var(--shadow-focus-ring)]"
+            className="px-3 py-2 rounded-md border border-line-strong bg-input text-foreground font-mono-amount text-body-sm focus:outline-none focus:shadow-[var(--shadow-focus-ring)]"
           />
         </div>
       </div>

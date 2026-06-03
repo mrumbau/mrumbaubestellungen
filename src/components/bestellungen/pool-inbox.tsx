@@ -1,3 +1,4 @@
+// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-xl→text-h2 (war 20px, jetzt 24px)
 "use client";
 
 /**
@@ -178,7 +179,7 @@ export function PoolInbox({
         />
       ))}
       {sortedBestellungen.length === 0 && (
-        <div className="text-center text-foreground-subtle text-sm py-10">
+        <div className="text-center text-foreground-subtle text-body-sm py-10">
           Pool ist leer. Sobald eine Material-Mail ankommt, taucht sie hier auf.
         </div>
       )}
@@ -360,7 +361,7 @@ function PoolInboxCard({
           className="text-right shrink-0 flex flex-col items-end gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="font-mono-amount text-xl font-semibold text-foreground tabular-nums leading-tight">
+          <div className="font-mono-amount text-h2 font-semibold text-foreground tabular-nums leading-tight">
             <BetragCell
               betrag={b.betrag}
               waehrung={b.waehrung}

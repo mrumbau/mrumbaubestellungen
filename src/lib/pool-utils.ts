@@ -36,16 +36,18 @@ export function bucketAge(daysOld: number): AgingBucket {
  * Tailwind-Wash-Klasse für den Pool-Card-Background. NULL = kein Wash
  * (Card behält Standard-Surface-Background).
  *
- * Drei-Sprachen-Disziplin: Wash maxt bei /40 Opacity, nie satter —
- * Owner-Pill (brand) und Status-Cell (status-tokens) müssen darüber
- * weiterhin lesbar bleiben.
+ * Drei-Sprachen-Disziplin v2 (UX-R1, 03.06.2026): Wash ist Stufe-3-Element.
+ * Maxt bei /40 Opacity, nie satter — Owner-Pill (brand) und Status-Cell
+ * (status-tokens) müssen darüber lesbar bleiben.
+ *
+ * Tokens (`--color-aging-stale` / `-rotting`) in globals.css zentralisiert.
  */
 export function agingWashClass(bucket: AgingBucket): string | null {
   switch (bucket) {
     case "stale":
-      return "bg-amber-50/40 dark:bg-amber-900/15";
+      return "bg-aging-stale";
     case "rotting":
-      return "bg-rose-50/40 dark:bg-rose-900/15";
+      return "bg-aging-rotting";
     case "fresh":
     case "ripening":
     default:

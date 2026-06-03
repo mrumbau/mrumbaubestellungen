@@ -17,7 +17,7 @@ export default function BestellungenLoading() {
 
       {/* Tabelle */}
       <div className="mt-4 bg-surface rounded-xl border border-line overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-body-sm">
           <thead>
             <tr className="bg-input">
               <th className="px-4 py-3"><div className="h-3 skeleton rounded w-20" /></th>

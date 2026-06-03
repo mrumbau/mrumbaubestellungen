@@ -1,3 +1,4 @@
+// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-3xl→text-h1 (war 30px, jetzt 28px)
 "use client";
 
 /**
@@ -60,7 +61,7 @@ export function BuchhaltungSummaryCards({
         <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
           Bezahlt
         </p>
-        <p className="font-mono-amount text-3xl font-bold text-foreground mt-2 relative">
+        <p className="font-mono-amount text-h1 font-bold text-foreground mt-2 relative">
           {EUR.format(summeBezahlt)}
         </p>
         <p className="text-[12px] text-foreground-subtle mt-1 relative">
@@ -78,7 +79,7 @@ export function BuchhaltungSummaryCards({
         <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
           Nächste Fällig
         </p>
-        <p className="font-mono-amount text-2xl font-bold text-foreground mt-2 relative">
+        <p className="font-mono-amount text-h2 font-bold text-foreground mt-2 relative">
           {naechsteFaelligDatum ? formatDatum(naechsteFaelligDatum) : "–"}
         </p>
         <p className="text-[12px] text-foreground-subtle mt-1 relative">

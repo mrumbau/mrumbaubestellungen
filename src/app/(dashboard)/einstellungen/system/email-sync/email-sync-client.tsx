@@ -84,7 +84,7 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        "px-3 py-1.5 text-xs font-medium rounded transition-colors min-h-[44px] md:min-h-0",
+        "px-3 py-1.5 text-meta font-medium rounded transition-colors min-h-[44px] md:min-h-0",
         "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
         active
           ? "bg-surface text-foreground shadow-card"

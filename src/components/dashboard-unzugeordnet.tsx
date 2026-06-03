@@ -132,16 +132,16 @@ export function DashboardUnzugeordnet({
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>
-          <h3 className="font-headline text-sm text-foreground tracking-tight">Nicht zugeordnet</h3>
+          <h3 className="font-headline text-body-sm text-foreground tracking-tight">Nicht zugeordnet</h3>
         </div>
       </div>
 
-      <p className="text-xs text-foreground-subtle mb-3">
+      <p className="text-meta text-foreground-subtle mb-3">
         Diese Bestellungen konnten keinem Besteller zugeordnet werden.
       </p>
 
       {fehler && (
-        <p className="text-xs text-error bg-error-bg rounded px-2 py-1 mb-2">{fehler}</p>
+        <p className="text-meta text-error bg-error-bg rounded px-2 py-1 mb-2">{fehler}</p>
       )}
 
       <div className="space-y-2">
@@ -155,7 +155,7 @@ export function DashboardUnzugeordnet({
                 prefetch={false}
                 className="flex-1 group"
               >
-                <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors">
+                <p className="text-body-sm font-medium text-foreground group-hover:text-brand transition-colors">
                   <span className="font-mono-amount">{b.bestellnummer || "Ohne Nr."}</span>
                   <span className="text-foreground-subtle font-normal"> – {hd.name === "–" ? "Unbekannt" : hd.name}</span>
                   {hd.isUnsicher && (
@@ -189,7 +189,7 @@ export function DashboardUnzugeordnet({
                   ))}
                   <button
                     onClick={closeAktion}
-                    className="w-8 h-8 rounded-lg bg-line-subtle text-foreground-subtle text-xs hover:bg-line transition-colors"
+                    className="w-8 h-8 rounded-lg bg-line-subtle text-foreground-subtle text-meta hover:bg-line transition-colors"
                     title="Abbrechen"
                   >
                     &times;
@@ -235,7 +235,7 @@ export function DashboardUnzugeordnet({
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => openAktion(b.id, "zuordnen")}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-brand bg-brand/5 rounded-lg hover:bg-brand/10 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-brand bg-brand/5 rounded-lg hover:bg-brand/10 transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -244,7 +244,7 @@ export function DashboardUnzugeordnet({
                   </button>
                   <button
                     onClick={() => openAktion(b.id, "verwerfen")}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error bg-error-bg rounded-lg hover:opacity-80 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-error bg-error-bg rounded-lg hover:opacity-80 transition-colors"
                     title="Einmalig verwerfen"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -254,7 +254,7 @@ export function DashboardUnzugeordnet({
                   </button>
                   <button
                     onClick={() => openAktion(b.id, "blockieren")}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error bg-error-bg border border-error-border rounded-lg hover:opacity-80 transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-error bg-error-bg border border-error-border rounded-lg hover:opacity-80 transition-colors"
                     title="Absender dauerhaft blockieren (Newsletter/Spam)"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

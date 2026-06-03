@@ -1,3 +1,4 @@
+// TODO text-scale (UX-R1 codemod, 03.06.2026): 2× approx-map review: text-xl→text-h2 (war 20px, jetzt 24px), text-3xl→text-h1 (war 30px, jetzt 28px)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -207,7 +208,7 @@ function CollapsibleCard({
       >
         <div className="flex items-center gap-2.5">
           {icon && <span className="text-foreground-subtle">{icon}</span>}
-          <h2 className="font-headline text-sm text-foreground tracking-tight">{title}</h2>
+          <h2 className="font-headline text-body-sm text-foreground tracking-tight">{title}</h2>
           {badge}
         </div>
         <svg
@@ -277,7 +278,7 @@ function WidgetSettings({
         <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-surface rounded-xl border border-line shadow-lg z-50">
           <div className="px-4 py-3 border-b border-line-subtle">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-foreground">Dashboard anpassen</p>
+              <p className="text-meta font-semibold text-foreground">Dashboard anpassen</p>
               <button onClick={onReset} className="text-[10px] text-foreground-subtle hover:text-brand transition-colors">
                 Zurücksetzen
               </button>
@@ -333,7 +334,7 @@ function ToggleRow({ label, active, onToggle, badge }: { label: string; active: 
       <div className={`w-8 h-5 rounded-full relative transition-colors shrink-0 ${active ? "bg-brand" : "bg-line"}`}>
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-surface shadow-sm transition-transform ${active ? "left-3.5" : "left-0.5"}`} />
       </div>
-      <span className={`text-xs flex-1 ${active ? "text-foreground font-medium" : "text-foreground-subtle"}`}>{label}</span>
+      <span className={`text-meta flex-1 ${active ? "text-foreground font-medium" : "text-foreground-subtle"}`}>{label}</span>
       {badge && <span className="text-[10px] text-foreground-faint bg-canvas px-1.5 py-0.5 rounded">{badge}</span>}
     </button>
   );
@@ -359,7 +360,7 @@ function StatCard({
 }) {
   const padding = density === "compact" ? "p-3" : "p-5";
   const gradientHeight = density === "compact" ? "h-6" : "h-8";
-  const valueSize = density === "compact" ? "text-xl" : "text-3xl";
+  const valueSize = density === "compact" ? "text-h2" : "text-h1";
   const valueSpacing = density === "compact" ? "mt-1" : "mt-2";
   return (
     <div className={`card card-hover ${padding} relative overflow-hidden`} style={{ borderTop: `3px solid ${color}` }}>
@@ -433,7 +434,7 @@ function HeroStatCard({
           </p>
           <div className="flex flex-col items-end gap-1.5">
             {volumen !== undefined && volumen > 0 && (
-              <span className="font-mono-amount text-sm font-semibold text-foreground-muted tabular-nums">
+              <span className="font-mono-amount text-body-sm font-semibold text-foreground-muted tabular-nums">
                 {new Intl.NumberFormat("de-DE", {
                   style: "currency",
                   currency: "EUR",
@@ -484,7 +485,7 @@ function VolumenCard({
 }) {
   const padding = density === "compact" ? "p-3" : "p-5";
   const gradientHeight = density === "compact" ? "h-6" : "h-8";
-  const amountSize = density === "compact" ? "text-lg" : "text-2xl";
+  const amountSize = density === "compact" ? "text-lead" : "text-h2";
   const amountSpacing = density === "compact" ? "mt-1" : "mt-2";
   const sparklineHeight = density === "compact" ? 18 : 24;
 
@@ -799,11 +800,11 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <h3 className="font-semibold text-error text-sm">{mahnungen.length} {mahnungen.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
+            <h3 className="font-semibold text-error text-body-sm">{mahnungen.length} {mahnungen.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
           </div>
           <div className="space-y-1.5">
             {mahnungen.map((m) => (
-              <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-surface rounded-lg border border-error-border/60 hover:border-error-border transition-colors text-sm">
+              <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-surface rounded-lg border border-error-border/60 hover:border-error-border transition-colors text-body-sm">
                 <span className="flex items-center gap-2">
                   <span className="font-mono-amount font-semibold text-brand">{m.bestellnummer || "–"}</span>
                   <span className="text-foreground-muted">{haendlerDisplay(m.haendler_name).name}</span>
@@ -847,7 +848,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm text-foreground-faint">Keine offenen Bestellungen.</p>
+                  <p className="text-body-sm text-foreground-faint">Keine offenen Bestellungen.</p>
                 </div>
               ) : (
                 <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -865,7 +866,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <AktionIcon status={b.status} />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
+                            <p className="text-body-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                               <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                               <span className="text-foreground-subtle font-normal"> – {haendlerDisplay(b.haendler_name).name}</span>
                             </p>
@@ -913,7 +914,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 </svg>
               }
               badge={
-                <Link href="/bestellungen" className="text-xs text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+                <Link href="/bestellungen" className="text-meta text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
                   Alle anzeigen
                 </Link>
               }
@@ -923,7 +924,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   <svg className="w-8 h-8 text-line-strong" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                   </svg>
-                  <p className="text-sm text-foreground-faint">Noch keine Bestellungen.</p>
+                  <p className="text-body-sm text-foreground-faint">Noch keine Bestellungen.</p>
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -933,7 +934,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                       // 22.05.2026 (Perf Stufe 2.9) — prefetch={false} (siehe aktionenNoetig oben).
                       <Link key={b.id} href={`/bestellungen/${b.id}`} prefetch={false} className="flex items-center justify-between p-3 rounded-lg hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
+                          <p className="text-body-sm font-medium text-foreground group-hover:text-brand transition-colors truncate">
                             <span className="font-mono-amount">{displayBestellnummer(b)}</span>
                             <span className="text-foreground-subtle font-normal"> – {haendlerDisplay(b.haendler_name).name}</span>
                           </p>
@@ -941,7 +942,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                         </div>
                         <div className="flex items-center gap-3 shrink-0 ml-2">
                           {b.betrag && (
-                            <span className="font-mono-amount text-sm font-semibold text-foreground hidden sm:inline">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
+                            <span className="font-mono-amount text-body-sm font-semibold text-foreground hidden sm:inline">{formatBetrag(b.betrag, b.waehrung || "EUR")}</span>
                           )}
                           <span className={`status-tag ${s.bg} ${s.text}`}>
                             <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
@@ -1073,7 +1074,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               </svg>
             }
             badge={
-              <Link href="/projekte" className="text-xs text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+              <Link href="/projekte" className="text-meta text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
                 Alle anzeigen
               </Link>
             }
@@ -1086,7 +1087,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   <Link key={p.id} href={`/bestellungen?projekt_id=${p.id}`} prefetch={false} className="p-3 rounded-lg border border-line-subtle hover:bg-input hover:shadow-sm transition-[background-color,box-shadow] duration-150 ease-out group">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: p.farbe }} />
-                      <span className="text-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
+                      <span className="text-body-sm font-semibold text-foreground group-hover:text-brand transition-colors truncate">{p.name}</span>
                     </div>
                     <div className="flex items-center gap-3 text-[12px] text-foreground-subtle">
                       <span><span className="font-mono-amount font-bold text-foreground">{p.stats.gesamt}</span> Best.</span>
@@ -1131,13 +1132,13 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
                   <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Monat</p>
-                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
+                  <p className="font-mono-amount text-lead font-bold text-foreground mt-0.5">
                     {(aboJaehrlicheKosten / 12).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                   </p>
                 </div>
                 <div className="p-2.5 bg-canvas rounded-lg border border-line-subtle text-center">
                   <p className="text-[10px] text-foreground-subtle font-medium uppercase tracking-wider">Pro Jahr</p>
-                  <p className="font-mono-amount text-lg font-bold text-foreground mt-0.5">
+                  <p className="font-mono-amount text-lead font-bold text-foreground mt-0.5">
                     {aboJaehrlicheKosten.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €
                   </p>
                 </div>
@@ -1149,7 +1150,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                   <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border ${h.dringend ? "bg-error-bg border-error-border" : "bg-warning-bg border-warning-border"}`}>
                     <div className={`w-2 h-2 rounded-full shrink-0 ${h.dringend ? "bg-error" : "bg-warning"}`} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-foreground">{h.name}</span>
+                      <span className="text-body-sm font-medium text-foreground">{h.name}</span>
                       <span className={`text-[12px] ml-2 ${h.dringend ? "text-error" : "text-warning"}`}>{h.detail}</span>
                     </div>
                     <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
@@ -1163,7 +1164,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-foreground-faint text-center py-2">Keine Abo-Hinweise.</p>
+              <p className="text-body-sm text-foreground-faint text-center py-2">Keine Abo-Hinweise.</p>
             )}
           </CollapsibleCard>
         </div>

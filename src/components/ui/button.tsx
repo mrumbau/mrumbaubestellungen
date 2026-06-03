@@ -49,7 +49,7 @@ export const buttonVariants = cva(
       },
       size: {
         sm: "h-8 px-3 text-[14px] gap-1.5 rounded-md",
-        md: "h-9 px-4 text-sm gap-2 rounded-md",
+        md: "h-9 px-4 text-body-sm gap-2 rounded-md",
         lg: "h-11 px-5 text-[16px] gap-2 rounded-lg font-semibold",
         // Touch-Targets auf Mobile (<md) auf 44×44px hochziehen für WCAG 2.5.5
         // / Apple HIG. Auf Desktop (md:) bleiben die kompakten Tabellen-Maße.

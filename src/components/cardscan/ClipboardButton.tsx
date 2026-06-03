@@ -110,7 +110,7 @@ export function ClipboardButton() {
           <span className="font-mono-amount text-[12px] text-foreground-subtle w-6 shrink-0">05</span>
           <div className="w-px h-8 bg-[var(--border-subtle)]" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground group-hover:text-cs-accent-text transition-colors">
+            <p className="text-body-sm font-medium text-foreground group-hover:text-cs-accent-text transition-colors">
               {state === "reading" ? "Lese Zwischenablage…" : state === "processing" ? "Analysiere…" : "Aus Zwischenablage"}
             </p>
             <p className="text-[12px] text-foreground-subtle mt-0.5">
@@ -127,7 +127,7 @@ export function ClipboardButton() {
         </div>
       </button>
       {error && (
-        <div className="p-3 rounded-md bg-error-bg border border-error-border text-error text-xs">
+        <div className="p-3 rounded-md bg-error-bg border border-error-border text-error text-meta">
           {error}
         </div>
       )}

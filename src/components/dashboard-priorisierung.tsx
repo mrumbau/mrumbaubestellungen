@@ -90,14 +90,14 @@ export function DashboardPriorisierung({
           <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
           </svg>
-          <h2 className="font-headline text-sm text-foreground tracking-tight">KI-Priorisierung</h2>
+          <h2 className="font-headline text-body-sm text-foreground tracking-tight">KI-Priorisierung</h2>
         </div>
-        <p className="text-xs text-foreground-faint mb-3">
+        <p className="text-meta text-foreground-faint mb-3">
           KI bewertet welche Bestellungen am dringendsten bearbeitet werden müssen.
         </p>
         <button
           onClick={laden}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-brand text-white rounded-lg hover:bg-brand-light transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-meta font-medium bg-brand text-white rounded-lg hover:bg-brand-light transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
@@ -113,7 +113,7 @@ export function DashboardPriorisierung({
       <div className="card p-5">
         <div className="flex items-center gap-3">
           <div className="spinner w-5 h-5" />
-          <span className="text-sm text-foreground-subtle">KI priorisiert Bestellungen…</span>
+          <span className="text-body-sm text-foreground-subtle">KI priorisiert Bestellungen…</span>
         </div>
         {slowWarning && (
           <p className="mt-3 text-[12px] text-warning leading-relaxed" role="status" aria-live="polite">
@@ -127,8 +127,8 @@ export function DashboardPriorisierung({
   if (error && !data) {
     return (
       <div className="bg-error-bg rounded-xl border border-error-border p-4">
-        <p className="text-sm text-error">{error}</p>
-        <button onClick={laden} className="mt-2 text-xs text-error underline">
+        <p className="text-body-sm text-error">{error}</p>
+        <button onClick={laden} className="mt-2 text-meta text-error underline">
           Erneut versuchen
         </button>
       </div>
@@ -146,7 +146,7 @@ export function DashboardPriorisierung({
           <svg className="w-5 h-5 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
           </svg>
-          <h2 className="font-headline text-sm text-foreground tracking-tight">KI-Priorisierung</h2>
+          <h2 className="font-headline text-body-sm text-foreground tracking-tight">KI-Priorisierung</h2>
           {generatedAt && (
             <time
               dateTime={generatedAt}
@@ -162,7 +162,7 @@ export function DashboardPriorisierung({
         <button
           onClick={laden}
           disabled={loading}
-          className="text-xs text-brand hover:text-brand-light font-medium transition-colors disabled:opacity-50 shrink-0"
+          className="text-meta text-brand hover:text-brand-light font-medium transition-colors disabled:opacity-50 shrink-0"
         >
           {loading ? "Lädt…" : "Neu generieren"}
         </button>
@@ -172,7 +172,7 @@ export function DashboardPriorisierung({
         <p className="text-[12px] text-error mb-2">{error}</p>
       )}
 
-      <p className="text-xs text-foreground-muted mb-4 leading-relaxed">{data.zusammenfassung}</p>
+      <p className="text-meta text-foreground-muted mb-4 leading-relaxed">{data.zusammenfassung}</p>
 
       {data.bestellungen.length === 0 ? (
         <div className="flex items-center gap-3 px-3 py-4 bg-success-bg border border-success-border rounded-lg">
@@ -199,13 +199,13 @@ export function DashboardPriorisierung({
             return (
               <div key={i} className={`${s.bg} rounded-lg p-3`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono-amount text-xs font-semibold text-foreground">{b.bestellnummer}</span>
+                  <span className="font-mono-amount text-meta font-semibold text-foreground">{b.bestellnummer}</span>
                   <span className={`status-tag ${s.badge}`}>
                     <span className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm ${s.bar}`} />
                     {b.prioritaet}
                   </span>
                 </div>
-                <p className="text-xs text-foreground-muted mb-2">{b.grund}</p>
+                <p className="text-meta text-foreground-muted mb-2">{b.grund}</p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-white/60 rounded-full overflow-hidden">
                     <div
@@ -216,7 +216,7 @@ export function DashboardPriorisierung({
                       }}
                     />
                   </div>
-                  <span className="font-mono-amount text-xs font-medium text-foreground-subtle w-8 text-right">{b.score}</span>
+                  <span className="font-mono-amount text-meta font-medium text-foreground-subtle w-8 text-right">{b.score}</span>
                 </div>
               </div>
             );

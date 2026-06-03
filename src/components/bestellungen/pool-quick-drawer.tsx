@@ -165,7 +165,7 @@ export function PoolQuickDrawer({
         </div>
         <div className="ml-auto text-right">
           <div className="text-[11px] uppercase tracking-[0.14em] text-foreground-subtle">Betrag</div>
-          <div className="font-mono-amount text-2xl font-semibold text-foreground tabular-nums leading-tight">
+          <div className="font-mono-amount text-h2 font-semibold text-foreground tabular-nums leading-tight">
             <BetragCell
               betrag={bestellung.betrag}
               waehrung={bestellung.waehrung}

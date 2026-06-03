@@ -332,7 +332,7 @@ function BudgetBar({
       </div>
       <div className="h-1.5 bg-canvas rounded-full overflow-hidden">
         <div
-          className={cn("h-full rounded-full transition-all", barTone)}
+          className={cn("h-full rounded-full transition-[width,background-color] duration-500", barTone)}
           style={{ width: `${Math.min(prozent, 100)}%` }}
         />
       </div>

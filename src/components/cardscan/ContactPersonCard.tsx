@@ -43,7 +43,7 @@ export function ContactPersonCard({
 
   return (
     <div className="card p-4 mb-4">
-      <h2 className="text-sm font-medium text-foreground-muted uppercase tracking-wider mb-4 flex items-center">
+      <h2 className="text-body-sm font-medium text-foreground-muted uppercase tracking-wider mb-4 flex items-center">
         Ansprechpartner
         <ConfidenceBadge score={confidence?.contactPerson} />
       </h2>
@@ -55,13 +55,13 @@ export function ContactPersonCard({
           if (field.type === "select") {
             return (
               <label key={field.key} className="block">
-                <span className="text-xs text-foreground-muted">
+                <span className="text-meta text-foreground-muted">
                   {field.label}
                 </span>
                 <select
                   value={value}
                   onChange={(e) => onChange(field.key, e.target.value)}
-                  className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                  className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 >
                   {field.options?.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -75,14 +75,14 @@ export function ContactPersonCard({
 
           return (
             <label key={field.key} className="block">
-              <span className="text-xs text-foreground-muted">
+              <span className="text-meta text-foreground-muted">
                 {field.label}
               </span>
               <input
                 type="text"
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
-                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 placeholder={`${field.label}…`}
               />
             </label>

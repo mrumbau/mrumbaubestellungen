@@ -15,7 +15,7 @@ export default function ArchivLoading() {
       </div>
 
       <div className="mt-4 bg-surface rounded-xl border border-line overflow-hidden">
-        <table className="w-full text-sm">
+        <table className="w-full text-body-sm">
           <thead>
             <tr className="bg-input">
               {[20, 16, 14, 10, 6, 6, 14].map((w, i) => (

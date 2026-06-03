@@ -65,11 +65,11 @@ export function DashboardNeueHaendler({
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <h3 className="font-headline text-sm text-foreground tracking-tight">Neue Händler erkannt</h3>
+          <h3 className="font-headline text-body-sm text-foreground tracking-tight">Neue Händler erkannt</h3>
         </div>
       </div>
 
-      <p className="text-xs text-foreground-subtle mb-3">
+      <p className="text-meta text-foreground-subtle mb-3">
         Diese Händler wurden automatisch erkannt – bitte prüfen und bestätigen.
       </p>
 
@@ -78,7 +78,7 @@ export function DashboardNeueHaendler({
           <div key={h.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-body-sm font-medium text-foreground">
                   {h.name}
                 </p>
                 <p className="text-[12px] text-foreground-faint truncate">
@@ -93,7 +93,7 @@ export function DashboardNeueHaendler({
                 <button
                   onClick={() => bestaetigen(h.id)}
                   disabled={loading === h.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -102,7 +102,7 @@ export function DashboardNeueHaendler({
                 </button>
                 <Link
                   href="/einstellungen"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -113,7 +113,7 @@ export function DashboardNeueHaendler({
                   onClick={() => setVerwerfenId(h.id)}
                   disabled={loading === h.id}
                   title="Diesen automatisch erkannten Händler verwerfen — er war keine echte Lieferanten-Mail"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error bg-error-bg border border-error-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-error bg-error-bg border border-error-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

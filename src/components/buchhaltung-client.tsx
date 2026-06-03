@@ -327,7 +327,7 @@ export function BuchhaltungClient({
     <div className="space-y-6">
       {/* Bezahlt error banner */}
       {bezahltError && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-xs text-error">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-error-bg border border-error-border rounded-lg text-meta text-error">
           <span>{bezahltError}</span>
           <button type="button" onClick={() => setBezahltError(null)} className="text-error/70 hover:text-error shrink-0">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -352,7 +352,7 @@ export function BuchhaltungClient({
             <>
               <button
                 onClick={() => setShowDatev(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-body-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
               >
                 <svg className="w-4 h-4 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -361,7 +361,7 @@ export function BuchhaltungClient({
               </button>
               <button
                 onClick={exportCSV}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-body-sm font-medium border border-line text-foreground bg-surface rounded-lg hover:bg-input hover:border-brand/30 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -392,7 +392,7 @@ export function BuchhaltungClient({
         <div className="flex items-center gap-1 p-1 bg-canvas rounded-lg">
           <button
             onClick={() => { setTab("offen"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
+            className={`flex items-center gap-2 px-4 py-2 text-body-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               tab === "offen"
                 ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
@@ -409,7 +409,7 @@ export function BuchhaltungClient({
           </button>
           <button
             onClick={() => { setTab("bezahlt"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
+            className={`flex items-center gap-2 px-4 py-2 text-body-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
               tab === "bezahlt"
                 ? "bg-surface text-foreground shadow-sm"
                 : "text-foreground-muted hover:text-foreground"
@@ -430,7 +430,7 @@ export function BuchhaltungClient({
           <select
             value={artFilter}
             onChange={(e) => setArtFilter(e.target.value as "alle" | "material" | "subunternehmer")}
-            className="px-3 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+            className="px-3 py-2.5 bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
           >
             <option value="alle">Alle Arten</option>
             <option value="material">Material</option>
@@ -447,7 +447,7 @@ export function BuchhaltungClient({
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               placeholder="Suche nach Bestellnummer, Händler..."
-              className="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-lg text-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-surface border border-line rounded-lg text-body-sm text-foreground placeholder-foreground-faint focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors"
             />
           </div>
           {!selectionMode && (
@@ -487,7 +487,7 @@ export function BuchhaltungClient({
       {selectionMode && (
         <div className="sticky bottom-4 z-20 mt-4 mx-auto max-w-xl">
           <div className="flex items-center justify-between gap-4 px-5 py-3 bg-sidebar-active text-white rounded-xl shadow-lg shadow-black/20">
-            <span className="text-sm font-medium">
+            <span className="text-body-sm font-medium">
               {selectedIds.size > 0
                 ? `${selectedIds.size} ${selectedIds.size === 1 ? "Rechnung" : "Rechnungen"} ausgewählt`
                 : "Rechnungen auswählen"}
@@ -496,7 +496,7 @@ export function BuchhaltungClient({
               <button
                 type="button"
                 onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}
-                className="px-3 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
+                className="px-3 py-1.5 text-body-sm text-white/70 hover:text-white transition-colors"
               >
                 Abbrechen
               </button>
@@ -505,7 +505,7 @@ export function BuchhaltungClient({
                   type="button"
                   onClick={() => bulkBezahltMarkieren(Array.from(selectedIds))}
                   disabled={bulkBezahltLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-success hover:bg-success/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-body-sm font-semibold bg-success hover:bg-success/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title={`${selectedIds.size} ausgewählte Rechnung${selectedIds.size === 1 ? "" : "en"} als bezahlt markieren — startet DATEV-Versand pro Rechnung im Hintergrund`}
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -519,7 +519,7 @@ export function BuchhaltungClient({
                   type="button"
                   onClick={() => archivieren(Array.from(selectedIds))}
                   disabled={archivLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-body-sm font-semibold bg-brand hover:bg-brand-light rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
@@ -533,7 +533,7 @@ export function BuchhaltungClient({
       )}
 
       {/* Summenzeile + Paginierung */}
-      <div className="mt-4 flex items-center justify-between text-sm">
+      <div className="mt-4 flex items-center justify-between text-body-sm">
         <span className="text-foreground-subtle">
           {gefiltert.length} {tab === "offen" ? "offen" : "bezahlt"}
           {gefiltert.length > 0 && (
@@ -549,17 +549,17 @@ export function BuchhaltungClient({
             <button
               onClick={() => goToPage(safeCurrentPage - 1)}
               disabled={safeCurrentPage <= 1}
-              className="px-3 py-1.5 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-body-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Vorherige
             </button>
-            <span className="text-foreground-muted font-medium px-2 font-mono-amount text-xs">
+            <span className="text-foreground-muted font-medium px-2 font-mono-amount text-meta">
               {safeCurrentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(safeCurrentPage + 1)}
               disabled={safeCurrentPage >= totalPages}
-              className="px-3 py-1.5 text-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-body-sm font-medium bg-surface border border-line rounded-lg hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Nächste
             </button>

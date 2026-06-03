@@ -208,7 +208,7 @@ export function LogsClient({ initialLogs }: { initialLogs: PipelineLog[] }) {
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-body-sm">
               <thead className="bg-canvas sticky top-0 z-10 border-b border-line-subtle">
                 <tr>
                   <Th>Zeitpunkt</Th>

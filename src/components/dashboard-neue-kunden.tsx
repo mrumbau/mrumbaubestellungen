@@ -44,11 +44,11 @@ export function DashboardNeueKunden({
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          <h3 className="font-headline text-sm text-foreground tracking-tight">Neue Kunden erkannt</h3>
+          <h3 className="font-headline text-body-sm text-foreground tracking-tight">Neue Kunden erkannt</h3>
         </div>
       </div>
 
-      <p className="text-xs text-foreground-subtle mb-3">
+      <p className="text-meta text-foreground-subtle mb-3">
         Diese Kunden wurden automatisch aus Dokumenten erkannt. Bitte prüfen und bestätigen.
       </p>
 
@@ -57,7 +57,7 @@ export function DashboardNeueKunden({
           <div key={k.id} className="bg-canvas rounded-lg p-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-body-sm font-medium text-foreground">
                   {k.name}
                 </p>
                 {k.keywords && k.keywords.length > 0 && (
@@ -75,7 +75,7 @@ export function DashboardNeueKunden({
                 <button
                   onClick={() => bestaetigen(k.id)}
                   disabled={loading === k.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-success bg-success-bg border border-success-border rounded-lg hover:opacity-80 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -84,7 +84,7 @@ export function DashboardNeueKunden({
                 </button>
                 <Link
                   href="/kunden"
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

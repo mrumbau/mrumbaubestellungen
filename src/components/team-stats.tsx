@@ -1,3 +1,4 @@
+// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-xl→text-h2 (war 20px, jetzt 24px)
 "use client";
 
 /**
@@ -41,15 +42,15 @@ export function TeamStats({ counts, nameMap }: TeamStatsProps) {
               aria-hidden="true"
             />
             <div className="flex items-center gap-3 relative">
-              <div className="w-10 h-10 rounded-lg bg-brand text-white flex items-center justify-center text-xs font-bold shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-brand text-white flex items-center justify-center text-meta font-bold shrink-0">
                 {kuerzel}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
+                <p className="text-body-sm font-medium text-foreground truncate">
                   {name || kuerzel}
                 </p>
                 <div className="flex items-baseline gap-1">
-                  <p className="font-mono-amount text-xl font-bold text-foreground">
+                  <p className="font-mono-amount text-h2 font-bold text-foreground">
                     {count}
                   </p>
                   <p className="text-[10px] text-foreground-subtle uppercase tracking-wide">

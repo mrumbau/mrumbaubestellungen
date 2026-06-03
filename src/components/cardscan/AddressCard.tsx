@@ -37,7 +37,7 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
 
   return (
     <div className="card p-4 mb-4">
-      <h2 className="text-sm font-medium text-foreground-muted uppercase tracking-wider mb-4 flex items-center">
+      <h2 className="text-body-sm font-medium text-foreground-muted uppercase tracking-wider mb-4 flex items-center">
         Adresse
         <ConfidenceBadge score={confidence?.address} />
       </h2>
@@ -47,14 +47,14 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
             (addr as Record<string, string | null>)[field.key] ?? "";
           return (
             <label key={field.key} className="block">
-              <span className="text-xs text-foreground-muted">
+              <span className="text-meta text-foreground-muted">
                 {field.label}
               </span>
               <input
                 type="text"
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
-                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
                 placeholder={`${field.label}…`}
               />
             </label>
@@ -63,7 +63,7 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
 
         {/* CU23: Land als Select statt Freitext-ISO-Code */}
         <label className="block">
-          <span className="text-xs text-foreground-muted">Land</span>
+          <span className="text-meta text-foreground-muted">Land</span>
           <select
             value={isCustomCountry ? "__other__" : countryValue}
             onChange={(e) => {
@@ -73,7 +73,7 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
                 onChange("countryCode", e.target.value);
               }
             }}
-            className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+            className="mt-1 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
           >
             <option value="">— bitte wählen —</option>
             {COUNTRY_OPTIONS.map((c) => (
@@ -90,7 +90,7 @@ export function AddressCard({ address, confidence, onChange }: AddressCardProps)
               onChange={(e) => onChange("countryCode", e.target.value.toUpperCase().slice(0, 2))}
               maxLength={2}
               placeholder="ISO-Code (z.B. ES, GB)"
-              className="mt-2 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-base uppercase focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className="mt-2 w-full py-2.5 px-3 rounded-md border border-line bg-input text-foreground text-body uppercase focus:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
             />
           )}
         </label>

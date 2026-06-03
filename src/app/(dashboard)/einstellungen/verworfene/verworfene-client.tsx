@@ -180,7 +180,7 @@ export function VerworfeneClient({
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-body-sm">
               <thead className="bg-canvas border-b border-line-subtle">
                 <tr>
                   <th

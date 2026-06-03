@@ -84,7 +84,7 @@ export function MonitorTab({
           <Select
             value={folderFilter}
             onChange={(e) => setFolderFilter(e.target.value)}
-            className="text-xs"
+            className="text-meta"
           >
             <option value="">Alle Folder</option>
             {folders.map((f) => (
@@ -96,7 +96,7 @@ export function MonitorTab({
           <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs"
+            className="text-meta"
           >
             <option value="">Alle Status</option>
             <option value="processed">Verarbeitet</option>
@@ -104,7 +104,7 @@ export function MonitorTab({
             <option value="failed">Fehlgeschlagen</option>
             <option value="pending">Ausstehend</option>
           </Select>
-          <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
+          <label className="inline-flex items-center gap-2 text-meta cursor-pointer">
             <input
               type="checkbox"
               checked={mismatchOnly}
@@ -128,7 +128,7 @@ export function MonitorTab({
         />
       ) : (
         <div className="rounded-lg border border-line-subtle overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-meta">
             <thead className="bg-canvas border-b border-line-subtle">
               <tr>
                 <th className="text-left px-3 py-2 font-semibold text-foreground-subtle uppercase tracking-wider">Zeit</th>
@@ -209,7 +209,7 @@ export function MonitorTab({
 function TraceModal({ entry, onClose }: { entry: LogEntry; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title="Trace-Details" size="lg">
-      <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-xs">
+      <dl className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-2 text-meta">
         <dt className="text-foreground-subtle">Internet-Message-ID</dt>
         <dd className="font-mono-amount break-all">{entry.internet_message_id}</dd>
 
