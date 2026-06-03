@@ -1,6 +1,7 @@
 import { PageHero } from "@/components/ui/page-hero";
 import { EditorialSection } from "@/components/ui/editorial-section";
 import { BestellnummerHero } from "@/components/ui/bestellnummer-hero";
+import { PatternsClient } from "./patterns-client";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +9,19 @@ export const dynamic = "force-dynamic";
  * Patterns-Page — admin-only Design-Sandbox.
  *
  * Sichtbar unter /einstellungen/system/patterns (System-Layout gated auf
- * Admin). Zeigt die Foundation-Primitives aus UX-R1 (EditorialSection,
- * PageHero, BestellnummerHero) in allen Varianten, damit das Vokabular
- * greifbar ist und Drift früh auffällt.
+ * Admin). Zeigt die Foundation-Primitives in allen Varianten, damit das
+ * Vokabular greifbar ist und Drift früh auffällt.
  *
- * Erweitert in späteren Wellen um UnifiedListCard, Visual-Weight-Stufen
- * (Status/Owner/Reserve/Score), Modal/Drawer-Varianten.
+ * Sections:
+ *  - Server (hier):   EditorialSection (4 Varianten), BestellnummerHero,
+ *                     Type-Scale.
+ *  - Client (PatternsClient): LaneNav (UX-R2), OwnerStatement (UX-R3 —
+ *                     statische Pfade, da Server-Hooks abhängig),
+ *                     SidebarBlock (UX-R3), UnifiedListCard (UX-R4),
+ *                     Modal-Variants default/confirm/destructive (UX-R5).
+ *
+ * Erweitert in späteren Wellen um Drawer-Varianten, Visual-Weight-Stufen
+ * (Status/Owner/Reserve/Score), PageHeader, HeroStatCard.
  */
 export default async function PatternsPage() {
   return (
@@ -140,6 +148,8 @@ export default async function PatternsPage() {
           </div>
         </EditorialSection>
       </section>
+
+      <PatternsClient />
     </div>
   );
 }

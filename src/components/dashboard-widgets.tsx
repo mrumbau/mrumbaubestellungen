@@ -1,4 +1,3 @@
-// TODO text-scale (UX-R1 codemod, 03.06.2026): 2× approx-map review: text-xl→text-h2 (war 20px, jetzt 24px), text-3xl→text-h1 (war 30px, jetzt 28px)
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";

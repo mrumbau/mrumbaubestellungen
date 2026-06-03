@@ -1,4 +1,3 @@
-// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-xl→text-h2 (war 20px, jetzt 24px)
 "use client";
 
 /**

@@ -2,6 +2,8 @@
 
 > "Linear meets Handwerk-Industrie" — präzises Tool-Design mit industriellem Material-Bewusstsein.
 
+> **Plan & Kontext:** Die UX-R1 → UX-R6-Welle ist vollständig dokumentiert in [`.claude/plans/noble-sparking-stallman.md`](.claude/plans/noble-sparking-stallman.md). Diese Datei ist die kanonische Quelle für Roll-out-Reihenfolge, Acceptance-Criteria und Welle-Status. Bei Konflikten zwischen DESIGN.md und Plan-File: Plan-File gewinnt für „warum", DESIGN.md gewinnt für „wie".
+
 ## Changelog
 
 - **v2 (03.06.2026, UX-R1 → UX-R6):** Editorial-Industrial-Versprechen vom Login zieht ins Innere. Neue Foundation-Primitives `EditorialSection` + `PageHero` + `BestellnummerHero`. Drei-Sprachen-Disziplin verschärft um Visual-Weight-Stufen 1-3 — max 1 lautes Element pro Card. Aging-Wash auf Tokens (`bg-aging-stale`, `bg-aging-rotting`) statt Tailwind-Defaults. Type-Scale-Migration via Codemod (270 Stellen). Plan: `.claude/plans/noble-sparking-stallman.md`. Sections 3-6 (Detail-Page, Modal/Drawer-Heuristik, CTA-Hierarchie) folgen in Welle 3+5+6.
@@ -9,6 +11,7 @@
 - **UX-R3 (03.06.2026):** Detail-Page als editoriale Akte. `BestellnummerHero` als Display-Numeral im PageHero-Wrap. Mahnung als full-width Banner statt Pill. `OwnerStatement` ersetzt `OwnerLane` (3 Render-Pfade mit editorial-DNA, Magnetic-CTA für Pool/Vorschlag). Sidebar 7 Cards → 3 Blöcke (Aktion / Meta / Aktivität). CTA-Hierarchie verschärft: Verwerfen = ghost destructive durch industrial-line getrennt, Mahnung quittieren = secondary.
 - **UX-R4 (03.06.2026):** PageHero auf Hot-Path-Pages (Dashboard, Buchhaltung, Archiv) und Stammdaten (Kunden, Projekte). Neue `UnifiedListCard`-Primitive als Foundation für künftige Listen (3 Variants: vendor-strip / title-strip / table-row). ProjektCard/KundenCard bleiben vorerst mit `borderLeft`-Brand-Identity — Migration braucht UnifiedListCard `accent-color`-Override. Settings/System-Pages behalten `PageHeader`. Build clean, 644/644 Tests grün, keine Token-Leaks.
 - **UX-R5 (03.06.2026):** Modal-Drawer-Heuristik: vier konkurrierende Patterns (Modal/Drawer/ConfirmDialog/Inline) auf zwei konsolidiert. Modal um Variants `destructive` + `confirm` (mit optional Comment-Input) erweitert. 14 ConfirmDialog-Usages migriert. Build clean.
+- **UX-R6 (03.06.2026):** Verankerung der Disziplin. ESLint-Rule gegen Tailwind-Default-Colors auf `error` gestuft (build-blockend, `/cardscan` als bewusste Sub-Brand-Ausnahme weiterhin allowlisted). Offener TODO-Marker zur Type-Scale-Migration aufgelöst, PRODUCT.md um Brand-Statements ergänzt und Sandbox-Page `/einstellungen/system/patterns` um UX-R2/3/4/5-Demos (Lanes, OwnerStatement, UnifiedListCard-Variants, Modal-Variants) erweitert, damit Visual-Drift früh sichtbar wird.
 
 ## Color Strategy
 
@@ -414,9 +417,12 @@ Aus dem heutigen UI-Audit identifiziert und bewusst eliminiert:
 - ❌ Doppel-Widget Timeline + Audit-Trail (→ Timeline mit Filter)
 - ❌ **Tab-Redundanz Pool/Meine offen/Meine erledigt/Alle** (UX-R2 → 3 Lanes)
 - ❌ **Pill-Inflation auf einer Card** (UX-R1 → Visual-Weight-Stufen, max 1 Stufe-1-Element)
-- ❌ **Tailwind-Default-Colors als Token-Bypass** (UX-R1 → ESLint-Rule blockt `bg-(slate|gray|emerald|...)-(50..900)` außerhalb /cardscan)
+- ❌ **Tailwind-Default-Colors als Token-Bypass** (UX-R1 → ESLint-Rule blockt `bg-(slate|gray|emerald|...)-(50..900)` außerhalb /cardscan; UX-R6 → Rule auf `error` gestuft, build-blockend)
 - ❌ **`transition-all` ohne spezifische Property** (UX-R1 → `transition-colors`, `transition-[width,background]`, etc., Emil-Performance-Regel)
 - ❌ **Arbitrary Text-Skalen `text-xs/sm/lg/xl/2xl`** (UX-R1 → Codemod migriert auf `.text-meta/.text-body-sm/.text-lead/.text-h2`, 270 Stellen)
+- ❌ **Card-Sediment** — fünf Listen, fünf Padding-/Hover-/Shadow-Mikro-Inkonsistenzen (UX-R4 → `UnifiedListCard`-Primitive mit drei Variants `vendor-strip`/`title-strip`/`table-row`)
+- ❌ **CTA-Equality im ApprovalPanel** — Freigeben, Mahnung quittieren, Verwerfen alle gleich laut (UX-R3 → max 1 Primary, Mahnung als Secondary-Warning-Pill, Verwerfen als Ghost-Destructive nach `industrial-line`-Separator)
+- ❌ **ConfirmDialog/Modal-Drift** — vier konkurrierende Patterns (Modal/Drawer/ConfirmDialog/Inline) für dieselbe Intent (UX-R5 → konsolidiert auf zwei Primitives `Modal` + `Drawer`; `confirm`- und `destructive`-Variants ersetzen das eigenständige ConfirmDialog-Pattern)
 
 Bleibt erlaubt aus funktionalen Gründen:
 - Side-Stripe-Border 3-4px für **Projekt-Identity** (Cards) und **Status-Pills** (functional, nicht decorative)

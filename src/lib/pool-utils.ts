@@ -22,8 +22,8 @@ export function ageInDays(createdAtIso: string, now: Date = new Date()): number 
  * Grenzen:
  *   fresh    = ≤ 2 Tage    → kein Background-Wash
  *   ripening = 2–7 Tage    → kein Background-Wash (noch normal)
- *   stale    = 7–14 Tage   → bg-amber-50/40
- *   rotting  = > 14 Tage   → bg-rose-50/40
+ *   stale    = 7–14 Tage   → bg-aging-stale Token
+ *   rotting  = > 14 Tage   → bg-aging-rotting Token
  */
 export function bucketAge(daysOld: number): AgingBucket {
   if (daysOld <= 2) return "fresh";

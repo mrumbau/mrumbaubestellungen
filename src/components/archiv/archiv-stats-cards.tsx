@@ -1,4 +1,3 @@
-// TODO text-scale (UX-R1 codemod, 03.06.2026): 1× approx-map review: text-3xl→text-h1 (war 30px, jetzt 28px)
 /**
  * 4 Summary-Cards (Projekte / Material / SU / Volumen) — Bento-Layout.
  *
