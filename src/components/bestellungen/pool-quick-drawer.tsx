@@ -22,12 +22,14 @@ import Link from "next/link";
 import { Drawer } from "@/components/ui";
 import { Badge } from "@/components/ui";
 import { VendorFavicon } from "@/components/ui/cells/vendor-favicon";
+import { ReserveBadge } from "@/components/ui/cells/reserve-badge";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
 import { OwnerLane, type BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { haendlerDisplay } from "@/lib/haendler-display";
+import { usePoolReservation } from "@/lib/hooks/use-pool-reservation";
 import type { Bestellung } from "./types";
 
 export interface PoolQuickDrawerProps {
@@ -47,6 +49,19 @@ export function PoolQuickDrawer({
   profil,
   bestellerOptions,
 }: PoolQuickDrawerProps) {
+  // 03.06.2026 (Pool 2.0 Sprint 2) — Auto-Reserve sobald der Drawer 1.5s
+  // stabil offen ist. Hook handelt Refresh alle 4min + Release beim
+  // Schließen + sendBeacon bei Tab-Close. Auch wenn die Bestellung null
+  // ist (kurzes Skelett-Mounting), läuft der Hook sauber durch — er
+  // disabled sich selbst dann.
+  const isPoolItem = !!bestellung &&
+    bestellung.besteller_kuerzel === "UNBEKANNT" &&
+    (bestellung.bestellungsart ?? "material") === "material";
+  const reservation = usePoolReservation({
+    bestellungId: open && bestellung && isPoolItem ? bestellung.id : null,
+    enabled: open && isPoolItem,
+  });
+
   // Defensive: wenn der Drawer öffnet bevor die Bestellung gefunden wurde
   // (Race beim ersten Mount), rendern wir das Skelett — vermeidet null-
   // Crashes auf children-Props.
@@ -63,9 +78,7 @@ export function PoolQuickDrawer({
   }
 
   const hd = haendlerDisplay(bestellung.haendler_name);
-  const isPool =
-    bestellung.besteller_kuerzel === "UNBEKANNT" &&
-    (bestellung.bestellungsart ?? "material") === "material";
+  const isPool = isPoolItem;
 
   return (
     <Drawer
@@ -118,6 +131,32 @@ export function PoolQuickDrawer({
       }
       bodyClassName="px-5 py-5 space-y-5"
     >
+      {/* Reserve-Awareness: zeigt entweder eigene oder fremde Reservation.
+          Eigene = leiser Helper-Text ("Du bearbeitest · 9:42 verbleibend").
+          Fremde = neutrale Awareness-Pill ("CR bearbeitet · 9:42"). */}
+      {reservation.isOwnReservation && reservation.ownExpiresAtIso && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-line-subtle bg-canvas">
+          <ReserveBadge
+            reserverKuerzel={profil.kuerzel}
+            reserverName={profil.name}
+            expiresAtIso={reservation.ownExpiresAtIso}
+            variant="self"
+          />
+          <span className="text-[11px] text-foreground-faint">Andere User sehen das.</span>
+        </div>
+      )}
+      {!reservation.isOwnReservation && reservation.otherHolder && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md border border-warning-border bg-warning-bg/40">
+          <ReserveBadge
+            reserverKuerzel={reservation.otherHolder.kuerzel}
+            reserverName={reservation.otherHolder.name}
+            expiresAtIso={reservation.otherHolder.expiresAtIso}
+            variant="other"
+          />
+          <span className="text-[11px] text-warning">Übernehmen bleibt erlaubt.</span>
+        </div>
+      )}
+
       {/* Hero — Betrag + Mobile-StatusBadges (Desktop-Badges sitzen im titleSlot) */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-2 sm:hidden">

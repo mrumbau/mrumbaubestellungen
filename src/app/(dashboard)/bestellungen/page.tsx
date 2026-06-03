@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
 import { ScopeTabs, type PoolScope } from "@/components/bestellungen/scope-tabs";
 import { PageHeader, PageHeaderCount } from "@/components/ui/page-header";
+import { InboxLayoutToggle, type PoolLayout } from "@/components/bestellungen/inbox-layout-toggle";
 
 const SCOPE_VALUES: ReadonlyArray<PoolScope> = ["pool", "mine-open", "mine-done", "all"];
 
@@ -135,6 +136,10 @@ export default async function BestellungenPage({
     { data: bestellungen },
     { data: projekte },
     { data: bestellerRollen },
+    { data: poolUserStateRows },
+    { data: reservationRows },
+    { data: haendlerRows },
+    { data: userConfigRow },
     { count: poolCount },
     { count: mineOpenCount },
     { count: mineDoneCount },
@@ -155,6 +160,34 @@ export default async function BestellungenPage({
       .select("kuerzel, name, rolle")
       .in("rolle", ["besteller", "admin"])
       .order("kuerzel"),
+    // 03.06.2026 (Pool 2.0 Sprint 2) — eigener Pool-State (seen/snoozed/
+    // deferred). Wir filtern client-side, weil wir sowieso die ganze
+    // Pool-Liste laden — der Server-side-Join würde nichts sparen, und
+    // ein clientseitiges-Snoozen ohne Refresh ist UX-Vorteil.
+    profil
+      ? supabase
+          .from("pool_user_state")
+          .select("bestellung_id, seen_at, snoozed_until, deferred_today")
+          .eq("user_id", profil.user_id)
+      : Promise.resolve({ data: [] }),
+    // Snapshot der aktiven Reservations für Realtime-Hydration.
+    supabase
+      .from("pool_reservations")
+      .select("bestellung_id, user_kuerzel, user_name, expires_at")
+      .gt("expires_at", new Date().toISOString()),
+    // Vendor-Domain-Map für VendorFavicon — kommt aus haendler-Tabelle,
+    // gejoined via haendler_name (Pool-Items haben oft noch keine
+    // haendler_id, aber der Pipeline-Defensiv-Fall hat den Namen).
+    supabase.from("haendler").select("name, domain"),
+    // User-Layout-Pref aus dashboard_config (Sprint 2 — Inbox vs Tabelle).
+    // profil.user_id existiert wenn profil gesetzt; sonst skip.
+    profil
+      ? supabase
+          .from("benutzer_rollen")
+          .select("dashboard_config")
+          .eq("user_id", profil.user_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     poolCountQuery,
     mineOpenCountQuery,
     mineDoneCountQuery,
@@ -192,6 +225,68 @@ export default async function BestellungenPage({
     ? (projekte || []).find((p) => p.id === projektIdParam)?.name || null
     : null;
 
+  // 03.06.2026 (Pool 2.0 Sprint 2) — Pool-User-State Map.
+  //   userState[id] = { seen, deferred } pro Pool-Item
+  //   snoozedUntilNow = Set der IDs die aktuell snoozed sind (aus Pool ausblenden)
+  type PoolUserStateRow = {
+    bestellung_id: string;
+    seen_at: string | null;
+    snoozed_until: string | null;
+    deferred_today: boolean | null;
+  };
+  const nowIso = new Date().toISOString();
+  const userState: Record<string, { seen: boolean; deferred: boolean }> = {};
+  const snoozedActive = new Set<string>();
+  for (const row of (poolUserStateRows ?? []) as PoolUserStateRow[]) {
+    if (row.snoozed_until && row.snoozed_until > nowIso) {
+      snoozedActive.add(row.bestellung_id);
+      continue; // snoozed IDs werden gar nicht erst in userState gelegt
+    }
+    userState[row.bestellung_id] = {
+      seen: !!row.seen_at,
+      deferred: !!row.deferred_today,
+    };
+  }
+
+  // 03.06.2026 (Pool 2.0 Sprint 2) — Reservation-Snapshot für Inbox-Hydration.
+  type ReservationRow = {
+    bestellung_id: string;
+    user_kuerzel: string;
+    user_name: string;
+    expires_at: string;
+  };
+  const initialReservations: Record<string, ReservationRow> = {};
+  for (const row of (reservationRows ?? []) as ReservationRow[]) {
+    initialReservations[row.bestellung_id] = row;
+  }
+
+  // 03.06.2026 (Pool 2.0 Sprint 2) — Vendor-Domain-Lookup via haendler_name.
+  // Case-insensitive Match damit die Pipeline-Defensive ("Unbekannter
+  // Lieferant (X)") trotzdem mit der haendler-Tabelle joined.
+  const haendlerDomainByName = new Map<string, string>();
+  for (const h of (haendlerRows ?? []) as Array<{ name: string; domain: string }>) {
+    haendlerDomainByName.set(h.name.toLowerCase(), h.domain);
+  }
+  const vendorDomainById: Record<string, string | null> = {};
+
+  // Snooze-Filter: nur im Pool-Scope aktiv (in anderen Scopes sind
+  // Bestellungen schon zugewiesen, Snooze irrelevant).
+  const bestellungenAfterSnooze =
+    scope === "pool"
+      ? bestellungenAngereichert.filter((b) => !snoozedActive.has(b.id as string))
+      : bestellungenAngereichert;
+
+  for (const b of bestellungenAfterSnooze) {
+    const name = (b.haendler_name as string | null | undefined) ?? "";
+    // Pipeline-Defensive entfernen für Match
+    const cleanName = name.replace(/^Unbekannter Lieferant \((.+)\)$/, "$1").toLowerCase().trim();
+    vendorDomainById[b.id as string] = haendlerDomainByName.get(cleanName) ?? null;
+  }
+
+  // 03.06.2026 (Pool 2.0 Sprint 2) — Layout-Pref aus dashboard_config lesen.
+  const userConfig = (userConfigRow?.dashboard_config as { pool_layout?: PoolLayout } | null) ?? null;
+  const poolLayoutDefault: PoolLayout = userConfig?.pool_layout === "table" ? "table" : "inbox";
+
   const scopeDescription =
     scope === "pool"
       ? "Pool — Material-Bestellungen ohne Besteller. Jeder kann übernehmen."
@@ -226,8 +321,9 @@ export default async function BestellungenPage({
       />
 
       {/* ScopeTabs als Primary-Navigation. Underline-Style + border-b bildet
-          die klare Top-Hierarchie über alle Sub-Filter (ArtTabs, FilterBar).  */}
-      <div>
+          die klare Top-Hierarchie über alle Sub-Filter (ArtTabs, FilterBar).
+          Im Pool-Scope sitzt rechts der Layout-Toggle (Inbox vs Tabelle). */}
+      <div className="flex items-end justify-between gap-3">
         <ScopeTabs
           active={scope}
           preservedSearchParams={projektIdParam ? { projekt_id: projektIdParam } : undefined}
@@ -243,6 +339,9 @@ export default async function BestellungenPage({
             },
           ]}
         />
+        {scope === "pool" && profil && (
+          <InboxLayoutToggle initial={poolLayoutDefault} />
+        )}
       </div>
 
       {reachedCap && (
@@ -252,7 +351,7 @@ export default async function BestellungenPage({
       )}
 
       <BestellungenTabelle
-        bestellungen={bestellungenAngereichert as unknown as import("@/components/bestellungen/types").Bestellung[]}
+        bestellungen={bestellungenAfterSnooze as unknown as import("@/components/bestellungen/types").Bestellung[]}
         projekte={(projekte || []) as unknown as { id: string; name: string; farbe: string }[]}
         aktiverProjektFilter={projektIdParam || null}
         aktiverProjektName={aktiverProjektName}
@@ -260,6 +359,10 @@ export default async function BestellungenPage({
         scope={scope}
         profil={profil ? { kuerzel: profil.kuerzel, rolle: profil.rolle, name: profil.name } : null}
         bestellerOptions={(bestellerRollen || []).map((b) => ({ kuerzel: b.kuerzel, name: b.name }))}
+        poolLayout={scope === "pool" ? poolLayoutDefault : "table"}
+        poolUserStateById={userState}
+        poolReservationsById={initialReservations}
+        vendorDomainById={vendorDomainById}
       />
     </div>
   );

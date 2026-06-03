@@ -1742,6 +1742,8 @@ export type Database = {
         Args: { p_bestellung_id: string }
         Returns: Json
       }
+      pool_defer_reset: { Args: never; Returns: number }
+      pool_defer_today: { Args: { p_bestellung_id: string }; Returns: Json }
       pool_mark_seen: { Args: { p_bestellung_ids: string[] }; Returns: Json }
       pool_reassign_bestellung: {
         Args: {
@@ -1768,6 +1770,13 @@ export type Database = {
         Args: { p_bestellung_id: string; p_kommentar?: string }
         Returns: Json
       }
+      pool_snooze: {
+        Args: { p_bestellung_id: string; p_reason?: string; p_until: string }
+        Returns: Json
+      }
+      pool_undefer: { Args: { p_bestellung_id: string }; Returns: Json }
+      pool_unsnooze: { Args: { p_bestellung_id: string }; Returns: Json }
+      pool_user_state_cleanup: { Args: never; Returns: number }
       refresh_dashboard_kpis: { Args: never; Returns: undefined }
       sync_one_flag: {
         Args: { p_bestellung_id: string; p_typ: string }

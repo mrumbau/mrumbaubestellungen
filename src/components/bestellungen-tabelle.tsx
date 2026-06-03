@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { ArtTabs } from "@/components/ui/art-tabs";
 import { useTableFilters, matchesFaelligkeitsFilter } from "@/lib/use-table-filters";
 import { useBestellungenListRealtime } from "@/lib/hooks/use-bestellung-realtime";
@@ -38,9 +39,12 @@ import { useBestellungPreview } from "@/components/bestellungen/use-bestellung-p
 import { useBestellungSavedViews, type ViewConfig } from "@/components/bestellungen/use-bestellung-saved-views";
 import { BestellungenConfirmDialogs } from "@/components/bestellungen/bestellungen-confirm-dialogs";
 import { PoolQuickDrawer } from "@/components/bestellungen/pool-quick-drawer";
+import { PoolInbox } from "@/components/bestellungen/pool-inbox";
 import { useDrawerStack } from "@/lib/hooks/use-drawer-stack";
 import { agingWashFromCreatedAt } from "@/lib/pool-utils";
+import type { ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
 import type { BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
+import type { PoolLayout } from "@/components/bestellungen/inbox-layout-toggle";
 
 // Bestellung + ProjektOption Types: src/components/bestellungen/types.ts.
 // STATUS_FILTER_OPTIONS wird aus @/lib/status-config importiert.
@@ -54,6 +58,10 @@ export function BestellungenTabelle({
   scope,
   profil,
   bestellerOptions,
+  poolLayout = "table",
+  poolUserStateById,
+  poolReservationsById,
+  vendorDomainById,
 }: {
   bestellungen: Bestellung[];
   projekte?: ProjektOption[];
@@ -79,6 +87,29 @@ export function BestellungenTabelle({
    */
   profil?: { kuerzel: string; rolle: string; name: string } | null;
   bestellerOptions?: BestellerOption[];
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 2) — Layout-Switch im Pool-Scope.
+   * "inbox" rendert PoolInbox Card-Feed, "table" rendert die klassische
+   * DataTable. Default kommt vom Server (User-Pref). Andere Scopes
+   * ignorieren den Wert (sie nutzen immer die Tabelle).
+   */
+  poolLayout?: PoolLayout;
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 2) — Per-User-State pro Bestellung.
+   * Server berechnet seen + deferred. Snoozed-IDs sind im Server schon
+   * weggefiltert.
+   */
+  poolUserStateById?: Record<string, { seen: boolean; deferred: boolean }>;
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 2) — Initial-Snapshot der aktiven
+   * Reservations. Realtime-Hook patcht inkrementell.
+   */
+  poolReservationsById?: ReservationMap;
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 2) — Vendor-Domain pro Bestellung für
+   * den VendorFavicon-Hero-Strip. Server-vorbereitet aus haendler-Tabelle.
+   */
+  vendorDomainById?: Record<string, string | null>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -149,6 +180,51 @@ export function BestellungenTabelle({
         : null,
     [drawerStack.drawerId, bestellungen],
   );
+
+  // 03.06.2026 (Pool 2.0 Sprint 2) — Snooze + Defer Action-Handler.
+  // Fire-and-forget POST + router.refresh() damit Server-Page beim
+  // nächsten Mount den User-State frisch lädt. Defer ist optimistic-
+  // freundlich (Item rutscht visuell sofort ans Ende dank pool-inbox-Sort,
+  // PathContext kommt durch Reload).
+  const handleSnooze = useCallback(
+    async (id: string, until: string, label: string) => {
+      try {
+        await fetch(`/api/bestellungen/${id}/pool-snooze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ until, reason: label }),
+          credentials: "same-origin",
+        });
+        router.refresh();
+      } catch {
+        // best-effort: toast wäre nice, aber Snooze ist niedrige Stakes
+      }
+    },
+    [router],
+  );
+
+  const handleDefer = useCallback(
+    async (id: string, deferred: boolean) => {
+      try {
+        await fetch(`/api/bestellungen/${id}/pool-defer-today`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ undo: !deferred }),
+          credentials: "same-origin",
+        });
+        router.refresh();
+      } catch {
+        // best-effort
+      }
+    },
+    [router],
+  );
+
+  // Inbox-Layout-Switch: rendert die PoolInbox-Card-Liste statt der
+  // DataTable. Filter/Sort/Pagination greifen NICHT — der Inbox-View
+  // zeigt explizit die volle Pool-Menge sortiert nach Server-Reihenfolge
+  // (Score in Sprint 3, hier noch created_at DESC).
+  const inboxMode = drawerEnabled && poolLayout === "inbox";
 
   // Spatial-Continuity (12.05.2026, Continuity-Patch-Sprint):
   // - Detail-Back-Flash: nach `Back` vom Detail-Page leuchtet die Row, von der
@@ -449,11 +525,36 @@ export function BestellungenTabelle({
         </div>
       )}
 
+      {/* 03.06.2026 (Pool 2.0 Sprint 2) — Inbox-Modus: rendert PoolInbox als
+          Card-Feed statt DataTable. Filter/Sort/Pagination greifen NICHT
+          (Inbox zeigt die volle Pool-Menge in Server-Reihenfolge), das Drawer-
+          Wiring + ConfirmDialogs sind aber identisch (sharen denselben State).
+          Inbox-Mode rendert hier UND skipped die Toolbar weiter unten. */}
+      {inboxMode && profil && (
+        <div className="mt-5">
+          <PoolInbox
+            bestellungen={bestellungen}
+            vendorDomainById={vendorDomainById}
+            userStateById={poolUserStateById}
+            initialReservations={poolReservationsById}
+            selfKuerzel={profil.kuerzel}
+            onOpenDrawer={(id) => drawerStack.openDrawer(id)}
+            onSnooze={handleSnooze}
+            onDefer={handleDefer}
+          />
+        </div>
+      )}
+
       {/* Art-Tabs + Search + Filters — Secondary-Filter-Reihe.
           02.06.2026 (UI-Polish): mt-6 → mt-5 weil ScopeTabs jetzt eine eigene
           border-b zeichnen und der Sub-Filter visuell direkt anschließt
-          (kein Doppel-Spacer mehr). */}
-      <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          (kein Doppel-Spacer mehr).
+          03.06.2026: Inbox-Mode skipped die Toolbar — der Card-Feed hat
+          keine Filter (Sprint 3 bringt Score-Sort als Default). */}
+      <div className={cn(
+        "mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+        inboxMode && "hidden",
+      )}>
         <ArtTabs value={artFilter} onChange={setArtFilter} counts={artCounts} />
 
         <FilterBar
@@ -555,7 +656,7 @@ export function BestellungenTabelle({
           ein Filter aktiv ist. Vorher waren die Pills nur im EmptyState-
           Zero-Match-Fall sichtbar; bei "warum sind hier nur 3 Treffer?"
           fehlte der one-glance-Hinweis. */}
-      {hasFilters && (
+      {hasFilters && !inboxMode && (
         <div className="mt-3">
           <ActiveFilterPills
             pills={(() => {
@@ -614,8 +715,10 @@ export function BestellungenTabelle({
         </div>
       )}
 
-      {/* Bulk toolbar — sticky-top, Linear-Style */}
-      <div className="mt-4">
+      {/* Bulk toolbar — sticky-top, Linear-Style.
+          Inbox-Mode hat keine Selection (Cards öffnen Drawer, Bulk-Aktionen
+          kommen in Sprint 3 via Multi-Select-Mode). */}
+      <div className={cn("mt-4", inboxMode && "hidden")}>
         <BulkToolbar
           count={selected.size}
           label="Bestellungen"
@@ -656,8 +759,8 @@ export function BestellungenTabelle({
         </BulkToolbar>
       </div>
 
-      {/* DataTable */}
-      <div className="mt-4">
+      {/* DataTable — im Inbox-Mode versteckt (PoolInbox rendert oben). */}
+      <div className={cn("mt-4", inboxMode && "hidden")}>
         <DataTable<Bestellung>
           columns={columns}
           data={paginatedRows}
@@ -742,8 +845,10 @@ export function BestellungenTabelle({
       </div>
 
       {/* Pagination — basiert auf gefilterten Resultaten (sorted.length),
-          NICHT totalCount. So sieht User die echten Pages für seine Filter. */}
-      {totalPages > 1 && (
+          NICHT totalCount. So sieht User die echten Pages für seine Filter.
+          Im Inbox-Mode versteckt — Pagination kommt in Sprint 3 für die
+          Inbox separat falls > 50 Items im Pool. */}
+      {totalPages > 1 && !inboxMode && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-foreground-subtle">
             {sorted.length === totalCount
