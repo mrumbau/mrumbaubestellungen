@@ -5,6 +5,8 @@
 ## Changelog
 
 - **v2 (03.06.2026, UX-R1 → UX-R6):** Editorial-Industrial-Versprechen vom Login zieht ins Innere. Neue Foundation-Primitives `EditorialSection` + `PageHero` + `BestellnummerHero`. Drei-Sprachen-Disziplin verschärft um Visual-Weight-Stufen 1-3 — max 1 lautes Element pro Card. Aging-Wash auf Tokens (`bg-aging-stale`, `bg-aging-rotting`) statt Tailwind-Defaults. Type-Scale-Migration via Codemod (270 Stellen). Plan: `.claude/plans/noble-sparking-stallman.md`. Sections 3-6 (Detail-Page, Modal/Drawer-Heuristik, CTA-Hierarchie) folgen in Welle 3+5+6.
+- **UX-R2 (03.06.2026):** Posteingang mit Lanes statt 4 Owner-Tabs. `/bestellungen/pool`, `/in-arbeit`, `/archiv` mit gemeinsamem Workspace-Layout. Quick-Filter-Chips für Art statt ArtTabs. Layout-Toggle entfernt (Lane bestimmt DNA). Pool-Card refactored: Mahnung als Stufe-1 Banner, Vendor als Hero-Headline. Cmd+K Cross-Lane-Search Foundation.
+- **UX-R3 (03.06.2026):** Detail-Page als editoriale Akte. `BestellnummerHero` als Display-Numeral im PageHero-Wrap. Mahnung als full-width Banner statt Pill. `OwnerStatement` ersetzt `OwnerLane` (3 Render-Pfade mit editorial-DNA, Magnetic-CTA für Pool/Vorschlag). Sidebar 7 Cards → 3 Blöcke (Aktion / Meta / Aktivität). CTA-Hierarchie verschärft: Verwerfen = ghost destructive durch industrial-line getrennt, Mahnung quittieren = secondary.
 
 ## Color Strategy
 
@@ -186,6 +188,69 @@ Drei Stufen ordnen die Indikatoren so, dass die Wand aus Pills aufhört. Stufe s
 - `PresenceBanner` (`_components/presence-banner.tsx`) — Avatar-Stack mit statischem Live-Dot
 - `ScopeTabs` (`@/components/bestellungen/scope-tabs.tsx`) — Pool / Meine offen / Meine erledigt / Alle
 - `PoolHeroCard` (`@/components/dashboard/pool-hero-card.tsx`) — Dashboard-Bento mit Anzahl + Ältester-Eintrag + Top-3-Vendor-Histogramm
+
+## Detail-Page als editoriale Akte (UX-R3, 03.06.2026)
+
+Die Bestelldetail-Page ist die zentrale Akte zu einer Bestellung — sie muss sich wie ein Anliegen anfühlen, nicht wie ein Dashboard. Vor UX-R3 trug der Header 10+ konkurrierende Elemente und die Sidebar 7 stacked Accordion-Panels ohne Hierarchie. Jetzt:
+
+### Hero-Struktur
+
+`EditorialSection tone="brand" marks lineBottom` wraps den gesamten Page-Header. Innen, in dieser Reihenfolge:
+
+1. **Mahnung-Banner** (full-width Strip, role=alert) — nur wenn aktiv. Status-abweichung-Triplet (warning-Variante). Verdrängt die Status-Pill aus Stufe 1: zwei laute Elemente nebeneinander brechen die Disziplin v2.
+2. **BestellnummerHero** — Display-Numeral `clamp(36, 5vw, 64)` in Barlow Condensed mit `tabular-nums`. Bestellnummer ist der Anker, nicht eine von zehn Pills. Halluzinations-Schutz: fehlende BN → Internal-ID-Fallback `BNi-{8char}` mit Eyebrow "BN unbekannt".
+3. **Vendor-Subline** — `IconBuilding` + Händler-Name + Unsicher-Marker (Pipeline-Defensive). Direkt unter dem Display-Numeral.
+4. **Meta-Line** — Status-Pill (sekundär wenn Mahnung aktiv), BestellerCell (wenn keine OwnerStatement greift), Doku-Counter, Bestelldatum, Aktualisiert-Hint. Alle als Stufe-3-subtle in `text-meta`.
+5. **Projekt-Pill** — Projekt-Farbe + Name. Stufe 3.
+6. **`<OwnerStatement>`** — editorial Statement-Block für Owner-Workflow (siehe unten).
+7. **Kontext-Pills** — Kundennummer, Projekt-Referenz, Fälligkeit. Nur wenn KI was extrahiert hat.
+8. **Betrag** rechts — `text-display-section` `font-mono-amount` `tabular-nums` in `font-headline`. Editorial Display-Stil mit Eyebrow oben ("Betrag" / "Betrag (netto)" / "Guthaben").
+
+Danach (außerhalb der EditorialSection): **Artikel-Kategorien** als Chip-Reihe, falls KI extrahiert hat. Stufe-3-Detail.
+
+### OwnerStatement statt OwnerLane
+
+`OwnerStatement` (`_components/owner-statement.tsx`) ersetzt die enge OwnerLane mit editorialem Block-Statement. Drei Render-Pfade:
+
+| State | Visual | Primary Action |
+|---|---|---|
+| **Pool / Vorschlag** (UNBEKANNT) | Dashed-border-Block + industrial-line oben + BestellerCell + Pipeline-Vorschlag-Inline | Magnetic-CTA "Übernehmen" |
+| **Owned** | Canvas-Block + Avatar + Statement-Text "X hat diese Bestellung übernommen." | Ghost "Übertragen" + Ghost "Zurück in Pool" |
+| **Auto-Claim 24h-Grace** | Subtle Stufe-3-Hint + Quick-Korrektur "Falsch — zurück in Pool" | Inline-Link ohne Kommentar-Modal |
+
+Pool-State ist der einzige mit Magnetic-CTA — der Akt der Übernahme ist Workflow-Schritt, nicht Pflege. Owned-State hat nur Ghost-Buttons — das Statement ist informativ, nicht aufrufend. Auto-Claim-Grace ist Korrekturpfad, nicht Aktion.
+
+SU/Abo + Freigegeben + Gutschrift → null. Diese Cases haben keinen Owner-Workflow.
+
+### Sidebar: 3 Blöcke statt 7 Cards
+
+Vorher rendete die Sidebar 7 Accordion-Panels: ApprovalPanel, SidebarMetadata, KiVorschlagBanner, Timeline, AiToolsPanel, CommentsThread (zweimal auf Mobile). Alle gleich gewichtet, ohne visuelle Hierarchie.
+
+Jetzt drei `<SidebarBlock>` mit `text-eyebrow uppercase tracking-[0.18em]`-Title:
+
+1. **Aktion** — ApprovalPanel. Eine primäre CTA-Hierarchie pro Block (siehe nächster Abschnitt).
+2. **Meta** — KiVorschlagBanner (KI-Suggestion inline) + SidebarMetadata (Bestellungsart, Art, Projekt, Vendor, Subunternehmer, Versand). Stammdaten der Bestellung.
+3. **Aktivität** — Timeline + AiToolsPanel + CommentsThread als collapsible Sub-Widgets. Default-collapsed.
+
+Gap zwischen Blöcken: `gap-6`. Gap zwischen Children innerhalb eines Blocks: `gap-3`. Der Block-Schnitt dominiert die Sub-Card-Struktur — das Auge sieht drei Bereiche, nicht sieben.
+
+### CTA-Hierarchie verschärft
+
+Drei-Sprachen-Disziplin v2 für CTAs: max 1 Primary CTA pro Surface. Im ApprovalPanel:
+
+| Klasse | Visual | Wann |
+|---|---|---|
+| **Primary** | `btn-primary` Magnetic, full-width Hero | Freigeben (eigentlicher Workflow-Abschluss) |
+| **Secondary** | Warning-Pill (`bg-warning-bg/40 border-warning-border text-warning`) | Mahnung quittieren (Pflege, niemals Hero) |
+| **Ghost / Destructive** | Transparent + Trash-Icon + `hover:text-error hover:bg-error-bg` | Bestellung verwerfen — nach `industrial-line my-1`-Separator vom Rest abgetrennt |
+
+**Regel:** Verwerfen ist niemals primary oder secondary — der ConfirmDialog `variant=danger` ist die Sicherheits-Brücke. Visuell laut sein wäre Doppelung. Mahnung-quittieren ist niemals primary — Freigabe ist der Workflow-Schritt. Wenn Freigabe nicht möglich (keine Rechnung): ruhiger Helper-Hinweis statt disabled-Button-Wall.
+
+### Was hier NICHT lebt
+
+- DocumentPanel hat eigene Card-Identität (PDF-Viewer + Tabs + Article-Drawer). Nicht in EditorialSection-Wrap — Card-in-Card. Konsistenz mit anderen Cards kommt in UX-R4.
+- KiVorschlagBanner bleibt eigenständige Card im MetaBlock — Inline-Form-Suggestion-Refactor wäre ein eigener Sprint.
+- Sub-Nav-Switcher im AktivitätBlock (Tabs für Audit / Kommentare / KI) ist nicht implementiert — die 3 Widgets bleiben collapsible-stacked. Pragmatischer Trade.
 
 ## Motion
 

@@ -26,7 +26,7 @@ import { ReserveBadge } from "@/components/ui/cells/reserve-badge";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
-import { OwnerLane, type BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
+import { OwnerStatement as OwnerLane, type BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-statement";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import { usePoolReservation } from "@/lib/hooks/use-pool-reservation";

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { EditorialSection } from "@/components/ui/editorial-section";
+import { BestellnummerHero } from "@/components/ui/bestellnummer-hero";
 import { getEffektiverStatus, getStatusConfig } from "@/lib/status-config";
-import { DOKUMENT_CONFIG, type Bestellungsart, displayBestellnummer } from "@/lib/bestellung-utils";
+import { DOKUMENT_CONFIG, type Bestellungsart } from "@/lib/bestellung-utils";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import {
@@ -9,18 +11,31 @@ import {
   IconBuilding,
   IconAlertCircle,
 } from "@/components/ui/icons";
-import { OwnerLane, type BestellerOption } from "./owner-lane";
+import { OwnerStatement, type BestellerOption } from "./owner-statement";
 import type { Bestellung, ProjektOption } from "./types";
 
 /**
- * DetailHeader — page-wide header below the SubNav / main sidebar.
+ * DetailHeader (UX-R3, 03.06.2026) — editoriale Akte für die Bestelldetail-Page.
  *
- * Covers: back-link, bestellnummer, status tag, Mahnung-hinweis, händler-,
- * besteller- and dokumentzähler-meta, projekt-tag, prominent betrag on the right,
- * and the optional artikel-kategorien chip row.
+ * Foundation: `<EditorialSection tone="brand" marks lineBottom>` wraps the
+ * whole hero. Inside:
  *
- * Pure server-renderable — no client state. Consumes the bestellung record plus
- * the projekt list so the project colour bar on the card matches the project tag.
+ *   - **Mahnung-Banner** (Stufe 1, full-width strip) wenn aktiv. Ersetzt
+ *     die alte Pill in der Headline — max 1 lautes Element pro Card, und
+ *     Mahnung verdrängt Status visuell.
+ *   - **BestellnummerHero** als Display-Numeral (clamp 36-64px in Barlow
+ *     Condensed). Bestellnummer ist der Anker der Akte, nicht eine von zehn
+ *     Pills.
+ *   - **Meta-Line:** Vendor + Doku-Counter + Bestelldatum + aktualisiert-Hint
+ *   - **Status-Pill** sekundär (nicht laut wenn Mahnung aktiv).
+ *   - **OwnerStatement** als editorial-statement-Block mit Magnetic-CTA für
+ *     Pool/Auto-Claim, ghost-Buttons für Owned (UX-R3 ersetzt OwnerLane).
+ *   - **Kontext-Pills** (Kundennummer, Projekt-Ref, Fälligkeit) Stufe-3-subtle.
+ *   - **Artikel-Kategorien** als untergeordnete Chip-Reihe nach dem Hero.
+ *
+ * Visual-Weight-Disziplin v2 (DESIGN.md): max 1 Stufe-1-Element pro Surface.
+ * Wenn Mahnung aktiv → Status-Pill bleibt klein, Stufe-1-Position gehört der
+ * Mahnung. Wenn keine Mahnung → Status-Pill darf laut sein.
  */
 export function DetailHeader({
   bestellung,
@@ -43,23 +58,9 @@ export function DetailHeader({
     zuordnung_methode?: string | null;
   };
   projekte: ProjektOption[];
-  /**
-   * 02.06.2026 (Pool Phase 2) — Profil ist nötig für die OwnerLane (Übernehmen-
-   * CTA bei POOL-State, Reassign/Return-Workflow bei CLAIMED-State). Optional
-   * weil DetailHeader auch in Server-Contexts ohne Auth-Setup gerendert werden
-   * können soll (z.B. Print-Layouts) — dann wird die Lane einfach weggelassen.
-   */
   profil?: { kuerzel: string; rolle: string; name: string };
-  /**
-   * 02.06.2026 (Pool Phase 3) — Reassign-Ziele. Wird im OwnerLane-Modal als
-   * Dropdown gerendert. Server lädt die Liste einmal pro Page (admin+besteller
-   * aus benutzer_rollen), die OwnerLane filtert intern den aktuellen Owner raus.
-   */
   bestellerOptions?: BestellerOption[];
 }) {
-  // 17.05.2026 — Gutschrift-Override: bei Rückerstattung wird statt
-  // "Vollständig"/"Offen" der Gutschrift-Badge angezeigt, damit User die
-  // Geld-Richtung sofort sehen (zurück zu MRU, nicht zu Vendor).
   const statusConfig = getStatusConfig(
     getEffektiverStatus(bestellung.status, bestellung.ist_gutschrift),
   );
@@ -73,95 +74,103 @@ export function DetailHeader({
     ? projekte.find((p) => p.id === bestellung.projekt_id)?.farbe
     : undefined;
 
+  const hd = haendlerDisplay(bestellung.haendler_name);
+  const hasMahnung = !!bestellung.mahnung_am;
+  const mahnungLabel = hasMahnung
+    ? `Mahnung${
+        bestellung.mahnung_count && bestellung.mahnung_count > 1
+          ? ` ${bestellung.mahnung_count}. Stufe`
+          : ""
+      } — ${new Date(bestellung.mahnung_am!).toLocaleDateString("de-DE")}`
+    : null;
+
+  const ownerLaneTakesOver =
+    art === "material" &&
+    bestellung.status !== "freigegeben" &&
+    !bestellung.ist_gutschrift &&
+    !!profil;
+
   return (
     <>
       <Link
         href="/bestellungen"
-        className="inline-flex items-center gap-1.5 w-fit mb-4 text-[14px] text-foreground-muted hover:text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
+        className="inline-flex items-center gap-1.5 w-fit mb-4 text-body-sm text-foreground-muted hover:text-brand transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
       >
         <IconArrowLeft className="h-3.5 w-3.5" />
         Bestellungen
       </Link>
 
-      <div
-        className="card p-5 mb-5 relative overflow-hidden"
-        style={projektFarbe ? { borderLeft: `4px solid ${projektFarbe}` } : undefined}
+      <EditorialSection
+        as="header"
+        tone="brand"
+        marks
+        lineBottom
+        padding="none"
+        className={hasMahnung ? "mb-5" : "mb-5"}
       >
-        {/* Subtle gradient overlay — status hint */}
+        {/* Mahnung-Banner (Stufe 1, full-width): Drei-Sprachen-Disziplin v2.
+            Verdrängt Status visuell — nie zwei laute Elemente nebeneinander. */}
+        {hasMahnung && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 border-b border-status-abweichung/30 bg-status-abweichung-bg px-6 py-2 text-meta text-status-abweichung-text"
+          >
+            <IconAlertCircle className="h-4 w-4 shrink-0" />
+            <span className="font-semibold uppercase tracking-[0.14em] text-eyebrow">
+              {mahnungLabel}
+            </span>
+          </div>
+        )}
+
         <div
-          aria-hidden="true"
-          className="absolute top-0 right-0 w-48 h-full opacity-[0.03]"
-          style={{ background: `linear-gradient(270deg, ${statusConfig.color}, transparent)` }}
-        />
-
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 relative">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="font-headline text-[24px] md:text-[24px] tracking-tight text-foreground">
-                {displayBestellnummer(bestellung)}
-              </h1>
-              <span className={`status-tag ${statusConfig.bg} ${statusConfig.text}`}>
-                <span
-                  aria-hidden="true"
-                  className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
-                  style={{ background: statusConfig.color }}
-                />
-                <statusConfig.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
-                <span className="sr-only">Status: </span>
-                {statusConfig.label}
-              </span>
-              {bestellung.mahnung_am && (
-                <span
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-error-bg border border-error-border text-error text-[12px] font-semibold"
-                  title={`Mahnung eingegangen am ${new Date(bestellung.mahnung_am).toLocaleDateString("de-DE")}`}
-                >
-                  <IconAlertCircle className="h-3.5 w-3.5" />
-                  {bestellung.mahnung_count && bestellung.mahnung_count > 1
-                    ? `${bestellung.mahnung_count}. Mahnung`
-                    : "Mahnung"}{" "}
-                  — {new Date(bestellung.mahnung_am).toLocaleDateString("de-DE")}
-                </span>
-              )}
-            </div>
-
-            {/* Compact meta line — 02.06.2026 (UX-Polish): BestellerCell wird
-                NUR noch hier gerendert, wenn die OwnerLane unten NICHT greift
-                (= SU/Abo "Geteilt"-Anzeige, Freigegebene, Gutschriften). Bei
-                Material-Pool/Claimed übernimmt die OwnerLane die Owner-Info,
-                sonst hätten wir dieselbe Aussage zweimal im Header.
-                "Unbekannter Lieferant (X)"-Prefix aus der Pipeline-Defensive
-                wird hier display-only zu X + Unsicher-Marker aufgelöst. */}
-            <div className="flex items-center gap-2 mt-2 flex-wrap text-[12px] text-foreground-subtle">
-              {(() => {
-                const hd = haendlerDisplay(bestellung.haendler_name);
-                return (
-                  <span className="inline-flex items-center gap-1.5 font-medium text-foreground-muted">
+          className="relative p-6 sm:p-8"
+          style={projektFarbe ? { borderLeft: `4px solid ${projektFarbe}` } : undefined}
+        >
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 relative">
+            <div className="flex-1 min-w-0">
+              {/* Bestellnummer als Display-Numeral. Halluzinations-sicher
+                  durch BestellnummerHero mit BNi-Fallback. */}
+              <BestellnummerHero
+                bestellung={bestellung}
+                subline={
+                  <span className="inline-flex items-center gap-2 text-body-sm text-foreground-muted">
                     <IconBuilding className="h-3.5 w-3.5 text-foreground-subtle" />
-                    <span>{hd.name}</span>
+                    <span className="font-medium">{hd.name}</span>
                     {hd.isUnsicher && (
                       <span
                         aria-hidden="true"
                         title="Pipeline hat den Lieferanten nicht eindeutig erkannt — Domain als Marker übernommen."
-                        className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full bg-warning-bg text-warning text-[9px] font-bold font-mono-amount cursor-help"
+                        className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-warning-bg text-warning text-eyebrow font-bold font-mono-amount cursor-help"
                       >
                         ?
                       </span>
                     )}
                   </span>
-                );
-              })()}
-              {(() => {
-                const ownerLaneTakesOver =
-                  art === "material" &&
-                  bestellung.status !== "freigegeben" &&
-                  !bestellung.ist_gutschrift &&
-                  !!profil;
-                if (ownerLaneTakesOver) return null;
-                return (
+                }
+              />
+
+              {/* Status + Doku-Counter + Datum + BestellerCell (wenn keine OwnerLane).
+                  Status ist hier sekundär — wenn Mahnung aktiv, ist Mahnung Stufe 1. */}
+              <div className="mt-4 flex items-center gap-2.5 flex-wrap text-meta text-foreground-subtle">
+                <span
+                  className={`status-tag ${statusConfig.bg} ${statusConfig.text}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
+                    style={{ background: statusConfig.color }}
+                  />
+                  <statusConfig.Icon
+                    className="w-3 h-3 mr-1 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">Status: </span>
+                  {statusConfig.label}
+                </span>
+
+                {!ownerLaneTakesOver && (
                   <>
-                    <span aria-hidden="true" className="text-line-strong">
-                      ·
-                    </span>
+                    <span aria-hidden="true" className="text-line-strong">·</span>
                     <BestellerCell
                       besteller_kuerzel={bestellung.besteller_kuerzel}
                       besteller_name={bestellung.besteller_name}
@@ -171,179 +180,202 @@ export function DetailHeader({
                       variant="with-name"
                     />
                   </>
-                );
-              })()}
-              <span aria-hidden="true" className="text-line-strong">
-                ·
-              </span>
+                )}
 
-              <DokumentCountPill current={dokCount} total={dokTotal} />
-              <span aria-hidden="true" className="text-line-strong">
-                ·
-              </span>
+                <span aria-hidden="true" className="text-line-strong">·</span>
+                <DokumentCountPill current={dokCount} total={dokTotal} />
 
-              {/* 06.05.2026 — Bestelldatum (echtes Datum aus BB) bevorzugt vor
-                  created_at (Pipeline-Erfassung). User sieht den echten Tag der
-                  Bestellung statt das System-Insert-Datum. */}
-              {bestellung.bestelldatum ? (
-                <span
-                  className="cursor-default"
-                  title={`Bestellt am ${new Date(bestellung.bestelldatum).toLocaleDateString("de-DE", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })} (erfasst ${new Date(bestellung.created_at).toLocaleString("de-DE", {
-                    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-                  })})`}
-                >
-                  Bestellt {new Date(bestellung.bestelldatum).toLocaleDateString("de-DE", {
-                    day: "2-digit", month: "2-digit", year: "numeric",
-                  })}
-                </span>
-              ) : (
-                <span
-                  className="cursor-default"
-                  title={new Date(bestellung.created_at).toLocaleString("de-DE", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                >
-                  {relativeZeit(bestellung.created_at)}
-                </span>
-              )}
-              {bestellung.updated_at && bestellung.updated_at !== bestellung.created_at && (
-                <>
-                  <span aria-hidden="true" className="text-line-strong">
-                    ·
-                  </span>
+                <span aria-hidden="true" className="text-line-strong">·</span>
+                {bestellung.bestelldatum ? (
                   <span
-                    className="cursor-default text-foreground-subtle"
-                    title={`Aktualisiert: ${new Date(bestellung.updated_at).toLocaleString(
-                      "de-DE",
-                      {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}`}
+                    className="cursor-default"
+                    title={`Bestellt am ${new Date(bestellung.bestelldatum).toLocaleDateString("de-DE", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })} (erfasst ${new Date(bestellung.created_at).toLocaleString("de-DE", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })})`}
                   >
-                    aktualisiert {relativeZeit(bestellung.updated_at)}
+                    Bestellt{" "}
+                    {new Date(bestellung.bestelldatum).toLocaleDateString("de-DE", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
                   </span>
-                </>
+                ) : (
+                  <span
+                    className="cursor-default"
+                    title={new Date(bestellung.created_at).toLocaleString("de-DE", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  >
+                    {relativeZeit(bestellung.created_at)}
+                  </span>
+                )}
+                {bestellung.updated_at &&
+                  bestellung.updated_at !== bestellung.created_at && (
+                    <>
+                      <span aria-hidden="true" className="text-line-strong">·</span>
+                      <span
+                        className="cursor-default text-foreground-subtle"
+                        title={`Aktualisiert: ${new Date(bestellung.updated_at).toLocaleString(
+                          "de-DE",
+                          {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}`}
+                      >
+                        aktualisiert {relativeZeit(bestellung.updated_at)}
+                      </span>
+                    </>
+                  )}
+              </div>
+
+              {/* Projekt-Pill (Stufe 3, subtle). */}
+              {bestellung.projekt_name && (
+                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-canvas text-meta">
+                  <span
+                    aria-hidden="true"
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: projektFarbe || "var(--mr-red)" }}
+                  />
+                  <span className="font-medium text-foreground">
+                    {bestellung.projekt_name}
+                  </span>
+                </div>
+              )}
+
+              {/* OwnerStatement — editorial-Statement-Block (UX-R3).
+                  Ersetzt die alte enge OwnerLane. Drei Render-Pfade:
+                  Pool/Vorschlag (Magnetic-CTA), Owned (ghost actions),
+                  Auto-Claim-24h-Grace (Korrigieren-Link).
+                  Rendert null in SU/Abo + freigegeben + Gutschrift. */}
+              {profil && (
+                <OwnerStatement
+                  bestellungId={bestellung.id}
+                  besteller_kuerzel={bestellung.besteller_kuerzel}
+                  besteller_name={bestellung.besteller_name}
+                  bestellungsart={bestellung.bestellungsart}
+                  status={bestellung.status}
+                  vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
+                  vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
+                  zuordnung_methode={bestellung.zuordnung_methode ?? null}
+                  updated_at={bestellung.updated_at ?? null}
+                  istGutschrift={bestellung.ist_gutschrift}
+                  profil={profil}
+                  besteller_options={bestellerOptions ?? []}
+                />
+              )}
+
+              {/* Kontext-Pills (Stufe 3, subtle): Kundennummer, Projekt-Ref,
+                  Fälligkeit. Nur wenn die KI was extrahiert hat. */}
+              {(bestellung.kundennummer ||
+                bestellung.projekt_referenz ||
+                bestellung.faelligkeitsdatum) && (
+                <div className="mt-3 flex items-center gap-1.5 flex-wrap text-meta">
+                  {bestellung.kundennummer && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                      title={`Kundennummer beim Lieferanten: ${bestellung.kundennummer}`}
+                    >
+                      <span className="text-foreground-subtle">Kd-Nr.</span>
+                      <span className="font-mono-amount font-medium text-foreground">
+                        {bestellung.kundennummer}
+                      </span>
+                    </span>
+                  )}
+                  {bestellung.projekt_referenz && !bestellung.projekt_name && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
+                      title={`Projekt-Referenz aus Dokument: ${bestellung.projekt_referenz}`}
+                    >
+                      <span className="text-foreground-subtle">Ref:</span>
+                      <span className="font-medium text-foreground line-clamp-1 max-w-[280px]">
+                        {bestellung.projekt_referenz}
+                      </span>
+                    </span>
+                  )}
+                  {bestellung.faelligkeitsdatum &&
+                    (() => {
+                      const f = new Date(bestellung.faelligkeitsdatum);
+                      const tageBis = Math.ceil(
+                        (f.getTime() - Date.now()) / (24 * 60 * 60 * 1000),
+                      );
+                      const ueberfaellig =
+                        tageBis < 0 && bestellung.status !== "freigegeben";
+                      const baldFaellig = tageBis >= 0 && tageBis <= 7;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
+                            ueberfaellig
+                              ? "bg-error-bg border-error-border text-error"
+                              : baldFaellig
+                                ? "bg-warning-bg border-warning-border text-warning"
+                                : "bg-canvas border-line-subtle text-foreground-muted"
+                          }`}
+                          title={`Zahlfrist aus Rechnung: ${f.toLocaleDateString("de-DE")}`}
+                        >
+                          <span className="text-foreground-subtle">Fällig</span>
+                          <span className="font-medium">
+                            {f.toLocaleDateString("de-DE", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </span>
+                          {ueberfaellig && (
+                            <span className="font-semibold">· überfällig</span>
+                          )}
+                          {baldFaellig && !ueberfaellig && (
+                            <span className="font-semibold">· in {tageBis}d</span>
+                          )}
+                        </span>
+                      );
+                    })()}
+                </div>
               )}
             </div>
 
-            {bestellung.projekt_name && (
-              <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-canvas text-[12px]">
-                <span
-                  aria-hidden="true"
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ background: projektFarbe || "var(--mr-red)" }}
-                />
-                <span className="font-medium text-foreground">{bestellung.projekt_name}</span>
-              </div>
-            )}
-
-            {/* 02.06.2026 (Pool Phase 2) — Owner-Lane: drei semantische States
-                (POOL/CLAIMED/FREIGEGEBEN). Lebt INNERHALB der card-Surface
-                damit visuell klar wird: Owner-Logic gehört zur Bestellung,
-                nicht zum Page-Chrome. Lane rendert sich selbst weg wenn nicht
-                relevant (SU/Abo, freigegeben, fremder Besteller). */}
-            {profil && (
-              <OwnerLane
-                bestellungId={bestellung.id}
-                besteller_kuerzel={bestellung.besteller_kuerzel}
-                besteller_name={bestellung.besteller_name}
-                bestellungsart={bestellung.bestellungsart}
-                status={bestellung.status}
-                vorschlag_kuerzel={bestellung.vorschlag_kuerzel ?? null}
-                vorschlag_konfidenz={bestellung.vorschlag_konfidenz ?? null}
-                zuordnung_methode={bestellung.zuordnung_methode ?? null}
-                updated_at={bestellung.updated_at ?? null}
-                istGutschrift={bestellung.ist_gutschrift}
-                profil={profil}
-                besteller_options={bestellerOptions ?? []}
-              />
-            )}
-
-            {/* 06.05.2026 — Extra-Kontext-Pills aus Mail/PDF: Kundennummer,
-                Projekt-Referenz, Fälligkeit. Werden nur angezeigt wenn die KI
-                tatsächlich was extrahiert hat — sonst leise im UI. */}
-            {(bestellung.kundennummer || bestellung.projekt_referenz || bestellung.faelligkeitsdatum) && (
-              <div className="mt-2.5 flex items-center gap-1.5 flex-wrap text-[12px]">
-                {bestellung.kundennummer && (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
-                    title={`Kundennummer beim Lieferanten: ${bestellung.kundennummer}`}
-                  >
-                    <span className="text-foreground-subtle">Kd-Nr.</span>
-                    <span className="font-mono-amount font-medium text-foreground">{bestellung.kundennummer}</span>
-                  </span>
-                )}
-                {bestellung.projekt_referenz && !bestellung.projekt_name && (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-canvas border border-line-subtle text-foreground-muted"
-                    title={`Projekt-Referenz aus Dokument — bei keinem Projekt zugeordnet, kann als Match-Hinweis dienen: ${bestellung.projekt_referenz}`}
-                  >
-                    <span className="text-foreground-subtle">Ref:</span>
-                    <span className="font-medium text-foreground line-clamp-1 max-w-[280px]">{bestellung.projekt_referenz}</span>
-                  </span>
-                )}
-                {bestellung.faelligkeitsdatum && (() => {
-                  const f = new Date(bestellung.faelligkeitsdatum);
-                  const tageBis = Math.ceil((f.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-                  const ueberfaellig = tageBis < 0 && bestellung.status !== "freigegeben";
-                  const baldFaellig = tageBis >= 0 && tageBis <= 7;
-                  return (
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
-                        ueberfaellig
-                          ? "bg-error-bg border-error-border text-error"
-                          : baldFaellig
-                            ? "bg-warning-bg border-warning-border text-warning"
-                            : "bg-canvas border-line-subtle text-foreground-muted"
-                      }`}
-                      title={`Zahlfrist aus Rechnung: ${f.toLocaleDateString("de-DE")}`}
-                    >
-                      <span className="text-foreground-subtle">Fällig</span>
-                      <span className="font-medium">{f.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}</span>
-                      {ueberfaellig && <span className="font-semibold">· überfällig</span>}
-                      {baldFaellig && !ueberfaellig && <span className="font-semibold">· in {tageBis}d</span>}
-                    </span>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col items-end shrink-0">
-            <p className="text-[10px] font-semibold tracking-widest uppercase text-foreground-subtle">
-              {bestellung.ist_gutschrift
-                ? "Guthaben"
-                : `Betrag${bestellung.betrag_ist_netto ? " (netto)" : ""}`}
-            </p>
-            <p
-              className={`text-[28px] font-bold font-mono-amount mt-0.5 leading-none ${
-                bestellung.ist_gutschrift ? "text-success" : "text-foreground"
-              }`}
-            >
-              {bestellung.betrag
-                ? `${bestellung.ist_gutschrift ? "+ " : ""}${Number(bestellung.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
-                : "–"}
-            </p>
-            {bestellung.waehrung && bestellung.waehrung !== "EUR" && (
-              <p className="text-[10px] text-foreground-subtle font-mono-amount mt-0.5">
-                {bestellung.waehrung}
+            {/* Betrag-Hero rechts. Editorial Display-Stil mit eyebrow oben. */}
+            <div className="flex flex-col items-end shrink-0">
+              <p className="text-eyebrow font-semibold tracking-[0.18em] uppercase text-foreground-subtle">
+                {bestellung.ist_gutschrift
+                  ? "Guthaben"
+                  : `Betrag${bestellung.betrag_ist_netto ? " (netto)" : ""}`}
               </p>
-            )}
+              <p
+                className={`text-display-section font-bold font-mono-amount mt-1 leading-none ${
+                  bestellung.ist_gutschrift ? "text-success" : "text-foreground"
+                }`}
+              >
+                {bestellung.betrag
+                  ? `${bestellung.ist_gutschrift ? "+ " : ""}${Number(
+                      bestellung.betrag,
+                    ).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
+                  : "–"}
+              </p>
+              {bestellung.waehrung && bestellung.waehrung !== "EUR" && (
+                <p className="text-eyebrow text-foreground-subtle font-mono-amount mt-1">
+                  {bestellung.waehrung}
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </EditorialSection>
 
       {bestellung.artikel_kategorien &&
         Object.keys(bestellung.artikel_kategorien).length > 0 && (
@@ -351,7 +383,7 @@ export function DetailHeader({
             {Object.entries(bestellung.artikel_kategorien).map(([kat, anzahl]) => (
               <Badge key={kat} tone="brand" size="md" className="gap-1.5">
                 {kat}
-                <span className="font-mono-amount bg-brand/10 text-brand rounded px-1 py-0.5 text-[10px] font-bold">
+                <span className="font-mono-amount bg-brand/10 text-brand rounded px-1 py-0.5 text-eyebrow font-bold">
                   {anzahl}
                 </span>
               </Badge>
@@ -362,7 +394,13 @@ export function DetailHeader({
   );
 }
 
-function DokumentCountPill({ current, total }: { current: number; total: number }) {
+function DokumentCountPill({
+  current,
+  total,
+}: {
+  current: number;
+  total: number;
+}) {
   const complete = current === total;
   return (
     <span

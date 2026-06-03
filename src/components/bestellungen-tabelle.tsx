@@ -43,7 +43,7 @@ import { PoolInbox } from "@/components/bestellungen/pool-inbox";
 import { useDrawerStack } from "@/lib/hooks/use-drawer-stack";
 import { agingWashFromCreatedAt } from "@/lib/pool-utils";
 import type { ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
-import type { BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
+import type { BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-statement";
 import type { PoolLayout } from "@/components/bestellungen/lane-config";
 import type { PoolScoreWeights, AffinityMap } from "@/lib/pool-score";
 

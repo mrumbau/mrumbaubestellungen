@@ -1,34 +1,27 @@
 "use client";
 
 /**
- * OwnerLane — Pool-Phase-2/3-Surface im DetailHeader.
+ * OwnerStatement — Editorial-Statement-Block für die Detail-Akte (UX-R3).
  *
- * Drei States (Drei-Sprachen-Disziplin, siehe DESIGN.md):
- *   1. **POOL**  — besteller_kuerzel=UNBEKANNT, Material, nicht freigegeben.
- *      Leerer Avatar + Eyebrow "Vorschlag" + Vorschlag-Pill + Magnetic-CTA
- *      "Übernehmen". Wenn die Pipeline einen Vorschlag-Kürzel mitgibt, wird er
- *      als ghost-Pill mit dotted-underline gerendert (NIE als Status-Pill —
- *      sonst kollidiert er mit dem 6-State-Workflow).
- *   2. **CLAIMED** — eindeutig zugewiesen, nicht freigegeben. Avatar + "Über-
- *      nommen von X" + zwei sekundäre Aktionen (Zurück in Pool, Übertragen).
- *   3. **FREIGEGEBEN** — Lane kollabiert komplett. Der Owner steht in der
- *      StatusCell, kein eigener Lane-Bedarf.
+ * Refactor der alten OwnerLane (Pool Phase 2/3) auf die Drei-Sprachen-
+ * Disziplin v2 mit Visual-Weight-Stufen. Drei Render-Pfade:
  *
- * SU/Abo nutzen die bestehende "Geteilt"-Logik in der Meta-Line der Detail-
- * Header — keine OwnerLane.
+ *   1. **Pool / Vorschlag** — UNBEKANNT-State. Editorial Hero-Block mit
+ *      Brand-Statement-Text "Diese Bestellung wartet im Pool." + Pipeline-
+ *      Vorschlag als Eyebrow-ghost + Magnetic-CTA "Übernehmen" als primärer
+ *      Akt der Übernahme.
+ *   2. **Owned** — claimed-State. Avatar + "{Name} hat diese Bestellung
+ *      übernommen." + zwei Ghost-Actions (Übertragen, Zurück in Pool).
+ *      Keine Magnetic — der Statement ist informativ, nicht aufrufend.
+ *   3. **Auto-Claim 24h-Grace** — sichtbar nur in den ersten 24h nach
+ *      Pipeline-Auto-Claim. Hint "Auto-übernommen via {Methode} · {Konfidenz}"
+ *      + Quick-Korrektur-Link "Falsch — zurück in Pool" (ohne Kommentar-Modal).
  *
- * Optimistic-UI (02.06.2026 Pool Phase 3):
- *   - `optimisticOwner` wird sofort beim Klick gesetzt, damit der State auf
- *     CLAIMED springt ohne auf das router.refresh()-Round-Trip zu warten.
- *   - Bei Server-Error rollback via Setzen auf null (Server-Werte gewinnen
- *     nach refresh ohnehin).
+ * SU/Abo / Freigegeben / Gutschrift → rendert null. Diese Cases haben keinen
+ * Owner-Workflow (siehe alte OwnerLane-Doku — Logic 1:1 übernommen).
  *
- * Conflict-Handling: pool_claim_bestellung-RPC ist idempotent + race-safe.
- * Bei was_already_claimed=true zeigen wir einen Warning-Toast mit dem aktuellen
- * Owner und triggern router.refresh() — der Server-Component lädt die neue
- * Realität nach.
- *
- * 02.06.2026 (Pool Phase 2 + 3).
+ * Optimistic-UI + Conflict-Resolution + Realtime-Toast-Subscription für
+ * fremde Owner-Changes bleibt unverändert aus der alten OwnerLane.
  */
 
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -38,6 +31,7 @@ import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { useBestellungPresence } from "@/lib/hooks/use-bestellung-presence";
 import { PresenceBanner } from "./presence-banner";
@@ -47,7 +41,7 @@ export interface BestellerOption {
   name: string;
 }
 
-export interface OwnerLaneProps {
+export interface OwnerStatementProps {
   bestellungId: string;
   besteller_kuerzel: string;
   besteller_name: string;
@@ -55,68 +49,35 @@ export interface OwnerLaneProps {
   status: string;
   vorschlag_kuerzel: string | null;
   vorschlag_konfidenz: number | null;
-  /**
-   * 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Provenance.
-   * `zuordnung_methode` startsWith `auto_high_confidence:` markiert ein
-   * von der Pipeline auto-übernommenes Item. `updated_at` bestimmt das
-   * 24h-Grace-Fenster — innerhalb dessen ein "Korrigieren"-CTA sichtbar ist,
-   * der das Item ohne Kommentar-Modal zurück in den Pool wirft.
-   */
   zuordnung_methode?: string | null;
   updated_at?: string | null;
-  /**
-   * 02.06.2026 (UX-Polish): Gutschriften haben keinen Owner-Workflow —
-   * Rückerstattung geht direkt an die Buchhaltung, niemand muss übernehmen.
-   * Bei istGutschrift=true rendert die Lane null, damit der Sidebar-Hinweis
-   * „keine Freigabe nötig" nicht durch einen Übernehmen-CTA widersprochen wird.
-   */
   istGutschrift?: boolean | null;
-  /** Aktueller User. */
   profil: { kuerzel: string; rolle: string; name: string };
-  /**
-   * Mögliche Reassign-Ziele (alle aktiven Besteller + Admins, ohne den
-   * aktuellen Owner — die Filterung passiert hier im UI nicht im Server,
-   * damit der Liste-Endpoint nur einmal pro Page geladen wird).
-   */
   besteller_options?: BestellerOption[];
 }
 
-export function OwnerLane(props: OwnerLaneProps) {
+export function OwnerStatement(props: OwnerStatementProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [pending, startTransition] = useTransition();
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
-  // Optimistic-State: sobald der User klickt, simulieren wir die Antwort der
-  // Pipeline lokal — der Server gewinnt nach dem router.refresh() ohnehin.
   const [optimisticKuerzel, setOptimisticKuerzel] = useState<string | null>(null);
   const [optimisticName, setOptimisticName] = useState<string | null>(null);
-  // Modal/Dialog-Sichtbarkeit
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [reassignTarget, setReassignTarget] = useState<string>("");
   const [reassignKommentar, setReassignKommentar] = useState<string>("");
-  // Owner-Change-Realtime: merkt sich das zuletzt gesehene Kürzel um Wechsel
-  // durch andere User zu detektieren. Initial gleich dem Server-Zustand,
-  // damit der erste Mount nicht als "Wechsel" zählt.
   const lastSeenOwnerRef = useRef(props.besteller_kuerzel);
 
-  // 02.06.2026 (Pool Phase 4) — Presence-Awareness. Hook IMMER aufrufen
-  // (Hook-Rules) — die Render-Entscheidung (welcher State braucht den Banner)
-  // passiert weiter unten. Auch bei SU/Abo + Freigegeben läuft die Subscription
-  // einmal kurz und wird sofort wieder geleert; akzeptierter Trade.
   const presenceViewers = useBestellungPresence({
     bestellungId: props.bestellungId,
     selfKuerzel: props.profil.kuerzel,
     selfName: props.profil.name,
   });
 
-  // 02.06.2026 (Pool Phase 3) — Owner-Change-Subscription. Abonniert events-
-  // INSERT für diese Bestellung; bei pool_claim/reassign/return durch einen
-  // ANDEREN Actor (nicht ich) zeigen wir einen kontextualisierten Toast.
-  // Existing useBestellungRealtime (in use-bestelldetail.ts) übernimmt den
-  // tatsächlichen router.refresh — wir setzen nur das Toast-Signal.
+  // Owner-Change-Subscription (übernommen aus alter OwnerLane)
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
     const channel = supabase
@@ -137,8 +98,6 @@ export function OwnerLane(props: OwnerLaneProps) {
           };
           if (!evt?.event_type) return;
           if (!["pool_claim", "pool_reassign", "pool_return"].includes(evt.event_type)) return;
-          // Eigener Trigger → keine Notification (eigenes Optimistic + Toast
-          // hat schon gefeuert).
           if (evt.actor === props.profil.kuerzel) return;
           if (evt.event_type === "pool_claim") {
             toast.warning(`Wurde gerade von ${evt.actor ?? "jemand anderem"} übernommen`, {
@@ -162,19 +121,14 @@ export function OwnerLane(props: OwnerLaneProps) {
     };
   }, [props.bestellungId, props.profil.kuerzel, toast]);
 
-  // Lokales Tracking für Owner-Change ohne Event-Subscription (z.B. wenn
-  // jemand direkt UPDATE setzt ohne Event-Trigger). Bei Owner-Wechsel reset
-  // optimistic state damit Server-Wert sichtbar wird.
   useEffect(() => {
     if (props.besteller_kuerzel !== lastSeenOwnerRef.current) {
       lastSeenOwnerRef.current = props.besteller_kuerzel;
-      // Optimistic-State reset wenn Server uns überholt hat
       setOptimisticKuerzel(null);
       setOptimisticName(null);
     }
   }, [props.besteller_kuerzel]);
 
-  // Effektive (= ggf. optimistisch überschriebene) Owner-Werte.
   const effectiveKuerzel = optimisticKuerzel ?? props.besteller_kuerzel;
   const effectiveName = optimisticName ?? props.besteller_name;
 
@@ -185,13 +139,8 @@ export function OwnerLane(props: OwnerLaneProps) {
   const isOwner = effectiveKuerzel === props.profil.kuerzel;
   const isAdmin = props.profil.rolle === "admin";
 
-  // SU/Abo nutzen weiterhin die "Geteilt"-Anzeige in der Meta-Line — keine Lane.
   if (!isMaterial) return null;
-  // Freigegeben: kein Owner-Workflow mehr nötig.
   if (isFreigegeben) return null;
-  // 02.06.2026 — Gutschriften haben keinen Owner-Workflow. Sidebar zeigt den
-  // dedizierten „Rückerstattung — keine Freigabe nötig"-Hinweis; ein Übernehmen-
-  // CTA würde dem widersprechen und User verwirren.
   if (props.istGutschrift) return null;
 
   async function postPoolAction(
@@ -214,7 +163,6 @@ export function OwnerLane(props: OwnerLaneProps) {
 
   async function handleClaim() {
     setIsClaiming(true);
-    // Optimistic — wir nehmen sofort an, dass es klappt.
     setOptimisticKuerzel(props.profil.kuerzel);
     setOptimisticName(props.profil.name);
     try {
@@ -318,76 +266,102 @@ export function OwnerLane(props: OwnerLaneProps) {
     }
   }
 
-  // Reassign-Ziele filtern (current owner ausblenden)
   const reassignTargets = (props.besteller_options ?? []).filter(
     (o) => o.kuerzel !== effectiveKuerzel,
   );
 
-  // POOL-State
+  // ─── POOL / Vorschlag (Magnetic-CTA) ──────────────────────────────────
   if (isUnbekannt) {
     return (
-      <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3 px-3 py-2.5 rounded-md bg-canvas border border-dashed border-line-strong">
-        <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
-          <BestellerCell
-            besteller_kuerzel={effectiveKuerzel}
-            besteller_name={effectiveName}
-            bestellungsart={props.bestellungsart}
-            vorschlag_kuerzel={props.vorschlag_kuerzel}
-            vorschlag_konfidenz={props.vorschlag_konfidenz}
-            variant="with-name"
-          />
-          {props.vorschlag_kuerzel && props.vorschlag_kuerzel !== "UNBEKANNT" && (
-            <span className="hidden sm:inline text-[12px] text-foreground-subtle">
-              Pipeline schlägt {props.vorschlag_kuerzel} vor
-              {typeof props.vorschlag_konfidenz === "number" && (
-                <span className="ml-1 font-mono-amount">
-                  · {Math.round(props.vorschlag_konfidenz * 100)} %
-                </span>
-              )}
-            </span>
-          )}
-          <PresenceBanner viewers={presenceViewers} />
+      <div className="mt-5 relative rounded-md border border-dashed border-line-strong bg-canvas">
+        <div className="industrial-line absolute inset-x-0 top-0" aria-hidden="true" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+            <BestellerCell
+              besteller_kuerzel={effectiveKuerzel}
+              besteller_name={effectiveName}
+              bestellungsart={props.bestellungsart}
+              vorschlag_kuerzel={props.vorschlag_kuerzel}
+              vorschlag_konfidenz={props.vorschlag_konfidenz}
+              variant="with-name"
+            />
+            <div className="text-meta text-foreground-muted">
+              <span className="font-medium text-foreground">Im Pool</span>
+              {props.vorschlag_kuerzel &&
+                props.vorschlag_kuerzel !== "UNBEKANNT" && (
+                  <>
+                    <span className="mx-1.5 text-foreground-faint">·</span>
+                    <span>
+                      Pipeline schlägt {props.vorschlag_kuerzel} vor
+                      {typeof props.vorschlag_konfidenz === "number" && (
+                        <span className="ml-1 font-mono-amount">
+                          ({Math.round(props.vorschlag_konfidenz * 100)} %)
+                        </span>
+                      )}
+                    </span>
+                  </>
+                )}
+            </div>
+            <PresenceBanner viewers={presenceViewers} />
+          </div>
+          <button
+            type="button"
+            onClick={handleClaim}
+            disabled={isClaiming || pending}
+            className={cn(
+              "btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md",
+              "text-body-sm min-h-[44px] sm:min-h-0",
+              "disabled:opacity-60 disabled:cursor-not-allowed",
+              "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+            )}
+            aria-label="Bestellung übernehmen"
+          >
+            {isClaiming ? (
+              <svg
+                className="animate-spin w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeOpacity="0.25"
+                />
+                <path
+                  d="M21 12a9 9 0 0 0-9-9"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            )}
+            Übernehmen
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleClaim}
-          disabled={isClaiming || pending}
-          className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-[14px] min-h-[44px] sm:min-h-0 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
-          aria-label="Bestellung übernehmen"
-        >
-          {isClaiming ? (
-            <svg
-              className="animate-spin w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.25" />
-              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          )}
-          Übernehmen
-        </button>
       </div>
     );
   }
 
-  // 03.06.2026 (Pool 2.0 Sprint 3) — Auto-Claim-Detection + 24h-Grace.
+  // ─── Auto-Claim Detection ─────────────────────────────────────────────
   const isAutoClaim =
     typeof props.zuordnung_methode === "string" &&
     props.zuordnung_methode.startsWith("auto_high_confidence:");
@@ -399,7 +373,6 @@ export function OwnerLane(props: OwnerLaneProps) {
     isAutoClaim && updatedAtTs > 0 && Date.now() - updatedAtTs < 24 * 60 * 60 * 1000;
 
   async function handleAutoClaimCorrect() {
-    // Wie pool-return aber ohne Kommentar-Modal: Quick-Korrektur direkt.
     setIsReturning(true);
     setOptimisticKuerzel("UNBEKANNT");
     setOptimisticName("UNBEKANNT");
@@ -424,13 +397,15 @@ export function OwnerLane(props: OwnerLaneProps) {
     }
   }
 
-  // CLAIMED-State: nur eigener Owner oder Admin sieht Sekundär-Aktionen
+  // ─── Owned (claimed) ──────────────────────────────────────────────────
   if (isOwner || isAdmin) {
     const hasReassignTargets = reassignTargets.length > 0;
     return (
       <>
+        {/* Auto-Claim-Grace-Banner (Stufe 3, subtle): 24h-Korrekturfenster
+            mit Quick-Action ohne Kommentar-Modal. */}
         {graceActive && (
-          <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-3 py-2 rounded-md border border-line-strong bg-canvas text-[12px]">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-md border border-line-strong bg-canvas text-meta">
             <span className="text-foreground-muted">
               <span className="font-medium text-foreground">Auto-übernommen</span>
               {originalMethode && (
@@ -444,7 +419,9 @@ export function OwnerLane(props: OwnerLaneProps) {
                   · {Math.round(props.vorschlag_konfidenz * 100)} %
                 </span>
               )}
-              <span className="ml-2 text-foreground-faint">— 24h-Korrekturfenster aktiv</span>
+              <span className="ml-2 text-foreground-faint">
+                — 24h-Korrekturfenster aktiv
+              </span>
             </span>
             <button
               type="button"
@@ -452,14 +429,26 @@ export function OwnerLane(props: OwnerLaneProps) {
               disabled={isReturning || pending}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-line bg-surface hover:bg-input transition-colors text-foreground disabled:opacity-50"
             >
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <svg
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+              >
                 <path d="M4 8h8M8 4l-4 4 4 4" />
               </svg>
               Falsch — zurück in Pool
             </button>
           </div>
         )}
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3 px-3 py-2.5 rounded-md bg-canvas">
+
+        {/* Owned-Statement: editorial Block mit Avatar + Statement-Text +
+            zwei Ghost-Actions. Keine Magnetic — der Statement ist
+            informativ, nicht aufrufend. */}
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-md bg-canvas">
           <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
             <BestellerCell
               besteller_kuerzel={effectiveKuerzel}
@@ -468,8 +457,12 @@ export function OwnerLane(props: OwnerLaneProps) {
               isAutoClaimed={isAutoClaim}
               variant="with-name"
             />
-            <span className="hidden sm:inline text-[12px] text-foreground-subtle">
-              {isAutoClaim ? "Auto-übernommen" : isOwner ? "Übernommen — du bist dran" : "Zugeordnet"}
+            <span className="text-meta text-foreground-muted">
+              {isAutoClaim
+                ? "Auto-übernommen"
+                : isOwner
+                  ? "hat diese Bestellung übernommen."
+                  : "ist zugeordnet."}
             </span>
             <PresenceBanner viewers={presenceViewers} />
           </div>
@@ -479,7 +472,14 @@ export function OwnerLane(props: OwnerLaneProps) {
                 type="button"
                 onClick={() => setReassignDialogOpen(true)}
                 disabled={isReassigning || isReturning || pending}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-line-strong bg-surface text-foreground-muted hover:bg-hover hover:text-foreground text-[13px] min-h-[44px] sm:min-h-0 transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className={cn(
+                  "inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md",
+                  "border border-line bg-transparent text-foreground-muted",
+                  "hover:bg-input hover:text-foreground hover:border-line-strong",
+                  "text-meta min-h-[44px] sm:min-h-0 transition-colors",
+                  "disabled:opacity-60 disabled:cursor-not-allowed",
+                  "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+                )}
                 aria-label="An anderen Besteller übertragen"
               >
                 <svg
@@ -503,7 +503,14 @@ export function OwnerLane(props: OwnerLaneProps) {
               type="button"
               onClick={() => setReturnDialogOpen(true)}
               disabled={isReturning || isReassigning || pending}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-line-strong bg-surface text-foreground-muted hover:bg-hover hover:text-foreground text-[13px] min-h-[44px] sm:min-h-0 transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+              className={cn(
+                "inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md",
+                "border border-line bg-transparent text-foreground-muted",
+                "hover:bg-input hover:text-foreground hover:border-line-strong",
+                "text-meta min-h-[44px] sm:min-h-0 transition-colors",
+                "disabled:opacity-60 disabled:cursor-not-allowed",
+                "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+              )}
               aria-label="Bestellung zurück in den Pool"
             >
               <svg
@@ -514,14 +521,17 @@ export function OwnerLane(props: OwnerLaneProps) {
                 strokeWidth={1.75}
                 aria-hidden="true"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L4 9m0 0l5-5M4 9h11a5 5 0 010 10h-4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 14L4 9m0 0l5-5M4 9h11a5 5 0 010 10h-4"
+                />
               </svg>
               Zurück in Pool
             </button>
           </div>
         </div>
 
-        {/* Return-Confirm: destruktiv, weil andere Besteller sie dann übernehmen können */}
         <ConfirmDialog
           open={returnDialogOpen}
           title="Zurück in den Pool legen?"
@@ -534,7 +544,6 @@ export function OwnerLane(props: OwnerLaneProps) {
           onCancel={() => setReturnDialogOpen(false)}
         />
 
-        {/* Reassign-Modal: User-Liste + optionaler Kommentar */}
         <Modal
           open={reassignDialogOpen}
           onClose={() => {
@@ -569,7 +578,7 @@ export function OwnerLane(props: OwnerLaneProps) {
             <div>
               <label
                 htmlFor="pool-reassign-target"
-                className="block text-[12px] font-semibold text-foreground-muted mb-1.5"
+                className="block text-meta font-semibold text-foreground-muted mb-1.5"
               >
                 Empfänger
               </label>
@@ -578,7 +587,7 @@ export function OwnerLane(props: OwnerLaneProps) {
                 value={reassignTarget}
                 onChange={(e) => setReassignTarget(e.target.value)}
                 disabled={isReassigning}
-                className="w-full px-3 py-2 rounded-md border border-line-strong bg-input text-[14px] text-foreground focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className="w-full px-3 py-2 rounded-md border border-line-strong bg-input text-body-sm text-foreground focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
               >
                 <option value="">— Besteller wählen —</option>
                 {reassignTargets.map((o) => (
@@ -591,20 +600,22 @@ export function OwnerLane(props: OwnerLaneProps) {
             <div>
               <label
                 htmlFor="pool-reassign-kommentar"
-                className="block text-[12px] font-semibold text-foreground-muted mb-1.5"
+                className="block text-meta font-semibold text-foreground-muted mb-1.5"
               >
                 Hinweis (optional)
               </label>
               <textarea
                 id="pool-reassign-kommentar"
                 value={reassignKommentar}
-                onChange={(e) => setReassignKommentar(e.target.value.slice(0, 500))}
+                onChange={(e) =>
+                  setReassignKommentar(e.target.value.slice(0, 500))
+                }
                 disabled={isReassigning}
                 rows={3}
                 placeholder="z. B. Bitte du, ich bin im Urlaub."
-                className="w-full px-3 py-2 rounded-md border border-line-strong bg-input text-[14px] text-foreground resize-none focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+                className="w-full px-3 py-2 rounded-md border border-line-strong bg-input text-body-sm text-foreground resize-none focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
               />
-              <p className="mt-1 text-[10px] text-foreground-subtle">
+              <p className="mt-1 text-eyebrow text-foreground-subtle">
                 Wird im Audit-Trail als Begründung gespeichert. Max. 500 Zeichen.
               </p>
             </div>
@@ -614,6 +625,5 @@ export function OwnerLane(props: OwnerLaneProps) {
     );
   }
 
-  // Sonderfall: Bestellung gehört jemand anderem, kein Eingriff möglich
   return null;
 }

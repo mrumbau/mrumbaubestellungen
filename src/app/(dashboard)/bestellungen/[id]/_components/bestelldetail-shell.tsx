@@ -14,6 +14,7 @@ import { AiToolsPanel } from "./ai-tools-panel";
 import { Timeline } from "./timeline";
 import { CommentsThread } from "./comments-thread";
 import { ApprovalPanel } from "./approval-panel";
+import { SidebarBlock } from "./sidebar-block";
 import type {
   Abgleich,
   AuditEvent,
@@ -147,76 +148,83 @@ export function BestelldetailShell({
           onTabChange={setActiveTab}
         />
 
-        <div className="w-80 flex flex-col gap-4 overflow-auto">
-          <ApprovalPanel
-            bestellung={bestellung}
-            freigabe={bd.optimisticFreigabe ?? freigabe}
-            profil={profil}
-            kannFreigeben={kannFreigeben}
-            hatRechnung={hatRechnung}
-            loading={bd.loading}
-            verwerfenLoading={bd.verwerfenLoading}
-            freigabeError={bd.freigabeError}
-            onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
-            onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
-            onMahnungQuittieren={bd.handleMahnungQuittieren}
-          />
+        <div className="w-80 flex flex-col gap-6 overflow-auto">
+          {/* AktionBlock — primärer CTA + Mahnung-Pflege + Ghost-Verwerfen. */}
+          <SidebarBlock title="Aktion">
+            <ApprovalPanel
+              bestellung={bestellung}
+              freigabe={bd.optimisticFreigabe ?? freigabe}
+              profil={profil}
+              kannFreigeben={kannFreigeben}
+              hatRechnung={hatRechnung}
+              loading={bd.loading}
+              verwerfenLoading={bd.verwerfenLoading}
+              freigabeError={bd.freigabeError}
+              onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
+              onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
+              onMahnungQuittieren={bd.handleMahnungQuittieren}
+            />
+          </SidebarBlock>
 
-          <SidebarMetadata
-            bestellung={bestellung}
-            projekte={projekte}
-            profil={profil}
-            subunternehmer={subunternehmer}
-            aktuelleArt={bd.aktuelleArt}
-            bestellungsartLoading={bd.bestellungsartLoading}
-            projektLoading={bd.projektLoading}
-            projektStats={bd.projektStats}
-            onBestellungsartChange={bd.handleBestellungsartChange}
-            onProjektZuordnen={bd.handleProjektZuordnen}
-          />
+          {/* MetaBlock — Stammdaten der Bestellung + KI-Vorschlag inline. */}
+          <SidebarBlock title="Meta">
+            <KiVorschlagBanner
+              bestellung={bestellung}
+              projekte={projekte}
+              loading={bd.vorschlagLoading}
+              onVorschlagAktion={bd.handleVorschlagAktion}
+            />
+            <SidebarMetadata
+              bestellung={bestellung}
+              projekte={projekte}
+              profil={profil}
+              subunternehmer={subunternehmer}
+              aktuelleArt={bd.aktuelleArt}
+              bestellungsartLoading={bd.bestellungsartLoading}
+              projektLoading={bd.projektLoading}
+              projektStats={bd.projektStats}
+              onBestellungsartChange={bd.handleBestellungsartChange}
+              onProjektZuordnen={bd.handleProjektZuordnen}
+            />
+          </SidebarBlock>
 
-          <KiVorschlagBanner
-            bestellung={bestellung}
-            projekte={projekte}
-            loading={bd.vorschlagLoading}
-            onVorschlagAktion={bd.handleVorschlagAktion}
-          />
-
-          <Timeline
-            dokumente={dokumente}
-            abgleich={abgleich}
-            freigabe={freigabe}
-            kommentare={kommentare}
-            events={events}
-            widgetId="timeline"
-            openWidgetId={openWidgetId}
-            onToggleWidget={toggleWidget}
-          />
-
-          <AiToolsPanel
-            abgleich={abgleich}
-            bestellung={bestellung}
-            openWidgetId={openWidgetId}
-            onToggleWidget={toggleWidget}
-            kiZusammenfassung={bd.kiZusammenfassung}
-            kiLoading={bd.kiLoading}
-            onKiZusammenfassung={bd.handleKiZusammenfassung}
-            duplikatResult={bd.duplikatResult}
-            duplikatLoading={bd.duplikatLoading}
-            onDuplikatCheck={bd.handleDuplikatCheck}
-            katResult={bd.katResult}
-            katLoading={bd.katLoading}
-            onKategorisierung={bd.handleKategorisierung}
-          />
-
-          <CommentsThread
-            kommentare={kommentare}
-            loading={bd.loading}
-            onSubmit={bd.handleKommentar}
-            widgetId="kommentare"
-            openWidgetId={openWidgetId}
-            onToggleWidget={toggleWidget}
-          />
+          {/* AktivitätBlock — Audit-Trail + KI-Tools + Kommentare,
+              alles als collapsible Sub-Widgets im selben Block. */}
+          <SidebarBlock title="Aktivität">
+            <Timeline
+              dokumente={dokumente}
+              abgleich={abgleich}
+              freigabe={freigabe}
+              kommentare={kommentare}
+              events={events}
+              widgetId="timeline"
+              openWidgetId={openWidgetId}
+              onToggleWidget={toggleWidget}
+            />
+            <AiToolsPanel
+              abgleich={abgleich}
+              bestellung={bestellung}
+              openWidgetId={openWidgetId}
+              onToggleWidget={toggleWidget}
+              kiZusammenfassung={bd.kiZusammenfassung}
+              kiLoading={bd.kiLoading}
+              onKiZusammenfassung={bd.handleKiZusammenfassung}
+              duplikatResult={bd.duplikatResult}
+              duplikatLoading={bd.duplikatLoading}
+              onDuplikatCheck={bd.handleDuplikatCheck}
+              katResult={bd.katResult}
+              katLoading={bd.katLoading}
+              onKategorisierung={bd.handleKategorisierung}
+            />
+            <CommentsThread
+              kommentare={kommentare}
+              loading={bd.loading}
+              onSubmit={bd.handleKommentar}
+              widgetId="kommentare"
+              openWidgetId={openWidgetId}
+              onToggleWidget={toggleWidget}
+            />
+          </SidebarBlock>
         </div>
       </div>
       )}
@@ -244,86 +252,94 @@ export function BestelldetailShell({
           />
         )}
         {mobileSection === "details" && (
-          <div className="flex flex-col gap-4 overflow-auto pb-20">
-            <KiVorschlagBanner
-              bestellung={bestellung}
-              projekte={projekte}
-              loading={bd.vorschlagLoading}
-              onVorschlagAktion={bd.handleVorschlagAktion}
-              compact
-            />
-            <SidebarMetadata
-              bestellung={bestellung}
-              projekte={projekte}
-              profil={profil}
-              subunternehmer={subunternehmer}
-              aktuelleArt={bd.aktuelleArt}
-              bestellungsartLoading={bd.bestellungsartLoading}
-              projektLoading={bd.projektLoading}
-              projektStats={bd.projektStats}
-              onBestellungsartChange={bd.handleBestellungsartChange}
-              onProjektZuordnen={bd.handleProjektZuordnen}
-            />
-            <AiToolsPanel
-              abgleich={abgleich}
-              bestellung={bestellung}
-              openWidgetId={openWidgetId}
-              onToggleWidget={toggleWidget}
-              kiZusammenfassung={bd.kiZusammenfassung}
-              kiLoading={bd.kiLoading}
-              onKiZusammenfassung={bd.handleKiZusammenfassung}
-              duplikatResult={bd.duplikatResult}
-              duplikatLoading={bd.duplikatLoading}
-              onDuplikatCheck={bd.handleDuplikatCheck}
-              katResult={bd.katResult}
-              katLoading={bd.katLoading}
-              onKategorisierung={bd.handleKategorisierung}
-            />
-            <Timeline
-              dokumente={dokumente}
-              abgleich={abgleich}
-              freigabe={freigabe}
-              kommentare={kommentare}
-              events={events}
-              widgetId="m-timeline"
-              openWidgetId={openWidgetId}
-              onToggleWidget={toggleWidget}
-            />
-            {kommentare.length > 0 && (
+          <div className="flex flex-col gap-6 overflow-auto pb-20">
+            <SidebarBlock title="Meta">
+              <KiVorschlagBanner
+                bestellung={bestellung}
+                projekte={projekte}
+                loading={bd.vorschlagLoading}
+                onVorschlagAktion={bd.handleVorschlagAktion}
+                compact
+              />
+              <SidebarMetadata
+                bestellung={bestellung}
+                projekte={projekte}
+                profil={profil}
+                subunternehmer={subunternehmer}
+                aktuelleArt={bd.aktuelleArt}
+                bestellungsartLoading={bd.bestellungsartLoading}
+                projektLoading={bd.projektLoading}
+                projektStats={bd.projektStats}
+                onBestellungsartChange={bd.handleBestellungsartChange}
+                onProjektZuordnen={bd.handleProjektZuordnen}
+              />
+            </SidebarBlock>
+            <SidebarBlock title="Aktivität">
+              <Timeline
+                dokumente={dokumente}
+                abgleich={abgleich}
+                freigabe={freigabe}
+                kommentare={kommentare}
+                events={events}
+                widgetId="m-timeline"
+                openWidgetId={openWidgetId}
+                onToggleWidget={toggleWidget}
+              />
+              <AiToolsPanel
+                abgleich={abgleich}
+                bestellung={bestellung}
+                openWidgetId={openWidgetId}
+                onToggleWidget={toggleWidget}
+                kiZusammenfassung={bd.kiZusammenfassung}
+                kiLoading={bd.kiLoading}
+                onKiZusammenfassung={bd.handleKiZusammenfassung}
+                duplikatResult={bd.duplikatResult}
+                duplikatLoading={bd.duplikatLoading}
+                onDuplikatCheck={bd.handleDuplikatCheck}
+                katResult={bd.katResult}
+                katLoading={bd.katLoading}
+                onKategorisierung={bd.handleKategorisierung}
+              />
+              {kommentare.length > 0 && (
+                <CommentsThread
+                  kommentare={kommentare}
+                  loading={bd.loading}
+                  onSubmit={bd.handleKommentar}
+                  widgetId="m-kommentare"
+                  openWidgetId={openWidgetId}
+                  onToggleWidget={toggleWidget}
+                />
+              )}
+            </SidebarBlock>
+          </div>
+        )}
+        {mobileSection === "aktionen" && (
+          <div className="flex flex-col gap-6 overflow-auto pb-20">
+            <SidebarBlock title="Aktion">
+              <ApprovalPanel
+                bestellung={bestellung}
+                freigabe={bd.optimisticFreigabe ?? freigabe}
+                profil={profil}
+                kannFreigeben={kannFreigeben}
+                hatRechnung={hatRechnung}
+                loading={bd.loading}
+                verwerfenLoading={bd.verwerfenLoading}
+                freigabeError={bd.freigabeError}
+                onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
+                onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
+                onMahnungQuittieren={bd.handleMahnungQuittieren}
+                variant="mobile"
+              />
+            </SidebarBlock>
+            <SidebarBlock title="Kommentare">
               <CommentsThread
                 kommentare={kommentare}
                 loading={bd.loading}
                 onSubmit={bd.handleKommentar}
                 widgetId="m-kommentare"
-                openWidgetId={openWidgetId}
-                onToggleWidget={toggleWidget}
+                mode="always-open"
               />
-            )}
-          </div>
-        )}
-        {mobileSection === "aktionen" && (
-          <div className="flex flex-col gap-4 overflow-auto pb-20">
-            <ApprovalPanel
-              bestellung={bestellung}
-              freigabe={bd.optimisticFreigabe ?? freigabe}
-              profil={profil}
-              kannFreigeben={kannFreigeben}
-              hatRechnung={hatRechnung}
-              loading={bd.loading}
-              verwerfenLoading={bd.verwerfenLoading}
-              freigabeError={bd.freigabeError}
-              onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
-              onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
-              onMahnungQuittieren={bd.handleMahnungQuittieren}
-              variant="mobile"
-            />
-            <CommentsThread
-              kommentare={kommentare}
-              loading={bd.loading}
-              onSubmit={bd.handleKommentar}
-              widgetId="m-kommentare"
-              mode="always-open"
-            />
+            </SidebarBlock>
           </div>
         )}
       </div>

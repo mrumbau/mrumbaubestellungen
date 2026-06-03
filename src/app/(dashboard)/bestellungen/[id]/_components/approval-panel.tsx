@@ -9,19 +9,22 @@ import type { Bestellung, Freigabe } from "./types";
 import type { BenutzerProfil } from "@/lib/auth";
 
 /**
- * ApprovalPanel — three destructive-aware control surfaces.
+ * ApprovalPanel (UX-R3, 03.06.2026) — Aktion-Block der Detail-Sidebar.
  *
- * Renders a variant that matches its location:
- *   - variant="sidebar"    → compact sidebar cards (default)
- *   - variant="mobile"     → larger buttons for the mobile aktionen-tab
- *   - variant="mobile-bar" → the fixed bottom bar with only the Freigabe CTA
+ * CTA-Hierarchie nach DESIGN.md v2 Section 3:
+ *   - **Primary** = Freigeben (der eigentliche Workflow-Schritt). Magnetic
+ *     btn-primary, full-width, Hero.
+ *   - **Secondary** = Mahnung quittieren. Warning-getöntes Pill, aber
+ *     visuell zurückgenommen. Niemals primary — Mahnung quittieren ist
+ *     Pflege-Aktion, nicht Workflow-Abschluss.
+ *   - **Ghost / Destructive** = Bestellung verwerfen. Ghost-Style mit
+ *     hover:error Affordance, durch industrial-line vom Rest abgetrennt.
+ *     ConfirmDialog (destructive) ist die echte Sicherheits-Brücke.
  *
- * Role-gating:
- *   - Freigabe: only visible when `kannFreigeben` is true (besteller, admin, or SU/Abo)
- *   - Verwerfen: admin + Besteller für eigene Material UND SU/Abo (analog Freigabe).
- *     Vorher admin-only — 12.05.2026 für Besteller geöffnet damit sie Spam +
- *     irrtümlich angelegte Einträge selbst aufräumen können.
- *   - Mahnung-quittieren: visible to everyone who sees the order with an open Mahnung
+ * Drei-Sprachen-Disziplin: max 1 Primary CTA pro Surface. Wenn freigegeben:
+ * Statt-CTA = Success-State-Card. Wenn !hatRechnung: Statt-CTA = ruhiger
+ * Helper-Hinweis. Verwerfen darf parallel sichtbar bleiben — es ist ein
+ * Eskape-Pfad, nicht Workflow.
  */
 export function ApprovalPanel({
   bestellung,
@@ -50,9 +53,6 @@ export function ApprovalPanel({
   onMahnungQuittieren: () => void;
   variant?: "sidebar" | "mobile" | "mobile-bar";
 }) {
-  // 17.05.2026 — Gutschriften brauchen KEINE Freigabe. Sie sind Rückerstattungen
-  // (Geld kommt zurück) und werden ohne Approval-Workflow direkt der Buchhaltung
-  // sichtbar gemacht. Freigabe-CTA wird unterdrückt + Hinweis-Banner gezeigt.
   const istGutschrift = bestellung.ist_gutschrift === true;
 
   // Mobile bottom bar — only Freigabe CTA, no other controls
@@ -76,41 +76,51 @@ export function ApprovalPanel({
 
   const isMobile = variant === "mobile";
 
+  const showVerwerfen =
+    profil.rolle === "admin" ||
+    (profil.rolle === "besteller" &&
+      (bestellung.besteller_kuerzel === profil.kuerzel ||
+        bestellung.bestellungsart === "subunternehmer" ||
+        bestellung.bestellungsart === "abo"));
+
   return (
-    <>
+    <div className="flex flex-col gap-3">
       {/* Gutschrift-Info-Banner — ersetzt den Freigabe-CTA */}
       {istGutschrift && !freigabe && (
         <Card padding="md" className="bg-success-bg border-success-border">
           <div className="flex items-center gap-2">
             <IconCheck className="h-4 w-4 text-success" />
-            <p className="font-headline text-[14px] text-success">Gutschrift</p>
+            <p className="font-headline text-body-sm text-success">Gutschrift</p>
           </div>
-          <p className="text-[12px] text-success/80 mt-1.5 ml-6">
+          <p className="text-meta text-success/80 mt-1.5 ml-6">
             Rückerstattung — keine Freigabe nötig. Direkt in der Buchhaltung sichtbar.
           </p>
         </Card>
       )}
 
-      {/* Freigabe state */}
+      {/* Primary CTA — Freigeben ODER bereits-freigegeben-State ODER helper */}
       {!istGutschrift && freigabe ? (
         <Card padding="md" className="bg-success-bg border-success-border">
           <div className="flex items-center gap-2">
             <IconCheck className="h-4 w-4 text-success" />
-            <p className="font-headline text-[14px] text-success">Freigegeben</p>
+            <p className="font-headline text-body-sm text-success">Freigegeben</p>
           </div>
-          <p className="text-[12px] text-success/80 mt-1.5 ml-6">
+          <p className="text-meta text-success/80 mt-1.5 ml-6">
             Von {freigabe.freigegeben_von_name} am{" "}
             {new Date(freigabe.freigegeben_am).toLocaleString("de-DE")}
           </p>
           {freigabe.kommentar && (
-            <p className="text-[12px] text-success/80 mt-1 ml-6 italic">
+            <p className="text-meta text-success/80 mt-1 ml-6 italic">
               {freigabe.kommentar}
             </p>
           )}
         </Card>
       ) : kannFreigeben && !istGutschrift ? (
         hatRechnung ? (
-          <Card padding={isMobile ? "none" : "md"} className={isMobile ? "p-0 bg-transparent border-0 shadow-none" : ""}>
+          <Card
+            padding={isMobile ? "none" : "md"}
+            className={isMobile ? "p-0 bg-transparent border-0 shadow-none" : ""}
+          >
             <Button
               size={isMobile ? "lg" : "md"}
               fullWidth
@@ -128,14 +138,8 @@ export function ApprovalPanel({
             )}
           </Card>
         ) : (
-          // 03.06.2026 (Phase 1 Quick Wins) — !hatRechnung war vorher als
-          // disabled fullWidth-Button mit Hero-Padding gerendert. In ~70% der
-          // Detail-Aufrufe ist gerade keine Rechnung da — das gab uns eine
-          // riesige tote Wand statt Status-Information. Jetzt: schlanker
-          // Info-Pill, der den Zustand benennt OHNE Action zu suggerieren.
-          // Auf Mobile entfällt die Pill ganz (mobile-bar gated bereits).
           !isMobile && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-line-subtle bg-canvas text-[12px] text-foreground-muted">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-line-subtle bg-canvas text-meta text-foreground-muted">
               <span
                 aria-hidden="true"
                 className="inline-block h-1.5 w-1.5 rounded-full bg-foreground-faint"
@@ -146,15 +150,17 @@ export function ApprovalPanel({
         )
       ) : null}
 
-      {/* Mahnung quittieren */}
+      {/* Secondary CTA — Mahnung quittieren. Visuell zurückgenommen
+          (warning-getöntes Pill, nicht laut). Pflege-Aktion, niemals
+          primary. */}
       {bestellung.mahnung_am && (
         <button
           type="button"
           onClick={onMahnungQuittieren}
           className={cn(
-            "w-full flex items-center justify-center gap-2 py-2.5 text-[12px] font-medium rounded-lg",
-            "border border-warning-border bg-warning-bg text-warning",
-            "hover:bg-warning hover:border-warning hover:text-white transition-colors",
+            "w-full flex items-center justify-center gap-2 py-2 text-meta font-medium rounded-md",
+            "border border-warning-border bg-warning-bg/40 text-warning",
+            "hover:bg-warning-bg hover:border-warning transition-colors",
             "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
           )}
         >
@@ -163,34 +169,29 @@ export function ApprovalPanel({
         </button>
       )}
 
-      {/* Bestellung verwerfen — admin + Besteller (eigene Material + SU/Abo).
-          02.06.2026 (UX-Polish): destruktive Aktion ist jetzt subtle Ghost-Link
-          statt prominent roter Border-Button. Der ConfirmDialog ist die echte
-          Sicherheits-Brücke; visuell so prominent wie die Hero-Freigabe zu sein
-          ist anti-pattern (rote Border = Augen-Magnet, dann ConfirmDialog =
-          „möchtest du wirklich" Reibung — Doppelung). Jetzt: leiser Text-Link
-          mit Trash-Glyph, hover:error-Token als Affordance. */}
-      {(profil.rolle === "admin" ||
-        (profil.rolle === "besteller" &&
-          (bestellung.besteller_kuerzel === profil.kuerzel ||
-            bestellung.bestellungsart === "subunternehmer" ||
-            bestellung.bestellungsart === "abo"))) && (
-        <button
-          type="button"
-          onClick={onOpenVerwerfenDialog}
-          disabled={verwerfenLoading}
-          className={cn(
-            "w-full inline-flex items-center justify-center gap-1.5 py-2 mt-1 text-[12px] font-medium rounded-md",
-            "text-foreground-subtle bg-transparent border border-transparent",
-            "hover:text-error hover:bg-error-bg transition-colors",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
-          )}
-        >
-          <IconTrash className="h-3.5 w-3.5" />
-          Bestellung verwerfen
-        </button>
+      {/* Ghost/Destructive — Bestellung verwerfen. Durch industrial-line
+          vom Rest getrennt. Ghost-Style mit hover:error Affordance.
+          ConfirmDialog (variant=danger) ist die echte Sicherheits-Brücke. */}
+      {showVerwerfen && (
+        <>
+          <div className="industrial-line my-1" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={onOpenVerwerfenDialog}
+            disabled={verwerfenLoading}
+            className={cn(
+              "w-full inline-flex items-center justify-center gap-1.5 py-2 text-meta font-medium rounded-md",
+              "text-foreground-subtle bg-transparent border border-transparent",
+              "hover:text-error hover:bg-error-bg transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+            )}
+          >
+            <IconTrash className="h-3.5 w-3.5" />
+            Bestellung verwerfen
+          </button>
+        </>
       )}
-    </>
+    </div>
   );
 }
