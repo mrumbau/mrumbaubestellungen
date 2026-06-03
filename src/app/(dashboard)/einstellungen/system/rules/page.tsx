@@ -46,8 +46,13 @@ export default async function RulesPage() {
         title="Auto-Zuordnungs-Regeln"
         description="Konfigurierbare Regeln für die automatische Besteller-Erkennung. Werden in der E-Mail-Pipeline VOR der KI-Analyse ausgewertet — bei Match wird der Besteller direkt zugeordnet, sonst greift die normale 5-Stufen-Logik (Bestellnummer-Match, Signal, Händler-Affinität, Name-im-Text, KI-Historie)."
       />
+      {/* 03.06.2026 (Pool 2.0 Sprint 3): DB-Schema `besteller_rules.combiner`
+          + `condition: Json` ist nun breiter als der UI-rigide `Rule.condition:
+          {type,value}`. UI-Code rendert nur Single-Condition; Multi-Condition
+          Form-Builder ist deferred (siehe Plan-File). Cast via unknown ist
+          konsistent mit Bestellung[]-Cast in bestellungen/page.tsx. */}
       <RulesClient
-        initialRules={(rules as Rule[]) || []}
+        initialRules={(rules as unknown as Rule[]) || []}
         bestellerListe={(bestellerRollen as BestellerRoleEntry[]) || []}
       />
     </div>
