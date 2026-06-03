@@ -7,6 +7,7 @@
 - **v2 (03.06.2026, UX-R1 → UX-R6):** Editorial-Industrial-Versprechen vom Login zieht ins Innere. Neue Foundation-Primitives `EditorialSection` + `PageHero` + `BestellnummerHero`. Drei-Sprachen-Disziplin verschärft um Visual-Weight-Stufen 1-3 — max 1 lautes Element pro Card. Aging-Wash auf Tokens (`bg-aging-stale`, `bg-aging-rotting`) statt Tailwind-Defaults. Type-Scale-Migration via Codemod (270 Stellen). Plan: `.claude/plans/noble-sparking-stallman.md`. Sections 3-6 (Detail-Page, Modal/Drawer-Heuristik, CTA-Hierarchie) folgen in Welle 3+5+6.
 - **UX-R2 (03.06.2026):** Posteingang mit Lanes statt 4 Owner-Tabs. `/bestellungen/pool`, `/in-arbeit`, `/archiv` mit gemeinsamem Workspace-Layout. Quick-Filter-Chips für Art statt ArtTabs. Layout-Toggle entfernt (Lane bestimmt DNA). Pool-Card refactored: Mahnung als Stufe-1 Banner, Vendor als Hero-Headline. Cmd+K Cross-Lane-Search Foundation.
 - **UX-R3 (03.06.2026):** Detail-Page als editoriale Akte. `BestellnummerHero` als Display-Numeral im PageHero-Wrap. Mahnung als full-width Banner statt Pill. `OwnerStatement` ersetzt `OwnerLane` (3 Render-Pfade mit editorial-DNA, Magnetic-CTA für Pool/Vorschlag). Sidebar 7 Cards → 3 Blöcke (Aktion / Meta / Aktivität). CTA-Hierarchie verschärft: Verwerfen = ghost destructive durch industrial-line getrennt, Mahnung quittieren = secondary.
+- **UX-R4 (03.06.2026):** PageHero auf Hot-Path-Pages (Dashboard, Buchhaltung, Archiv) und Stammdaten (Kunden, Projekte). Neue `UnifiedListCard`-Primitive löst Card-Sediment auf (3 Variants: vendor-strip / title-strip / table-row). Settings/System-Pages behalten `PageHeader`. Keine neuen Token-Leaks.
 
 ## Color Strategy
 
@@ -251,6 +252,29 @@ Drei-Sprachen-Disziplin v2 für CTAs: max 1 Primary CTA pro Surface. Im Approval
 - DocumentPanel hat eigene Card-Identität (PDF-Viewer + Tabs + Article-Drawer). Nicht in EditorialSection-Wrap — Card-in-Card. Konsistenz mit anderen Cards kommt in UX-R4.
 - KiVorschlagBanner bleibt eigenständige Card im MetaBlock — Inline-Form-Suggestion-Refactor wäre ein eigener Sprint.
 - Sub-Nav-Switcher im AktivitätBlock (Tabs für Audit / Kommentare / KI) ist nicht implementiert — die 3 Widgets bleiben collapsible-stacked. Pragmatischer Trade.
+
+## Card-Konsistenz via UnifiedListCard (UX-R4, 03.06.2026)
+
+**Audit-Wurzel:** jede Liste (Bestellungen-Pool, Buchhaltung, Archiv, Kunden, Projekte, Settings-Listen) rendert mit eigenem Padding-/Gap-/Shadow-Token-Set. Folge: Card-Sediment — optisch ähnliche Flächen, die sich beim Wechseln zwischen Lanes nicht wie dasselbe System anfühlen. Die `card`-Klasse alleine reicht nicht, weil sie nur Surface + Border + Shadow setzt, aber nicht das Innenleben (Strip-Position, Hover-Bar, Title-Treatment, Meta-Row-Rhythmus).
+
+**Foundation-Lösung:** `UnifiedListCard`-Primitive in `src/components/ui/unified-list-card.tsx` mit 3 Variants. Eine Komponente, drei Render-Pfade, gemeinsame Token-Basis (`bg-surface`, `border-line-subtle`, `--shadow-card`). Props: `variant`, `href`, `onClick`, `isActive`, `isDeferred`, `wash`, `ariaLabel`.
+
+| Variant | Visual | Typischer Einsatz |
+|---|---|---|
+| `vendor-strip` | `rounded-lg border border-line bg-surface` + Magnetic-Lift (`hover:-translate-y-px hover:shadow-card hover:border-line-strong`). Voller Card-Charakter. | Pool-Inbox / In-Arbeit / Archiv — Editorial-Cards mit Vendor-Hero. |
+| `title-strip` | `rounded-md border border-line-subtle bg-surface` + sanfter Hover (kein Lift). Dichter, weniger Bewegung. | Stammdaten-Listen (Kunden, Projekte) wenn semantisch Card. |
+| `table-row` | `bg-transparent` + nur `hover:bg-surface-hover transition-colors`. Kein Border, kein Shadow — DataTable hat eigene Trennlinien. | DataTable-Rows wenn als Card lesbar gemacht werden soll. |
+
+Active-State (`isActive=true`) → `ring-1 ring-brand/40` für strip-Variants, `bg-brand/[0.06]` für table-row. Deferred-State → `opacity-65`. `wash`-Prop überschreibt das `bg-surface` für Aging-States.
+
+**Status der Migration (UX-R4 Welle):**
+- **PageHero migriert:** `/dashboard`, `/buchhaltung`, `/archiv`, `/kunden`, `/projekte` (top-level). Hot-Path-Pages tragen jetzt corner-marks + industrial-line + optional film-grain.
+- **UnifiedListCard live:** noch keine Page aktiv. Die existing ProjektCard und KundenCard nutzen `borderLeft: 4px <projekt-farbe>` als bewusste Brand-Color-Identity, die durch UnifiedListCard mit ihrem fixen border-line gebrochen würde. Eine UnifiedListCard-Migration für diese Cards bräuchte einen `accent-color`-Override-Prop, der in einer Folge-Welle ergänzt werden kann.
+- **Foundation-Stand:** UnifiedListCard ist bereit für neue Listen (z.B. zukünftige Vendoren-Liste, DATEV-Liste, KI-Vorschläge-Liste) und für die Pool-Card-Migration in UX-R6 wenn die Token-Disziplin verschärft wird.
+
+**Settings-Exception:** `/einstellungen` (Hub) und `/einstellungen/system/*` bleiben bei `PageHeader` + nativen Listen. Begründung: Admin-Tooling ist informationsdicht, kein Storytelling. PageHero würde Vertical-Space schlucken ohne Mehrwert zu liefern; UnifiedListCard würde DataTable-Density-Vorteile auflösen.
+
+**Anti-Pattern (vorher):** jede Liste deklarierte `<div class="card card-hover">` mit eigener Padding-Logik und eigenen Hover-Properties → 5 Listen, 5 Mikro-Inkonsistenzen. Jetzt: Foundation-Primitive mit drei semantischen Variants + dokumentierte Override-Stellen für brand-color-Identities.
 
 ## Motion
 

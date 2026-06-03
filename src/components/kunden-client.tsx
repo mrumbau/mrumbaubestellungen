@@ -19,7 +19,7 @@ import {
   type Density,
 } from "@/components/ui";
 import { Modal } from "@/components/ui/modal";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHero } from "@/components/ui/page-hero";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
 import { IconCheck, IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
@@ -424,11 +424,11 @@ export function KundenClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHero
         eyebrow="Stammdaten"
         title="Kunden"
         description={`${kunden.length} Auftraggeber${unbestaetigt.length > 0 ? ` · ${unbestaetigt.length} unbestätigt` : ""}`}
-        separator={false}
+        tone="neutral"
         actions={
         <div className="flex items-center gap-2 flex-wrap">
           {/* View-Mode Toggle */}

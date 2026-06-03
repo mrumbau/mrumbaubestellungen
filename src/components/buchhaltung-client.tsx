@@ -7,7 +7,7 @@ import type { Rolle } from "@/lib/auth";
 import { DatevExportModal } from "@/components/buchhaltung/datev-export-modal";
 import { BuchhaltungSummaryCards } from "@/components/buchhaltung/summary-cards";
 import { BuchhaltungTable } from "@/components/buchhaltung/buchhaltung-table";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHero } from "@/components/ui/page-hero";
 import type { BuchhaltungRow } from "@/components/buchhaltung/types";
 
 // BuchhaltungRow + isFaelligBald + isUeberfaellig sind nach
@@ -342,11 +342,12 @@ export function BuchhaltungClient({
         projekte={projekte}
       />
 
-      <PageHeader
-        eyebrow="Rechnungswesen"
-        title="Buchhaltung"
-        description={rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen" : "Freigegebene Rechnungen"}
-        separator={false}
+      <PageHero
+        eyebrow="Buchhaltung"
+        title="Rechnungen"
+        description={rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen mit DATEV-Export." : "Freigegebene Rechnungen mit DATEV-Export und Bezahlt-Tracking."}
+        tone="brand"
+        marks
         actions={
           kannBezahlen && (
             <>

@@ -45,7 +45,7 @@ import {
 } from "@/components/projekte/status-dropdown";
 import { ProjektFormModal } from "@/components/projekte/projekt-form-modal";
 import { ProjektCard } from "@/components/projekte/projekt-card";
-import { PageHeader } from "@/components/ui/page-header";
+import { PageHero } from "@/components/ui/page-hero";
 
 type ViewMode = "grid" | "table";
 
@@ -461,11 +461,11 @@ export function ProjekteClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHero
         eyebrow="Stammdaten"
         title="Projekte"
         description={`${aktive.length} aktiv${archiviert.length > 0 ? ` · ${archiviert.length} archiviert` : ""}`}
-        separator={false}
+        tone="neutral"
         actions={
         <div className="flex items-center gap-2 flex-wrap">
           {/* View-Mode Toggle */}
