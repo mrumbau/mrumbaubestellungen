@@ -134,6 +134,7 @@ export default async function BestellungenPage({
   const [
     { data: bestellungen },
     { data: projekte },
+    { data: bestellerRollen },
     { count: poolCount },
     { count: mineOpenCount },
     { count: mineDoneCount },
@@ -145,6 +146,15 @@ export default async function BestellungenPage({
       .select("id, name, farbe")
       .neq("status", "archiviert")
       .order("name"),
+    // 03.06.2026 (Pool 2.0 Sprint 1) — Besteller-Optionen für den PoolQuickDrawer.
+    // OwnerLane braucht Reassign-Targets; ohne diese Liste fehlt der CTA.
+    // Kleine Query (≤ 4 Rows), parallel zu den Count-Queries, vernachlässigbarer
+    // Cost.
+    supabase
+      .from("benutzer_rollen")
+      .select("kuerzel, name, rolle")
+      .in("rolle", ["besteller", "admin"])
+      .order("kuerzel"),
     poolCountQuery,
     mineOpenCountQuery,
     mineDoneCountQuery,
@@ -248,6 +258,8 @@ export default async function BestellungenPage({
         aktiverProjektName={aktiverProjektName}
         isAdmin={profil?.rolle === "admin"}
         scope={scope}
+        profil={profil ? { kuerzel: profil.kuerzel, rolle: profil.rolle, name: profil.name } : null}
+        bestellerOptions={(bestellerRollen || []).map((b) => ({ kuerzel: b.kuerzel, name: b.name }))}
       />
     </div>
   );

@@ -37,6 +37,10 @@ import { useBestellungenActions } from "@/components/bestellungen/use-bestellung
 import { useBestellungPreview } from "@/components/bestellungen/use-bestellung-preview";
 import { useBestellungSavedViews, type ViewConfig } from "@/components/bestellungen/use-bestellung-saved-views";
 import { BestellungenConfirmDialogs } from "@/components/bestellungen/bestellungen-confirm-dialogs";
+import { PoolQuickDrawer } from "@/components/bestellungen/pool-quick-drawer";
+import { useDrawerStack } from "@/lib/hooks/use-drawer-stack";
+import { agingWashFromCreatedAt } from "@/lib/pool-utils";
+import type { BestellerOption } from "@/app/(dashboard)/bestellungen/[id]/_components/owner-lane";
 
 // Bestellung + ProjektOption Types: src/components/bestellungen/types.ts.
 // STATUS_FILTER_OPTIONS wird aus @/lib/status-config importiert.
@@ -48,6 +52,8 @@ export function BestellungenTabelle({
   aktiverProjektFilter,
   aktiverProjektName,
   scope,
+  profil,
+  bestellerOptions,
 }: {
   bestellungen: Bestellung[];
   projekte?: ProjektOption[];
@@ -63,6 +69,16 @@ export function BestellungenTabelle({
    *   - "pool" | "mine-open" | "all" | undefined → "offen"
    */
   scope?: "pool" | "mine-open" | "mine-done" | "all";
+  /**
+   * 03.06.2026 (Pool 2.0 Sprint 1) — Pool-Quick-Drawer.
+   * profil: für OwnerLane (Claim / Reassign / Return).
+   * bestellerOptions: Reassign-Targets.
+   * Beide bewusst optional — wenn nicht durchgereicht, fällt der Drawer-CTA
+   * weg und Row-Click geht klassisch zur Detail-Page (Sprint-1-Rückzug ohne
+   * Disruption).
+   */
+  profil?: { kuerzel: string; rolle: string; name: string } | null;
+  bestellerOptions?: BestellerOption[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -118,6 +134,21 @@ export function BestellungenTabelle({
   // Debounce gegen Burst-Updates (Re-Backfill-Cron). Server-Component lädt
   // dann die neue Page neu — inkl. der gerade angekommenen Mail.
   useBestellungenListRealtime();
+
+  // 03.06.2026 (Pool 2.0 Sprint 1) — Drawer-Stack via URL ?drawer=<id>.
+  // Browser-Back schließt den Drawer ohne die Page zu verlassen.
+  // Drawer wird im Pool-Scope als Default-Click-Behavior aktiviert; in
+  // anderen Scopes (mine-open / mine-done / all) bleibt der klassische
+  // Detail-Page-Klick erhalten — der Drawer ist primär ein Triage-Werkzeug.
+  const drawerStack = useDrawerStack();
+  const drawerEnabled = scope === "pool" && !!profil;
+  const openBestellung = useMemo(
+    () =>
+      drawerStack.drawerId
+        ? bestellungen.find((b) => b.id === drawerStack.drawerId) ?? null
+        : null,
+    [drawerStack.drawerId, bestellungen],
+  );
 
   // Spatial-Continuity (12.05.2026, Continuity-Patch-Sprint):
   // - Detail-Back-Flash: nach `Back` vom Detail-Page leuchtet die Row, von der
@@ -641,6 +672,15 @@ export function BestellungenTabelle({
           sort={sort}
           onSortChange={setSort}
           onRowClick={(b) => {
+            // 03.06.2026 (Pool 2.0 Sprint 1): Pool-Scope öffnet Drawer
+            // statt Detail-Page. Spatial-Continuity-Triage. Cmd-/Shift-/
+            // Middle-Click umgehen den Drawer via Link-Default-Behavior
+            // (DataTable handelt das nativ — der Link unter der Row bleibt
+            // klickbar). Andere Scopes navigieren wie bisher.
+            if (drawerEnabled) {
+              drawerStack.openDrawer(b.id);
+              return;
+            }
             // 12.05.2026 (Continuity-Patch): Detail-Back-Flash — den
             // navigations-Trigger merken damit beim Back die Row geflasht
             // werden kann. Vor der eigentlichen Navigation aufgerufen.
@@ -658,13 +698,23 @@ export function BestellungenTabelle({
             //   1. Bulk-Success (kurzer Green-Flash, dann verschwindet Row evtl.)
             //   2. PDF-Modal offen (persistent brand-tint)
             //   3. PDF-Modal gerade geschlossen (2.2s afterglow)
-            //   4. Zurück vom Detail-Page (3.5s afterglow)
-            //   5. Erste Row nach Page-Wechsel (1.5s pulse)
+            //   4. Drawer offen für diese Row (Pool-Scope, persistent brand-tint)
+            //   5. Zurück vom Detail-Page (3.5s afterglow)
+            //   6. Erste Row nach Page-Wechsel (1.5s pulse)
+            //   7. (Pool-Scope only) Aging-Wash: stale > 7d → amber, rotting > 14d → rose
             if (bulkSuccessIds.has(b.id)) return "row-bulk-success-flash";
             if (b.id === previewId) return "row-preview-active";
             if (b.id === recentlyClosedId) return "row-preview-afterglow";
+            if (drawerEnabled && drawerStack.isOpen(b.id)) return "row-preview-active";
             if (b.id === returnFlashId) return "row-return-afterglow";
             if (b.id === pagePulseId) return "row-page-pulse";
+            // 03.06.2026 (Pool 2.0 Sprint 1) — Aging-Wash nur im Pool-Scope.
+            // In anderen Scopes würde der Wash verwirren (Bestand-Items mit
+            // Owner sind nicht "alt im Sinne von vergessen").
+            if (scope === "pool") {
+              const wash = agingWashFromCreatedAt(b.created_at);
+              if (wash) return wash;
+            }
             return "";
           }}
           emptyState={
@@ -777,6 +827,20 @@ export function BestellungenTabelle({
         onGoTo={goToDoc}
         typ={previewTyp}
       />
+
+      {/* 03.06.2026 (Pool 2.0 Sprint 1) — PoolQuickDrawer. Nur im Pool-Scope
+          aktiv (drawerEnabled). Wenn drawerId in der URL aber Bestellung
+          nicht mehr in der Liste (z.B. zwischenzeitlich claim'd → aus Pool
+          gefiltert), schließt der Drawer im next-Render. */}
+      {drawerEnabled && profil && (
+        <PoolQuickDrawer
+          open={!!drawerStack.drawerId && !!openBestellung}
+          onClose={drawerStack.closeDrawer}
+          bestellung={openBestellung}
+          profil={profil}
+          bestellerOptions={bestellerOptions}
+        />
+      )}
     </>
   );
 }

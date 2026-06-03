@@ -278,6 +278,7 @@ export type Database = {
           projekt_vorschlag_konfidenz: number | null
           projekt_vorschlag_methode: string | null
           reply_token: string | null
+          reply_token_used_at: string | null
           status: string
           subunternehmer_id: string | null
           tracking_nummer: string | null
@@ -333,6 +334,7 @@ export type Database = {
           projekt_vorschlag_konfidenz?: number | null
           projekt_vorschlag_methode?: string | null
           reply_token?: string | null
+          reply_token_used_at?: string | null
           status?: string
           subunternehmer_id?: string | null
           tracking_nummer?: string | null
@@ -388,6 +390,7 @@ export type Database = {
           projekt_vorschlag_konfidenz?: number | null
           projekt_vorschlag_methode?: string | null
           reply_token?: string | null
+          reply_token_used_at?: string | null
           status?: string
           subunternehmer_id?: string | null
           tracking_nummer?: string | null
@@ -1201,6 +1204,85 @@ export type Database = {
         }
         Relationships: []
       }
+      pool_reservations: {
+        Row: {
+          bestellung_id: string
+          expires_at: string
+          reserved_at: string
+          source: string
+          user_id: string | null
+          user_kuerzel: string
+          user_name: string
+        }
+        Insert: {
+          bestellung_id: string
+          expires_at: string
+          reserved_at?: string
+          source?: string
+          user_id?: string | null
+          user_kuerzel: string
+          user_name: string
+        }
+        Update: {
+          bestellung_id?: string
+          expires_at?: string
+          reserved_at?: string
+          source?: string
+          user_id?: string | null
+          user_kuerzel?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pool_reservations_bestellung_id_fkey"
+            columns: ["bestellung_id"]
+            isOneToOne: true
+            referencedRelation: "bestellungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pool_user_state: {
+        Row: {
+          bestellung_id: string
+          deferred_at: string | null
+          deferred_today: boolean
+          seen_at: string | null
+          snooze_reason: string | null
+          snoozed_until: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bestellung_id: string
+          deferred_at?: string | null
+          deferred_today?: boolean
+          seen_at?: string | null
+          snooze_reason?: string | null
+          snoozed_until?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bestellung_id?: string
+          deferred_at?: string | null
+          deferred_today?: boolean
+          seen_at?: string | null
+          snooze_reason?: string | null
+          snoozed_until?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pool_user_state_bestellung_id_fkey"
+            columns: ["bestellung_id"]
+            isOneToOne: false
+            referencedRelation: "bestellungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projekte: {
         Row: {
           adresse: string | null
@@ -1660,11 +1742,25 @@ export type Database = {
         Args: { p_bestellung_id: string }
         Returns: Json
       }
+      pool_mark_seen: { Args: { p_bestellung_ids: string[] }; Returns: Json }
       pool_reassign_bestellung: {
         Args: {
           p_bestellung_id: string
           p_kommentar?: string
           p_neuer_kuerzel: string
+        }
+        Returns: Json
+      }
+      pool_release_reservation: {
+        Args: { p_bestellung_id: string }
+        Returns: Json
+      }
+      pool_reservation_expire: { Args: never; Returns: number }
+      pool_reserve_bestellung: {
+        Args: {
+          p_bestellung_id: string
+          p_source?: string
+          p_ttl_minutes?: number
         }
         Returns: Json
       }
@@ -1678,6 +1774,8 @@ export type Database = {
         Returns: undefined
       }
       trigger_discover_emails: { Args: never; Returns: number }
+      trigger_erinnerungen_owner: { Args: never; Returns: number }
+      trigger_erinnerungen_pool: { Args: never; Returns: number }
       trigger_retry_failed_emails: { Args: never; Returns: number }
       trigger_second_review_emails: { Args: never; Returns: number }
       try_lock_message: {
@@ -1822,3 +1920,4 @@ export const Constants = {
     },
   },
 } as const
+

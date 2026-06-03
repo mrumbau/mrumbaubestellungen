@@ -31,6 +31,9 @@ export { Spinner } from "./spinner";
 
 export { Modal } from "./modal";
 
+export { Drawer } from "./drawer";
+export type { DrawerProps } from "./drawer";
+
 export { ToastProvider, useToast } from "./toast";
 
 export { Card, SectionCard, cardVariants } from "./card";
