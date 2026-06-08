@@ -20,32 +20,23 @@
 import { useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+// 03.06.2026 — pure-Helpers in /lib/bestellungen-art.ts ausgelagert, weil
+// Next.js sonst alle Exports einer "use client"-Datei als Client-Boundary
+// markiert. Server-Loader brauchen `parseArtFilter` aber.
+import {
+  type Bestellungsart,
+  ALL_BESTELLUNGSARTEN,
+  parseArtFilter,
+} from "@/lib/bestellungen-art";
 
-export type Bestellungsart = "material" | "subunternehmer" | "abo";
-
-export const ALL_BESTELLUNGSARTEN: ReadonlyArray<Bestellungsart> = [
-  "material",
-  "subunternehmer",
-  "abo",
-];
+// Re-Export für bestehende Importeure von dieser Datei.
+export { type Bestellungsart, ALL_BESTELLUNGSARTEN, parseArtFilter };
 
 const LABELS: Record<Bestellungsart, string> = {
   material: "Material",
   subunternehmer: "Subunternehmer",
   abo: "Abo",
 };
-
-export function parseArtFilter(value: string | null | undefined): Set<Bestellungsart> {
-  if (!value) return new Set();
-  const tokens = value.split(",").map((t) => t.trim()).filter(Boolean);
-  const valid = new Set<Bestellungsart>();
-  for (const t of tokens) {
-    if (t === "material" || t === "subunternehmer" || t === "abo") {
-      valid.add(t);
-    }
-  }
-  return valid;
-}
 
 export interface ArtFilterChipsProps {
   /** Counts pro Art für die Sub-Label-Anzeige. */

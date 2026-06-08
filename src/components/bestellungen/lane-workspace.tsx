@@ -13,11 +13,14 @@
  */
 
 import { BestellungenTabelle } from "@/components/bestellungen-tabelle";
+import { ArtFilterChips } from "@/components/bestellungen/art-filter-chips";
+// 03.06.2026 — Server-safe Pure-Helpers aus /lib/bestellungen-art.ts.
+// art-filter-chips.tsx ist "use client" und darf vom Server nur als
+// JSX-Komponente verwendet werden, nicht für const/function-Imports.
 import {
-  ArtFilterChips,
   ALL_BESTELLUNGSARTEN,
   type Bestellungsart,
-} from "@/components/bestellungen/art-filter-chips";
+} from "@/lib/bestellungen-art";
 import type { Lane } from "@/components/bestellungen/lane-config";
 import type { LaneLoadResult, UserProfil } from "@/lib/bestellungen-lane-loader";
 

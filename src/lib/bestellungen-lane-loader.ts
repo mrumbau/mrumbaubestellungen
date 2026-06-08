@@ -26,10 +26,13 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { type Lane, isLane } from "@/components/bestellungen/lane-config";
+// 03.06.2026 — Server-safe Pure-Helpers aus /lib/bestellungen-art.ts,
+// NICHT aus art-filter-chips.tsx (Client-Component, würde Server-Crash
+// "Attempted to call parseArtFilter from the server" verursachen).
 import {
   type Bestellungsart,
   parseArtFilter,
-} from "@/components/bestellungen/art-filter-chips";
+} from "@/lib/bestellungen-art";
 
 // Reuse den Bestellungs-Type aus dem existing Modul
 import type { Bestellung, ProjektOption } from "@/components/bestellungen/types";
@@ -111,7 +114,15 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
         `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
       );
     }
-    q = q.not("status", "in", "(freigegeben,verworfen,storniert)");
+    // 03.06.2026 — Root-Cause der Pool-Lane-Crash auf Production:
+    // `.not("status", "in", "(...)")` hat Supabase-JS-Edge/Node serialisiert
+    // zu URL `status=not.in.%28...%29`, was die PostgREST-Server-Side anders
+    // parst als erwartet und einen Throw verursacht hat (silent in dev).
+    // Drei explizite `.neq()` sind robuster und semantisch gleich.
+    q = q
+      .neq("status", "freigegeben")
+      .neq("status", "verworfen")
+      .neq("status", "storniert");
     return q;
   }
 
@@ -122,6 +133,7 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
         `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
       );
     }
+    // `.in()` ist robust (anders als das tükische `.not("col", "in", ...)`).
     q = q.in("status", ["freigegeben", "verworfen", "storniert"]);
     return q;
   }
