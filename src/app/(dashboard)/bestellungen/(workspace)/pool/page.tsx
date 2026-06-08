@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getBenutzerProfil } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { LaneWorkspace } from "@/components/bestellungen/lane-workspace";
@@ -9,10 +10,11 @@ export const dynamic = "force-dynamic";
 /**
  * Pool-Lane (UX-R2, 03.06.2026) — die kollaborative Triage-Inbox.
  *
- * 03.06.2026 — Defensive Try-Catch um loadLaneData + LaneWorkspace damit
- * ein Server-Render-Error nicht silent zu error.tsx eskaliert. Statt
- * dessen rendert der Pool eine Fallback-UI mit dem echten Stack-Trace
- * (auch in production), damit wir die Ursache sehen können.
+ * 03.06.2026 — Defensive Try-Catch + ?debug=minimal Bypass für die
+ * Diagnose. Bei ?debug=minimal rendert die Page nur eine simple Liste
+ * der Pool-Items ohne LaneWorkspace/BestellungenTabelle. Falls die
+ * minimal-Variante funktioniert aber der Default-Render crasht, wissen
+ * wir der Bug ist in LaneWorkspace/BestellungenTabelle.
  */
 export default async function PoolLanePage({
   searchParams,
@@ -34,6 +36,39 @@ export default async function PoolLanePage({
       },
       profil,
     );
+
+    // Diagnose-Bypass: ?debug=minimal rendert eine simple Liste ohne
+    // LaneWorkspace/BestellungenTabelle. Wenn diese Variante geht, ist
+    // der Bug in einem Sub-Component.
+    if (params.debug === "minimal") {
+      return (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-md border border-success-border bg-success-bg px-4 py-2 text-meta text-success">
+            ✓ loadLaneData OK — {data.bestellungen.length} Pool-Items geladen.
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {data.bestellungen.slice(0, 50).map((b) => (
+              <li
+                key={b.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-md border border-line bg-surface"
+              >
+                <Link
+                  href={`/bestellungen/${b.id}`}
+                  className="flex-1 min-w-0 truncate font-mono-amount text-body-sm text-brand hover:text-brand-light"
+                >
+                  {b.bestellnummer ?? "Ohne Nr."} · {b.haendler_name ?? "—"}
+                </Link>
+                <span className="text-meta text-foreground-subtle whitespace-nowrap">
+                  {b.betrag != null
+                    ? `${Number(b.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`
+                    : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
 
     return (
       <>
