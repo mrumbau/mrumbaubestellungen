@@ -227,45 +227,69 @@ export async function persistAnhangDokumente(
       continue;
     }
 
-    // 03.06.2026 — PayPal-/Bereits-bezahlt-Detection durchschreiben.
-    // RPC persist_dokument_atomic hat (Stand 03.06.2026) diese Spalten noch
-    // NICHT als Parameter. Wir machen einen Folge-UPDATE auf das frisch
-    // inserted-Dokument. Defensive: try/catch + warn-Log, damit ein
-    // Schema-Mismatch (z.B. Migration noch nicht ausgeführt) nicht die
-    // gesamte Pipeline killt — die Bezahlt-Auto-Erkennung ist ein
-    // optionales Komfort-Feature, kein Pflicht-Pfad.
-    if (
-      analyse.typ === "rechnung" &&
-      analyse.bezahlt_bereits === true &&
-      insertedDokuId
-    ) {
-      try {
-        const { error: updateError } = await supabase
-          .from("dokumente")
-          .update({
-            bezahlt_bereits: true,
-            zahlungsmethode: analyse.zahlungsmethode ?? "andere",
-          })
-          .eq("id", insertedDokuId as string);
+    // 08.06.2026 — Bezahlt-Detection auf RECHNUNGEN.
+    // Zwei Pfade kombiniert:
+    //   (a) KI-strikt (Schema-Field `bezahlt_bereits`) für Nicht-PayPal-
+    //       Zahlungsmethoden (Klarna, Stripe, Vorkasse etc.)
+    //   (b) Pragmatischer Substring-Match auf "paypal" (case-insensitive)
+    //       in beliebigen Doku-Metadaten — Wenn "PayPal" irgendwo
+    //       auftaucht, gilt die Rechnung als PayPal-bezahlt. User-Regel
+    //       08.06.2026: "Wenn irgendwo PayPal vorkommt, dann bezahlt."
+    //
+    // RPC persist_dokument_atomic akzeptiert die zwei neuen Spalten nicht
+    // als Parameter (noch ohne Migration der Signatur), also Folge-UPDATE
+    // mit try/catch. Bei Substring-Treffer überschreibt 'paypal' eine
+    // eventuelle KI-Methoden-Klassifikation (z.B. KI sagt 'andere', aber
+    // "paypal@…" im Absender → 'paypal').
+    if (analyse.typ === "rechnung" && insertedDokuId) {
+      const haystacks: (string | null | undefined)[] = [
+        email_betreff,
+        email_absender,
+        storagePfad,
+        dateiName,
+        analyse.bestellnummer,
+        // analyse-JSON komplett — fängt KI-Volltext, IBAN-Hinweise,
+        // artikel-Texte ("PayPal-Gebühr") usw. ab.
+        JSON.stringify(analyse),
+      ];
+      const istPayPalImText = haystacks.some(
+        (s) => typeof s === "string" && /paypal/i.test(s),
+      );
+      const istBezahltErkannt = istPayPalImText || analyse.bezahlt_bereits === true;
 
-        if (updateError) {
-          // Migration noch nicht durch? Spalten fehlen? → silent warn, kein abort.
-          logInfo(
-            "webhook/email",
-            "PayPal-Detection-Update übersprungen (Spalten evtl. nicht da)",
-            { dokuId: insertedDokuId, err: updateError.message },
-          );
-        } else {
-          logInfo("webhook/email", "Rechnung als bereits bezahlt markiert", {
+      if (istBezahltErkannt) {
+        const zahlungsmethode = istPayPalImText
+          ? "paypal"
+          : (analyse.zahlungsmethode ?? "andere");
+        try {
+          const { error: updateError } = await supabase
+            .from("dokumente")
+            .update({
+              bezahlt_bereits: true,
+              zahlungsmethode,
+            })
+            .eq("id", insertedDokuId as string);
+
+          if (updateError) {
+            // Migration noch nicht durch? Spalten fehlen? → silent warn, kein abort.
+            logInfo(
+              "webhook/email",
+              "Bezahlt-Detection-Update übersprungen (Spalten evtl. nicht da)",
+              { dokuId: insertedDokuId, err: updateError.message },
+            );
+          } else {
+            logInfo("webhook/email", "Rechnung als bereits bezahlt markiert", {
+              dokuId: insertedDokuId,
+              zahlungsmethode,
+              quelle: istPayPalImText ? "substring(paypal)" : "ki-strict",
+            });
+          }
+        } catch (err) {
+          logInfo("webhook/email", "Bezahlt-Detection-Update Exception", {
             dokuId: insertedDokuId,
-            zahlungsmethode: analyse.zahlungsmethode ?? "andere",
+            err: err instanceof Error ? err.message : String(err),
           });
         }
-      } catch (err) {
-        logInfo("webhook/email", "PayPal-Detection-Update Exception", {
-          dokuId: insertedDokuId,
-          err: err instanceof Error ? err.message : String(err),
-        });
       }
     }
 

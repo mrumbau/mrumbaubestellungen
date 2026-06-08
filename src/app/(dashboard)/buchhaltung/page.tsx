@@ -49,7 +49,7 @@ export default async function BuchhaltungPage() {
         supabase.from("freigaben").select("bestellung_id, freigegeben_von_name, freigegeben_am").in("bestellung_id", bestellIds),
         supabase
           .from("dokumente")
-          .select("id, bestellung_id, gesamtbetrag, faelligkeitsdatum, bezahlt_am, bezahlt_von, archiviert_am, bestellnummer_erkannt, storage_pfad, created_at")
+          .select("id, bestellung_id, gesamtbetrag, faelligkeitsdatum, bezahlt_am, bezahlt_von, archiviert_am, bestellnummer_erkannt, storage_pfad, created_at, bezahlt_bereits, zahlungsmethode")
           .in("bestellung_id", bestellIds)
           .eq("typ", "rechnung")
           // Archivierte Rechnungen gehören ins Archiv-View, nicht in Buchhaltung.
@@ -109,6 +109,10 @@ export default async function BuchhaltungPage() {
       // 17.05.2026 — Gutschrift-Flag für UI-Markierung (grünes Label, evtl.
       // Soll/Haben-Tausch im DATEV-Export, Filter-Kategorie).
       ist_gutschrift: b.ist_gutschrift || false,
+      // 08.06.2026 — Bezahlt-Auto-Erkennung pro Rechnung (PayPal-Substring +
+      // KI-strict-Pfad). PayPalBadge in der Tabelle rendert nur bei TRUE.
+      bezahlt_bereits: r.bezahlt_bereits ?? null,
+      zahlungsmethode: r.zahlungsmethode ?? null,
     };
   }).filter((r): r is NonNullable<typeof r> => r !== null)
     .sort((a, b) => {

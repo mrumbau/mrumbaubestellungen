@@ -32,6 +32,10 @@ export interface BuchhaltungRow {
   // Label „GUTSCHRIFT". Betrag-Vorzeichen-Anzeige (+ statt -) plus eigener
   // Bezahlt-Sinn: bei Gutschrift = "Geld erhalten" statt "Geld überwiesen".
   ist_gutschrift?: boolean;
+  // 08.06.2026 — Bezahlt-Auto-Erkennung pro Rechnungs-Doku. Wenn true,
+  // erscheint blaues PayPal-P (oder grüner Check für andere Methoden).
+  bezahlt_bereits?: boolean | null;
+  zahlungsmethode?: string | null;
 }
 
 export function isFaelligBald(datum: string | null) {

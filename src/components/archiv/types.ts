@@ -44,6 +44,8 @@ export interface Dokument {
   storage_pfad: string | null;
   gesamtbetrag: number | null;
   created_at: string;
+  bezahlt_bereits?: boolean | null;
+  zahlungsmethode?: string | null;
 }
 
 export interface ProjektStats {

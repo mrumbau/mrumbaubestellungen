@@ -89,12 +89,12 @@ export default async function ArchivPage() {
 
   // Phase 2: Dokumente laden (abhängig von Phase 1)
   const allOrderIds = allOrders.map((o) => o.id);
-  let dokumenteMap: Record<string, Array<{ id: string; bestellung_id: string; typ: string; storage_pfad: string | null; gesamtbetrag: number | null; created_at: string }>> = {};
+  let dokumenteMap: Record<string, Array<{ id: string; bestellung_id: string; typ: string; storage_pfad: string | null; gesamtbetrag: number | null; created_at: string; bezahlt_bereits: boolean | null; zahlungsmethode: string | null }>> = {};
 
   if (allOrderIds.length > 0) {
     const { data: dokumente } = await supabase
       .from("dokumente")
-      .select("id, bestellung_id, typ, storage_pfad, gesamtbetrag, created_at")
+      .select("id, bestellung_id, typ, storage_pfad, gesamtbetrag, created_at, bezahlt_bereits, zahlungsmethode")
       .in("bestellung_id", allOrderIds);
 
     for (const dok of dokumente || []) {
@@ -108,6 +108,8 @@ export default async function ArchivPage() {
       dokumenteMap[dok.bestellung_id].push({
         ...dok,
         bestellung_id: dok.bestellung_id, // narrow nach null-check
+        bezahlt_bereits: dok.bezahlt_bereits ?? null,
+        zahlungsmethode: dok.zahlungsmethode ?? null,
       });
     }
   }

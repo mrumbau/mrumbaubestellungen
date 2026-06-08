@@ -9,6 +9,7 @@ import { DOKUMENT_CONFIG, displayBestellnummer } from "@/lib/bestellung-utils";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DokumentIcon } from "@/components/ui/cells/dokument-icon";
+import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
 import type { Dokument, PaidBestellung } from "./types";
 
 export interface OrderRowProps {
@@ -38,6 +39,15 @@ export function OrderRow({
   isSelected = false,
   toggleSelect,
 }: OrderRowProps) {
+  // 08.06.2026 — PayPal-Markierung aus den Rechnungs-Dokumenten aggregieren,
+  // damit das Badge auch in der Archiv-Liste (freigegebene Bestellungen)
+  // sichtbar ist. Nimmt das erste Rechnungs-Doku mit bezahlt_bereits=true.
+  const paypalDoku = docs.find(
+    (d) => d.typ === "rechnung" && d.bezahlt_bereits === true,
+  );
+  const bezahltBereits = !!paypalDoku;
+  const zahlungsmethode = paypalDoku?.zahlungsmethode ?? null;
+
   return (
     <>
       <tr
@@ -120,7 +130,13 @@ export function OrderRow({
         </td>
         <td className="px-4 py-3.5">
           <div className="flex flex-col">
-            <span className="text-[12px] text-foreground-muted">{formatDatum(order.bezahlt_am)}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px] text-foreground-muted">{formatDatum(order.bezahlt_am)}</span>
+              <PayPalBadge
+                bezahltBereits={bezahltBereits}
+                zahlungsmethode={zahlungsmethode}
+              />
+            </div>
             {order.bezahlt_von && (
               <span className="text-[10px] text-foreground-faint">{order.bezahlt_von}</span>
             )}

@@ -10,6 +10,7 @@
 
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { haendlerDisplay } from "@/lib/haendler-display";
+import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
 import { type BuchhaltungRow, isFaelligBald, isUeberfaellig } from "./types";
 import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
 
@@ -192,6 +193,10 @@ export function BuchhaltungTable({
                         GUTSCHRIFT
                       </span>
                     )}
+                    <PayPalBadge
+                      bezahltBereits={r.bezahlt_bereits ?? null}
+                      zahlungsmethode={r.zahlungsmethode ?? null}
+                    />
                   </span>
                 </td>
                 <td className="px-4 py-3.5 text-center">
