@@ -5,8 +5,28 @@ import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
+import { logError, logInfo } from "@/lib/logger";
 
 // POST /api/bestellungen/verwerfen – Bestellung verwerfen (Spam/irrelevant)
+//
+// 08.06.2026 (Bulk-Delete-Bug-Fix):
+//   Vor diesem Fix scheiterte Bulk-Delete in der Produktion mit
+//   "Bestellungen konnten nicht gelöscht werden". Root-Cause: der
+//   Cleanup-Block listete nur 5 FK-Tabellen (webhook_logs, freigaben,
+//   abgleiche, kommentare, dokumente) — die nach Audit eingeführten
+//   pool_reservations + pool_user_state (FK auf bestellungen) waren
+//   nicht dabei. Sobald eine ausgewählte Bestellung einen Pool-State
+//   hatte, blockierte der FK den Parent-DELETE.
+//
+//   Single-Delete fiel selten auf, weil die getroffene Bestellung oft
+//   keine Pool-Reservation besitzt. Bei Bulk-Auswahl von z.B. 5
+//   Bestellungen steigt die Wahrscheinlichkeit auf Treffer drastisch
+//   → User sah immer "fehlgeschlagen".
+//
+//   Sekundärer Bug: der Endpoint hat den echten DB-Fehler verschluckt
+//   (return generischer Text, kein logError). Damit war der Bug auch
+//   in den Logs unsichtbar. Jetzt: logError mit voller Fehler-Message
+//   pro fehlgeschlagener ID + structured response mit deleted/failed.
 export async function POST(request: NextRequest) {
   try {
     if (!checkCsrf(request)) {
@@ -134,31 +154,129 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Zugehörige Daten löschen (Reihenfolge: FK-Abhängigkeiten zuerst)
-    for (const id of ids) {
-      await supabase.from("webhook_logs").delete().eq("bestellung_id", id);
-      await supabase.from("freigaben").delete().eq("bestellung_id", id);
-      await supabase.from("abgleiche").delete().eq("bestellung_id", id);
-      await supabase.from("kommentare").delete().eq("bestellung_id", id);
-      await supabase.from("dokumente").delete().eq("bestellung_id", id);
+    // 08.06.2026 — Per-ID-Loop statt single-bulk-DELETE.
+    //
+    // Vorher: 5 FK-Tabellen-Cleanups in äußerer Schleife + EIN bulk DELETE
+    // auf bestellungen.in(ids). Ein einziger FK-Fail (z.B. pool_reservations)
+    // killte den ganzen Batch + verschluckte die Fehler-Message.
+    //
+    // Jetzt:
+    //   1. Pro ID alle bekannten FK-Cascades + DELETE in eigenem try/catch.
+    //   2. Jede ID liefert success oder failed.reason. Endpoint returnt
+    //      strukturiertes Ergebnis statt 500-mit-leerer-Message.
+    //   3. logError bei jedem Fail mit echter Fehler-Message + Tabellen-Hint.
+    const deleted: string[] = [];
+    const failed: Array<{ id: string; reason: string }> = [];
+
+    // Hilfsfunktion: cleant eine FK-Tabelle für genau eine bestellung_id.
+    // Loggt Warnings (nicht-fatal) — wenn die Tabelle gar nicht existiert
+    // (legacy bestellung_signale), wird der Fehler erfasst aber nicht
+    // weitergereicht. Bei "echtem" Block-Fehler (z.B. Permission) sammelt
+    // sich der Hinweis im Log und das spätere bestellungen-DELETE wird
+    // sowieso scheitern → Fehler-Pfad sauber.
+    async function cleanupFkTable(
+      table:
+        | "webhook_logs"
+        | "freigaben"
+        | "abgleiche"
+        | "kommentare"
+        | "dokumente"
+        | "pool_reservations"
+        | "pool_user_state",
+      bestellungId: string,
+    ): Promise<string | null> {
+      const { error } = await supabase.from(table).delete().eq("bestellung_id", bestellungId);
+      if (error) {
+        // Tabelle fehlt evtl. (legacy) oder Permission. Nicht-fatal: wir
+        // versuchen trotzdem den parent-DELETE; der zeigt den echten FK-Fail.
+        logInfo("verwerfen", `Cleanup ${table} fehlgeschlagen (nicht-fatal)`, {
+          bestellungId,
+          err: error.message,
+        });
+        return error.message;
+      }
+      return null;
     }
 
-    // Defense-in-depth: Besteller-Filter auch im DELETE.
-    // 12.05.2026: SU/Abo-Bypass eingebaut (analog Permission-Check oben).
-    let deleteQuery = supabase.from("bestellungen").delete().in("id", ids);
-    if (profil!.rolle === "besteller") {
-      // Or-Filter: entweder eigene Material ODER SU/Abo (jeder Besteller darf das)
-      deleteQuery = deleteQuery.or(
-        `besteller_kuerzel.eq.${profil!.kuerzel},bestellungsart.in.(subunternehmer,abo)`,
+    for (const id of ids) {
+      try {
+        // 08.06.2026 — pool_reservations + pool_user_state ergänzt (Bug-Fix).
+        // Reihenfolge ist defensive: wir cleanen alle FK-Tabellen vor dem
+        // parent-DELETE. Wenn EINE dieser Tabellen failt, wird das im Log
+        // sichtbar; das parent-DELETE selbst zeigt dann den echten Grund.
+        await cleanupFkTable("pool_reservations", id);
+        await cleanupFkTable("pool_user_state", id);
+        await cleanupFkTable("webhook_logs", id);
+        await cleanupFkTable("freigaben", id);
+        await cleanupFkTable("abgleiche", id);
+        await cleanupFkTable("kommentare", id);
+        await cleanupFkTable("dokumente", id);
+
+        // Defense-in-depth: Besteller-Filter auch im DELETE.
+        // 12.05.2026: SU/Abo-Bypass eingebaut (analog Permission-Check oben).
+        let deleteQuery = supabase.from("bestellungen").delete().eq("id", id);
+        if (profil!.rolle === "besteller") {
+          // Or-Filter: entweder eigene Material ODER SU/Abo (jeder Besteller darf das)
+          deleteQuery = deleteQuery.or(
+            `besteller_kuerzel.eq.${profil!.kuerzel},bestellungsart.in.(subunternehmer,abo)`,
+          );
+        }
+        const { error: delError } = await deleteQuery;
+
+        if (delError) {
+          logError("verwerfen", `DELETE bestellung fehlgeschlagen`, {
+            bestellungId: id,
+            err: delError.message,
+            code: (delError as { code?: string }).code,
+            details: (delError as { details?: string }).details,
+            hint: (delError as { hint?: string }).hint,
+          });
+          failed.push({ id, reason: delError.message || "Unbekannter DB-Fehler" });
+        } else {
+          deleted.push(id);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logError("verwerfen", `Exception bei Bestellungs-Delete`, {
+          bestellungId: id,
+          err: msg,
+        });
+        failed.push({ id, reason: msg });
+      }
+    }
+
+    // Response-Format:
+    //   - Alle erfolgreich → 200 + { success: true, deleted: N }
+    //   - Teilweise erfolgreich → 200 + { success: true, deleted, failed }
+    //     (UI zeigt warning-Toast mit Counts + Fehlern)
+    //   - Alle fehlgeschlagen → 500 + { success: false, deleted: 0, failed }
+    //
+    // Wichtig: deleted/failed arrays werden IMMER zurückgegeben, damit das
+    // UI Single + Bulk + Partial einheitlich rendern kann.
+    if (deleted.length === 0) {
+      const erstesProblem = failed[0]?.reason ?? "Unbekannter Fehler";
+      return NextResponse.json(
+        {
+          success: false,
+          deleted: 0,
+          deleted_ids: [],
+          failed,
+          error: `Bestellungen konnten nicht gelöscht werden: ${erstesProblem}`,
+        },
+        { status: 500 },
       );
     }
-    const { error: delError } = await deleteQuery;
-    if (delError) {
-      return NextResponse.json({ error: "Bestellungen konnten nicht gelöscht werden" }, { status: 500 });
-    }
 
-    return NextResponse.json({ success: true, deleted: ids.length });
-  } catch {
+    return NextResponse.json({
+      success: true,
+      deleted: deleted.length,
+      deleted_ids: deleted,
+      failed,
+    });
+  } catch (err) {
+    logError("verwerfen", "Unerwartete Exception", {
+      err: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json({ error: ERRORS.INTERNER_FEHLER }, { status: 500 });
   }
 }

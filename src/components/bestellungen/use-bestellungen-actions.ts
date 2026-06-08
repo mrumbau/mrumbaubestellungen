@@ -109,23 +109,48 @@ export function useBestellungenActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bestellung_ids: Array.from(selected) }),
       });
-      if (res.ok) {
-        const count = selected.size;
+      // 08.06.2026 (Bulk-Delete-Bug-Fix): Server liefert jetzt strukturiertes
+      // Ergebnis `{ success, deleted, deleted_ids, failed: [{id, reason}] }`.
+      // - 200 + alle deleted → success-Toast
+      // - 200 + partial → warning-Toast mit Counts + Erstgrund
+      // - 500 + 0 deleted → error-Toast mit Erstgrund
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        deleted?: number;
+        deleted_ids?: string[];
+        failed?: Array<{ id: string; reason: string }>;
+        error?: string;
+      };
+      const deletedN = data.deleted ?? 0;
+      const failedArr = data.failed ?? [];
+
+      if (res.ok && deletedN > 0 && failedArr.length === 0) {
         setSelected(new Set());
         setShowDeleteDialog(false);
-        // 22.05.2026 (Perf Stufe 2.5): router.refresh entfernt — useBestellungen
-        // ListRealtime catches bestellungen DELETE events, refresht mit 800ms
-        // debounce. Bei Bulk (alle DELETEs binnen ~500ms) sieht User die Rows
-        // nach ~1300ms verschwinden (vorher: sofortiger Refresh).
         toast.success(
-          `${count} ${count === 1 ? "Bestellung entfernt" : "Bestellungen entfernt"}`,
+          `${deletedN} ${deletedN === 1 ? "Bestellung entfernt" : "Bestellungen entfernt"}`,
         );
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast.error("Löschen fehlgeschlagen", {
-          description: data.error || "Bitte erneut versuchen.",
-        });
+        return;
       }
+
+      if (res.ok && deletedN > 0 && failedArr.length > 0) {
+        // Partial: einige erfolgreich, andere nicht. Selection auf failed-Set
+        // reduzieren, damit User sieht was übrig blieb und es manuell prüfen kann.
+        const failedIds = new Set(failedArr.map((f) => f.id));
+        setSelected(failedIds);
+        setShowDeleteDialog(false);
+        toast.warning(
+          `${deletedN} entfernt, ${failedArr.length} fehlgeschlagen`,
+          {
+            description: `Grund (erstes Problem): ${failedArr[0].reason}`,
+          },
+        );
+        return;
+      }
+
+      // res !ok ODER deletedN === 0 → echter Fehler
+      const grund = failedArr[0]?.reason ?? data.error ?? "Bitte erneut versuchen.";
+      toast.error("Löschen fehlgeschlagen", { description: grund });
     } catch {
       toast.error("Netzwerkfehler", {
         description: "Bestellungen konnten nicht gelöscht werden.",

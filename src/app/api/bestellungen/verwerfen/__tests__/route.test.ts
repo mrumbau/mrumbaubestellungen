@@ -3,9 +3,14 @@
  *
  * 19.05.2026 (A2.5) — Single + Bulk verwerfen. Eigene Auth-Logik (kein
  * requireAuth-Helper) + supabase.auth.getUser + createServiceClient für DELETE.
+ *
+ * 08.06.2026 (Bulk-Delete-Bug-Fix) — Endpoint refactored auf Per-ID-Loop
+ * mit pool_reservations + pool_user_state Cleanup und strukturiertem
+ * Response `{ success, deleted, deleted_ids, failed: [{id, reason}] }`.
+ * Tests erweitert um: Pool-Cleanup-Verifikation, Partial-Success-Reporting,
+ * Alle-Failed-Pfad.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 import { makeRequest, TEST_PROFIL, TEST_UUID } from "@/test-helpers/api-route";
 
 const mockCheckCsrf = vi.fn(() => true);
@@ -45,32 +50,41 @@ function makeAuthClient(profil: typeof TEST_PROFIL.besteller_MT | null) {
   };
 }
 
-/** Service-Client mock für die actual Writes */
-function makeServiceClient(opts: {
+interface ServiceOpts {
   bestellungen?: VerwerfenBestellung[];
-  delError?: { message: string } | null;
+  /** Map<id, error-msg> — wenn id in der Map, scheitert das DELETE für genau diese ID. */
+  deleteErrorsPerId?: Map<string, string>;
   dokumente?: Array<{ email_absender: string; email_betreff: string }>;
-}) {
-  // bestellungen.SELECT.in()
-  const inSelectBest = vi.fn().mockResolvedValue({ data: opts.bestellungen ?? [], error: null });
+}
+
+/**
+ * Service-Client mock für actual Writes.
+ *
+ * 08.06.2026 — angepasst auf Per-ID-Loop:
+ *   - bestellungen.delete().eq("id", X) wird einzeln pro ID gerufen
+ *   - bei Besteller-Rolle: zusätzlich .or(...) am Ende der Chain
+ *   - Mock erlaubt deleteErrorsPerId um partial-failure zu simulieren
+ *   - cleanupCounts trackt FK-Cleanup-Calls für Assertions
+ */
+function makeServiceClient(opts: ServiceOpts = {}) {
+  const cleanupCounts: Record<string, number> = {
+    pool_reservations: 0,
+    pool_user_state: 0,
+    webhook_logs: 0,
+    freigaben: 0,
+    abgleiche: 0,
+    kommentare: 0,
+    dokumente: 0,
+  };
+  const deletedBestellungenIds: string[] = [];
+
   // dokumente.SELECT.eq() → for verworfene_emails-learning
   const eqDok = vi.fn().mockResolvedValue({ data: opts.dokumente ?? [], error: null });
-  // DELETE chain: delete().in()/eq()/or() → final error
-  const deleteEq = vi.fn().mockResolvedValue({ data: null, error: null });
-  const deleteIn = vi.fn().mockResolvedValue({ data: null, error: null });
-  const deleteOr = vi.fn().mockResolvedValue({ data: null, error: opts.delError ?? null });
-  const delChain = {
-    eq: () => deleteEq,
-    in: () => deleteIn,
-    or: () => deleteOr,
-  };
   // verworfene_emails.INSERT (no-op in tests)
   const insert = vi.fn().mockResolvedValue({ data: null, error: null });
-  // generic from() router
+
   const from = vi.fn().mockImplementation((table: string) => {
     if (table === "bestellungen") {
-      // 3 contexts: SELECT.in (permissions-check), SELECT.eq.maybeSingle (snapshot
-      // pro id für verworfene_emails), DELETE für actual wipe
       const bestellungenList = opts.bestellungen ?? [];
       return {
         select: vi.fn().mockImplementation(() => ({
@@ -82,30 +96,75 @@ function makeServiceClient(opts: {
             }),
           })),
         })),
-        delete: () => ({
-          in: () => ({
-            or: () => deleteOr(),
-          }),
-        }),
+        delete: () => {
+          // Per-ID DELETE: chain ist entweder .eq("id", X)  →  (admin)
+          //                          oder .eq("id", X).or(...) (besteller)
+          // Beide müssen thenable sein (resolve to {data,error}).
+          return {
+            eq: (_col: string, val: string) => {
+              const result = (): Promise<{ data: null; error: { message: string } | null }> => {
+                const errMsg = opts.deleteErrorsPerId?.get(val);
+                if (!errMsg) deletedBestellungenIds.push(val);
+                return Promise.resolve({ data: null, error: errMsg ? { message: errMsg } : null });
+              };
+              return {
+                or: () => result(),
+                // direkt-awaitable fallback wenn .or() nicht gerufen wird
+                then: (resolve: (v: { data: null; error: { message: string } | null }) => unknown) =>
+                  result().then(resolve),
+              };
+            },
+          };
+        },
       };
     }
     if (table === "dokumente") {
-      return { select: vi.fn().mockReturnValue({ eq: eqDok }), delete: () => ({ eq: deleteEq }) };
+      return {
+        select: vi.fn().mockReturnValue({ eq: eqDok }),
+        delete: () => ({
+          eq: (_c: string, _v: string) => {
+            cleanupCounts.dokumente++;
+            return Promise.resolve({ data: null, error: null });
+          },
+        }),
+      };
     }
-    if (table === "webhook_logs" || table === "freigaben" || table === "abgleiche" || table === "kommentare") {
-      return { delete: () => ({ eq: deleteEq }) };
+    // Generic FK-cleanup tables (incl. pool_reservations + pool_user_state)
+    if (
+      table === "webhook_logs" ||
+      table === "freigaben" ||
+      table === "abgleiche" ||
+      table === "kommentare" ||
+      table === "pool_reservations" ||
+      table === "pool_user_state"
+    ) {
+      return {
+        delete: () => ({
+          eq: (_c: string, _v: string) => {
+            cleanupCounts[table]++;
+            return Promise.resolve({ data: null, error: null });
+          },
+        }),
+      };
     }
     if (table === "verworfene_emails") {
       return { insert };
     }
-    return { select: vi.fn(), insert, delete: () => ({ eq: deleteEq, in: deleteIn, or: deleteOr }) };
+    // Fallback
+    return {
+      select: vi.fn(),
+      insert,
+      delete: () => ({
+        eq: () => Promise.resolve({ data: null, error: null }),
+      }),
+    };
   });
-  // Backup direkt-accessible für assertions
-  return { from, inSelectBest, deleteOr, insertVerworfene: insert };
+  return { from, cleanupCounts, deletedBestellungenIds, insertVerworfene: insert };
 }
 
 const ID_A = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
 const ID_B = "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb";
+const ID_C = "cccccccc-cccc-4ccc-cccc-cccccccccccc";
 
 describe("POST /api/bestellungen/verwerfen", () => {
   beforeEach(() => {
@@ -135,10 +194,24 @@ describe("POST /api/bestellungen/verwerfen", () => {
     expect(res.status).toBe(403);
   });
 
-  it("400 bei fehlender ID", async () => {
+  it("400 bei fehlender ID (leere Auswahl)", async () => {
     mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.besteller_MT));
     const { POST } = await import("../route");
     const res = await POST(makeRequest({}));
+    expect(res.status).toBe(400);
+  });
+
+  it("400 bei leerem bestellung_ids-Array", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.besteller_MT));
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_ids: [] }));
+    expect(res.status).toBe(400);
+  });
+
+  it("400 bei ungültiger UUID", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.besteller_MT));
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_id: "nicht-uuid" }));
     expect(res.status).toBe(400);
   });
 
@@ -171,6 +244,7 @@ describe("POST /api/bestellungen/verwerfen", () => {
     const json = await res.json();
     expect(json.success).toBe(true);
     expect(json.deleted).toBe(1);
+    expect(json.failed).toEqual([]);
   });
 
   it("Besteller darf fremde SU verwerfen (Bypass — Bug-Fix vom 12.05.)", async () => {
@@ -203,7 +277,7 @@ describe("POST /api/bestellungen/verwerfen", () => {
     expect(res.status).toBe(200);
   });
 
-  it("Bulk-Verwerfen: alle eigene → success", async () => {
+  it("Bulk-Verwerfen: alle eigene → success mit deleted_ids-Liste", async () => {
     mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.besteller_MT));
     mockCreateServiceClient.mockReturnValue(makeServiceClient({
       bestellungen: [
@@ -216,6 +290,8 @@ describe("POST /api/bestellungen/verwerfen", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.deleted).toBe(2);
+    expect(json.deleted_ids).toEqual([ID_A, ID_B]);
+    expect(json.failed).toEqual([]);
   });
 
   it("Bulk mit fremder ID → 403 (Permission-Aborte)", async () => {
@@ -229,5 +305,78 @@ describe("POST /api/bestellungen/verwerfen", () => {
     const { POST } = await import("../route");
     const res = await POST(makeRequest({ bestellung_ids: [ID_A, ID_B] }));
     expect(res.status).toBe(403);
+  });
+
+  // 08.06.2026 (Bug-Fix) — pool_reservations + pool_user_state müssen IMMER
+  // gecleant werden vor dem parent-DELETE, sonst FK-Constraint-Violation.
+  it("FK-Cleanup: pool_reservations + pool_user_state werden pro ID gecleant", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.admin));
+    const service = makeServiceClient({
+      bestellungen: [
+        { id: ID_A, besteller_kuerzel: "MT", bestellungsart: "material" },
+        { id: ID_B, besteller_kuerzel: "CR", bestellungsart: "material" },
+        { id: ID_C, besteller_kuerzel: "MT", bestellungsart: "material" },
+      ],
+    });
+    mockCreateServiceClient.mockReturnValue(service);
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_ids: [ID_A, ID_B, ID_C] }));
+    expect(res.status).toBe(200);
+    // 3 IDs × 1 Cleanup pro Tabelle = 3 Calls
+    expect(service.cleanupCounts.pool_reservations).toBe(3);
+    expect(service.cleanupCounts.pool_user_state).toBe(3);
+    expect(service.cleanupCounts.dokumente).toBe(3);
+    expect(service.cleanupCounts.freigaben).toBe(3);
+  });
+
+  // Partial-Failure: 1 ID failt am parent-DELETE (z.B. FK-Constraint),
+  // andere 2 gehen durch. API muss 200 + strukturierte deleted+failed liefern.
+  it("Partial-Failure: 1 von 3 failt → 200 mit deleted=2, failed=[1]", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.admin));
+    const service = makeServiceClient({
+      bestellungen: [
+        { id: ID_A, besteller_kuerzel: "MT", bestellungsart: "material" },
+        { id: ID_B, besteller_kuerzel: "CR", bestellungsart: "material" },
+        { id: ID_C, besteller_kuerzel: "MT", bestellungsart: "material" },
+      ],
+      deleteErrorsPerId: new Map([
+        [ID_B, 'update or delete on table "bestellungen" violates foreign key constraint "some_fkey" on table "neue_tabelle"'],
+      ]),
+    });
+    mockCreateServiceClient.mockReturnValue(service);
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_ids: [ID_A, ID_B, ID_C] }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.deleted).toBe(2);
+    expect(json.deleted_ids).toEqual([ID_A, ID_C]);
+    expect(json.failed).toHaveLength(1);
+    expect(json.failed[0].id).toBe(ID_B);
+    expect(json.failed[0].reason).toMatch(/foreign key/);
+  });
+
+  // Alle fehlgeschlagen → 500 mit error-Feld
+  it("Alle fehlgeschlagen → 500 mit error-Beschreibung", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.admin));
+    const service = makeServiceClient({
+      bestellungen: [
+        { id: ID_A, besteller_kuerzel: "MT", bestellungsart: "material" },
+        { id: ID_B, besteller_kuerzel: "CR", bestellungsart: "material" },
+      ],
+      deleteErrorsPerId: new Map([
+        [ID_A, "DB-Lock"],
+        [ID_B, "DB-Lock"],
+      ]),
+    });
+    mockCreateServiceClient.mockReturnValue(service);
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_ids: [ID_A, ID_B] }));
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.deleted).toBe(0);
+    expect(json.failed).toHaveLength(2);
+    expect(json.error).toContain("DB-Lock");
   });
 });
