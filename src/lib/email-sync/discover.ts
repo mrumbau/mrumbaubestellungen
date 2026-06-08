@@ -36,9 +36,25 @@ interface FolderDiscoverResult {
   folder_id: string;
   folder_name: string;
   bootstrap: boolean;
+  /**
+   * 08.06.2026 — neue Semantik: Anzahl Mails die wir tatsächlich NEU geclaimet
+   * haben (= Pipeline-Arbeit erzeugen). Bereits-bekannte Mails laufen nicht
+   * hierdurch — die zählen in `messages_already_known`. Das ist der Fix für
+   * den Burst-Bug: Budget wird gegen messages_claimed gemessen, nicht gegen
+   * "alles was wir gelesen haben".
+   */
   messages_seen: number;
   messages_claimed: number;
   messages_bootstrap_skipped: number;
+  /**
+   * 08.06.2026 — Diagnose: wie viele Mails wurden von Graph zurückgegeben,
+   * waren aber bereits geclaimet (status='pending'|'processed'|'failed'|
+   * 'irrelevant'). Wenn dieser Wert dauerhaft hoch ist + messages_claimed
+   * niedrig, sind wir in einem "Partial-Replay-Loop" (= Token nicht
+   * fortgeschrieben). Sollte bei normalem Sync ≈0 sein.
+   */
+  messages_already_known: number;
+  pages_read: number;
   duration_ms: number;
   error: string | null;
 }
@@ -54,8 +70,15 @@ export interface DiscoverResult {
 
 /** Hartes Limit damit Discover-Phase im Vercel-Budget bleibt. */
 const MAX_RUN_MS = 50_000;
-/** Pro Discover-Tick max so viele Mails über alle Folder. */
+/** Pro Discover-Tick max so viele NEU GECLAIMTE Mails über alle Folder. */
 const MAX_MESSAGES_PER_TICK = 100;
+/**
+ * 08.06.2026 — Hartes Page-Limit pro Folder pro Tick. Wallclock-Schutz für
+ * den Fall dass viele bereits-bekannte Mails aus dem Delta-Stream kommen
+ * (= claim ist no-op, aber Page-Pull braucht trotzdem ~200ms Graph-Roundtrip).
+ * Bei $top=50 entspricht das max 20×50=1000 Lookups pro Folder pro Tick.
+ */
+const MAX_PAGES_PER_FOLDER = 20;
 
 export async function runDiscover(): Promise<DiscoverResult> {
   const startTime = Date.now();
@@ -125,9 +148,14 @@ async function discoverFolder(
 ): Promise<FolderDiscoverResult> {
   const folderStart = Date.now();
   const isBootstrap = folder.delta_token === null;
-  let messagesSeen = 0;
-  let messagesClaimed = 0;
+  // 08.06.2026 (Burst-Bug-Fix) — getrennte Counter:
+  //   messagesNewlyClaimed = wirklich neu (Budget-Maß)
+  //   messagesAlreadyKnown = von Graph zurückgegeben, claim no-op
+  //   pagesRead = Wallclock-Schutz gegen ewige Schleife
+  let messagesNewlyClaimed = 0;
+  let messagesAlreadyKnown = 0;
   let messagesBootstrapSkipped = 0;
+  let pagesRead = 0;
   let lastError: string | null = null;
   let finalDeltaToken: string | null = null;
 
@@ -139,20 +167,30 @@ async function discoverFolder(
 
     while (true) {
       if (Date.now() - globalStartTime > MAX_RUN_MS) break;
-      if (messagesSeen >= remainingBudget) break;
+      // 08.06.2026 — Budget zählt jetzt NUR neu geclaimte (= Pipeline-Arbeit).
+      // Bereits bekannte Mails blockieren das Budget nicht mehr, sodass der
+      // Loop bei großen Bursts (>100 Mails seit letztem Delta) durch die
+      // schon-pending-Mails durchläuft und die neuen am Ende auch erreicht.
+      if (messagesNewlyClaimed >= remainingBudget) break;
+      // 08.06.2026 — Page-Cap als Wallclock-Schutz: bei extrem langem
+      // Delta-Stream (z.B. 5000 alte Mails durch Token-Replay) brechen wir
+      // nach 20 Pages ab. Bei $top=50 = max 1000 lookups pro Folder/Tick.
+      if (pagesRead >= MAX_PAGES_PER_FOLDER) break;
 
       const batch = await generator.next();
       if (batch.done) {
         finalDeltaToken = batch.value;
         break;
       }
+      // Counter NACH done-Check, damit der Done-Marker selbst nicht als
+      // gelesene Page zählt.
+      pagesRead++;
 
       const messages = batch.value;
       for (const msg of messages) {
         if (Date.now() - globalStartTime > MAX_RUN_MS) break;
-        if (messagesSeen >= remainingBudget) break;
+        if (messagesNewlyClaimed >= remainingBudget) break;
         if (msg.removed || !msg.internetMessageId) continue;
-        messagesSeen++;
 
         try {
           const claimed = await claimMessage(supabase, {
@@ -166,15 +204,23 @@ async function discoverFolder(
             has_attachments: msg.hasAttachments,
           });
 
-          if (!claimed) continue; // bereits gesehen
+          if (!claimed) {
+            // Bereits in email_processing_log → Counter nur für Diagnose
+            messagesAlreadyKnown++;
+            continue;
+          }
+
+          // 08.06.2026 — Counter NACH erfolgreichem claim. Das ist der Bug-Fix:
+          // vor dem 08.06. wurde der Counter VOR claim erhöht und blockierte
+          // das Budget mit bereits-bekannten Mails → Mails nach Position 100
+          // im Delta-Stream wurden bei Bursts nie erreicht.
+          messagesNewlyClaimed++;
 
           if (isBootstrap) {
             await markBootstrapSkip(supabase, msg.internetMessageId);
             messagesBootstrapSkipped++;
-          } else {
-            // Bleibt als status='pending' liegen — process-one holt's später
-            messagesClaimed++;
           }
+          // Sonst: bleibt als status='pending' liegen — process-one holt's später
         } catch (err) {
           logError(
             "email-sync/discover",
@@ -191,7 +237,7 @@ async function discoverFolder(
         .update({
           delta_token: finalDeltaToken,
           last_sync_at: new Date().toISOString(),
-          last_sync_count: messagesSeen,
+          last_sync_count: messagesNewlyClaimed,
           last_error: null,
         })
         .eq("id", folder.id);
@@ -199,12 +245,14 @@ async function discoverFolder(
         lastError = `Folder-Update fehlgeschlagen: ${updateErr.message}`;
       }
     } else {
-      // Partial Sync (Timeout / Budget) — Token NICHT committen
+      // Partial Sync (Timeout / Budget / Page-Cap) — Token NICHT committen.
+      // 08.06.2026: last_sync_count zeigt jetzt die NEU geclaimte Anzahl
+      // (vorher: alle gesehenen — verfälschte Statistik bei Replay-Schleife).
       const { error: updateErr } = await supabase
         .from("mail_sync_folders")
         .update({
           last_sync_at: new Date().toISOString(),
-          last_sync_count: messagesSeen,
+          last_sync_count: messagesNewlyClaimed,
         })
         .eq("id", folder.id);
       if (updateErr) {
@@ -236,12 +284,14 @@ async function discoverFolder(
   }
 
   const duration = Date.now() - folderStart;
-  if (messagesSeen > 0) {
+  if (messagesNewlyClaimed > 0 || messagesAlreadyKnown > 0) {
     logInfo("email-sync/discover", `Folder ${folder.folder_name} discovered`, {
       bootstrap: isBootstrap,
-      seen: messagesSeen,
-      claimed: messagesClaimed,
+      newly_claimed: messagesNewlyClaimed,
+      already_known: messagesAlreadyKnown,
       bootstrap_skipped: messagesBootstrapSkipped,
+      pages_read: pagesRead,
+      finalized_delta: finalDeltaToken !== null,
       duration_ms: duration,
     });
   }
@@ -250,9 +300,14 @@ async function discoverFolder(
     folder_id: folder.id,
     folder_name: folder.folder_name,
     bootstrap: isBootstrap,
-    messages_seen: messagesSeen,
-    messages_claimed: messagesClaimed,
+    // 08.06.2026 (Bug-Fix) — messages_seen ist jetzt die Anzahl NEU geclaimter
+    // Mails (Pipeline-Arbeit), nicht mehr "alles was Graph zurückgegeben hat".
+    // Aufrufer (runDiscover) nutzt diesen Wert für globales Tick-Budget.
+    messages_seen: messagesNewlyClaimed,
+    messages_claimed: messagesNewlyClaimed,
     messages_bootstrap_skipped: messagesBootstrapSkipped,
+    messages_already_known: messagesAlreadyKnown,
+    pages_read: pagesRead,
     duration_ms: duration,
     error: lastError,
   };
