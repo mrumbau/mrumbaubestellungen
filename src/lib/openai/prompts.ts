@@ -67,6 +67,27 @@ export const DokumentAnalyseSchema = z.object({
   // negativer Endbetrag in Strom-/Gas-Abrechnungen.
   // Wichtig für Buchhaltung: Soll/Haben-Tausch + keine Freigabe nötig.
   ist_gutschrift: z.boolean(),
+  // 03.06.2026 — Bezahlt-bereits-Detection. true NUR bei EINDEUTIGEN
+  // Formulierungen die belegen dass die Rechnung schon beglichen ist.
+  // ✅ ERLAUBT: "Mit PayPal bezahlt", "Bereits bezahlt", "Zahlung per PayPal
+  //    erhalten", "PayPal-Zahlung abgeschlossen", "Betrag dankend erhalten",
+  //    "Zahlungseingang verbucht am DD.MM.YYYY", "Rechnung wurde bereits bezahlt"
+  // ❌ NICHT ERLAUBT: "Zahlbar via PayPal", "Bitte überweisen Sie", "Bankeinzug
+  //    erfolgt in 14 Tagen", "Sie können mit PayPal zahlen", "Fällig am",
+  //    "Zahlungsziel: 14 Tage netto", oder generell Zahlungs-AUFFORDERUNGEN.
+  // Im Zweifel false setzen. NJ kann manuell nachsetzen.
+  bezahlt_bereits: z.boolean(),
+  zahlungsmethode: z.enum([
+    "paypal",
+    "vorkasse",
+    "kreditkarte",
+    "lastschrift",
+    "klarna",
+    "stripe",
+    "sofort",
+    "ueberweisung",
+    "andere",
+  ]).nullable(),
 });
 
 export interface DokumentAnalyse {
@@ -99,6 +120,9 @@ export interface DokumentAnalyse {
   // 17.05.2026 — Siehe Schema-Kommentar oben. Default false (KI nullable
   // erforderlich aber Default-Verhalten ist "keine Gutschrift").
   ist_gutschrift?: boolean;
+  // 03.06.2026 — Bezahlt-bereits via PayPal/Vorkasse/etc. Default false.
+  bezahlt_bereits?: boolean;
+  zahlungsmethode?: "paypal" | "vorkasse" | "kreditkarte" | "lastschrift" | "klarna" | "stripe" | "sofort" | "ueberweisung" | "andere" | null;
 }
 
 // F4.3: AbgleichErgebnis-Schema für Structured Outputs.
@@ -323,7 +347,9 @@ Gib folgende Struktur zurück:
   "besteller_im_dokument": "Tschon,Marlon",
   "projekt_referenz": "BV: Glögler, Prinzenstr. 42",
   "bestelldatum": "2026-04-16",
-  "ist_gutschrift": false
+  "ist_gutschrift": false,
+  "bezahlt_bereits": false,
+  "zahlungsmethode": null
 }
 
 Extrahiere auch:
@@ -370,6 +396,58 @@ Wenn ist_gutschrift = true:
   • Die Soll/Haben-Logik macht die Buchhaltungs-Software, nicht du
 
 Default: ist_gutschrift = false. Setze nur true wenn EINDEUTIGES Signal vorhanden.
+
+═══════════════════════════════════════════════════════════════════════════
+💳 BEREITS-BEZAHLT-DETECTION (PayPal & Co.) — KRITISCH für Buchhaltung
+═══════════════════════════════════════════════════════════════════════════
+
+Setze "bezahlt_bereits": true NUR wenn das Dokument EINDEUTIG bestätigt, dass
+die Rechnung bereits beglichen wurde. Damit spart Nada (Buchhaltung) sich
+manuelle Klicks und falsche Mahnungen werden verhindert.
+
+✅ ERLAUBTE EINDEUTIGE Trigger-Formulierungen (mindestens EINE → bezahlt_bereits = true):
+  ✓ "Mit PayPal bezahlt"
+  ✓ "Bereits mit PayPal bezahlt"
+  ✓ "PayPal-Zahlung abgeschlossen"
+  ✓ "Zahlung per PayPal erhalten"
+  ✓ "Zahlungseingang via PayPal verbucht"
+  ✓ "Betrag dankend erhalten"
+  ✓ "Diese Rechnung wurde bereits bezahlt"
+  ✓ "Bereits bezahlt am DD.MM.YYYY"
+  ✓ "Zahlung eingegangen am DD.MM.YYYY"
+  ✓ "Vielen Dank für Ihre Zahlung"
+  ✓ "Vorkasse erhalten" / "Vorauszahlung erhalten"
+  ✓ "Lastschrift wurde eingezogen"
+  ✓ "PayPal Transaction ID: ..." (klare Belegung dass die Transaktion durch ist)
+
+❌ KEINE Trigger — bei diesen Formulierungen UNBEDINGT bezahlt_bereits = false:
+  ✗ "Zahlbar per PayPal innerhalb 14 Tagen"
+  ✗ "Sie können mit PayPal zahlen"
+  ✗ "Bitte überweisen Sie auf folgendes Konto"
+  ✗ "Zahlungsziel: 14 Tage netto"
+  ✗ "Fällig am DD.MM.YYYY"
+  ✗ "Bankeinzug erfolgt in den nächsten Tagen"
+  ✗ "Sofort-Überweisung möglich"
+  ✗ "Bei Fragen zur Zahlung..."
+  ✗ Generelle Erwähnung von Zahlungs-OPTIONEN (Auswahl, nicht Vollzug)
+
+"zahlungsmethode" (eines der Enum-Werte oder null):
+  • "paypal"        — PayPal explizit als Zahlungsmittel genannt
+  • "vorkasse"      — "Vorkasse erhalten", Pre-Payment-Receipt
+  • "kreditkarte"   — Kartenabrechnung, "Kreditkarte belastet"
+  • "lastschrift"   — SEPA-Lastschrift eingezogen
+  • "klarna"        — Klarna-Zahlung abgeschlossen
+  • "stripe"        — Stripe-Transaktion verbucht
+  • "sofort"        — Sofortüberweisung erhalten
+  • "ueberweisung"  — Banküberweisung eingegangen
+  • "andere"        — eindeutig bezahlt aber Methode unklar
+  • null            — bezahlt_bereits=false ODER nicht erkennbar
+
+Wenn bezahlt_bereits = true UND zahlungsmethode = null, im Zweifel "andere".
+Wenn auch nur ein KLEINER Zweifel besteht: bezahlt_bereits = false. NJ kann
+manuell nachträglich auf "bezahlt" setzen.
+
+Default: bezahlt_bereits = false, zahlungsmethode = null.
 
 Falls ein Feld nicht erkennbar ist, setze null.
 

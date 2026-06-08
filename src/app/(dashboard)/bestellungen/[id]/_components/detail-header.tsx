@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/icons";
 import { OwnerStatement, type BestellerOption } from "./owner-statement";
 import type { Bestellung, ProjektOption } from "./types";
+import { shouldShowMahnung, effectiveMahnungCount } from "@/lib/mahnung-display";
 
 /**
  * DetailHeader (UX-R3, 03.06.2026) — editoriale Akte für die Bestelldetail-Page.
@@ -75,12 +76,12 @@ export function DetailHeader({
     : undefined;
 
   const hd = haendlerDisplay(bestellung.haendler_name);
-  const hasMahnung = !!bestellung.mahnung_am;
+  // 03.06.2026 — Mahnung-Display via lib/mahnung-display Helper (defensive Regeln).
+  const hasMahnung = shouldShowMahnung(bestellung);
+  const mahnungCountUI = effectiveMahnungCount(bestellung);
   const mahnungLabel = hasMahnung
     ? `Mahnung${
-        bestellung.mahnung_count && bestellung.mahnung_count > 1
-          ? ` ${bestellung.mahnung_count}. Stufe`
-          : ""
+        mahnungCountUI > 1 ? ` ${mahnungCountUI}. Stufe` : ""
       } — ${new Date(bestellung.mahnung_am!).toLocaleDateString("de-DE")}`
     : null;
 

@@ -39,8 +39,10 @@ import type { Bestellung, ProjektOption } from "@/components/bestellungen/types"
 
 export const HARD_CAP = 500;
 
+// 03.06.2026 — bezahlt_am/bezahlt_von für PayPal-Badge + Mahnung-Logik.
+// dokumente(bezahlt_bereits, zahlungsmethode) für embedded PayPal-Detection.
 const BESTELLUNG_SELECT =
-  "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, updated_at, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer)";
+  "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, bezahlt_am, bezahlt_von, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, updated_at, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, bezahlt_bereits, zahlungsmethode, typ)";
 
 export interface LaneLoadParams {
   lane: Lane;
@@ -344,27 +346,47 @@ export async function loadLaneData(
     scoreSettingsQuery,
   ]);
 
-  // Doku-Nummern-Aufbereitung (gleicher Pattern wie alte page.tsx)
+  // Doku-Nummern + PayPal-Detection-Aggregation
+  type DokuRow = {
+    bestellnummer_erkannt: string | null;
+    auftragsnummer: string | null;
+    lieferscheinnummer: string | null;
+    bezahlt_bereits?: boolean | null;
+    zahlungsmethode?: string | null;
+    typ?: string | null;
+  };
   type BestellungMitDokus = {
     id: string;
-    dokumente?: Array<{
-      bestellnummer_erkannt: string | null;
-      auftragsnummer: string | null;
-      lieferscheinnummer: string | null;
-    }> | null;
+    dokumente?: DokuRow[] | null;
   } & Record<string, unknown>;
 
   const bestellungenAngereichert = ((bestellungenRaw || []) as BestellungMitDokus[]).map(
     (b) => {
       const dokuNummern: string[] = [];
+      // 03.06.2026 — PayPal-Detection auf Bestellungs-Ebene aggregieren.
+      // Eine Bestellung ist "bezahlt_bereits", wenn IRGENDEINE Rechnung der
+      // Bestellung ein KI-erkanntes Bezahlt-Signal trägt. Wenn mehrere
+      // Methoden gemischt sind: erste-wins (in der Praxis hat eine
+      // Bestellung max. eine Zahlungsmethode).
+      let bezahlt_bereits: boolean | null = null;
+      let zahlungsmethode: string | null = null;
       for (const d of b.dokumente || []) {
         if (d.bestellnummer_erkannt) dokuNummern.push(d.bestellnummer_erkannt);
         if (d.auftragsnummer) dokuNummern.push(d.auftragsnummer);
         if (d.lieferscheinnummer) dokuNummern.push(d.lieferscheinnummer);
+        if (d.typ === "rechnung" && d.bezahlt_bereits === true && !bezahlt_bereits) {
+          bezahlt_bereits = true;
+          zahlungsmethode = d.zahlungsmethode ?? "andere";
+        }
       }
       const { dokumente: _drop, ...rest } = b;
       void _drop;
-      return { ...rest, doku_nummern: dokuNummern };
+      return {
+        ...rest,
+        doku_nummern: dokuNummern,
+        bezahlt_bereits,
+        zahlungsmethode,
+      };
     },
   );
 

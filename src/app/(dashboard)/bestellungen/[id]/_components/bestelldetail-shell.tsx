@@ -115,6 +115,15 @@ export function BestelldetailShell({
       profil.kuerzel === bestellung.besteller_kuerzel ||
       istSuOderAbo);
 
+  // 03.06.2026 — PayPal-/Bereits-bezahlt-Detection aggregiert aus dokumente.
+  // Wenn IRGENDEINE Rechnung der Bestellung von der KI als bereits bezahlt
+  // erkannt wurde → ApprovalPanel zeigt den Status-Banner + Sidebar-Badge.
+  const bezahltBereitsDoku = dokumente.find(
+    (d) => d.typ === "rechnung" && d.bezahlt_bereits === true,
+  );
+  const bezahltBereits = !!bezahltBereitsDoku;
+  const zahlungsmethode = bezahltBereitsDoku?.zahlungsmethode ?? null;
+
   return (
     <>
       {bd.actionError && (
@@ -164,6 +173,8 @@ export function BestelldetailShell({
               onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
               onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
               onMahnungQuittieren={bd.handleMahnungQuittieren}
+              bezahltBereits={bezahltBereits}
+              zahlungsmethode={zahlungsmethode}
             />
           </SidebarBlock>
 
@@ -329,6 +340,8 @@ export function BestelldetailShell({
                 onOpenFreigabeDialog={() => bd.setShowFreigabeDialog(true)}
                 onOpenVerwerfenDialog={() => bd.setShowVerwerfenDialog(true)}
                 onMahnungQuittieren={bd.handleMahnungQuittieren}
+                bezahltBereits={bezahltBereits}
+                zahlungsmethode={zahlungsmethode}
                 variant="mobile"
               />
             </SidebarBlock>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/cn";
 import { IconCheck, IconTrash } from "@/components/ui/icons";
+import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
 import type { Bestellung, Freigabe } from "./types";
 import type { BenutzerProfil } from "@/lib/auth";
 
@@ -38,6 +39,8 @@ export function ApprovalPanel({
   onOpenFreigabeDialog,
   onOpenVerwerfenDialog,
   onMahnungQuittieren,
+  bezahltBereits,
+  zahlungsmethode,
   variant = "sidebar",
 }: {
   bestellung: Bestellung;
@@ -51,6 +54,10 @@ export function ApprovalPanel({
   onOpenFreigabeDialog: () => void;
   onOpenVerwerfenDialog: () => void;
   onMahnungQuittieren: () => void;
+  /** 03.06.2026 — Aggregiert aus dokumente[] vom Shell. */
+  bezahltBereits?: boolean | null;
+  /** 03.06.2026 — Aggregiert aus dokumente[] vom Shell. */
+  zahlungsmethode?: string | null;
   variant?: "sidebar" | "mobile" | "mobile-bar";
 }) {
   const istGutschrift = bestellung.ist_gutschrift === true;
@@ -85,6 +92,27 @@ export function ApprovalPanel({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 03.06.2026 — PayPal-/Bereits-bezahlt-Marker oben. Sofort sichtbar
+          damit klar ist: KI hat erkannt dass diese Rechnung bereits beglichen
+          ist, NJ muss nichts mehr klicken. */}
+      {bezahltBereits && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-line-subtle bg-canvas">
+          <PayPalBadge
+            bezahltBereits={true}
+            zahlungsmethode={zahlungsmethode ?? null}
+            size="md"
+          />
+          <div className="flex flex-col">
+            <span className="text-meta font-semibold text-foreground">
+              {zahlungsmethode === "paypal" ? "PayPal bezahlt" : "Bereits bezahlt"}
+            </span>
+            <span className="text-eyebrow uppercase tracking-[0.14em] text-foreground-subtle">
+              Auto-erkannt aus Rechnung
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Gutschrift-Info-Banner — ersetzt den Freigabe-CTA */}
       {istGutschrift && !freigabe && (
         <Card padding="md" className="bg-success-bg border-success-border">

@@ -43,6 +43,7 @@ import { usePoolSeenTracker } from "@/lib/hooks/use-pool-seen-tracker";
 import { usePoolReservationsRealtime, type ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
 import { cn } from "@/lib/cn";
 import type { Bestellung } from "./types";
+import { shouldShowMahnung, effectiveMahnungCount } from "@/lib/mahnung-display";
 
 export interface PoolInboxProps {
   bestellungen: Bestellung[];
@@ -232,9 +233,11 @@ function PoolInboxCard({
   const wash = agingWashFromCreatedAt(b.created_at);
   const isOwnReserve = reservation?.user_kuerzel === selfKuerzel;
   const showOtherReserve = !!reservation && !isOwnReserve;
-  const hasMahnung = !!b.mahnung_am;
+  // 03.06.2026 — Mahnung-Display via lib/mahnung-display (Single-Source-of-Truth).
+  const hasMahnung = shouldShowMahnung(b);
+  const mahnungCountUI = effectiveMahnungCount(b);
   const mahnungLabel = hasMahnung
-    ? `Mahnung${b.mahnung_count && b.mahnung_count > 1 ? ` ${b.mahnung_count}. Stufe` : ""}${b.mahnung_am ? ` seit ${describeAge(ageInDays(b.mahnung_am))}` : ""}`
+    ? `Mahnung${mahnungCountUI > 1 ? ` ${mahnungCountUI}. Stufe` : ""}${b.mahnung_am ? ` seit ${describeAge(ageInDays(b.mahnung_am))}` : ""}`
     : null;
 
   const menuItems: ActionMenuItem[] = [

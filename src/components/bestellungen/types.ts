@@ -49,6 +49,15 @@ export interface Bestellung {
   haendler_id?: string | null;
   zuordnung_methode?: string | null;
   updated_at?: string | null;
+  // 03.06.2026 — Bezahl-Status auf Bestellungs-Ebene.
+  bezahlt_am?: string | null;
+  bezahlt_von?: string | null;
+  // 03.06.2026 — PayPal/Bereits-bezahlt-Detection (aggregiert aus dokumente).
+  // bezahlt_bereits=true wenn IRGENDEINE Rechnung der Bestellung von der KI
+  // eindeutig als "bereits bezahlt" erkannt wurde. zahlungsmethode = die
+  // erkannte Methode ("paypal", "vorkasse", ...) oder null.
+  bezahlt_bereits?: boolean | null;
+  zahlungsmethode?: string | null;
 }
 
 export interface ProjektOption {

@@ -627,6 +627,7 @@ export type Database = {
           bestellnummer_erkannt: string | null
           bestellung_id: string | null
           bezahlt_am: string | null
+          bezahlt_bereits: boolean | null
           bezahlt_von: string | null
           content_hash: string | null
           created_at: string
@@ -648,6 +649,7 @@ export type Database = {
           quelle: string
           storage_pfad: string | null
           typ: string
+          zahlungsmethode: string | null
         }
         Insert: {
           archiviert_am?: string | null
@@ -658,6 +660,7 @@ export type Database = {
           bestellnummer_erkannt?: string | null
           bestellung_id?: string | null
           bezahlt_am?: string | null
+          bezahlt_bereits?: boolean | null
           bezahlt_von?: string | null
           content_hash?: string | null
           created_at?: string
@@ -679,6 +682,7 @@ export type Database = {
           quelle: string
           storage_pfad?: string | null
           typ: string
+          zahlungsmethode?: string | null
         }
         Update: {
           archiviert_am?: string | null
@@ -689,6 +693,7 @@ export type Database = {
           bestellnummer_erkannt?: string | null
           bestellung_id?: string | null
           bezahlt_am?: string | null
+          bezahlt_bereits?: boolean | null
           bezahlt_von?: string | null
           content_hash?: string | null
           created_at?: string
@@ -710,6 +715,7 @@ export type Database = {
           quelle?: string
           storage_pfad?: string | null
           typ?: string
+          zahlungsmethode?: string | null
         }
         Relationships: [
           {

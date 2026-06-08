@@ -190,7 +190,7 @@ export async function persistAnhangDokumente(
     // Vorher: direkter INSERT → bei content_hash-Konflikt (Race-Condition,
     // Doppel-Webhook) gab's Unique-Constraint-Error. Jetzt: RPC macht
     // Pre-Check + idempotenter Return des existierenden doku_id.
-    const { error: insertError } = await supabase.rpc("persist_dokument_atomic", {
+    const { data: insertedDokuId, error: insertError } = await supabase.rpc("persist_dokument_atomic", {
       p_bestellung_id: bestellungId,
       p_typ: analyse.typ,
       p_quelle: "email",
@@ -225,6 +225,48 @@ export async function persistAnhangDokumente(
         fehler_text: `Dokument-Insert fehlgeschlagen: pfad="${storagePfad}", fehler="${insertError.message}"`,
       });
       continue;
+    }
+
+    // 03.06.2026 — PayPal-/Bereits-bezahlt-Detection durchschreiben.
+    // RPC persist_dokument_atomic hat (Stand 03.06.2026) diese Spalten noch
+    // NICHT als Parameter. Wir machen einen Folge-UPDATE auf das frisch
+    // inserted-Dokument. Defensive: try/catch + warn-Log, damit ein
+    // Schema-Mismatch (z.B. Migration noch nicht ausgeführt) nicht die
+    // gesamte Pipeline killt — die Bezahlt-Auto-Erkennung ist ein
+    // optionales Komfort-Feature, kein Pflicht-Pfad.
+    if (
+      analyse.typ === "rechnung" &&
+      analyse.bezahlt_bereits === true &&
+      insertedDokuId
+    ) {
+      try {
+        const { error: updateError } = await supabase
+          .from("dokumente")
+          .update({
+            bezahlt_bereits: true,
+            zahlungsmethode: analyse.zahlungsmethode ?? "andere",
+          })
+          .eq("id", insertedDokuId as string);
+
+        if (updateError) {
+          // Migration noch nicht durch? Spalten fehlen? → silent warn, kein abort.
+          logInfo(
+            "webhook/email",
+            "PayPal-Detection-Update übersprungen (Spalten evtl. nicht da)",
+            { dokuId: insertedDokuId, err: updateError.message },
+          );
+        } else {
+          logInfo("webhook/email", "Rechnung als bereits bezahlt markiert", {
+            dokuId: insertedDokuId,
+            zahlungsmethode: analyse.zahlungsmethode ?? "andere",
+          });
+        }
+      } catch (err) {
+        logInfo("webhook/email", "PayPal-Detection-Update Exception", {
+          dokuId: insertedDokuId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     await applyAnalyseToBestellung(supabase, bestellungId, analyse);

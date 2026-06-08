@@ -74,7 +74,7 @@ export function VendorFavicon({
         {initial}
       </span>
       {domain ? (
-        // eslint-disable-next-line @next/next/no-img-element -- s2 ist extern + CDN-cached, wir wollen kein next/image-Optimierungs-Loop
+        // Native <img> bewusst — s2 ist extern + CDN-cached, kein next/image-Optimierungs-Loop.
         <img
           src={getFaviconUrl(domain)}
           alt={altText}

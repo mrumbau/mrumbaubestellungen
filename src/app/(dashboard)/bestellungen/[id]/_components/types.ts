@@ -34,6 +34,11 @@ export type Dokument = {
   ist_gutschrift: boolean | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ki_roh_daten: Record<string, any> | null;
+  // 03.06.2026 — Bezahl-Status + KI-Detection auf Rechnungs-Dokument.
+  bezahlt_am?: string | null;
+  bezahlt_von?: string | null;
+  bezahlt_bereits?: boolean | null;
+  zahlungsmethode?: string | null;
 };
 
 export type Abgleich = {
@@ -137,6 +142,11 @@ export type Bestellung = {
   // UNBEKANNT ist. Beide bleiben auch nach Claim erhalten (Audit-Provenance).
   vorschlag_kuerzel?: string | null;
   vorschlag_konfidenz?: number | null;
+  // 03.06.2026 — Bezahl-Status + KI-erkannte Zahlungsmethode.
+  bezahlt_am?: string | null;
+  bezahlt_von?: string | null;
+  bezahlt_bereits?: boolean | null;
+  zahlungsmethode?: string | null;
 };
 
 export type ProjektStats = {

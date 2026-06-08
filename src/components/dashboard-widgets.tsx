@@ -810,7 +810,10 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
-                  {m.mahnung_count && m.mahnung_count > 1 && <span className="text-[10px] font-bold text-error">{m.mahnung_count}.</span>}
+                  {/* 03.06.2026 — Defensive: nur 1-10 als Mahnung-Stufe rendern. */}
+                  {m.mahnung_count && m.mahnung_count > 1 && m.mahnung_count <= 10 && (
+                    <span className="text-[10px] font-bold text-error">{m.mahnung_count}.</span>
+                  )}
                   <span className="text-[10px] text-error">{new Date(m.mahnung_am).toLocaleDateString("de-DE")}</span>
                 </span>
               </a>

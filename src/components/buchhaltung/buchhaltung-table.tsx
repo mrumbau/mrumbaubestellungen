@@ -11,6 +11,7 @@
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import { type BuchhaltungRow, isFaelligBald, isUeberfaellig } from "./types";
+import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
 
 export interface BuchhaltungTableProps {
   paginatedRows: BuchhaltungRow[];
@@ -131,7 +132,7 @@ export function BuchhaltungTable({
                 <td className="px-4 py-3.5">
                   <span className="font-mono-amount font-semibold text-brand">
                     {r.bestellnummer || "–"}
-                    {r.mahnung_am && (
+                    {shouldShowMahnung(r) && r.mahnung_am && (
                       <span
                         className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold"
                         title={`Mahnung eingegangen am ${new Date(r.mahnung_am).toLocaleDateString("de-DE")}`}
@@ -154,9 +155,7 @@ export function BuchhaltungTable({
                             d="M12 15.75h.007v.008H12v-.008z"
                           />
                         </svg>
-                        {r.mahnung_count && r.mahnung_count > 1
-                          ? `${r.mahnung_count}. Mahnung`
-                          : "Mahnung"}
+                        {mahnungStufeLabel(r)}
                       </span>
                     )}
                   </span>

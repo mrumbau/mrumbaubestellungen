@@ -28,10 +28,12 @@ import { haendlerDisplay } from "@/lib/haendler-display";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
 import { StatusCell } from "@/components/ui/cells/status-cell";
+import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { Badge, type DataTableColumn } from "@/components/ui";
 import { IconCheck, IconAlertCircle } from "@/components/ui/icons";
 import type { Bestellung } from "./types";
+import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
 
 export interface UseBestellungColumnsOptions {
   projektFarbenMap: Map<string, string>;
@@ -77,15 +79,13 @@ export function useBestellungColumns({
                 title={displayBestellnummer(b)}
               >
                 <span className="truncate">{displayBestellnummer(b)}</span>
-                {b.mahnung_am && (
+                {shouldShowMahnung(b) && b.mahnung_am && (
                   <span
                     className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-error-bg text-error text-[10px] font-semibold shrink-0"
                     title={`Mahnung eingegangen am ${new Date(b.mahnung_am).toLocaleDateString("de-DE")}`}
                   >
                     <IconAlertCircle className="w-3 h-3" />
-                    {b.mahnung_count && b.mahnung_count > 1
-                      ? `${b.mahnung_count}. Mahnung`
-                      : "Mahnung"}
+                    {mahnungStufeLabel(b)}
                   </span>
                 )}
               </Link>
@@ -199,7 +199,15 @@ export function useBestellungColumns({
         key: "status",
         label: "Status",
         sortable: true,
-        render: (b) => <StatusCell status={b.status} istGutschrift={b.ist_gutschrift} />,
+        render: (b) => (
+          <div className="flex items-center gap-1.5">
+            <StatusCell status={b.status} istGutschrift={b.ist_gutschrift} />
+            <PayPalBadge
+              bezahltBereits={b.bezahlt_bereits}
+              zahlungsmethode={b.zahlungsmethode}
+            />
+          </div>
+        ),
       },
       {
         key: "betrag",

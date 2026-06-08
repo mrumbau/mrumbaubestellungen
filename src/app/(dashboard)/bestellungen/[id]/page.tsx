@@ -53,7 +53,7 @@ export default async function BestellungDetailPage({
     supabase
       .from("dokumente")
       .select(
-        "id, typ, quelle, storage_pfad, email_betreff, email_absender, ki_roh_daten, bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, artikel, gesamtbetrag, netto, mwst, faelligkeitsdatum, lieferdatum, bestelldatum, kundennummer, besteller_im_dokument, projekt_referenz, iban, ist_gutschrift, created_at",
+        "id, typ, quelle, storage_pfad, email_betreff, email_absender, ki_roh_daten, bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, artikel, gesamtbetrag, netto, mwst, faelligkeitsdatum, lieferdatum, bestelldatum, kundennummer, besteller_im_dokument, projekt_referenz, iban, ist_gutschrift, bezahlt_am, bezahlt_von, bezahlt_bereits, zahlungsmethode, created_at",
       )
       .eq("bestellung_id", id)
       .order("created_at", { ascending: true }),
