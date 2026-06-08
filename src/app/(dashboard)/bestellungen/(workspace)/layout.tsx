@@ -3,7 +3,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { PageHero } from "@/components/ui/page-hero";
 import { LaneNav } from "@/components/bestellungen/lane-nav";
 import { CmdKSearchTrigger } from "@/components/bestellungen/cmdk-search";
-import { loadLaneData } from "@/lib/bestellungen-lane-loader";
+import { loadLaneDataSafe } from "@/lib/bestellungen-lane-loader";
 
 // 03.06.2026 — Edge-Runtime auskommentiert nach Pool-Lane-Crash auf Production.
 // Sub-Queries (vw_user_*_affinity, firma_einstellungen) hatten möglicherweise
@@ -41,21 +41,10 @@ export default async function BestellungenWorkspaceLayout({
   const profil = await getBenutzerProfil();
   const supabase = await createServerSupabaseClient();
 
-  // 03.06.2026 — Defensive: bei Lane-Loader-Crash bleibt das Layout funktional,
-  // die Lane-Pages selbst werfen ggf. einen sichtbaren Error. So sehen wir
-  // LaneNav + PageHero auch wenn der counts-Query fehlschlägt.
-  let counts: { pool: number; "in-arbeit": number; archiv: number } = {
-    pool: 0,
-    "in-arbeit": 0,
-    archiv: 0,
-  };
-  try {
-    const data = await loadLaneData(supabase, { lane: "pool" }, profil);
-    counts = data.counts;
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error("[workspace/layout] loadLaneData failed for counts:", err);
-  }
+  // 03.06.2026 — `loadLaneDataSafe` wirft NIE, gibt im Crash-Case einen
+  // emptyLaneResult zurück. Layout + LaneNav (mit 0-counts) bleiben sichtbar.
+  const data = await loadLaneDataSafe(supabase, { lane: "pool" }, profil);
+  const counts = data.counts;
 
   return (
     <div className="flex flex-col gap-6">

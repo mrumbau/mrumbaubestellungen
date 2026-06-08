@@ -65,12 +65,14 @@ export function LaneWorkspace({
   // Pool-Chip-Count = nur material-Bestellungen aktuell in der Lane.
   // Für In-Arbeit/Archiv: pro Bestellungsart zählen über die geladenen
   // Bestellungen (Server hat schon nach Lane gefiltert).
+  // 03.06.2026 — Defensive: data.bestellungen kann in disaster cases leer
+  // sein. `?? []` schützt vor TypeError "not iterable".
   const chipCounts: Record<Bestellungsart, number> = {
     material: 0,
     subunternehmer: 0,
     abo: 0,
   };
-  for (const b of data.bestellungen) {
+  for (const b of data.bestellungen ?? []) {
     const art = (b.bestellungsart || "material") as Bestellungsart;
     if (art in chipCounts) chipCounts[art]++;
   }
@@ -85,10 +87,10 @@ export function LaneWorkspace({
       <ArtFilterChips counts={chipCounts} visibleArten={visibleArten} />
 
       <BestellungenTabelle
-        bestellungen={data.bestellungen}
-        projekte={data.projekte}
+        bestellungen={data.bestellungen ?? []}
+        projekte={data.projekte ?? []}
         aktiverProjektFilter={projektId || null}
-        aktiverProjektName={data.aktiverProjektName}
+        aktiverProjektName={data.aktiverProjektName ?? null}
         isAdmin={isAdmin}
         scope={scope}
         profil={
@@ -96,17 +98,17 @@ export function LaneWorkspace({
             ? { kuerzel: profil.kuerzel, rolle: profil.rolle, name: profil.name }
             : null
         }
-        bestellerOptions={data.bestellerOptions}
+        bestellerOptions={data.bestellerOptions ?? []}
         poolLayout={poolLayout}
-        poolUserStateById={data.poolUserStateById}
-        poolReservationsById={data.poolReservationsById}
-        vendorDomainById={data.vendorDomainById}
-        haendlerIdByBestellungId={data.haendlerIdByBestellungId}
-        isAutoClaimedById={data.isAutoClaimedById}
+        poolUserStateById={data.poolUserStateById ?? {}}
+        poolReservationsById={data.poolReservationsById ?? {}}
+        vendorDomainById={data.vendorDomainById ?? {}}
+        haendlerIdByBestellungId={data.haendlerIdByBestellungId ?? {}}
+        isAutoClaimedById={data.isAutoClaimedById ?? {}}
         scoreWeights={data.scoreWeights}
-        vendorAffinity={data.vendorAffinity}
-        projektAffinity={data.projektAffinity}
-        scoreTopXThreshold={data.scoreTopXThreshold}
+        vendorAffinity={data.vendorAffinity ?? {}}
+        projektAffinity={data.projektAffinity ?? {}}
+        scoreTopXThreshold={data.scoreTopXThreshold ?? 0.8}
         embedded
       />
     </div>

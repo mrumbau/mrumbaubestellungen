@@ -141,6 +141,52 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
   return query;
 }
 
+/**
+ * Empty/safe Default-Result wenn loadLaneData ausnahmsweise crasht. Damit
+ * können die Lane-Pages auch in Disaster-Cases die Lane-Struktur (LaneNav,
+ * PageHero, Empty-State) zeigen, statt die ganze Page auf error.tsx zu
+ * eskalieren.
+ */
+export function emptyLaneResult(): LaneLoadResult {
+  return {
+    bestellungen: [],
+    projekte: [],
+    bestellerOptions: [],
+    counts: { pool: 0, "in-arbeit": 0, archiv: 0 },
+    reachedCap: false,
+    total: 0,
+    aktiverProjektName: null,
+    poolUserStateById: {},
+    poolReservationsById: {},
+    vendorDomainById: {},
+    haendlerIdByBestellungId: {},
+    isAutoClaimedById: {},
+    scoreWeights: undefined,
+    vendorAffinity: {},
+    projektAffinity: {},
+    scoreTopXThreshold: 0.8,
+  };
+}
+
+/**
+ * Top-level safe Variant von loadLaneData. Verwende diese in Layouts/Pages
+ * — sie fängt jeden Throw der Hauptqueries und gibt einen sauberen
+ * Empty-Result statt rejected Promise zurück.
+ */
+export async function loadLaneDataSafe(
+  supabase: SupabaseClient,
+  params: LaneLoadParams,
+  profil: UserProfil | null,
+): Promise<LaneLoadResult> {
+  try {
+    return await loadLaneData(supabase, params, profil);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[loadLaneDataSafe] crash in loadLaneData:", err);
+    return emptyLaneResult();
+  }
+}
+
 export async function loadLaneData(
   supabase: SupabaseClient,
   params: LaneLoadParams,
