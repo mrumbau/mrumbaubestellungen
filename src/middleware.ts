@@ -4,6 +4,12 @@ import { computeDashboardEnabled } from "@/lib/auth";
 
 const PUBLIC_PATHS = [
   "/login",
+  // 08.06.2026 — Self-Service-Passwort-Reset für alle Rollen.
+  // Beide Pages müssen ohne aktive Session erreichbar sein. /passwort-neu
+  // bekommt vom Recovery-Mail-Link einen kurzlebigen Auth-Token in der URL
+  // mitgeliefert und tauscht ihn dort in eine Recovery-Session ein.
+  "/passwort-vergessen",
+  "/passwort-neu",
   "/api/webhook",
   "/api/cron",
   "/api/health",

@@ -21,6 +21,7 @@
  */
 
 import { useState, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { Logo } from "@/components/logo";
@@ -410,6 +411,18 @@ function LoginForm() {
                     className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-[900ms] ease-fluid bg-gradient-to-r from-transparent via-white/12 to-transparent"
                   />
                 </button>
+
+                {/* 08.06.2026 — Passwort-vergessen-Link für Self-Service-Reset
+                    aller Rollen. Bewusst klein und subtil unter dem CTA — kein
+                    visueller Wettbewerb mit dem Anmelden-Button. */}
+                <div className="text-center">
+                  <Link
+                    href="/passwort-vergessen"
+                    className="text-[12px] text-foreground-subtle hover:text-foreground transition-colors duration-200 ease-fluid underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] rounded"
+                  >
+                    Passwort vergessen?
+                  </Link>
+                </div>
               </form>
             </div>
           </div>
