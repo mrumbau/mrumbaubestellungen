@@ -169,14 +169,19 @@ describe("POST /api/email-sync/folders/:id/backfill", () => {
     expect(res.status).toBe(403);
   });
 
-  it("403 für Nicht-Admin (Besteller)", async () => {
+  it("Besteller darf Backfill triggern (Firmeninhaber MT/CR-Pfad)", async () => {
     mockGetProfil.mockResolvedValue(TEST_PROFIL.besteller_MT);
+    mockListMessages.mockReturnValue(asyncGen([[]]));
+    const service = makeServiceClient({ existingLogs: [] });
+    mockCreateServerClient.mockReturnValue(service);
+    mockCreateServiceClient.mockReturnValue(service);
+
     const { POST } = await import("../route");
-    const res = await POST(makeRequest({ days: 7 }), makeContext());
-    expect(res.status).toBe(403);
+    const res = await POST(makeRequest({ days: 7, dryRun: true }), makeContext());
+    expect(res.status).toBe(200);
   });
 
-  it("403 für Buchhaltung", async () => {
+  it("403 für Buchhaltung (NJ — Sync ist nicht ihre Domäne)", async () => {
     mockGetProfil.mockResolvedValue(TEST_PROFIL.buchhaltung);
     const { POST } = await import("../route");
     const res = await POST(makeRequest({ days: 7 }), makeContext());

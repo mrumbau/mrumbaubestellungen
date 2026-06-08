@@ -17,7 +17,10 @@
  *   }
  *
  * Sicherheit:
- *   - Admin-only (rolle='admin')
+ *   - Admin oder Besteller (Buchhaltung ausgeschlossen — Sync ist nicht
+ *     ihre Domäne). 08.06.2026: Besteller-Zugriff geöffnet weil die
+ *     Firmeninhaber (MT, CR) den Backfill für ihren Posteingang triggern
+ *     können müssen. NJ (Buchhaltung) hat keinen Grund für Sync-Power.
  *   - CSRF-Check (gleiche Origin)
  *   - Maximaler Zeitraum 90 Tage
  *   - dryRun=true verändert NICHTS in der DB
@@ -99,9 +102,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: ERRORS.UNGUELTIGER_URSPRUNG }, { status: 403 });
   }
 
-  // 2. Auth: Admin-only
+  // 2. Auth: Admin + Besteller dürfen Backfill triggern.
+  // Buchhaltung explizit nicht (nicht in ihrer Domäne).
   const profil = await getBenutzerProfil();
-  if (!requireRoles(profil, "admin")) {
+  if (!requireRoles(profil, "admin", "besteller")) {
     return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
   }
 
