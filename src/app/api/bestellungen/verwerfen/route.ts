@@ -169,11 +169,11 @@ export async function POST(request: NextRequest) {
     const failed: Array<{ id: string; reason: string }> = [];
 
     // Hilfsfunktion: cleant eine FK-Tabelle für genau eine bestellung_id.
-    // Loggt Warnings (nicht-fatal) — wenn die Tabelle gar nicht existiert
-    // (legacy bestellung_signale), wird der Fehler erfasst aber nicht
-    // weitergereicht. Bei "echtem" Block-Fehler (z.B. Permission) sammelt
-    // sich der Hinweis im Log und das spätere bestellungen-DELETE wird
-    // sowieso scheitern → Fehler-Pfad sauber.
+    // Spalten-Name ist parametrisiert weil die legacy bestellung_signale-
+    // Tabelle eine abweichend benannte FK-Spalte hat (matched_bestellung_id).
+    // Loggt Warnings (nicht-fatal) — bei "echtem" Block-Fehler (z.B.
+    // Permission) sammelt sich der Hinweis im Log und das spätere
+    // bestellungen-DELETE wird sowieso scheitern → Fehler-Pfad sauber.
     async function cleanupFkTable(
       table:
         | "webhook_logs"
@@ -182,10 +182,12 @@ export async function POST(request: NextRequest) {
         | "kommentare"
         | "dokumente"
         | "pool_reservations"
-        | "pool_user_state",
+        | "pool_user_state"
+        | "bestellung_signale",
       bestellungId: string,
+      column: "bestellung_id" | "matched_bestellung_id" = "bestellung_id",
     ): Promise<string | null> {
-      const { error } = await supabase.from(table).delete().eq("bestellung_id", bestellungId);
+      const { error } = await supabase.from(table).delete().eq(column, bestellungId);
       if (error) {
         // Tabelle fehlt evtl. (legacy) oder Permission. Nicht-fatal: wir
         // versuchen trotzdem den parent-DELETE; der zeigt den echten FK-Fail.
@@ -201,6 +203,11 @@ export async function POST(request: NextRequest) {
     for (const id of ids) {
       try {
         // 08.06.2026 — pool_reservations + pool_user_state ergänzt (Bug-Fix).
+        // bestellung_signale (Chrome-Ext-Legacy, stillgelegt 22.05.2026) hat
+        // die FK-Spalte matched_bestellung_id (NICHT bestellung_id) und blieb
+        // deshalb beim ersten Bug-Fix-Pass übersehen — Live-Fehler zeigte
+        // "bestellung_signale_matched_bestellung_id_fkey".
+        //
         // Reihenfolge ist defensive: wir cleanen alle FK-Tabellen vor dem
         // parent-DELETE. Wenn EINE dieser Tabellen failt, wird das im Log
         // sichtbar; das parent-DELETE selbst zeigt dann den echten Grund.
@@ -211,6 +218,7 @@ export async function POST(request: NextRequest) {
         await cleanupFkTable("abgleiche", id);
         await cleanupFkTable("kommentare", id);
         await cleanupFkTable("dokumente", id);
+        await cleanupFkTable("bestellung_signale", id, "matched_bestellung_id");
 
         // Defense-in-depth: Besteller-Filter auch im DELETE.
         // 12.05.2026: SU/Abo-Bypass eingebaut (analog Permission-Check oben).

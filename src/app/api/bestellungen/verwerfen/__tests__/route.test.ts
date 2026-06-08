@@ -75,6 +75,7 @@ function makeServiceClient(opts: ServiceOpts = {}) {
     abgleiche: 0,
     kommentare: 0,
     dokumente: 0,
+    bestellung_signale: 0,
   };
   const deletedBestellungenIds: string[] = [];
 
@@ -136,7 +137,8 @@ function makeServiceClient(opts: ServiceOpts = {}) {
       table === "abgleiche" ||
       table === "kommentare" ||
       table === "pool_reservations" ||
-      table === "pool_user_state"
+      table === "pool_user_state" ||
+      table === "bestellung_signale"
     ) {
       return {
         delete: () => ({
@@ -307,9 +309,12 @@ describe("POST /api/bestellungen/verwerfen", () => {
     expect(res.status).toBe(403);
   });
 
-  // 08.06.2026 (Bug-Fix) — pool_reservations + pool_user_state müssen IMMER
-  // gecleant werden vor dem parent-DELETE, sonst FK-Constraint-Violation.
-  it("FK-Cleanup: pool_reservations + pool_user_state werden pro ID gecleant", async () => {
+  // 08.06.2026 (Bug-Fix) — pool_reservations + pool_user_state +
+  // bestellung_signale müssen IMMER gecleant werden vor dem parent-DELETE,
+  // sonst FK-Constraint-Violation. bestellung_signale ist Chrome-Ext-Legacy
+  // (Tabelle existiert noch in der DB obwohl Modul stillgelegt) und hat
+  // die Sonder-Spalte matched_bestellung_id statt bestellung_id.
+  it("FK-Cleanup: pool_reservations + pool_user_state + bestellung_signale werden pro ID gecleant", async () => {
     mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.admin));
     const service = makeServiceClient({
       bestellungen: [
@@ -327,6 +332,7 @@ describe("POST /api/bestellungen/verwerfen", () => {
     expect(service.cleanupCounts.pool_user_state).toBe(3);
     expect(service.cleanupCounts.dokumente).toBe(3);
     expect(service.cleanupCounts.freigaben).toBe(3);
+    expect(service.cleanupCounts.bestellung_signale).toBe(3);
   });
 
   // Partial-Failure: 1 ID failt am parent-DELETE (z.B. FK-Constraint),
