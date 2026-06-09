@@ -62,7 +62,7 @@ export interface UserProfil {
 export interface LaneLoadResult {
   bestellungen: Bestellung[];
   projekte: ProjektOption[];
-  bestellerOptions: Array<{ kuerzel: string; name: string }>;
+  bestellerOptions: Array<{ kuerzel: string; name: string; rolle: string }>;
   counts: Record<Lane, number>;
   reachedCap: boolean;
   total: number;
@@ -398,10 +398,15 @@ export async function loadLaneData(
     ? projekte.find((p) => p.id === params.projektId)?.name || null
     : null;
 
+  // 09.06.2026 — rolle wird mit ausgeliefert, damit Dropdown-Helper in der UI
+  // Admin-Konten (z.B. MH = IT-Support) als Ziel-Optionen ausfiltern kann.
+  // Lane-Loader filtert weiterhin auf besteller+admin damit Detail-Page-
+  // Modals (OwnerStatement, KI-Vorschlag) den vollen Pool kennen.
   const bestellerOptions = ((bestellerRollenRaw || []) as Array<{
     kuerzel: string;
     name: string;
-  }>).map((b) => ({ kuerzel: b.kuerzel, name: b.name }));
+    rolle: string;
+  }>).map((b) => ({ kuerzel: b.kuerzel, name: b.name, rolle: b.rolle }));
 
   const counts: Record<Lane, number> = {
     pool: poolCount ?? 0,

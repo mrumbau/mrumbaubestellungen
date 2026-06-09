@@ -19,7 +19,16 @@
  * Pool-Scope). Cmd/Shift/Middle-Click navigiert zur Detail-Page via Link.
  */
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import {
+  buildZuordnungActionLabel,
+  buildZuordnungConfirmText,
+  type AssignableBestellerOption,
+} from "@/lib/zuordnung";
 import Link from "next/link";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
@@ -43,6 +52,7 @@ import { usePoolSeenTracker } from "@/lib/hooks/use-pool-seen-tracker";
 import { usePoolReservationsRealtime, type ReservationMap } from "@/lib/hooks/use-pool-reservations-realtime";
 import { cn } from "@/lib/cn";
 import type { Bestellung } from "./types";
+import { getAssignableBesteller } from "@/lib/zuordnung";
 import { shouldShowMahnung, effectiveMahnungCount } from "@/lib/mahnung-display";
 
 export interface PoolInboxProps {
@@ -81,6 +91,11 @@ export interface PoolInboxProps {
   onSnooze: (bestellungId: string, untilIso: string, label: string) => void;
   /** Defer-Toggle. */
   onDefer: (bestellungId: string, deferred: boolean) => void;
+  /**
+   * 09.06.2026 — Zuordnungs-Liste für das ActionMenu-„Zuordnen…"-Submenü
+   * jeder Pool-Card. Optional gehalten damit alte Caller weiterhin gehen.
+   */
+  alleBesteller?: Array<{ kuerzel: string; name: string; rolle?: string }>;
 }
 
 export function PoolInbox({
@@ -98,6 +113,7 @@ export function PoolInbox({
   onOpenDrawer,
   onSnooze,
   onDefer,
+  alleBesteller = [],
 }: PoolInboxProps) {
   const reservationMap = usePoolReservationsRealtime(initialReservations);
 
@@ -175,6 +191,7 @@ export function PoolInbox({
           onSnooze={onSnooze}
           onDefer={onDefer}
           snoozeOptions={snoozeOptions}
+          alleBesteller={alleBesteller}
         />
       ))}
       {sortedBestellungen.length === 0 && (
@@ -201,6 +218,8 @@ interface PoolInboxCardProps {
   onSnooze: (bestellungId: string, untilIso: string, label: string) => void;
   onDefer: (bestellungId: string, deferred: boolean) => void;
   snoozeOptions: ReadonlyArray<{ key: string; label: string; until: string }>;
+  /** 09.06.2026 — Besteller-Liste für Zuordnen-Submenü. */
+  alleBesteller: Array<{ kuerzel: string; name: string; rolle?: string }>;
 }
 
 function PoolInboxCard({
@@ -218,6 +237,7 @@ function PoolInboxCard({
   onSnooze,
   onDefer,
   snoozeOptions,
+  alleBesteller,
 }: PoolInboxCardProps) {
   const articleRef = useRef<HTMLElement | null>(null);
   const setArticleRef = useCallback(
@@ -240,7 +260,58 @@ function PoolInboxCard({
     ? `Mahnung${mahnungCountUI > 1 ? ` ${mahnungCountUI}. Stufe` : ""}${b.mahnung_am ? ` seit ${describeAge(ageInDays(b.mahnung_am))}` : ""}`
     : null;
 
+  // 09.06.2026 — Per-Card Zuordnungs-State.
+  const router = useRouter();
+  const { toast } = useToast();
+  const [confirmTarget, setConfirmTarget] = useState<AssignableBestellerOption | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const zuordnenOptions = useMemo(
+    () => getAssignableBesteller(alleBesteller, b.besteller_kuerzel ?? null, selfKuerzel),
+    [alleBesteller, b.besteller_kuerzel, selfKuerzel],
+  );
+
+  async function submitZuordnung(opt: AssignableBestellerOption) {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/bestellungen/zuordnen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bestellung_id: b.id,
+          besteller_kuerzel: opt.kuerzel,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.ok) {
+        toast.success(
+          opt.isGemeinschaft
+            ? "In Gemeinschaft zurückgegeben"
+            : `An ${opt.kuerzel} (${opt.name}) zugeordnet`,
+        );
+        router.refresh();
+      } else {
+        toast.error("Zuordnung fehlgeschlagen", {
+          description: data.error ?? "Bitte erneut versuchen.",
+        });
+      }
+    } catch {
+      toast.error("Netzwerkfehler");
+    } finally {
+      setSubmitting(false);
+      setConfirmTarget(null);
+    }
+  }
+
   const menuItems: ActionMenuItem[] = [
+    // Zuordnen — pro Besteller eigenes Item (ActionMenu unterstützt keine
+    // Submenüs; flach mit Präfix ist die einfachste Lösung).
+    ...zuordnenOptions.map((opt) => ({
+      label: opt.isGemeinschaft
+        ? "Zurück in Gemeinschaft"
+        : `Zuordnen an ${opt.kuerzel} (${opt.name})`,
+      onSelect: () => setConfirmTarget(opt),
+    })),
     ...snoozeOptions.map((opt) => ({
       label: `Snooze: ${opt.label}`,
       onSelect: () => onSnooze(b.id, opt.until, opt.label),
@@ -415,6 +486,48 @@ function PoolInboxCard({
           <ActionMenu items={menuItems} label="Pool-Item-Aktionen" />
         </div>
       </div>
+      {/* 09.06.2026 — Confirm-Modal für Zuordnung. Rendert außerhalb des
+          Card-Inhalts; Modal portalt sich selbst. */}
+      <Modal
+        open={!!confirmTarget}
+        onClose={() => !submitting && setConfirmTarget(null)}
+        size="sm"
+        variant="default"
+        title={
+          confirmTarget?.isGemeinschaft
+            ? "In Gemeinschaft zurückgeben?"
+            : "Zuordnen?"
+        }
+        footer={
+          confirmTarget ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmTarget(null)}
+                disabled={submitting}
+                data-modal-cancel
+              >
+                Abbrechen
+              </Button>
+              <Button
+                variant="primary"
+                loading={submitting}
+                onClick={() => confirmTarget && submitZuordnung(confirmTarget)}
+              >
+                {submitting
+                  ? "Speichere…"
+                  : buildZuordnungActionLabel(confirmTarget.kuerzel)}
+              </Button>
+            </>
+          ) : null
+        }
+      >
+        {confirmTarget && (
+          <p className="text-body-sm text-foreground-muted">
+            {buildZuordnungConfirmText(confirmTarget.kuerzel, confirmTarget.name, 1)}
+          </p>
+        )}
+      </Modal>
     </article>
   );
 }

@@ -34,6 +34,7 @@ import { Badge, type DataTableColumn } from "@/components/ui";
 import { IconCheck, IconAlertCircle } from "@/components/ui/icons";
 import type { Bestellung } from "./types";
 import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
+import { ZuordnenRowTrigger } from "./zuordnen-row-trigger";
 
 export interface UseBestellungColumnsOptions {
   projektFarbenMap: Map<string, string>;
@@ -41,6 +42,9 @@ export interface UseBestellungColumnsOptions {
   handlePreview: (bestellungId: string, typ: string) => void;
   preloadPreview: (bestellungId: string, typ: string) => void;
   setFreigabeConfirmId: (id: string | null) => void;
+  /** 09.06.2026 — Inline-Reassign hinter dem Besteller-Pill. */
+  eigenerKuerzel?: string;
+  alleBesteller?: Array<{ kuerzel: string; name: string; rolle?: string }>;
 }
 
 export function useBestellungColumns({
@@ -49,6 +53,8 @@ export function useBestellungColumns({
   handlePreview,
   preloadPreview,
   setFreigabeConfirmId,
+  eigenerKuerzel,
+  alleBesteller,
 }: UseBestellungColumnsOptions): DataTableColumn<Bestellung>[] {
   return useMemo(
     () => [
@@ -142,14 +148,28 @@ export function useBestellungColumns({
         hideBelow: "md",
         stopPropagation: true,
         render: (b) => (
-          <BestellerCell
-            besteller_kuerzel={b.besteller_kuerzel}
-            besteller_name={b.besteller_name}
-            bestellungsart={b.bestellungsart}
-            vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
-            vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
-            variant="pill-only"
-          />
+          <span className="inline-flex items-center">
+            <BestellerCell
+              besteller_kuerzel={b.besteller_kuerzel}
+              besteller_name={b.besteller_name}
+              bestellungsart={b.bestellungsart}
+              vorschlag_kuerzel={b.vorschlag_kuerzel ?? null}
+              vorschlag_konfidenz={b.vorschlag_konfidenz ?? null}
+              variant="pill-only"
+            />
+            {/* 09.06.2026 — Inline-Reassign-Trigger. Sichtbar wenn
+                eigenerKuerzel + alleBesteller von der Parent-Page durchgereicht
+                werden (Pool + In-Arbeit). Zelle bekommt einen kleinen ▼-Pfeil. */}
+            {eigenerKuerzel && alleBesteller && (
+              <ZuordnenRowTrigger
+                bestellungId={b.id}
+                currentKuerzel={b.besteller_kuerzel}
+                eigenerKuerzel={eigenerKuerzel}
+                alleBesteller={alleBesteller}
+                status={b.status}
+              />
+            )}
+          </span>
         ),
       },
       {

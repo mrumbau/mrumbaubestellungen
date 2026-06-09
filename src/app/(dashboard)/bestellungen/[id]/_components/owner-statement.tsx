@@ -38,6 +38,12 @@ import { PresenceBanner } from "./presence-banner";
 export interface BestellerOption {
   kuerzel: string;
   name: string;
+  /**
+   * 09.06.2026 — wird vom Lane-Loader mitgeliefert, damit Zuordnungs-
+   * Dropdowns Admin-Konten (z.B. IT) ausfiltern können. Optional gehalten
+   * für ältere Caller die nur kuerzel/name übergeben.
+   */
+  rolle?: string;
 }
 
 export interface OwnerStatementProps {

@@ -35,6 +35,8 @@ import { useBestellungColumns } from "@/components/bestellungen/use-bestellung-c
 import { PdfPreviewModal } from "@/components/bestellungen/pdf-preview-modal";
 import { BestellungenEmptyState } from "@/components/bestellungen/bestellungen-empty-state";
 import { useBestellungenActions } from "@/components/bestellungen/use-bestellungen-actions";
+import { ZuordnenBulkButton } from "@/components/bestellungen/zuordnen-bulk-button";
+import { getAssignableBesteller } from "@/lib/zuordnung";
 import { useBestellungPreview } from "@/components/bestellungen/use-bestellung-preview";
 import { useBestellungSavedViews, type ViewConfig } from "@/components/bestellungen/use-bestellung-saved-views";
 import { BestellungenConfirmDialogs } from "@/components/bestellungen/bestellungen-confirm-dialogs";
@@ -519,6 +521,8 @@ export function BestellungenTabelle({
     handlePreview,
     preloadPreview,
     setFreigabeConfirmId,
+    eigenerKuerzel: profil?.kuerzel,
+    alleBesteller: bestellerOptions,
   });
 
   return (
@@ -573,6 +577,7 @@ export function BestellungenTabelle({
             onOpenDrawer={(id) => drawerStack.openDrawer(id)}
             onSnooze={handleSnooze}
             onDefer={handleDefer}
+            alleBesteller={bestellerOptions}
           />
         </div>
       )}
@@ -782,6 +787,29 @@ export function BestellungenTabelle({
               </Button>
             );
           })()}
+          {/* 09.06.2026 — Bulk-Zuordnen: Dropdown mit MT/CR/.../Gemeinschaft.
+              Eigener Kürzel + aktueller Owner werden vom Helper rausgefiltert.
+              MT/CR sind aktuell die produktiven Besteller, MH (admin) wird
+              ausgeschlossen. Bei neuem Besteller-Account erscheint er auto-
+              matisch. */}
+          {profil && (
+            <ZuordnenBulkButton
+              count={selected.size}
+              options={getAssignableBesteller(
+                (bestellerOptions ?? []).map((o) => ({
+                  kuerzel: o.kuerzel,
+                  name: o.name,
+                  rolle: o.rolle ?? "besteller",
+                })),
+                null, // Bulk: keinen aktuellen Owner — User-Wahl beliebig
+                profil.kuerzel,
+              )}
+              loading={actions.zuordnenLoading}
+              onConfirm={(kuerzel, label) =>
+                actions.handleBulkZuordnen(kuerzel, label)
+              }
+            />
+          )}
           <Button
             size="sm"
             variant="destructive"

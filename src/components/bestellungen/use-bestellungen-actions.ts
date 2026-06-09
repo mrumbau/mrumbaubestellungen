@@ -249,6 +249,88 @@ export function useBestellungenActions({
     }
   }
 
+  // ─── Bulk-Zuordnen (09.06.2026) ────────────────────────────────
+  const [zuordnenLoading, setZuordnenLoading] = useState(false);
+
+  /**
+   * Bulk-Zuordnung an einen Besteller (oder Gemeinschaft = UNBEKANNT).
+   * Caller ruft das mit der ausgewählten Kürzel-/Namen-Kombination auf.
+   * Confirm-Dialog wird vom Caller gerendert — dieser Hook führt nur aus.
+   */
+  async function handleBulkZuordnen(
+    zielKuerzel: string,
+    zielLabel: string,
+  ): Promise<void> {
+    setZuordnenLoading(true);
+    try {
+      const res = await fetch("/api/bestellungen/bulk-zuordnen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: Array.from(selected),
+          besteller_kuerzel: zielKuerzel,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        total?: number;
+        updated?: string[];
+        was_already_correct?: string[];
+        no_permission?: string[];
+        errors?: Array<{ id: string; reason: string }>;
+        error?: string;
+      };
+
+      if (!res.ok) {
+        toast.error("Zuordnung fehlgeschlagen", {
+          description: data.error ?? "Bitte erneut versuchen.",
+        });
+        return;
+      }
+
+      const updatedN = (data.updated ?? []).length;
+      const alreadyN = (data.was_already_correct ?? []).length;
+      const noPermN = (data.no_permission ?? []).length;
+      const errorsN = (data.errors ?? []).length;
+
+      onAffectedRows?.(data.updated ?? []);
+
+      if (updatedN > 0 && errorsN === 0 && noPermN === 0) {
+        setSelected(new Set());
+        const parts: string[] = [`${updatedN} zugeordnet`];
+        if (alreadyN > 0) parts.push(`${alreadyN} bereits ${zielLabel}`);
+        toast.success(parts.join(" · "));
+        return;
+      }
+
+      if (updatedN > 0 && (errorsN > 0 || noPermN > 0)) {
+        // Partial — Selection auf failed reduzieren, damit User sieht was übrig blieb
+        const failedIds = new Set<string>([
+          ...(data.errors ?? []).map((e) => e.id),
+          ...(data.no_permission ?? []),
+        ]);
+        setSelected(failedIds);
+        const parts: string[] = [`${updatedN} zugeordnet`];
+        if (noPermN > 0) parts.push(`${noPermN} ohne Berechtigung`);
+        if (errorsN > 0) parts.push(`${errorsN} Fehler`);
+        toast.warning("Zuordnung teilweise erfolgreich", {
+          description: parts.join(" · "),
+        });
+        return;
+      }
+
+      // Nichts erfolgreich
+      const grund = data.errors?.[0]?.reason ?? data.error ?? "Bitte erneut versuchen.";
+      toast.error("Zuordnung fehlgeschlagen", { description: grund });
+    } catch {
+      toast.error("Netzwerkfehler", {
+        description: "Zuordnung konnte nicht gesendet werden.",
+      });
+    } finally {
+      setZuordnenLoading(false);
+    }
+  }
+
   return {
     // Delete
     showDeleteDialog,
@@ -260,6 +342,9 @@ export function useBestellungenActions({
     setShowFreigebenDialog,
     bulkFreigebenLoading,
     handleBulkFreigeben,
+    // Bulk-Zuordnen (09.06.2026)
+    zuordnenLoading,
+    handleBulkZuordnen,
     // Quick-Freigabe
     freigabeLoadingId,
     freigabeConfirmId,
