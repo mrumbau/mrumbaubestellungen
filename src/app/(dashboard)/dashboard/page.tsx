@@ -87,8 +87,20 @@ export default async function DashboardPage({
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
     supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),
-    // Mahnungen: Bestellungen mit mahnung_am die noch nicht bezahlt sind
-    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, betrag, mahnung_am, mahnung_count").not("mahnung_am", "is", null).is("bezahlt_am", null).order("mahnung_am", { ascending: false })),
+    // Mahnungen: Bestellungen mit mahnung_am die noch nicht bezahlt sind.
+    // 09.06.2026 — zusätzlich hat_rechnung, status, bezahlt_am, plus aggregiertes
+    // bezahlt_bereits via dokumente-Embed. Damit das Widget shouldShowMahnung()
+    // korrekt anwenden und PayPal/keine-Rechnung-Fälle ausblenden kann.
+    eigene(
+      supabase
+        .from("bestellungen")
+        .select(
+          "id, bestellnummer, haendler_name, betrag, mahnung_am, mahnung_count, hat_rechnung, status, bezahlt_am, dokumente(bezahlt_bereits, typ)",
+        )
+        .not("mahnung_am", "is", null)
+        .is("bezahlt_am", null)
+        .order("mahnung_am", { ascending: false }),
+    ),
     // KI-Cache — beim Page-Load mit-laden, damit Zusammenfassung + Priorisierung
     // sofort sichtbar sind statt hinter Button versteckt. Upsert pro User+Typ.
     supabase.from("dashboard_ki_cache").select("typ, inhalt, generated_at").eq("user_id", profil.user_id),
@@ -331,7 +343,36 @@ export default async function DashboardPage({
         letzte={letzte}
         aboHinweise={aboHinweise}
         aboJaehrlicheKosten={aboJaehrlicheKosten}
-        mahnungen={(mahnungenRoh || []) as { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[]}
+        mahnungen={(() => {
+          // 09.06.2026 — bezahlt_bereits aus dokumente aggregieren, damit
+          // shouldShowMahnung() im Widget PayPal-bezahlte Bestellungen filtert.
+          type RohEintrag = {
+            id: string;
+            bestellnummer: string | null;
+            haendler_name: string | null;
+            betrag: number | null;
+            mahnung_am: string;
+            mahnung_count?: number | null;
+            hat_rechnung?: boolean | null;
+            status?: string | null;
+            bezahlt_am?: string | null;
+            dokumente?: Array<{ bezahlt_bereits: boolean | null; typ: string | null }> | null;
+          };
+          return ((mahnungenRoh ?? []) as RohEintrag[]).map((m) => ({
+            id: m.id,
+            bestellnummer: m.bestellnummer,
+            haendler_name: m.haendler_name,
+            betrag: m.betrag,
+            mahnung_am: m.mahnung_am,
+            mahnung_count: m.mahnung_count ?? undefined,
+            hat_rechnung: m.hat_rechnung ?? false,
+            status: m.status ?? null,
+            bezahlt_am: m.bezahlt_am ?? null,
+            bezahlt_bereits: (m.dokumente ?? []).some(
+              (d) => d.typ === "rechnung" && d.bezahlt_bereits === true,
+            ),
+          }));
+        })()}
         kiZusammenfassungCache={kiZusammenfassungCache}
         kiPriorisierungCache={kiPriorisierungCache}
         volumenTrend={{

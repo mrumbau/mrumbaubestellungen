@@ -13,7 +13,11 @@ import {
 } from "@/components/ui/icons";
 import { OwnerStatement, type BestellerOption } from "./owner-statement";
 import type { Bestellung, ProjektOption } from "./types";
-import { shouldShowMahnung, effectiveMahnungCount } from "@/lib/mahnung-display";
+import {
+  shouldShowMahnung,
+  effectiveMahnungCount,
+  mahnungReviewHinweis,
+} from "@/lib/mahnung-display";
 
 /**
  * DetailHeader (UX-R3, 03.06.2026) — editoriale Akte für die Bestelldetail-Page.
@@ -43,6 +47,7 @@ export function DetailHeader({
   projekte,
   profil,
   bestellerOptions,
+  bezahltBereits,
 }: {
   bestellung: Bestellung & {
     bestellnummer: string | null;
@@ -61,6 +66,12 @@ export function DetailHeader({
   projekte: ProjektOption[];
   profil?: { kuerzel: string; rolle: string; name: string };
   bestellerOptions?: BestellerOption[];
+  /**
+   * 09.06.2026 — Aggregiert aus dokumente (any-Rechnung mit bezahlt_bereits=true).
+   * Wird in bestelldetail-shell aus dem dokumente-Array berechnet und an
+   * den Header propagiert, damit shouldShowMahnung() PayPal korrekt blockt.
+   */
+  bezahltBereits?: boolean;
 }) {
   const statusConfig = getStatusConfig(
     getEffektiverStatus(bestellung.status, bestellung.ist_gutschrift),
@@ -77,13 +88,19 @@ export function DetailHeader({
 
   const hd = haendlerDisplay(bestellung.haendler_name);
   // 03.06.2026 — Mahnung-Display via lib/mahnung-display Helper (defensive Regeln).
-  const hasMahnung = shouldShowMahnung(bestellung);
-  const mahnungCountUI = effectiveMahnungCount(bestellung);
+  // 09.06.2026 — bezahlt_bereits wird vom Parent aus dokumente aggregiert.
+  const mahnungInput = {
+    ...bestellung,
+    bezahlt_bereits: bezahltBereits ?? null,
+  };
+  const hasMahnung = shouldShowMahnung(mahnungInput);
+  const mahnungCountUI = effectiveMahnungCount(mahnungInput);
   const mahnungLabel = hasMahnung
     ? `Mahnung${
         mahnungCountUI > 1 ? ` ${mahnungCountUI}. Stufe` : ""
       } — ${new Date(bestellung.mahnung_am!).toLocaleDateString("de-DE")}`
     : null;
+  const mahnungReviewMsg = mahnungReviewHinweis(mahnungInput);
 
   const ownerLaneTakesOver =
     art === "material" &&
@@ -119,6 +136,20 @@ export function DetailHeader({
             <IconAlertCircle className="h-4 w-4 shrink-0" />
             <span className="font-semibold uppercase tracking-[0.14em] text-eyebrow">
               {mahnungLabel}
+            </span>
+          </div>
+        )}
+        {/* 09.06.2026 — Mahn-Mail erkannt, aber keine Rechnung hinterlegt.
+            Statt Banner ein Review-Hinweis in warning-tone — kein „2. Stufe"
+            mehr wenn die Bestellung gar keine Rechnung hat. */}
+        {!hasMahnung && mahnungReviewMsg && (
+          <div
+            role="status"
+            className="flex items-center gap-2 border-b border-warning/30 bg-warning-bg px-6 py-2 text-meta text-warning"
+          >
+            <IconAlertCircle className="h-4 w-4 shrink-0" />
+            <span className="font-semibold uppercase tracking-[0.14em] text-eyebrow">
+              {mahnungReviewMsg}
             </span>
           </div>
         )}

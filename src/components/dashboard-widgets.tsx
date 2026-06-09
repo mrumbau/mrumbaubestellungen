@@ -16,6 +16,7 @@ import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 import { Sparkline } from "@/components/ui/sparkline";
 import { getStatusConfig } from "@/lib/status-config";
 import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -85,7 +86,21 @@ export interface DashboardWidgetsProps {
   bestellerStats?: Record<string, number>;
   aboHinweise?: { typ: "ueberfaellig" | "kuendigung" | "vertragsende"; name: string; detail: string; dringend: boolean }[];
   aboJaehrlicheKosten?: number;
-  mahnungen?: { id: string; bestellnummer: string | null; haendler_name: string | null; betrag: number | null; mahnung_am: string; mahnung_count?: number }[];
+  mahnungen?: {
+    id: string;
+    bestellnummer: string | null;
+    haendler_name: string | null;
+    betrag: number | null;
+    mahnung_am: string;
+    mahnung_count?: number;
+    // 09.06.2026 — Required für Defensive-Display (shouldShowMahnung):
+    // ohne diese Felder kann der Helper PayPal-bezahlt und Rechnung-fehlt
+    // nicht erkennen, und das Widget zeigt falsche Stufen wie früher.
+    hat_rechnung?: boolean;
+    bezahlt_am?: string | null;
+    bezahlt_bereits?: boolean | null;
+    status?: string | null;
+  }[];
   kiZusammenfassungCache?: KiCacheEintrag | null;
   kiPriorisierungCache?: KiCacheEintrag | null;
   /** Trend-Daten für Volumen-Widget (Sparkline + Delta vs. Vergleichs-Range) */
@@ -791,18 +806,27 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
         </div>
       </div>
 
-      {/* Mahnungen — prominente Warnung (Error-Semantik) */}
-      {mahnungen && mahnungen.length > 0 && (
+      {/* Mahnungen — prominente Warnung (Error-Semantik).
+          09.06.2026 — sichtbare Mahnungen werden hier client-seitig nochmal
+          via shouldShowMahnung() gefiltert. Damit erscheint im Widget nur
+          was fachlich plausibel ist (Rechnung vorhanden, nicht bezahlt,
+          nicht PayPal, kein terminaler Status, Stufe 1-10). */}
+      {(() => {
+        const sichtbar = (mahnungen ?? []).filter((m) => shouldShowMahnung(m));
+        if (sichtbar.length === 0) return null;
+        return (
         <div className="mb-4 bg-error-bg border border-error-border rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <svg className="w-5 h-5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <h3 className="font-semibold text-error text-body-sm">{mahnungen.length} {mahnungen.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
+            <h3 className="font-semibold text-error text-body-sm">{sichtbar.length} {sichtbar.length === 1 ? "Mahnung" : "Mahnungen"} eingegangen</h3>
           </div>
           <div className="space-y-1.5">
-            {mahnungen.map((m) => (
+            {sichtbar.map((m) => {
+              const stufenLabel = mahnungStufeLabel(m);
+              return (
               <a key={m.id} href={`/bestellungen/${m.id}`} className="flex items-center justify-between px-3 py-2 bg-surface rounded-lg border border-error-border/60 hover:border-error-border transition-colors text-body-sm">
                 <span className="flex items-center gap-2">
                   <span className="font-mono-amount font-semibold text-brand">{m.bestellnummer || "–"}</span>
@@ -810,17 +834,18 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="font-mono-amount font-medium">{m.betrag ? `${Number(m.betrag).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €` : "–"}</span>
-                  {/* 03.06.2026 — Defensive: nur 1-10 als Mahnung-Stufe rendern. */}
-                  {m.mahnung_count && m.mahnung_count > 1 && m.mahnung_count <= 10 && (
-                    <span className="text-[10px] font-bold text-error">{m.mahnung_count}.</span>
+                  {stufenLabel && (
+                    <span className="text-[10px] font-bold text-error">{stufenLabel}</span>
                   )}
                   <span className="text-[10px] text-error">{new Date(m.mahnung_am).toLocaleDateString("de-DE")}</span>
                 </span>
               </a>
-            ))}
+              );
+            })}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* 22.05.2026 — "Zu prüfen"-Section nach /todo umgezogen. Dashboard fokussiert
           jetzt auf Workflow-Metriken (KPIs, Volumen, Mahnungen, Letzte/Offene Bestellungen). */}

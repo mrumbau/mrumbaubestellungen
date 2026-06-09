@@ -122,6 +122,14 @@ export default async function BestellungDetailPage({
         .maybeSingle()
     : { data: null };
 
+  // 09.06.2026 — bezahlt_bereits ist eine Dokument-Spalte; für den
+  // Mahnungs-Display-Check im DetailHeader müssen wir den Bestell-Level-Wert
+  // aus den Rechnungs-Dokumenten aggregieren. Sonst greift der PayPal-Schutz
+  // im Header nicht und Mahnungen werden angezeigt obwohl PayPal-bezahlt.
+  const bezahltBereitsHeader = ((dokumente as Dokument[] | null) ?? []).some(
+    (d) => d.typ === "rechnung" && d.bezahlt_bereits === true,
+  );
+
   return (
     <div className="flex flex-col h-full">
       <DetailHeader
@@ -141,6 +149,7 @@ export default async function BestellungDetailPage({
         bestellerOptions={
           (bestellerOptions as { kuerzel: string; name: string }[] | null) ?? []
         }
+        bezahltBereits={bezahltBereitsHeader}
       />
 
       <BestelldetailShell

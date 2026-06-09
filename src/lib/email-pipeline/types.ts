@@ -11,6 +11,14 @@ export interface ClassifyEmailInput {
   email_betreff: string;
   email_vorschau: string;
   hat_anhaenge: boolean;
+  /**
+   * 09.06.2026 — Per-Mail-Idempotenz für die Mahn-Erkennung. Wenn übergeben,
+   * prüft classify-logic vor dem `increment_mahnung`-RPC, ob diese Mail-ID
+   * für eine bestimmte Bestellung schon mal als Mahnung gezählt wurde
+   * (Spur in email_processing_log: bestellung_id + error_msg='mahnung_markiert').
+   * Verhindert dass Backfill/Retry dieselbe Mahn-Mail mehrfach incrementiert.
+   */
+  internet_message_id?: string | null;
 }
 
 export interface ClassifyEmailResult {

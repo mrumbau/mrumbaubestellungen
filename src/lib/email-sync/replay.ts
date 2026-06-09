@@ -173,6 +173,9 @@ async function replayOneMessageWithLock(
         email_betreff: message.subject ?? "",
         email_vorschau: message.bodyPreview ?? "",
         hat_anhaenge: message.hasAttachments,
+        // 09.06.2026 — Per-Mail-Idempotenz für Mahn-Counter. Verhindert
+        // dass Backfill/Retry dieselbe Mahn-Mail mehrfach zählt.
+        internet_message_id: message.internetMessageId,
       });
 
       if (!classifyResult.relevant) {
