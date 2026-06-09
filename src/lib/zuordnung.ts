@@ -1,18 +1,22 @@
 /**
- * Zuordnungs-Helpers für die UI (09.06.2026).
+ * Zuordnungs-Helpers für die UI (09.06.2026, korrigiert 09.06.2026 v2).
  *
  * Zentralisiert:
  *   - Marker-Konstanten (UNBEKANNT / Gemeinschaft)
  *   - Helper zum Bauen der Dropdown-Optionen pro Zuordnungs-Stelle
  *
- * Regeln (auf User-Wunsch):
- *   • Nur Bestellerinnen sind valide Zuordnungs-Ziele (Admin-Konten wie MH
- *     fallen raus). Neue Besteller-Accounts erscheinen automatisch, weil
- *     die Optionen aus benutzer_rollen kommen.
- *   • Eigener Kürzel (= aktiv eingeloggter User) wird ausgefiltert — kein
- *     Self-Claim auf sich selbst.
- *   • Aktueller Besitzer der Bestellung wird ausgefiltert — kein no-op-
- *     Update auf den schon gesetzten Wert.
+ * Regeln (User-präzisiert v2):
+ *   • Nur produktive Besteller (rolle='besteller') sind Ziele. Admin-Konten
+ *     wie MH fallen raus. Neue Besteller-Accounts erscheinen automatisch
+ *     weil die Optionen aus benutzer_rollen kommen.
+ *   • Aktueller Besitzer wird ausgefiltert — kein no-op-Update auf den
+ *     schon gesetzten Wert.
+ *   • Eigener Kürzel wird NICHT mehr ausgefiltert. v1 hatte das gemacht und
+ *     führte zum Bug "Dropdown zeigt nur Gemeinschaft", wenn z.B. MT eine
+ *     CR-Bestellung umordnen wollte: CR=Current → raus, MT=Self → raus,
+ *     bleibt nur Gemeinschaft. v2 lässt Self stehen, damit man im Pool
+ *     auch sich selbst übernehmen kann und in der Tabelle den jeweils
+ *     anderen Besteller wirklich sieht.
  *   • Virtuelles Item "GT (Gemeinschaft)" wird angehängt — semantisch =
  *     zurück in Pool (besteller_kuerzel = UNBEKANNT). Nur sichtbar wenn
  *     der aktuelle Owner nicht eh schon UNBEKANNT ist.
@@ -49,20 +53,20 @@ interface BestellerInput {
 export function getAssignableBesteller(
   alleBesteller: BestellerInput[],
   currentOwner: string | null,
-  eigenerKuerzel: string,
+  // 09.06.2026 v2 — eigenerKuerzel bleibt im Interface für API-Stabilität
+  // und mögliche zukünftige Telemetrie. Wird aktuell NICHT mehr als Filter
+  // benutzt (siehe Doku-Block oben).
+  _eigenerKuerzel: string,
 ): AssignableBestellerOption[] {
   const currentNormalized = (currentOwner ?? POOL_KUERZEL).toUpperCase();
-  const selfNormalized = eigenerKuerzel.toUpperCase();
 
   const echteBesteller: AssignableBestellerOption[] = alleBesteller
     .filter((b) => {
       // Nur produktive Besteller — Admin/Buchhaltung raus.
       // Wenn rolle nicht geliefert wird (Legacy-Caller), defensive durchlassen.
       if (b.rolle && b.rolle !== "besteller") return false;
-      // Aktueller Owner raus
+      // Aktueller Owner raus (kein no-op-Update)
       if (b.kuerzel.toUpperCase() === currentNormalized) return false;
-      // Self raus
-      if (b.kuerzel.toUpperCase() === selfNormalized) return false;
       return true;
     })
     .map((b) => ({ kuerzel: b.kuerzel, name: b.name }));

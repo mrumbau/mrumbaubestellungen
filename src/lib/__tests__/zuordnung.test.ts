@@ -25,9 +25,10 @@ describe("getAssignableBesteller", () => {
     expect(kuerzel).not.toContain("NJ"); // Buchhaltung raus
   });
 
-  it("filtert eigenen Kürzel raus (kein Self-Claim)", () => {
+  it("filtert eigenen Kürzel NICHT raus — Self-Claim erlaubt (v2 Korrektur)", () => {
+    // Im Pool (currentOwner=null) muss MT sich auch sich selbst zuordnen können.
     const result = getAssignableBesteller(BESTELLER_LIST, null, "MT");
-    expect(result.map((o) => o.kuerzel)).not.toContain("MT");
+    expect(result.map((o) => o.kuerzel)).toContain("MT");
   });
 
   it("filtert aktuellen Owner raus (kein no-op)", () => {
@@ -53,18 +54,28 @@ describe("getAssignableBesteller", () => {
     expect(result.find((o) => o.kuerzel === POOL_KUERZEL)).toBeUndefined();
   });
 
-  it("MT sieht nur CR + Gemeinschaft wenn Owner=CR", () => {
+  it("Bug-Reproduktion v2: MT sieht MT + Gemeinschaft wenn Owner=CR", () => {
+    // v1-Bug: Self-Filter UND Current-Owner-Filter zusammen warfen sowohl MT
+    // (self) als auch CR (owner) raus → nur Gemeinschaft. v2-Fix: Self bleibt.
     const result = getAssignableBesteller(BESTELLER_LIST, "CR", "MT");
-    // CR ist Owner → raus. MT ist self → raus. MH/NJ wegen rolle raus.
-    // Bleibt: nichts an echten Bestellern + Gemeinschaft
-    expect(result.map((o) => o.kuerzel)).toEqual(["UNBEKANNT"]);
+    expect(result.map((o) => o.kuerzel)).toContain("MT");
+    expect(result.map((o) => o.kuerzel)).toContain("UNBEKANNT");
+    expect(result.map((o) => o.kuerzel)).not.toContain("CR"); // Owner bleibt raus
   });
 
-  it("CR sieht MT + Gemeinschaft wenn Owner=UNBEKANNT (Pool-Übernahme)", () => {
+  it("Pool-Übernahme: CR sieht MT + CR (kein Owner gesetzt)", () => {
+    // Owner=Pool → kein Filter auf Owner; Self ist nicht mehr gefiltert.
+    // MT + CR bleiben beide. Gemeinschaft NICHT angehängt (Owner ist schon Pool).
     const result = getAssignableBesteller(BESTELLER_LIST, "UNBEKANNT", "CR");
-    // Owner=Pool → kein Filter auf Owner; CR=self → raus
-    // MT bleibt (besteller). Gemeinschaft NICHT angehängt (Owner ist schon Pool).
-    expect(result.map((o) => o.kuerzel)).toEqual(["MT"]);
+    expect(result.map((o) => o.kuerzel)).toEqual(expect.arrayContaining(["MT", "CR"]));
+    expect(result.map((o) => o.kuerzel)).not.toContain("UNBEKANNT");
+  });
+
+  it("In-Arbeit-Tabelle MT-Bestellung: CR + Gemeinschaft sichtbar", () => {
+    // Eingeloggter MT sieht eine eigene Bestellung in der Tabelle.
+    // MT (Owner) → raus. CR + Gemeinschaft bleiben.
+    const result = getAssignableBesteller(BESTELLER_LIST, "MT", "MT");
+    expect(result.map((o) => o.kuerzel)).toEqual(["CR", "UNBEKANNT"]);
   });
 
   it("ohne rolle-Feld (Legacy-Caller) wird durchgelassen", () => {
