@@ -19,7 +19,7 @@
  * Pool-Scope). Cmd/Shift/Middle-Click navigiert zur Detail-Page via Link.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -483,6 +483,16 @@ function PoolInboxCard({
               istGutschrift={b.ist_gutschrift}
             />
           </div>
+          {/* 11.06.2026 — sichtbarer „Zuordnen ▼"-Button direkt neben dem
+              ActionMenu. User-Wunsch: nicht im Drei-Punkte-Menü versteckt.
+              Stop-Propagation auf onClick damit der Click nicht den Drawer
+              öffnet. */}
+          {zuordnenOptions.length > 0 && (
+            <PoolZuordnenButton
+              options={zuordnenOptions}
+              onSelect={(opt) => setConfirmTarget(opt)}
+            />
+          )}
           <ActionMenu items={menuItems} label="Pool-Item-Aktionen" />
         </div>
       </div>
@@ -529,5 +539,109 @@ function PoolInboxCard({
         )}
       </Modal>
     </article>
+  );
+}
+
+/**
+ * Sichtbarer „Zuordnen ▼"-Button für eine Pool-Card (11.06.2026).
+ *
+ * Klein, kompakt, neben dem ActionMenu-Drei-Punkte. Klick öffnet ein Popover
+ * mit den Bestellern (MT/CR/GP/…). Auswahl triggert den Parent-Confirm-Modal
+ * (siehe `setConfirmTarget` in PoolInboxCard).
+ *
+ * Stop-Propagation auf Click damit der Row-Click nicht den Drawer aufmacht.
+ */
+function PoolZuordnenButton({
+  options,
+  onSelect,
+}: {
+  options: AssignableBestellerOption[];
+  onSelect: (opt: AssignableBestellerOption) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Outside-Click + Escape schließt Popover
+  useEffect(() => {
+    if (!open) return;
+    function handleDoc(e: MouseEvent) {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleDoc);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleDoc);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Bestellung zuordnen"
+        className={[
+          "inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-semibold",
+          "bg-brand text-foreground-inverse hover:bg-brand-light",
+          "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+          "transition-colors",
+        ].join(" ")}
+      >
+        Zuordnen
+        <svg
+          aria-hidden="true"
+          className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute z-30 mt-1 right-0 min-w-[200px] rounded-md border border-line bg-surface shadow-lg py-1"
+        >
+          {options.map((opt) => (
+            <button
+              key={opt.kuerzel + opt.name}
+              role="menuitem"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onSelect(opt);
+              }}
+              className={[
+                "w-full text-left px-3 py-1.5 text-[13px]",
+                "hover:bg-surface-hover focus-visible:outline-none focus-visible:bg-surface-hover",
+                opt.isGemeinschaft ? "border-t border-line-subtle text-foreground-muted" : "",
+              ].join(" ")}
+            >
+              <span className="font-mono-amount font-semibold">{opt.kuerzel}</span>
+              <span className="ml-2 text-foreground-subtle">{opt.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

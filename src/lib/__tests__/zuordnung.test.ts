@@ -78,6 +78,36 @@ describe("getAssignableBesteller", () => {
     expect(result.map((o) => o.kuerzel)).toEqual(["CR", "UNBEKANNT"]);
   });
 
+  // 11.06.2026 — Sentinel: wenn das Dropdown nur „Gemeinschaft" zeigt
+  // ist immer etwas kaputt (Daten fehlen oder Filter zu aggressiv). Test
+  // fängt Regressionen sofort ab.
+  it("Sentinel: bei vollständiger Liste darf das Result nie NUR Gemeinschaft sein", () => {
+    for (const [owner, viewer] of [
+      [null, "MT"],
+      [null, "CR"],
+      ["MT", "MT"],
+      ["MT", "CR"],
+      ["CR", "MT"],
+      ["CR", "CR"],
+    ] as const) {
+      const result = getAssignableBesteller(BESTELLER_LIST, owner, viewer);
+      const echteKuerzel = result.filter((o) => !o.isGemeinschaft).map((o) => o.kuerzel);
+      expect(echteKuerzel.length, `owner=${owner} viewer=${viewer}: mind. 1 echter Besteller erwartet`).toBeGreaterThan(0);
+    }
+  });
+
+  it("GP wird automatisch berücksichtigt sobald er in benutzer_rollen ist", () => {
+    // User-Wunsch 11.06.2026: dritter Besteller GP. Sobald er als
+    // rolle='besteller' eingetragen ist, erscheint er ohne Code-Änderung.
+    const erweitert = [
+      ...BESTELLER_LIST,
+      { kuerzel: "GP", name: "GP Besteller", rolle: "besteller" },
+    ];
+    const result = getAssignableBesteller(erweitert, "MT", "MT");
+    expect(result.map((o) => o.kuerzel)).toContain("GP");
+    expect(result.map((o) => o.kuerzel)).toContain("CR");
+  });
+
   it("ohne rolle-Feld (Legacy-Caller) wird durchgelassen", () => {
     const result = getAssignableBesteller(
       [{ kuerzel: "XY", name: "Test" }] as Array<{ kuerzel: string; name: string }>,

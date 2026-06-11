@@ -57,6 +57,21 @@ function isAuthorized(request: NextRequest, body: { secret?: string }): boolean 
 
 const DIGEST_DEDUP_HOURS = 20; // pro Empfänger max 1× pro Tag
 
+/**
+ * 11.06.2026 — Feature-Flag um den automatischen Pool-Digest deaktivieren zu
+ * können ohne den Cron-Schedule (pg_cron / Vercel-Cron) anzufassen.
+ *
+ * `POOL_DIGEST_ENABLED` muss explizit auf "true" gesetzt sein damit Mails
+ * rausgehen. Default = false: kein Versand, kein mahnung_count-Anstieg, kein
+ * webhook_logs-Eintrag (außer dem disabled-Marker im logInfo). User-Wunsch:
+ * keine täglichen bu@mrumbau.de-Sammelmails an alle Besteller.
+ *
+ * Re-aktivieren via Vercel Env: POOL_DIGEST_ENABLED=true (Production).
+ */
+function isDigestEnabled(): boolean {
+  return process.env.POOL_DIGEST_ENABLED === "true";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.json().catch(() => ({}));
@@ -65,6 +80,26 @@ export async function POST(request: NextRequest) {
 
     if (!isAuthorized(request, body)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 11.06.2026 — Feature-Flag-Check als allererstes nach Auth. Cron läuft
+    // weiter (pg_cron-Schedule unverändert), führt aber keine Mail-Aktion aus.
+    // Wichtig: NICHT die Bestellungen anfassen — kein UPDATE auf mahnung_count,
+    // damit der Counter durch deaktivierten Digest nicht weiterhin geprägt
+    // wird (war bislang ein Counter-Pollution-Quelle für Pool-UNBEKANNT-
+    // Bestellungen, die im UI als "Mahnung 7. Stufe" auftauchten).
+    if (!isDigestEnabled()) {
+      logInfo(
+        "/api/cron/erinnerungen-pool",
+        "open orders digest disabled — Versand übersprungen (POOL_DIGEST_ENABLED ≠ 'true')",
+      );
+      return NextResponse.json({
+        success: true,
+        disabled: true,
+        message:
+          "POOL_DIGEST_ENABLED ist nicht 'true' — kein Pool-Digest versendet, keine Bestellung verändert.",
+        gesendet: 0,
+      });
     }
 
     const supabase = createServiceClient();
