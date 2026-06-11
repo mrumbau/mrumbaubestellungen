@@ -45,16 +45,27 @@ function makeAuthClient(
 }
 
 function makeServiceClient(opts: {
-  benutzer?: { name: string; kuerzel: string } | null;
+  /** 11.06.2026 — rolle wird jetzt mit gelesen + geprüft. Default 'besteller'. */
+  benutzer?: { name: string; kuerzel: string; rolle?: string } | null;
   bestellung?: { besteller_kuerzel: string; besteller_name: string } | null;
   updateError?: { message: string } | null;
 }) {
-  const benutzerSingle = vi.fn().mockResolvedValue({ data: opts.benutzer ?? null, error: null });
+  const benutzerData = opts.benutzer === undefined
+    ? null
+    : opts.benutzer === null
+      ? null
+      : { rolle: "besteller", ...opts.benutzer };
+  // benutzer-Query nutzt maybeSingle (kann auch null returnen)
+  const benutzerMaybe = vi.fn().mockResolvedValue({ data: benutzerData, error: null });
+  // bestellung-Query nutzt weiter single
   const bestellungSingle = vi.fn().mockResolvedValue({ data: opts.bestellung ?? null, error: null });
-  let selectCount = 0;
+  let callCount = 0;
   const eq = vi.fn().mockImplementation(() => {
-    selectCount++;
-    return { single: selectCount === 1 ? benutzerSingle : bestellungSingle };
+    callCount++;
+    return {
+      single: callCount === 1 ? benutzerMaybe : bestellungSingle, // Legacy-Fallback
+      maybeSingle: benutzerMaybe,
+    };
   });
   const select = vi.fn().mockReturnValue({ eq });
   const insert = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -174,6 +185,43 @@ describe("POST /api/bestellungen/zuordnen", () => {
     const text = sb._insert.mock.calls[0]?.[0]?.text as string;
     expect(text).not.toContain("<script>");
     expect(text).not.toContain('"');
+  });
+
+  // 11.06.2026 — Defense-in-Depth: Ziel-Account muss rolle='besteller' sein.
+  // Frontend filtert Admin/Buchhaltung schon raus, Backend blockt sie aber
+  // server-seitig damit ein manipuliertes Request keine Bestellung an MH
+  // (Admin) oder NJ (Buchhaltung) zuweisen kann.
+  it("400 wenn Ziel-Account Admin ist", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "admin", { kuerzel: "MH", name: "MH" }));
+    mockCreateServiceClient.mockReturnValue(makeServiceClient({
+      benutzer: { name: "Mohammed Hawrami", kuerzel: "MH", rolle: "admin" },
+    }));
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_id: TEST_UUID.bestellung, besteller_kuerzel: "MH" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("400 wenn Ziel-Account Buchhaltung ist", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "admin"));
+    mockCreateServiceClient.mockReturnValue(makeServiceClient({
+      benutzer: { name: "Nada Jerinic", kuerzel: "NJ", rolle: "buchhaltung" },
+    }));
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_id: TEST_UUID.bestellung, besteller_kuerzel: "NJ" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("200 wenn Ziel-Account UNBEKANNT (zurück in Pool/Gemeinschaft)", async () => {
+    // UNBEKANNT überspringt den benutzer_rollen-Lookup — gibt es per
+    // Definition keinen User-Eintrag dazu.
+    mockCreateServerClient.mockReturnValue(makeAuthClient({ id: "u1" }, "besteller", { kuerzel: "MT", name: "Marlon" }));
+    mockCreateServiceClient.mockReturnValue(makeServiceClient({
+      benutzer: null, // wird gar nicht abgefragt
+      bestellung: { besteller_kuerzel: "MT", besteller_name: "Marlon" },
+    }));
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_id: TEST_UUID.bestellung, besteller_kuerzel: "UNBEKANNT" }));
+    expect(res.status).toBe(200);
   });
 
   // Suppress unused-var noise (vitest hoisting)

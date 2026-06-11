@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceClient } from "@/lib/supabase";
 import { getBenutzerProfil } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -91,10 +92,15 @@ export default async function BestellungDetailPage({
     // 02.06.2026 (Pool Phase 3) — Besteller-Optionen für Reassign-Modal in
     // OwnerLane. Admin + Besteller — buchhaltung wird ausgeschlossen, sie ist
     // kein gültiges Reassign-Ziel.
-    supabase
+    // 11.06.2026 — Service-Client statt User-Client weil RLS `benutzer_rollen_eigene`
+    // sonst Nicht-Admin-Usern nur den eigenen Eintrag liefert und das Reassign-
+    // Dropdown leer bleibt. Server-seitiger Filter auf rolle='besteller'
+    // schließt Admin als Reassign-Ziel aus (Admin-Owner ist ohnehin selten
+    // gewünscht; OwnerStatement-Modal hatte den nur historisch durchgelassen).
+    createServiceClient()
       .from("benutzer_rollen")
       .select("kuerzel, name, rolle")
-      .in("rolle", ["besteller", "admin"])
+      .eq("rolle", "besteller")
       .order("name"),
   ]);
 

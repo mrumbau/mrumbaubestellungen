@@ -25,6 +25,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase";
 import { type Lane, isLane } from "@/components/bestellungen/lane-config";
 // 03.06.2026 — Server-safe Pure-Helpers aus /lib/bestellungen-art.ts,
 // NICHT aus art-filter-chips.tsx (Client-Component, würde Server-Crash
@@ -330,10 +331,22 @@ export async function loadLaneData(
       .select("id, name, farbe")
       .neq("status", "archiviert")
       .order("name"),
-    supabase
+    // 11.06.2026 — Bug-Fix Dropdown „nur Gemeinschaft":
+    // benutzer_rollen hat eine RLS-Policy `benutzer_rollen_eigene` die Nicht-
+    // Admin-Usern nur die EIGENE Zeile zeigt. Der User-scoped Server-Client
+    // lieferte deshalb für MT nur MT zurück. → Dropdown filtert eigenen Owner
+    // raus → leer. Wir holen die Besteller-Liste daher mit dem Service-Client
+    // (umgeht RLS) und filtern Server-seitig auf rolle='besteller' damit auch
+    // bei kompromittiertem Helper kein Admin durchrutscht.
+    //
+    // Datenschutz: Wir lesen nur kuerzel/name/rolle, drei Felder die für das
+    // Dropdown unverzichtbar sind und die kein PII darstellen, das User vor
+    // ihren Kollegen verstecken müssten. Mail-Adresse oder user_id holen wir
+    // nicht.
+    createServiceClient()
       .from("benutzer_rollen")
       .select("kuerzel, name, rolle")
-      .in("rolle", ["besteller", "admin"])
+      .eq("rolle", "besteller")
       .order("kuerzel"),
     poolCountQuery,
     inArbeitCountQuery,

@@ -42,21 +42,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ungültige Bestellungs-ID" }, { status: 400 });
     }
 
-    if (!besteller_kuerzel || !isValidKuerzel(besteller_kuerzel)) {
+    // 11.06.2026 — UNBEKANNT ist ein gültiger Ziel-Wert (zurück in Pool),
+    // matched aber nicht das 2-5-Buchstaben-Kürzel-Pattern. Erlauben.
+    const POOL_KUERZEL_LITERAL = "UNBEKANNT";
+    if (
+      !besteller_kuerzel ||
+      (besteller_kuerzel !== POOL_KUERZEL_LITERAL && !isValidKuerzel(besteller_kuerzel))
+    ) {
       return NextResponse.json({ error: "Ungültiges Kürzel" }, { status: 400 });
     }
 
     const supabase = createServiceClient();
 
-    // Besteller-Name holen
-    const { data: benutzer } = await supabase
-      .from("benutzer_rollen")
-      .select("name, kuerzel")
-      .eq("kuerzel", besteller_kuerzel)
-      .single();
+    // 11.06.2026 — UNBEKANNT (Pool/Gemeinschaft) ist ein gültiger Ziel-Wert
+    // und entspricht keinem Benutzer-Eintrag. Wir überspringen den Lookup
+    // und setzen Name = "Gemeinschaft" direkt. Bei echten Ziel-Kürzeln
+    // wird zusätzlich die Rolle geprüft (Defense-in-Depth).
+    let benutzer: { name: string; kuerzel: string };
+    if (besteller_kuerzel === POOL_KUERZEL_LITERAL) {
+      benutzer = { name: "Gemeinschaft", kuerzel: POOL_KUERZEL_LITERAL };
+    } else {
+      const { data: row } = await supabase
+        .from("benutzer_rollen")
+        .select("name, kuerzel, rolle")
+        .eq("kuerzel", besteller_kuerzel)
+        .maybeSingle();
 
-    if (!benutzer) {
-      return NextResponse.json({ error: "Besteller nicht gefunden" }, { status: 404 });
+      if (!row) {
+        return NextResponse.json({ error: "Besteller nicht gefunden" }, { status: 404 });
+      }
+      if (row.rolle !== "besteller") {
+        return NextResponse.json(
+          { error: "Ziel-Account ist kein Besteller — Zuordnung nicht erlaubt" },
+          { status: 400 },
+        );
+      }
+      benutzer = { name: row.name, kuerzel: row.kuerzel };
     }
 
     // Vorherigen Besteller laden für den Kommentar

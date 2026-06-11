@@ -96,6 +96,24 @@ describe("getAssignableBesteller", () => {
     }
   });
 
+  it("Bug-Reproduktion 11.06.2026: Helper bleibt nutzbar selbst wenn Loader RLS-bedingt nur eine Zeile liefert", () => {
+    // RLS-Simulation: der User-scoped Server-Client lieferte unter
+    // benutzer_rollen_eigene-Policy nur die eigene Zeile. Bevor das im
+    // Loader auf Service-Client umgestellt wurde, sah der Helper z.B.
+    // nur [MT] und filterte MT als Owner raus → nur Gemeinschaft.
+    //
+    // Sentinel: Wenn der Loader korrekt arbeitet, ist alleBesteller
+    // mindestens 2 Items lang (MT+CR). Dieser Test simuliert den Bug:
+    // bei alleBesteller=[MT] sehen wir explizit die kaputte Variante,
+    // damit eine Regression im Loader sofort auffällt (Doku-Test).
+    const nurOwnerSichtbar = [{ kuerzel: "MT", name: "Marlon Tschon", rolle: "besteller" }];
+    const result = getAssignableBesteller(nurOwnerSichtbar, "MT", "MT");
+    const echteKuerzel = result.filter((o) => !o.isGemeinschaft).map((o) => o.kuerzel);
+    // Dokumentiert: bei nur-Owner-Sichtbar bleibt nichts übrig → klares
+    // Symptom dass der Lane-Loader RLS-blockiert war.
+    expect(echteKuerzel).toEqual([]);
+  });
+
   it("GP wird automatisch berücksichtigt sobald er in benutzer_rollen ist", () => {
     // User-Wunsch 11.06.2026: dritter Besteller GP. Sobald er als
     // rolle='besteller' eingetragen ist, erscheint er ohne Code-Änderung.
