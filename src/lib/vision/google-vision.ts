@@ -1,11 +1,19 @@
-// CardScan Module – Google Cloud Vision OCR Wrapper
-// Verwendet DOCUMENT_TEXT_DETECTION für optimale Layout-Analyse bei Visitenkarten.
+// Google Cloud Vision OCR Wrapper.
+// Verwendet DOCUMENT_TEXT_DETECTION für optimale Layout-Analyse.
 // Language-Hints: ["de", "en"] für deutsche und englische Texte.
+//
+// 21.09.2026 — aus /lib/cardscan hierher verschoben. Das CardScan-Modul
+// wurde entfernt, diese Datei aber nicht: die Email-Pipeline nutzt sie über
+// pipeline/vision-fallback.ts als OCR-Fallback für Rechnungs-Anhänge, die
+// GPT nicht lesen konnte. Sie war die einzige CardScan-Datei, an der das
+// Bestellwesen hing.
 
 import { logError, logInfo } from "@/lib/logger";
-import { CARDSCAN_VISION_MAX_IMAGE_BYTES } from "./constants";
 
-const ROUTE_TAG = "/lib/cardscan/google-vision";
+/** Maximale Bildgröße für einen Vision-Call (5 MB). */
+const VISION_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const ROUTE_TAG = "/lib/vision/google-vision";
 
 const VISION_API_URL = "https://vision.googleapis.com/v1/images:annotate";
 
@@ -26,7 +34,7 @@ interface VisionOcrResult {
  * Sendet ein Base64-Bild an Google Cloud Vision DOCUMENT_TEXT_DETECTION.
  * Gibt den erkannten Volltext zurück.
  *
- * R2/F7.16: Pre-Call Size-Check. Bilder über CARDSCAN_VISION_MAX_IMAGE_BYTES
+ * R2/F7.16: Pre-Call Size-Check. Bilder über VISION_MAX_IMAGE_BYTES
  * werden abgelehnt — verhindert kostspielige OCR auf unkomprimierten XL-Fotos.
  */
 export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResult> {
@@ -45,13 +53,13 @@ export async function ocrWithVision(imageBase64: string): Promise<VisionOcrResul
 
   // Size-Check: Base64-Länge × 0.75 ≈ Originalbytes
   const estimatedBytes = Math.ceil((cleanBase64.length * 3) / 4);
-  if (estimatedBytes > CARDSCAN_VISION_MAX_IMAGE_BYTES) {
+  if (estimatedBytes > VISION_MAX_IMAGE_BYTES) {
     logError(ROUTE_TAG, "Bild zu groß für Vision-OCR", {
       estimatedKb: Math.round(estimatedBytes / 1024),
-      maxKb: Math.round(CARDSCAN_VISION_MAX_IMAGE_BYTES / 1024),
+      maxKb: Math.round(VISION_MAX_IMAGE_BYTES / 1024),
     });
     throw new Error(
-      `Bild zu groß für OCR (${Math.round(estimatedBytes / 1024)} KB). Maximum: ${Math.round(CARDSCAN_VISION_MAX_IMAGE_BYTES / 1024 / 1024 * 10) / 10} MB. Bitte vor dem Upload komprimieren.`
+      `Bild zu groß für OCR (${Math.round(estimatedBytes / 1024)} KB). Maximum: ${Math.round(VISION_MAX_IMAGE_BYTES / 1024 / 1024 * 10) / 10} MB. Bitte vor dem Upload komprimieren.`
     );
   }
 

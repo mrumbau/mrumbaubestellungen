@@ -15,7 +15,7 @@
  * Kosten-Cap: 50 Calls/Tag (~$0.07/Tag absolut max).
  */
 
-import { ocrWithVision } from "@/lib/cardscan/google-vision";
+import { ocrWithVision } from "@/lib/vision/google-vision";
 import { analysiereDokument, type DokumentAnalyse } from "@/lib/openai";
 import { createServiceClient } from "@/lib/supabase";
 import { logError, logInfo } from "@/lib/logger";
