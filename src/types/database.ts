@@ -1415,6 +1415,37 @@ export type Database = {
         }
         Relationships: []
       }
+      v_rechnungseingang: {
+        Row: {
+          absender: string | null
+          bestellnummer: string | null
+          bestellung_id: string | null
+          bestellung_status: string | null
+          besteller_kuerzel: string | null
+          betrag: number | null
+          betreff: string | null
+          eingang: string | null
+          erwarteter_typ: string | null
+          fehler: string | null
+          haendler_name: string | null
+          hat_anhang: boolean | null
+          id: string | null
+          ki_typ: string | null
+          kontrolle: string | null
+          ordner: string | null
+          ordner_passt_nicht: boolean | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_processing_log_bestellung_id_fkey"
+            columns: ["bestellung_id"]
+            isOneToOne: false
+            referencedRelation: "bestellungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_pipeline_logs: {
         Row: {
           bestellnummer: string | null
