@@ -468,6 +468,17 @@ export async function findByErweiterterMatch(
       return false;
     }
 
+    // 21.09.2026 — Jede der folgenden Prüfungen kann ein Dokument ablehnen,
+    // aber nur eine tatsächlich DURCHGEFÜHRTE Prüfung kann es bestätigen.
+    // Wir merken uns deshalb, ob überhaupt ein positives Signal vorlag.
+    let bestaetigendesSignal = false;
+
+    // Identische Auftragsnummer ist der stärkste Anker den wir hier haben.
+    // (Der Ungleich-Fall wurde oben schon hart abgelehnt.)
+    if (dokumentAuftragsnummer && k.auftragsnummer && dokumentAuftragsnummer === k.auftragsnummer) {
+      bestaetigendesSignal = true;
+    }
+
     // R5c: Cross-Number-Validation jetzt FUZZY (war exakt)
     const kandidatNummern = [k.bestellnummer, k.auftragsnummer].filter((n): n is string => !!n);
     if (kandidatNummern.length > 0 && dokumentNummern.length > 0) {
@@ -475,12 +486,40 @@ export async function findByErweiterterMatch(
         kandidatNummern.some((kn) => bestellnummernFuzzyMatch(dn, kn)),
       );
       if (!hatUebereinstimmung) return false;
+      bestaetigendesSignal = true;
     }
     // Betrag-Validation (max 15% Abweichung)
     if (erkannterBetrag && k.betrag) {
       const abweichung = Math.abs(Number(k.betrag) - erkannterBetrag) / Math.max(Number(k.betrag), erkannterBetrag);
       if (abweichung > 0.15) return false;
+      bestaetigendesSignal = true;
     }
+
+    // 21.09.2026 — Fehlten Nummern UND Betrag, wurde bis hierher keine
+    // einzige inhaltliche Prüfung ausgeführt: beide Blöcke oben sind an ihre
+    // Daten gebunden und werden bei null/leer stillschweigend übersprungen.
+    // Übrig blieb dann nur "gleicher Händler + letzte 14 Tage + Typ-Flag noch
+    // frei" — und der erste Kandidat der Liste gewann.
+    //
+    // Das ist genau der Fall, in dem das System am wenigsten weiss und am
+    // aggressivsten geraten hat: schlecht erkannte Dokumente (kein Betrag,
+    // keine Nummer) wurden an irgendeine offene Bestellung desselben Händlers
+    // gehaengt. Bei Haendlern wie Bauhaus oder OBI, wo in 14 Tagen viele
+    // Bestellungen offen sind, produziert das falsch verknuepfte Lieferscheine
+    // und Rechnungen.
+    //
+    // Ohne ein einziges bestaetigendes Signal ordnen wir deshalb nicht mehr zu.
+    // Das Dokument landet stattdessen im Pool und wird dort manuell zugeordnet
+    // — eine sichtbare offene Aufgabe ist deutlich billiger als eine falsche
+    // Verknuepfung, die erst der Buchhaltung auffaellt.
+    if (!bestaetigendesSignal) {
+      logInfo("webhook/email/match", "Match abgelehnt: kein bestaetigendes Signal", {
+        kandidat_id: k.id,
+        grund: "weder Nummern- noch Betragsabgleich moeglich",
+      });
+      return false;
+    }
+
     return true;
   });
 
