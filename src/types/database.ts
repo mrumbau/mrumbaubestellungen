@@ -111,6 +111,7 @@ export type Database = {
           id: string
           kuerzel: string
           name: string
+          nimmt_neue_bestellungen: boolean
           rolle: string
           user_id: string | null
         }
@@ -121,6 +122,7 @@ export type Database = {
           id?: string
           kuerzel: string
           name: string
+          nimmt_neue_bestellungen?: boolean
           rolle: string
           user_id?: string | null
         }
@@ -131,6 +133,7 @@ export type Database = {
           id?: string
           kuerzel?: string
           name?: string
+          nimmt_neue_bestellungen?: boolean
           rolle?: string
           user_id?: string | null
         }
