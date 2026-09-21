@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import {
   bestellnummernFuzzyMatch,
   haendlerNamesMatch,
+  findByExactNumber,
 } from "../bestellung-match";
 
 describe("bestellnummernFuzzyMatch — R5c-Bugfix Substring-Match", () => {
@@ -108,5 +109,131 @@ describe("haendlerNamesMatch — Cross-Match-Logic", () => {
   it("Sonderzeichen werden in Token normalisiert", () => {
     // & und Bindestriche werden zu Leerzeichen
     expect(haendlerNamesMatch("Hold & Spada", "Hold-Spada")).toBe(true); // beide haben Token "hold" + "spada"
+  });
+});
+
+// =====================================================================
+// findByExactNumber — Prioritätsreihenfolge
+// =====================================================================
+
+/**
+ * 21.09.2026 — Die Kandidaten-Queries laufen seit dem Performance-Umbau
+ * parallel statt sequenziell. Vorher garantierte das `await` + `return` die
+ * Prioritätsreihenfolge implizit; jetzt muss sie explizit beim Einsammeln
+ * der Ergebnisse hergestellt werden. Diese Tests pinnen genau das fest —
+ * ohne sie könnte ein späterer Umbau unbemerkt die falsche Bestellung
+ * zurückgeben, und Fehlzuordnungen sind hier das teuerste Fehlverhalten.
+ */
+
+type MockTreffer = {
+  spalte: string;
+  wert: string;
+  ankerSpalte: string;
+  ankerWert: string;
+  id: string;
+};
+
+function makeSupabaseMock(treffer: MockTreffer[]) {
+  const calls: Array<Record<string, string>> = [];
+  const client = {
+    from() {
+      return {
+        select() {
+          const eqs: Record<string, string> = {};
+          const builder = {
+            eq(spalte: string, wert: string) {
+              eqs[spalte] = wert;
+              return builder;
+            },
+            limit() {
+              return builder;
+            },
+            async maybeSingle() {
+              calls.push({ ...eqs });
+              const hit = treffer.find(
+                (t) => eqs[t.spalte] === t.wert && eqs[t.ankerSpalte] === t.ankerWert,
+              );
+              return { data: hit ? { id: hit.id } : null };
+            },
+          };
+          return builder;
+        },
+      };
+    },
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { client: client as any, calls };
+}
+
+describe("findByExactNumber — Prioritätsreihenfolge bleibt trotz Parallelität erhalten", () => {
+  const ctx = {
+    haendler: { id: "h-1", name: "Bauhaus" },
+    subunternehmer: null,
+    haendlerName: "Bauhaus GmbH",
+  };
+
+  it("haendler_id schlägt haendler_name bei gleichzeitigem Treffer", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-id" },
+      { spalte: "bestellnummer", wert: "A1000", ankerSpalte: "haendler_name", ankerWert: "Bauhaus GmbH", id: "via-name" },
+    ]);
+    const res = await findByExactNumber(client, ["A1000"], ctx);
+    expect(res?.id).toBe("via-id");
+  });
+
+  it("bestellnummer schlägt auftragsnummer und lieferscheinnummer", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "lieferscheinnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-ls" },
+      { spalte: "auftragsnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-auf" },
+      { spalte: "bestellnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-best" },
+    ]);
+    const res = await findByExactNumber(client, ["A1000"], ctx);
+    expect(res?.id).toBe("via-best");
+  });
+
+  it("erste Suchnummer gewinnt vor späteren", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "ERSTE", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "treffer-erste" },
+      { spalte: "bestellnummer", wert: "ZWEITE", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "treffer-zweite" },
+    ]);
+    const res = await findByExactNumber(client, ["ERSTE", "ZWEITE"], ctx);
+    expect(res?.id).toBe("treffer-erste");
+  });
+
+  it("bricht nach Treffer der ersten Suchnummer ab — zweite wird nicht mehr abgefragt", async () => {
+    const { client, calls } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "ERSTE", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "treffer-erste" },
+    ]);
+    await findByExactNumber(client, ["ERSTE", "ZWEITE"], ctx);
+    expect(calls.some((c) => Object.values(c).includes("ZWEITE"))).toBe(false);
+  });
+
+  it("findet über subunternehmer_id wenn kein Händler-Anker greift", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "SU-9", ankerSpalte: "subunternehmer_id", ankerWert: "su-1", id: "via-su" },
+    ]);
+    const res = await findByExactNumber(
+      client,
+      ["SU-9"],
+      { haendler: null, subunternehmer: { id: "su-1", firma: "Elektro Meier" }, haendlerName: null },
+    );
+    expect(res?.id).toBe("via-su");
+  });
+
+  it("liefert null und fragt gar nicht ab, wenn kein Anker vorhanden ist", async () => {
+    const { client, calls } = makeSupabaseMock([]);
+    const res = await findByExactNumber(
+      client,
+      ["A1000"],
+      { haendler: null, subunternehmer: null, haendlerName: null },
+    );
+    expect(res).toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("liefert null wenn keine Kombination trifft", async () => {
+    const { client } = makeSupabaseMock([]);
+    const res = await findByExactNumber(client, ["A1000", "B2000"], ctx);
+    expect(res).toBeNull();
   });
 });
