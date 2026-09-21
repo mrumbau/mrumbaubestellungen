@@ -292,6 +292,7 @@ export type Database = {
           updated_at: string | null
           versanddienstleister: string | null
           voraussichtliche_lieferung: string | null
+          vorausbezahlt: boolean
           vorschlag_konfidenz: number | null
           vorschlag_kuerzel: string | null
           waehrung: string | null
@@ -348,6 +349,7 @@ export type Database = {
           updated_at?: string | null
           versanddienstleister?: string | null
           voraussichtliche_lieferung?: string | null
+          vorausbezahlt?: boolean
           vorschlag_konfidenz?: number | null
           vorschlag_kuerzel?: string | null
           waehrung?: string | null
@@ -404,6 +406,7 @@ export type Database = {
           updated_at?: string | null
           versanddienstleister?: string | null
           voraussichtliche_lieferung?: string | null
+          vorausbezahlt?: boolean
           vorschlag_konfidenz?: number | null
           vorschlag_kuerzel?: string | null
           waehrung?: string | null
@@ -804,6 +807,8 @@ export type Database = {
       }
       haendler: {
         Row: {
+          immer_vorausbezahlt: boolean
+          zahlungsziel_tage: number | null
           confirmed_at: string | null
           created_at: string
           domain: string
@@ -813,6 +818,8 @@ export type Database = {
           url_muster: string[] | null
         }
         Insert: {
+          immer_vorausbezahlt?: boolean
+          zahlungsziel_tage?: number | null
           confirmed_at?: string | null
           created_at?: string
           domain: string
@@ -822,6 +829,8 @@ export type Database = {
           url_muster?: string[] | null
         }
         Update: {
+          immer_vorausbezahlt?: boolean
+          zahlungsziel_tage?: number | null
           confirmed_at?: string | null
           created_at?: string
           domain?: string
