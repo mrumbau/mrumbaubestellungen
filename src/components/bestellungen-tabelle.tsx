@@ -1037,6 +1037,14 @@ export function BestellungenTabelle({
           bestellung={openBestellung}
           profil={profil}
           bestellerOptions={bestellerOptions}
+          // 22.09.2026 — Belege direkt aus dem Drawer ansehen, statt erst
+          // „Volldetails öffnen" zu müssen. Dieselbe Vorschau wie in der
+          // Tabelle, inklusive Blättern bei mehreren Dokumenten eines Typs
+          // (Teilrechnungen). Beide sind native <dialog> mit showModal, die
+          // zuletzt geöffnete liegt oben — die Vorschau deckt den Drawer
+          // also korrekt ab.
+          onPreview={(typ) => openBestellung && handlePreview(openBestellung.id, typ)}
+          onPreload={(typ) => openBestellung && preloadPreview(openBestellung.id, typ)}
         />
       )}
     </>
