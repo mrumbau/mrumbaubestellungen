@@ -47,7 +47,11 @@ function makeSupabaseMock(bestellung: Bestellung, haendler: Haendler[]) {
       }
       // haendler
       const h: Record<string, unknown> = {
-        select: () => h,
+        // findeHaendlerId holt den ganzen Stamm: .select(...) direkt awaited
+        select: () => ({
+          ...h,
+          then: (res: (v: { data: Haendler[] }) => unknown) => res({ data: haendler }),
+        }),
         eq: (spalte: string, wert: unknown) => {
           if (spalte === "id") {
             const treffer = haendler.find((x) => x.id === wert) ?? null;
@@ -185,3 +189,84 @@ describe("propagateAnalyseFields — Faelligkeit aus Zahlungsziel", () => {
 
 // Nicht benutzt, aber haelt vi im Import-Graph konsistent mit den anderen Tests.
 void vi;
+
+// =====================================================================
+// Fehlende Haendler-Verknuepfung nachtragen (22.09.2026)
+// =====================================================================
+
+/**
+ * haendler_id wurde bisher nur beim Anlegen gesetzt. War der Haendler da
+ * nicht aufloesbar, blieb das Feld fuer immer leer — bei 179 von 377
+ * Bestellungen. Diese Tests sichern die Selbstheilung, vor allem die Regel
+ * "nur bei Eindeutigkeit": in den echten Daten trifft "Amazon Business" zwei
+ * Stammsaetze (amazon.de und amazon.com).
+ */
+describe("propagateAnalyseFields — Haendler-Verknuepfung nachtragen", () => {
+  const H = (id: string, name: string): Haendler =>
+    ({ id, name, immer_vorausbezahlt: false, zahlungsziel_tage: null });
+
+  it("verknuepft bei exaktem Namen", async () => {
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: null, haendler_name: "Hold & Spada" },
+      [H("h-1", "Hold & Spada"), H("h-2", "Bauhaus")],
+    );
+    await propagateAnalyseFields(client, "b-1", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBe("h-1");
+  });
+
+  it("verknuepft ueber ein eindeutiges Praefix", async () => {
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: null, haendler_name: "Strauss Deutschland GmbH & Co. KG" },
+      [H("h-strauss", "Strauss")],
+    );
+    await propagateAnalyseFields(client, "b-2", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBe("h-strauss");
+  });
+
+  it("verknuepft auch andersherum (Stammsatz laenger als Bestellung)", async () => {
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: null, haendler_name: "CHECK24" },
+      [H("h-c24", "CHECK24 Vergleichsportal Autoteile GmbH")],
+    );
+    await propagateAnalyseFields(client, "b-3", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBe("h-c24");
+  });
+
+  it("verknuepft NICHT, wenn mehrere Stammsaetze passen (Amazon-Fall)", async () => {
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: null, haendler_name: "Amazon Business" },
+      [H("h-de", "Amazon"), H("h-com", "Amazon")],
+    );
+    await propagateAnalyseFields(client, "b-4", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBeUndefined();
+  });
+
+  it("verknuepft NICHT ohne passenden Stammsatz", async () => {
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: null, haendler_name: "Telekom Deutschland GmbH" },
+      [H("h-1", "Bauhaus")],
+    );
+    await propagateAnalyseFields(client, "b-5", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBeUndefined();
+  });
+
+  it("ruehrt eine bestehende Verknuepfung nicht an", async () => {
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: "h-alt", haendler_name: "Hold & Spada" },
+      [H("h-neu", "Hold & Spada")],
+    );
+    await propagateAnalyseFields(client, "b-6", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBeUndefined();
+  });
+
+  it("nutzt die frisch gefundene Verknuepfung sofort fuer die Stammdaten", async () => {
+    // Ohne das waere vorausbezahlt erst beim naechsten Dokument gesetzt.
+    const { client, updates } = makeSupabaseMock(
+      { ...LEERE_BESTELLUNG, haendler_id: null, haendler_name: "Amazon" },
+      [{ id: "h-amazon", name: "Amazon", immer_vorausbezahlt: true, zahlungsziel_tage: null }],
+    );
+    await propagateAnalyseFields(client, "b-7", analyse(), { mode: "document" });
+    expect(updates[0]?.haendler_id).toBe("h-amazon");
+    expect(updates[0]?.vorausbezahlt).toBe(true);
+  });
+});

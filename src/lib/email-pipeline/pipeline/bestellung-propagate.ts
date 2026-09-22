@@ -158,6 +158,33 @@ export async function propagateAnalyseFields(
     updateFields.projekt_referenz = analyse.projekt_referenz;
   }
 
+  // ----- 22.09.2026 — Fehlende Haendler-Verknuepfung nachtragen -----
+  //
+  // haendler_id wurde bisher AUSSCHLIESSLICH beim Anlegen der Bestellung
+  // gesetzt (bestellung-finden.ts). War der Haendler in diesem Moment nicht
+  // aufloesbar — etwa weil die Rechnung vor der Bestaetigung eintraf oder der
+  // Absender noch nicht im Stamm stand —, blieb das Feld fuer immer leer.
+  // Auch dann, wenn ein spaeteres Dokument den Haendler eindeutig benennt und
+  // haendler_name nachgetragen wurde.
+  //
+  // Das betraf 179 von 377 Bestellungen (47 %). Die Verknuepfung ist aber der
+  // Anker fuer die Match-Stufen 1, 4 und 5, fuer die Haendler-Affinitaet und
+  // fuer die Stammdaten (vorausbezahlt, Zahlungsziel). Fehlt sie, faellt alles
+  // auf Textvergleiche zurueck — dort entstehen die Fehlzuordnungen.
+  //
+  // Jetzt heilt sich das bei jedem weiteren Dokument selbst.
+  let haendlerId = existing.haendler_id;
+  if (!haendlerId && existing.haendler_name) {
+    const gefunden = await findeHaendlerId(supabase, existing.haendler_name);
+    if (gefunden) {
+      updateFields.haendler_id = gefunden;
+      haendlerId = gefunden;
+      logInfo("webhook/email/propagate", "Haendler-Verknuepfung nachgetragen", {
+        bestellungId, haendler: existing.haendler_name, haendlerId: gefunden,
+      });
+    }
+  }
+
   // ----- 21.09.2026 — Haendler-Stammdaten: vorausbezahlt + Zahlungsziel -----
   // Zwei Dinge, die das System bisher aus dem Belegtext zu erraten versuchte,
   // obwohl sie laengst bekannt sind:
@@ -172,7 +199,7 @@ export async function propagateAnalyseFields(
   //
   // Beides nur additiv: gesetzte Werte werden nie ueberschrieben, und ein
   // fehlender Stammsatz aendert schlicht nichts.
-  const stamm = await ladeHaendlerStammdaten(supabase, existing.haendler_id, existing.haendler_name);
+  const stamm = await ladeHaendlerStammdaten(supabase, haendlerId, existing.haendler_name);
 
   // Wie ist_gutschrift eine ODER-Logik: einmal vorausbezahlt bleibt
   // vorausbezahlt. Zurueckgenommen wird das nur von Hand.
@@ -311,4 +338,47 @@ function addiereTage(basis: string | null | undefined, tage: number): string | n
   if (Number.isNaN(d.getTime())) return null;
   d.setUTCDate(d.getUTCDate() + tage);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Sucht den Haendler-Stammsatz zu einem Haendlernamen.
+ *
+ * Zwei Stufen, beide case-insensitiv:
+ *   1. exakter Name
+ *   2. Praefix in beide Richtungen ("Amazon Business" ↔ "Amazon",
+ *      "Tervex bau" ↔ "Tervex Bau – Mjaltor Zekjiri")
+ *
+ * Entscheidend: Es wird NUR verknuepft, wenn genau ein Stammsatz passt. In
+ * den echten Daten trifft "Amazon Business" zwei Eintraege (amazon.de und
+ * amazon.com) — dort waere jede Wahl geraten. Lieber keine Verknuepfung als
+ * eine falsche: eine fehlende faellt beim naechsten Dokument wieder auf, eine
+ * falsche zieht Affinitaet und Stammdaten dauerhaft in die Irre.
+ *
+ * Fail-soft: bei einem Fehler bleibt es bei null, die Pipeline laeuft weiter.
+ */
+async function findeHaendlerId(
+  supabase: SupabaseClient,
+  haendlerName: string,
+): Promise<string | null> {
+  const name = haendlerName.trim();
+  if (name.length < 3) return null;
+
+  try {
+    const { data } = await supabase.from("haendler").select("id, name");
+    const alle = (data ?? []) as Array<{ id: string; name: string | null }>;
+    const ziel = name.toLowerCase();
+
+    const exakt = alle.filter((h) => String(h.name ?? "").toLowerCase().trim() === ziel);
+    if (exakt.length === 1) return exakt[0].id;
+    if (exakt.length > 1) return null;
+
+    const praefix = alle.filter((h) => {
+      const k = String(h.name ?? "").toLowerCase().trim();
+      if (k.length < 3) return false;
+      return ziel.startsWith(k) || k.startsWith(ziel);
+    });
+    return praefix.length === 1 ? praefix[0].id : null;
+  } catch {
+    return null;
+  }
 }
