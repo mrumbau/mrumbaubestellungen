@@ -111,6 +111,7 @@ export type Database = {
           id: string
           kuerzel: string
           name: string
+          nimmt_neue_bestellungen: boolean
           rolle: string
           user_id: string | null
         }
@@ -121,6 +122,7 @@ export type Database = {
           id?: string
           kuerzel: string
           name: string
+          nimmt_neue_bestellungen?: boolean
           rolle: string
           user_id?: string | null
         }
@@ -131,6 +133,7 @@ export type Database = {
           id?: string
           kuerzel?: string
           name?: string
+          nimmt_neue_bestellungen?: boolean
           rolle?: string
           user_id?: string | null
         }
@@ -289,6 +292,7 @@ export type Database = {
           updated_at: string | null
           versanddienstleister: string | null
           voraussichtliche_lieferung: string | null
+          vorausbezahlt: boolean
           vorschlag_konfidenz: number | null
           vorschlag_kuerzel: string | null
           waehrung: string | null
@@ -345,6 +349,7 @@ export type Database = {
           updated_at?: string | null
           versanddienstleister?: string | null
           voraussichtliche_lieferung?: string | null
+          vorausbezahlt?: boolean
           vorschlag_konfidenz?: number | null
           vorschlag_kuerzel?: string | null
           waehrung?: string | null
@@ -401,6 +406,7 @@ export type Database = {
           updated_at?: string | null
           versanddienstleister?: string | null
           voraussichtliche_lieferung?: string | null
+          vorausbezahlt?: boolean
           vorschlag_konfidenz?: number | null
           vorschlag_kuerzel?: string | null
           waehrung?: string | null
@@ -440,155 +446,6 @@ export type Database = {
             columns: ["subunternehmer_id"]
             isOneToOne: false
             referencedRelation: "subunternehmer"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      cardscan_captures: {
-        Row: {
-          confidence_scores: Json | null
-          created_at: string
-          crm1_customer_id: string | null
-          crm1_duration_ms: number | null
-          crm1_error: string | null
-          crm1_reference_number: string | null
-          crm1_status: string | null
-          crm2_customer_id: string | null
-          crm2_duration_ms: number | null
-          crm2_error: string | null
-          crm2_reference_number: string | null
-          crm2_status: string | null
-          duplicate_matches: Json | null
-          duplicate_override: boolean | null
-          extracted_data: Json | null
-          final_data: Json | null
-          id: string
-          llm_duration_ms: number | null
-          ocr_duration_ms: number | null
-          openai_cost_eur: number | null
-          openai_input_tokens: number | null
-          openai_output_tokens: number | null
-          raw_image_path: string | null
-          raw_text: string | null
-          source_meta: Json | null
-          source_type: string
-          status: string
-          updated_at: string
-          user_id: string
-          vision_cost_eur: number | null
-        }
-        Insert: {
-          confidence_scores?: Json | null
-          created_at?: string
-          crm1_customer_id?: string | null
-          crm1_duration_ms?: number | null
-          crm1_error?: string | null
-          crm1_reference_number?: string | null
-          crm1_status?: string | null
-          crm2_customer_id?: string | null
-          crm2_duration_ms?: number | null
-          crm2_error?: string | null
-          crm2_reference_number?: string | null
-          crm2_status?: string | null
-          duplicate_matches?: Json | null
-          duplicate_override?: boolean | null
-          extracted_data?: Json | null
-          final_data?: Json | null
-          id?: string
-          llm_duration_ms?: number | null
-          ocr_duration_ms?: number | null
-          openai_cost_eur?: number | null
-          openai_input_tokens?: number | null
-          openai_output_tokens?: number | null
-          raw_image_path?: string | null
-          raw_text?: string | null
-          source_meta?: Json | null
-          source_type: string
-          status?: string
-          updated_at?: string
-          user_id: string
-          vision_cost_eur?: number | null
-        }
-        Update: {
-          confidence_scores?: Json | null
-          created_at?: string
-          crm1_customer_id?: string | null
-          crm1_duration_ms?: number | null
-          crm1_error?: string | null
-          crm1_reference_number?: string | null
-          crm1_status?: string | null
-          crm2_customer_id?: string | null
-          crm2_duration_ms?: number | null
-          crm2_error?: string | null
-          crm2_reference_number?: string | null
-          crm2_status?: string | null
-          duplicate_matches?: Json | null
-          duplicate_override?: boolean | null
-          extracted_data?: Json | null
-          final_data?: Json | null
-          id?: string
-          llm_duration_ms?: number | null
-          ocr_duration_ms?: number | null
-          openai_cost_eur?: number | null
-          openai_input_tokens?: number | null
-          openai_output_tokens?: number | null
-          raw_image_path?: string | null
-          raw_text?: string | null
-          source_meta?: Json | null
-          source_type?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
-          vision_cost_eur?: number | null
-        }
-        Relationships: []
-      }
-      cardscan_sync_errors: {
-        Row: {
-          acknowledged: boolean | null
-          acknowledged_at: string | null
-          acknowledged_by: string | null
-          capture_id: string
-          created_at: string
-          crm: string
-          error_details: Json | null
-          error_message: string
-          error_type: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          acknowledged?: boolean | null
-          acknowledged_at?: string | null
-          acknowledged_by?: string | null
-          capture_id: string
-          created_at?: string
-          crm: string
-          error_details?: Json | null
-          error_message: string
-          error_type: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          acknowledged?: boolean | null
-          acknowledged_at?: string | null
-          acknowledged_by?: string | null
-          capture_id?: string
-          created_at?: string
-          crm?: string
-          error_details?: Json | null
-          error_message?: string
-          error_type?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cardscan_sync_errors_capture_id_fkey"
-            columns: ["capture_id"]
-            isOneToOne: false
-            referencedRelation: "cardscan_captures"
             referencedColumns: ["id"]
           },
         ]
@@ -950,6 +807,8 @@ export type Database = {
       }
       haendler: {
         Row: {
+          immer_vorausbezahlt: boolean
+          zahlungsziel_tage: number | null
           confirmed_at: string | null
           created_at: string
           domain: string
@@ -959,6 +818,8 @@ export type Database = {
           url_muster: string[] | null
         }
         Insert: {
+          immer_vorausbezahlt?: boolean
+          zahlungsziel_tage?: number | null
           confirmed_at?: string | null
           created_at?: string
           domain: string
@@ -968,6 +829,8 @@ export type Database = {
           url_muster?: string[] | null
         }
         Update: {
+          immer_vorausbezahlt?: boolean
+          zahlungsziel_tage?: number | null
           confirmed_at?: string | null
           created_at?: string
           domain?: string
@@ -1560,6 +1423,37 @@ export type Database = {
           total_mails: number | null
         }
         Relationships: []
+      }
+      v_rechnungseingang: {
+        Row: {
+          absender: string | null
+          bestellnummer: string | null
+          bestellung_id: string | null
+          bestellung_status: string | null
+          besteller_kuerzel: string | null
+          betrag: number | null
+          betreff: string | null
+          eingang: string | null
+          erwarteter_typ: string | null
+          fehler: string | null
+          haendler_name: string | null
+          hat_anhang: boolean | null
+          id: string | null
+          ki_typ: string | null
+          kontrolle: string | null
+          ordner: string | null
+          ordner_passt_nicht: boolean | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_processing_log_bestellung_id_fkey"
+            columns: ["bestellung_id"]
+            isOneToOne: false
+            referencedRelation: "bestellungen"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_pipeline_logs: {
         Row: {

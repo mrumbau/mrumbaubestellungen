@@ -78,3 +78,51 @@ export function describeAge(daysOld: number): string {
   if (whole < 30) return `seit über zwei Wochen`;
   return `seit über einem Monat`;
 }
+
+/**
+ * 22.09.2026 — Nächster Auswahl-Zustand für die Pool-Mehrfachauswahl.
+ *
+ * Reine Funktion, weil hier die Fehler sitzen: Bereichsauswahl per
+ * Umschalttaste muss sich auf die SICHTBARE Reihenfolge beziehen, in beide
+ * Richtungen funktionieren und beim Abwählen genauso arbeiten wie beim
+ * Auswählen.
+ *
+ * Verhalten wie in gängigen Dateimanagern: Der Anker (die zuletzt
+ * angeklickte Karte) bestimmt die Richtung. War der Anker ausgewählt, wird
+ * der Bereich ausgewählt; war er es nicht, wird er abgewählt.
+ *
+ * @param selected    aktuell ausgewählte IDs
+ * @param id          angeklickte ID
+ * @param shiftKey    Umschalttaste gedrückt
+ * @param anker       zuletzt angeklickte ID, oder null
+ * @param reihenfolge IDs in der sichtbaren Reihenfolge
+ */
+export function naechsteAuswahl(
+  selected: ReadonlySet<string>,
+  id: string,
+  shiftKey: boolean,
+  anker: string | null,
+  reihenfolge: readonly string[],
+): Set<string> {
+  const next = new Set(selected);
+
+  if (shiftKey && anker && anker !== id) {
+    const von = reihenfolge.indexOf(anker);
+    const bis = reihenfolge.indexOf(id);
+    if (von !== -1 && bis !== -1) {
+      const [a, b] = von < bis ? [von, bis] : [bis, von];
+      const auswaehlen = selected.has(anker);
+      for (let i = a; i <= b; i++) {
+        if (auswaehlen) next.add(reihenfolge[i]);
+        else next.delete(reihenfolge[i]);
+      }
+      return next;
+    }
+    // Anker oder Ziel nicht mehr sichtbar (gefiltert, verschwunden) →
+    // auf einfaches Umschalten zurückfallen statt nichts zu tun.
+  }
+
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}

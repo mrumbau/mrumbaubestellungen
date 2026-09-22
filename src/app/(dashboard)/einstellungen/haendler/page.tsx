@@ -16,7 +16,7 @@ export default async function HaendlerPage() {
   const [{ data: haendler }, { data: statsRows }] = await Promise.all([
     supabase
       .from("haendler")
-      .select("id, name, domain, email_absender, url_muster")
+      .select("id, name, domain, email_absender, url_muster, immer_vorausbezahlt, zahlungsziel_tage")
       .order("name", { ascending: true }),
     supabase.from("bestellungen").select("haendler_name, status, created_at"),
   ]);

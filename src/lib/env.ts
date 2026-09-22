@@ -35,11 +35,11 @@ const envSchema = z.object({
   MS_CLIENT_SECRET: z.string().min(1),
   MS_MAILBOX: z.string().email(),
 
-  // ── CardScan (optionale Features) ───────────────────────────────────────
+  // ── Google Cloud Vision (OCR-Fallback der Email-Pipeline) ───────────────
+  // 21.09.2026 — kam urspruenglich mit dem CardScan-Modul. Das Modul ist
+  // entfernt, der Key bleibt: pipeline/vision-fallback.ts liest damit
+  // Rechnungs-Anhaenge, die GPT nicht entziffern konnte.
   GOOGLE_CLOUD_VISION_API_KEY: z.string().optional(),
-  DAS_PROGRAMM_TOKEN_CRM1: z.string().optional(),
-  DAS_PROGRAMM_TOKEN_CRM2: z.string().optional(),
-  DAS_PROGRAMM_ENDPOINT: z.string().url().optional(),
 
   // ── SMTP (Email-Versand für Erinnerungen / DATEV) ───────────────────────
   SMTP_USER: z.string().email().optional(),

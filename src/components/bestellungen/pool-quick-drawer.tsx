@@ -32,6 +32,9 @@ import { haendlerDisplay } from "@/lib/haendler-display";
 import { usePoolReservation } from "@/lib/hooks/use-pool-reservation";
 import type { Bestellung } from "./types";
 
+/** Die vier Belegarten einer Bestellung. */
+type Dokumenttyp = "bestellbestaetigung" | "lieferschein" | "rechnung" | "versandbestaetigung";
+
 export interface PoolQuickDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -39,6 +42,17 @@ export interface PoolQuickDrawerProps {
   haendlerDomain?: string | null;
   profil: { kuerzel: string; rolle: string; name: string };
   bestellerOptions?: BestellerOption[];
+  /**
+   * 22.09.2026 — Beleg-Vorschau direkt aus dem Drawer.
+   *
+   * Vorher musste man erst „Volldetails öffnen" drücken, um eine Bestätigung
+   * oder Rechnung zu sehen — beim Zuordnen im Pool ist genau das aber die
+   * Frage, die man beantworten muss. Die Vorschau-Mechanik samt
+   * Mehrfach-Dokument-Navigation existiert bereits (useBestellungPreview),
+   * sie war hier nur nicht angeschlossen.
+   */
+  onPreview?: (typ: Dokumenttyp) => void;
+  onPreload?: (typ: Dokumenttyp) => void;
 }
 
 export function PoolQuickDrawer({
@@ -48,6 +62,8 @@ export function PoolQuickDrawer({
   haendlerDomain,
   profil,
   bestellerOptions,
+  onPreview,
+  onPreload,
 }: PoolQuickDrawerProps) {
   // 03.06.2026 (Pool 2.0 Sprint 2) — Auto-Reserve sobald der Drawer 1.5s
   // stabil offen ist. Hook handelt Refresh alle 4min + Release beim
@@ -61,6 +77,19 @@ export function PoolQuickDrawer({
     bestellungId: open && bestellung && isPoolItem ? bestellung.id : null,
     enabled: open && isPoolItem,
   });
+
+  // 22.09.2026 — Welche Belege liegen vor? Reihenfolge wie im Ablauf:
+  // Bestätigung → Lieferschein → Rechnung → Versand.
+  const vorhandeneDokumente = ((): Array<{ typ: Dokumenttyp; label: string }> => {
+    if (!bestellung) return [];
+    const alle = [
+      { typ: "bestellbestaetigung" as const, label: "Bestätigung", da: bestellung.hat_bestellbestaetigung },
+      { typ: "lieferschein" as const, label: "Lieferschein", da: bestellung.hat_lieferschein },
+      { typ: "rechnung" as const, label: "Rechnung", da: bestellung.hat_rechnung },
+      { typ: "versandbestaetigung" as const, label: "Versand", da: bestellung.hat_versandbestaetigung },
+    ];
+    return alle.filter((d) => d.da).map(({ typ, label }) => ({ typ, label }));
+  })();
 
   // Defensive: wenn der Drawer öffnet bevor die Bestellung gefunden wurde
   // (Race beim ersten Mount), rendern wir das Skelett — vermeidet null-
@@ -195,7 +224,7 @@ export function PoolQuickDrawer({
         />
       </section>
 
-      {/* Doku-Status — was ist schon da, was fehlt */}
+      {/* Doku-Status — was ist schon da, was fehlt, und direkt ansehbar */}
       <section aria-label="Dokumente">
         <div className="text-[11px] uppercase tracking-[0.14em] text-foreground-subtle mb-2">Dokumente</div>
         <div className="flex items-center gap-2">
@@ -205,11 +234,36 @@ export function PoolQuickDrawer({
             hat_rechnung={bestellung.hat_rechnung}
             hat_versandbestaetigung={bestellung.hat_versandbestaetigung}
             bestellungsart={bestellung.bestellungsart}
+            onPreview={onPreview}
+            onPreload={onPreload}
           />
           <span className="text-[11px] text-foreground-faint">
             B = Bestätigung · L = Lieferschein · R = Rechnung · V = Versand
           </span>
         </div>
+
+        {/* 22.09.2026 — Beschriftete Knöpfe zusätzlich zu den Punkten.
+            Die Punkte sind bewusst klein gehalten (Tabellen-Herkunft), als
+            alleiniger Einstieg zum Ansehen aber zu unscheinbar: man sieht
+            ihnen nicht an, dass sie anklickbar sind. Gezeigt wird nur, was
+            tatsächlich vorliegt — ein Knopf für ein fehlendes Dokument wäre
+            eine Sackgasse. */}
+        {onPreview && vorhandeneDokumente.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {vorhandeneDokumente.map((d) => (
+              <button
+                key={d.typ}
+                type="button"
+                onClick={() => onPreview(d.typ)}
+                onMouseEnter={() => onPreload?.(d.typ)}
+                onFocus={() => onPreload?.(d.typ)}
+                className="rounded-md border border-line bg-canvas px-2.5 py-1.5 text-[12px] text-foreground hover:border-line-strong hover:bg-surface-hover transition-colors"
+              >
+                {d.label} ansehen
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Meta */}

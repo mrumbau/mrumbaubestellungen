@@ -66,7 +66,7 @@ Alle drei Bestell-Personen teilen sich `info@mrumbau.de` — alle eingehenden Ma
 
 ## Stand der Implementation (12.05.2026)
 
-- UI-Audit: ~78/90 echte Findings adressiert (~87%), CardScan separater Audit
+- UI-Audit: ~78/90 echte Findings adressiert (~87%)
 - Decomposition heute: 4618 → 1946 LOC in 4 Monolith-Files (-58%)
 - 394 Tests grün, Production-Build clean
 - Foundation-System: 6 Status-Tokens × 3-Part-Triplet, Industrial-SVG-Texturen, OKLCH-Tinted-Neutrals, DM Sans + Barlow Condensed + JetBrains Mono
