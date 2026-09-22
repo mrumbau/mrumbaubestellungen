@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -22,6 +23,10 @@ export type Haendler = {
   domain: string;
   url_muster: string[];
   email_absender: string[];
+  /** 21.09.2026 — bei diesem Händler wird grundsätzlich im Voraus bezahlt. */
+  immer_vorausbezahlt?: boolean | null;
+  /** 21.09.2026 — Zahlungsziel in Tagen. Nur Rückfall, wenn die Rechnung keins nennt. */
+  zahlungsziel_tage?: number | null;
 };
 
 export type HaendlerStat = {
@@ -35,6 +40,9 @@ type FormState = {
   domain: string;
   urlMuster: string;
   emailAbsender: string;
+  immerVorausbezahlt: boolean;
+  /** Als Text gehalten, damit das Feld leerbar bleibt (= unbekannt). */
+  zahlungszielTage: string;
 };
 
 type HaendlerPayload = {
@@ -42,9 +50,14 @@ type HaendlerPayload = {
   domain: string;
   url_muster: string[];
   email_absender: string[];
+  immer_vorausbezahlt: boolean;
+  zahlungsziel_tage: number | null;
 };
 
-const emptyForm: FormState = { name: "", domain: "", urlMuster: "", emailAbsender: "" };
+const emptyForm: FormState = {
+  name: "", domain: "", urlMuster: "", emailAbsender: "",
+  immerVorausbezahlt: false, zahlungszielTage: "",
+};
 
 export function HaendlerClient({
   initialHaendler,
@@ -84,6 +97,8 @@ export function HaendlerClient({
       domain: h.domain,
       urlMuster: h.url_muster.join(", "),
       emailAbsender: h.email_absender.join(", "),
+      immerVorausbezahlt: h.immer_vorausbezahlt === true,
+      zahlungszielTage: h.zahlungsziel_tage != null ? String(h.zahlungsziel_tage) : "",
     });
     setEditId(h.id);
     setShowForm(true);
@@ -101,12 +116,27 @@ export function HaendlerClient({
       list.setError("Name und Domain sind Pflichtfelder.");
       return;
     }
+    const ziel = form.zahlungszielTage.trim();
+    if (ziel !== "" && !/^\d{1,3}$/.test(ziel)) {
+      list.setError("Zahlungsziel: bitte eine ganze Zahl von 0 bis 365 Tagen, oder leer lassen.");
+      return;
+    }
+    if (ziel !== "" && Number(ziel) > 365) {
+      list.setError("Zahlungsziel: höchstens 365 Tage.");
+      return;
+    }
 
     const payload: HaendlerPayload = {
       name: form.name.trim(),
       domain: form.domain.trim(),
       url_muster: form.urlMuster.split(",").map((s) => s.trim()).filter(Boolean),
       email_absender: form.emailAbsender.split(",").map((s) => s.trim()).filter(Boolean),
+      immer_vorausbezahlt: form.immerVorausbezahlt,
+      // Leeres Feld heißt "unbekannt" — dann bleibt die Fälligkeit leer,
+      // statt ein Datum zu erfinden.
+      zahlungsziel_tage: form.zahlungszielTage.trim() === ""
+        ? null
+        : Number(form.zahlungszielTage.trim()),
     };
 
     const saved = await list.submit({ id: editId, payload });
@@ -177,6 +207,33 @@ export function HaendlerClient({
               placeholder="bestellung@bauhaus.de, noreply@bauhaus.de"
               value={form.emailAbsender}
               onChange={(e) => setForm((f) => ({ ...f, emailAbsender: e.target.value }))}
+              wrapperClassName="md:col-span-2"
+            />
+            <label className="md:col-span-2 flex items-start gap-2.5 rounded-md border border-line bg-canvas px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.immerVorausbezahlt}
+                onChange={(e) => setForm((f) => ({ ...f, immerVorausbezahlt: e.target.checked }))}
+                className="mt-0.5 h-4 w-4 accent-[var(--mr-red)]"
+              />
+              <span className="flex flex-col">
+                <span className="text-body-sm font-medium text-foreground">
+                  Immer vorausbezahlt
+                </span>
+                <span className="text-meta text-foreground-muted">
+                  Für Händler wie Amazon Business oder PayPal-Shops. Bestellungen
+                  brauchen dann keine Rechnungsfreigabe — sie bleiben aber sichtbar,
+                  damit die Lieferung kontrolliert werden kann.
+                </span>
+              </span>
+            </label>
+            <Input
+              label="Zahlungsziel (Tage)"
+              hint="Nur Rückfall: greift, wenn auf der Rechnung selbst kein Fälligkeitsdatum steht. Leer lassen, wenn unbekannt."
+              placeholder="z. B. 30"
+              inputMode="numeric"
+              value={form.zahlungszielTage}
+              onChange={(e) => setForm((f) => ({ ...f, zahlungszielTage: e.target.value }))}
               wrapperClassName="md:col-span-2"
             />
             <div className="md:col-span-2 flex items-center gap-2 pt-1">
@@ -271,6 +328,12 @@ function HaendlerRow({
           <span className="text-[12px] font-mono-amount text-foreground-muted bg-canvas border border-line-subtle rounded px-1.5 py-0.5">
             {haendler.domain}
           </span>
+          {haendler.immer_vorausbezahlt && (
+            <Badge tone="success" size="sm">Vorausbezahlt</Badge>
+          )}
+          {haendler.zahlungsziel_tage != null && (
+            <Badge tone="muted" size="sm">{haendler.zahlungsziel_tage} Tage Ziel</Badge>
+          )}
         </div>
         {haendler.url_muster.length > 0 && (
           <p className="text-[12px] text-foreground-subtle mt-1 truncate">

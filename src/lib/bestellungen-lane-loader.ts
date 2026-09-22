@@ -43,7 +43,7 @@ export const HARD_CAP = 500;
 // 03.06.2026 — bezahlt_am/bezahlt_von für PayPal-Badge + Mahnung-Logik.
 // dokumente(bezahlt_bereits, zahlungsmethode) für embedded PayPal-Detection.
 const BESTELLUNG_SELECT =
-  "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, bezahlt_am, bezahlt_von, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, updated_at, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, bezahlt_bereits, zahlungsmethode, typ)";
+  "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, bezahlt_am, bezahlt_von, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, vorausbezahlt, updated_at, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, bezahlt_bereits, zahlungsmethode, typ)";
 
 export interface LaneLoadParams {
   lane: Lane;
@@ -370,6 +370,7 @@ export async function loadLaneData(
   };
   type BestellungMitDokus = {
     id: string;
+    vorausbezahlt?: boolean | null;
     dokumente?: DokuRow[] | null;
   } & Record<string, unknown>;
 
@@ -392,6 +393,14 @@ export async function loadLaneData(
           zahlungsmethode = d.zahlungsmethode ?? "andere";
         }
       }
+      // 21.09.2026 — Vorausbezahlt aus den Haendler-Stammdaten zaehlt hier
+      // genauso wie ein KI-erkanntes Bezahlt-Signal am Beleg. Sonst traegt
+      // die Liste bei Amazon-Bestellungen kein Bezahlt-Abzeichen, obwohl die
+      // Detailseite sie laengst als vorausbezahlt fuehrt.
+      if (!bezahlt_bereits && b.vorausbezahlt === true) {
+        bezahlt_bereits = true;
+      }
+
       const { dokumente: _drop, ...rest } = b;
       void _drop;
       return {

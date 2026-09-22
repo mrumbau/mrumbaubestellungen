@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, domain, url_muster, email_absender } = body;
+    const { name, domain, url_muster, email_absender, immer_vorausbezahlt, zahlungsziel_tage } = body;
 
     if (!name || !domain) {
       return NextResponse.json({ error: "Name und Domain sind Pflichtfelder" }, { status: 400 });
@@ -94,6 +94,14 @@ export async function POST(request: NextRequest) {
         domain,
         url_muster: url_muster || [],
         email_absender: email_absender || [],
+        // 21.09.2026 — Stammdaten fuer vorausbezahlte Haendler. Obergrenze
+        // 365 Tage: alles darueber ist in der Praxis ein Tippfehler, und ein
+        // falsches Faelligkeitsdatum ist schaedlicher als gar keins.
+        immer_vorausbezahlt: immer_vorausbezahlt === true,
+        zahlungsziel_tage:
+          Number.isInteger(zahlungsziel_tage) && zahlungsziel_tage >= 0 && zahlungsziel_tage <= 365
+            ? zahlungsziel_tage
+            : null,
       })
       .select()
       .single();
