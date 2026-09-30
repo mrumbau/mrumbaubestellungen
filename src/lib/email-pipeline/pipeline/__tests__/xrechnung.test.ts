@@ -250,3 +250,84 @@ describe("tryParseEInvoiceFromAttachments — High-Level", () => {
     expect(result).toBeNull();
   });
 });
+
+/**
+ * 30.09.2026 — ZUGFeRD-PDFs. Der Zweig war seit dem ersten Tag tot
+ * (`pdfDoc.getAttachments()` gibt es in pdf-lib nicht), was in sechs
+ * Monaten niemandem auffiel, weil er still nichts lieferte statt zu
+ * scheitern. Diese Tests bauen echte PDFs und pruefen den ganzen Weg.
+ */
+describe("extractEInvoiceXml — ZUGFeRD im PDF", () => {
+  const CII = `<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100">
+  <rsm:ExchangedDocument><ram:ID>RE-4711</ram:ID></rsm:ExchangedDocument>
+</rsm:CrossIndustryInvoice>`;
+
+  async function pdfMitAnhang(
+    eintraege: Array<{ name: string; inhalt: string }>,
+  ): Promise<string> {
+    const { PDFDocument } = await import("pdf-lib");
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    for (const e of eintraege) {
+      await doc.attach(Buffer.from(e.inhalt, "utf-8"), e.name, { mimeType: "application/xml" });
+    }
+    return Buffer.from(await doc.save()).toString("base64");
+  }
+
+  it("liest die eingebettete XML aus einem ZUGFeRD-PDF", async () => {
+    const base64 = await pdfMitAnhang([{ name: "factur-x.xml", inhalt: CII }]);
+    const xml = await extractEInvoiceXml({
+      name: "Rechnung_2026_09.pdf",
+      mime_type: "application/pdf",
+      base64,
+    });
+    expect(xml).toContain("CrossIndustryInvoice");
+  });
+
+  it("findet die Rechnung auch unter einem unueblichen Dateinamen", async () => {
+    // Der Name ist nicht streng genormt — verworfen wird am Inhalt.
+    const base64 = await pdfMitAnhang([{ name: "beleg_2026.xml", inhalt: CII }]);
+    const xml = await extractEInvoiceXml({
+      name: "Rechnung.pdf",
+      mime_type: "application/pdf",
+      base64,
+    });
+    expect(xml).toContain("CrossIndustryInvoice");
+  });
+
+  it("ignoriert eingebettete Dateien, die keine E-Rechnung sind", async () => {
+    const base64 = await pdfMitAnhang([
+      { name: "lieferhinweis.xml", inhalt: "<hinweis>Ware kommt Montag</hinweis>" },
+    ]);
+    const xml = await extractEInvoiceXml({
+      name: "Rechnung.pdf",
+      mime_type: "application/pdf",
+      base64,
+    });
+    expect(xml).toBeNull();
+  });
+
+  it("nimmt die echte Rechnung, wenn noch andere Dateien im PDF stecken", async () => {
+    const base64 = await pdfMitAnhang([
+      { name: "agb.xml", inhalt: "<agb>Zahlbar sofort</agb>" },
+      { name: "factur-x.xml", inhalt: CII },
+    ]);
+    const xml = await extractEInvoiceXml({
+      name: "Rechnung.pdf",
+      mime_type: "application/pdf",
+      base64,
+    });
+    expect(xml).toContain("CrossIndustryInvoice");
+  });
+
+  it("liefert null bei einem PDF ohne eingebettete Datei", async () => {
+    const base64 = await pdfMitAnhang([]);
+    const xml = await extractEInvoiceXml({
+      name: "Rechnung.pdf",
+      mime_type: "application/pdf",
+      base64,
+    });
+    expect(xml).toBeNull();
+  });
+});
