@@ -4,6 +4,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { PoolConfigClient } from "./pool-config-client";
 
+import { istVerwaltung } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 /**
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 export default async function PoolConfigPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
-  if (profil.rolle !== "admin") redirect("/einstellungen");
+  if (!istVerwaltung(profil.rolle)) redirect("/einstellungen");
 
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase

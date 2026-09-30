@@ -20,7 +20,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { getBenutzerProfil, type BenutzerProfil, type Rolle } from "@/lib/auth";
+import { getBenutzerProfil, type BenutzerProfil } from "@/lib/auth";
+import { istVerwaltung, type Rolle } from "@/lib/rollen";
 import { ERRORS } from "@/lib/errors";
 
 export type AuthResult =
@@ -37,7 +38,15 @@ export async function requireAuth(rolen?: Rolle[]): Promise<AuthResult> {
       ),
     };
   }
-  if (rolen && rolen.length > 0 && !rolen.includes(profil.rolle)) {
+  // 30.09.2026 — wie in requireRoles(): "admin" heisst hier "darf verwalten",
+  // die Geschaeftsfuehrung faellt also mit hinein. Nur Testdaten und die
+  // DSGVO-Loeschung fragen streng mit istNurAdmin().
+  const rollePasst =
+    !rolen ||
+    rolen.length === 0 ||
+    rolen.includes(profil.rolle) ||
+    (rolen.includes("admin") && istVerwaltung(profil.rolle));
+  if (!rollePasst) {
     return {
       response: NextResponse.json(
         { error: ERRORS.KEINE_BERECHTIGUNG },

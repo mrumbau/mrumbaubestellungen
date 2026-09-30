@@ -14,6 +14,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { isValidUUID } from "@/lib/validation";
 import { logError } from "@/lib/logger";
 
+import { istVerwaltung } from "@/lib/rollen";
 type FreigabenResult = { success: true } | { success: false; error: string; code?: number };
 
 export async function freigebenBestellung(
@@ -28,7 +29,7 @@ export async function freigebenBestellung(
   if (!profil) {
     return { success: false, error: "Nicht authentifiziert", code: 401 };
   }
-  if (profil.rolle !== "admin" && profil.rolle !== "besteller") {
+  if (!istVerwaltung(profil.rolle) && profil.rolle !== "besteller") {
     return { success: false, error: "Keine Berechtigung", code: 403 };
   }
 
@@ -47,7 +48,7 @@ export async function freigebenBestellung(
   const istSuOderAbo =
     bestellung.bestellungsart === "subunternehmer" || bestellung.bestellungsart === "abo";
   if (
-    profil.rolle !== "admin" &&
+    !istVerwaltung(profil.rolle) &&
     bestellung.besteller_kuerzel !== profil.kuerzel &&
     !istSuOderAbo
   ) {

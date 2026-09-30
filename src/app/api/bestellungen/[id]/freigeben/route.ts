@@ -6,6 +6,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 
+import { istVerwaltung } from "@/lib/rollen";
 // POST /api/bestellungen/[id]/freigeben – Rechnung freigeben
 export async function POST(
   request: NextRequest,
@@ -45,7 +46,7 @@ export async function POST(
     // SU/Abo: jeder Besteller darf freigeben (nicht an einen Besteller gebunden)
     const istSuOderAbo = bestellung.bestellungsart === "subunternehmer" || bestellung.bestellungsart === "abo";
     if (
-      profil.rolle !== "admin" &&
+      !istVerwaltung(profil.rolle) &&
       bestellung.besteller_kuerzel !== profil.kuerzel &&
       !istSuOderAbo
     ) {

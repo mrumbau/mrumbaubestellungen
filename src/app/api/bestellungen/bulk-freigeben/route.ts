@@ -19,6 +19,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 
+import { istVerwaltung } from "@/lib/rollen";
 const ROUTE_TAG = "/api/bestellungen/bulk-freigeben";
 
 const BodySchema = z.object({
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
       const istSuOderAbo =
         b.bestellungsart === "subunternehmer" || b.bestellungsart === "abo";
       const darfFreigeben =
-        profil.rolle === "admin" ||
+        istVerwaltung(profil.rolle) ||
         b.besteller_kuerzel === profil.kuerzel ||
         istSuOderAbo;
       if (!darfFreigeben) {

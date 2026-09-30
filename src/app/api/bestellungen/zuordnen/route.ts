@@ -6,6 +6,8 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 
+import { istVerwaltung } from "@/lib/rollen";
+import { darfBestellungenErhalten } from "@/lib/rollen";
 // POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen.
 // 22.05.2026 — von admin-only auf admin+besteller geöffnet, weil "Nicht zugeordnet"
 // jetzt auf der /todo-Page für alle sichtbar ist (jeder soll claimen können).
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest) {
       if (!row) {
         return NextResponse.json({ error: "Besteller nicht gefunden" }, { status: 404 });
       }
-      if (row.rolle !== "besteller") {
+      if (!darfBestellungenErhalten(row.rolle)) {
         return NextResponse.json(
           { error: "Ziel-Account ist kein Besteller — Zuordnung nicht erlaubt" },
           { status: 400 },
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
     // 22.05.2026 — zuordnung_methode kennzeichnet den ausführenden Actor:
     // "manuell_admin" wenn Admin, "manuell_besteller" wenn Besteller (für Audit).
     const zuordnungsMethode =
-      profil?.rolle === "admin" ? "manuell_admin" : "manuell_besteller";
+      istVerwaltung(profil?.rolle) ? "manuell_admin" : "manuell_besteller";
     const { error } = await supabase
       .from("bestellungen")
       .update({

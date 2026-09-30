@@ -10,6 +10,7 @@ import { BuchhaltungTable } from "@/components/buchhaltung/buchhaltung-table";
 import { PageHero } from "@/components/ui/page-hero";
 import type { BuchhaltungRow } from "@/components/buchhaltung/types";
 
+import { istVerwaltung } from "@/lib/rollen";
 // BuchhaltungRow + isFaelligBald + isUeberfaellig sind nach
 // src/components/buchhaltung/types.ts ausgelagert.
 
@@ -146,7 +147,7 @@ export function BuchhaltungClient({
     URL.revokeObjectURL(url);
   }
 
-  const kannBezahlen = rolle === "buchhaltung" || rolle === "admin";
+  const kannBezahlen = rolle === "buchhaltung" || istVerwaltung(rolle);
 
   // 07.05.2026 — toggleBezahlt arbeitet jetzt auf DOKUMENT-Ebene (eine
   // Bestellung kann mehrere Rechnungen haben, jede mit eigenem Bezahlt-Status).

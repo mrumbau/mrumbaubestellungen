@@ -21,6 +21,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logError, logInfo } from "@/lib/logger";
 
+import { istVerwaltung } from "@/lib/rollen";
 const ROUTE = "pipeline/reply-action";
 
 export const TOKEN_RE = /\[REF:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i;
@@ -230,14 +231,14 @@ export async function applyReplyAction(
   }
 
   // 2. Action-spezifische Rollen-Validation
-  if (action === "freigeben" && senderProfil.rolle !== "besteller" && senderProfil.rolle !== "admin") {
+  if (action === "freigeben" && senderProfil.rolle !== "besteller" && !istVerwaltung(senderProfil.rolle)) {
     return { success: false, skipped: true, reason: "rolle_unzulaessig" };
   }
-  if (action === "bezahlt" && senderProfil.rolle !== "buchhaltung" && senderProfil.rolle !== "admin") {
+  if (action === "bezahlt" && senderProfil.rolle !== "buchhaltung" && !istVerwaltung(senderProfil.rolle)) {
     return { success: false, skipped: true, reason: "rolle_unzulaessig" };
   }
   // 02.06.2026 (Pool Phase 5) — UEBERNEHMEN braucht besteller- oder admin-Rolle.
-  if (action === "uebernehmen" && senderProfil.rolle !== "besteller" && senderProfil.rolle !== "admin") {
+  if (action === "uebernehmen" && senderProfil.rolle !== "besteller" && !istVerwaltung(senderProfil.rolle)) {
     return { success: false, skipped: true, reason: "rolle_unzulaessig" };
   }
 

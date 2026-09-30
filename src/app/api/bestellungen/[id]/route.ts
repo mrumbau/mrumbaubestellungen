@@ -7,6 +7,7 @@ import { ERRORS } from "@/lib/errors";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { requireRoles } from "@/lib/auth";
 
+import { istVerwaltung } from "@/lib/rollen";
 // GET /api/bestellungen/[id] – Details + Dokumente + Abgleich
 export async function GET(
   _request: NextRequest,
@@ -130,7 +131,7 @@ export async function PATCH(
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
-    if (profil.rolle !== "admin") {
+    if (!istVerwaltung(profil.rolle)) {
       const { data: bestellung } = await serviceClient
         .from("bestellungen")
         .select("besteller_kuerzel, bestellungsart")

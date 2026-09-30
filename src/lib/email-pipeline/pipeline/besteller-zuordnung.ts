@@ -21,6 +21,7 @@ import {
 import { logError, logInfo } from "@/lib/logger";
 import type { AnalyseErgebnis } from "./anhang-analyse";
 
+import { BESTELL_ROLLEN } from "@/lib/rollen";
 export interface BestellerZuordnungContext {
   haendlerDomain: string;
   haendlerName: string;
@@ -198,7 +199,7 @@ export async function assignBesteller(
   if (!bestellerKuerzel) {
     const { data: benutzerListe } = await supabase
       .from("benutzer_rollen").select("kuerzel, name, email")
-      .in("rolle", ["besteller", "admin"])
+      .in("rolle", [...BESTELL_ROLLEN])
       // 21.09.2026 — wer keine neuen Bestellungen mehr annimmt, ist auch
       // dann kein Ziel, wenn sein Name noch im Dokument oder im Mailtext
       // auftaucht (alte Lieferadressen, Altbestellungen im Verlauf).

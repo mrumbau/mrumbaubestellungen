@@ -7,6 +7,7 @@ import {
   HARD_CAP,
 } from "@/lib/bestellungen-lane-loader";
 
+import { istVerwaltung } from "@/lib/rollen";
 // Edge-Runtime testweise raus — siehe layout.tsx Begründung.
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function PoolLanePage({
             lane="pool"
             data={data}
             profil={profil}
-            isAdmin={profil?.rolle === "admin"}
+            isAdmin={istVerwaltung(profil?.rolle)}
             projektId={params.projekt_id}
           />
         )}

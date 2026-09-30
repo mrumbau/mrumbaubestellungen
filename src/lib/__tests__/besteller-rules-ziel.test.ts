@@ -28,8 +28,18 @@ describe("pruefeZiel", () => {
     expect(await pruefeZiel(mock(cr), "CR")).toBeNull();
   });
 
-  it("laesst einen Admin durch", async () => {
-    expect(await pruefeZiel(mock({ ...cr, kuerzel: "MH", rolle: "admin" }), "MH")).toBeNull();
+  it("laesst die Geschaeftsfuehrung durch", async () => {
+    const gf = { ...cr, kuerzel: "CR", rolle: "geschaeftsfuehrer" };
+    expect(await pruefeZiel(mock(gf), "CR")).toBeNull();
+  });
+
+  it("nimmt ein Admin-Konto NICHT an", async () => {
+    // 30.09.2026 — vorher durfte eine Regel auf einen Admin zeigen. Das war
+    // falsch: Admin-Konten koennen gar nicht Eigentuemer einer Bestellung
+    // sein, die Regel haette also eine Zuweisung erzeugt, die die Zuordnung
+    // an anderer Stelle ablehnt.
+    const mh = { ...cr, kuerzel: "MH", name: "Mohammed Hawrami", rolle: "admin" };
+    expect(await pruefeZiel(mock(mh), "MH")).not.toBeNull();
   });
 
   it("nimmt ein unbekanntes Kuerzel nicht an", async () => {
@@ -42,7 +52,9 @@ describe("pruefeZiel", () => {
   });
 
   it("nimmt eine fremde Rolle nicht an", async () => {
-    expect(await pruefeZiel(mock({ ...cr, kuerzel: "BU", rolle: "buchhaltung" }), "BU")).toContain("kein Besteller");
+    expect(
+      await pruefeZiel(mock({ ...cr, kuerzel: "BU", rolle: "buchhaltung" }), "BU"),
+    ).toContain("bekommt keine Bestellungen");
   });
 
   it("lehnt ab, wenn die Pruefung selbst scheitert — kein stilles Durchwinken", async () => {

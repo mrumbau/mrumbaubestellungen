@@ -35,6 +35,7 @@ import { logError, logInfo } from "@/lib/logger";
 import { safeCompare } from "@/lib/safe-compare";
 import { ensureReplyToken } from "@/lib/email-pipeline/pipeline/reply-action";
 
+import { BESTELL_ROLLEN } from "@/lib/rollen";
 const BodySchema = z
   .object({
     secret: z.string().optional(),
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     const { data: empfaengerListe } = await supabase
       .from("benutzer_rollen")
       .select("kuerzel, name, email, rolle")
-      .in("rolle", ["besteller", "admin"])
+      .in("rolle", [...BESTELL_ROLLEN])
       .order("name");
 
     if (!empfaengerListe || empfaengerListe.length === 0) {

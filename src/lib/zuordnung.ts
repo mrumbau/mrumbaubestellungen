@@ -6,8 +6,9 @@
  *   - Helper zum Bauen der Dropdown-Optionen pro Zuordnungs-Stelle
  *
  * Regeln (User-präzisiert v2):
- *   • Nur produktive Besteller (rolle='besteller') sind Ziele. Admin-Konten
- *     wie MH fallen raus. Neue Besteller-Accounts erscheinen automatisch
+ *   • Nur wer selbst bestellt, ist Ziel: rolle='besteller' und seit dem
+ *     30.09.2026 auch rolle='geschaeftsfuehrer'. Admin-Konten wie MH fallen
+ *     raus. Neue Besteller-Accounts erscheinen automatisch
  *     weil die Optionen aus benutzer_rollen kommen.
  *   • Aktueller Besitzer wird ausgefiltert — kein no-op-Update auf den
  *     schon gesetzten Wert.
@@ -21,6 +22,8 @@
  *     zurück in Pool (besteller_kuerzel = UNBEKANNT). Nur sichtbar wenn
  *     der aktuelle Owner nicht eh schon UNBEKANNT ist.
  */
+
+import { darfBestellungenErhalten } from "./rollen";
 
 /** Pool-Marker in der DB. */
 export const POOL_KUERZEL = "UNBEKANNT";
@@ -63,8 +66,10 @@ export function getAssignableBesteller(
   const echteBesteller: AssignableBestellerOption[] = alleBesteller
     .filter((b) => {
       // Nur produktive Besteller — Admin/Buchhaltung raus.
+      // 30.09.2026: die Geschaeftsfuehrung bestellt selbst und bleibt drin,
+      // Admins bleiben draussen (sonst landen Bestellungen beim IT-Support).
       // Wenn rolle nicht geliefert wird (Legacy-Caller), defensive durchlassen.
-      if (b.rolle && b.rolle !== "besteller") return false;
+      if (b.rolle && !darfBestellungenErhalten(b.rolle)) return false;
       // Aktueller Owner raus (kein no-op-Update)
       if (b.kuerzel.toUpperCase() === currentNormalized) return false;
       return true;

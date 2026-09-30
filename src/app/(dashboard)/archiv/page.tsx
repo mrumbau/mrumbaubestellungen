@@ -4,6 +4,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import type { ArchivedProjekt, PaidBestellung } from "@/components/archiv/types";
 
+import { istVerwaltung } from "@/lib/rollen";
 // 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1103-LOC-Mega-Component.
 const ArchivClient = dynamicImport(
   () => import("@/components/archiv-client").then((m) => m.ArchivClient),
@@ -165,7 +166,7 @@ export default async function ArchivPage() {
         totalSU: safeSuOrders.length,
         totalVolumen,
       }}
-      istAdmin={profil.rolle === "admin"}
+      istAdmin={istVerwaltung(profil.rolle)}
       limitReached={{
         material: safeMatOrders.length >= HARD_CAP,
         su: safeSuOrders.length >= HARD_CAP,

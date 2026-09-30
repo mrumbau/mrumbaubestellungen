@@ -15,6 +15,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { darfBestellungenErhalten } from "./rollen";
 /**
  * Gibt eine Fehlermeldung zurueck, wenn das Kuerzel kein gueltiges Regelziel
  * ist — oder null, wenn alles passt.
@@ -36,8 +37,8 @@ export async function pruefeZiel(
   if (!data) {
     return `„${kuerzel}" ist kein bekanntes Kürzel.`;
   }
-  if (!["besteller", "admin"].includes(String(data.rolle))) {
-    return `„${kuerzel}" ist kein Besteller — eine Regel kann nur an Besteller oder Admins zuweisen.`;
+  if (!darfBestellungenErhalten(String(data.rolle))) {
+    return `„${kuerzel}" bekommt keine Bestellungen zugewiesen — eine Regel kann nur auf Besteller oder die Geschäftsführung zeigen.`;
   }
   if (data.nimmt_neue_bestellungen === false) {
     return `${data.name} nimmt keine neuen Bestellungen mehr an. Bitte ein anderes Ziel wählen.`;

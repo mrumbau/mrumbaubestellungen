@@ -9,6 +9,7 @@ import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
 import type { Bestellung, Freigabe } from "./types";
 import type { BenutzerProfil } from "@/lib/auth";
 
+import { istVerwaltung } from "@/lib/rollen";
 /**
  * ApprovalPanel (UX-R3, 03.06.2026) — Aktion-Block der Detail-Sidebar.
  *
@@ -90,7 +91,7 @@ export function ApprovalPanel({
   const isMobile = variant === "mobile";
 
   const showVerwerfen =
-    profil.rolle === "admin" ||
+    istVerwaltung(profil.rolle) ||
     (profil.rolle === "besteller" &&
       (bestellung.besteller_kuerzel === profil.kuerzel ||
         bestellung.bestellungsart === "subunternehmer" ||

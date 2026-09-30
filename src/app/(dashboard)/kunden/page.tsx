@@ -3,6 +3,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { KundenClient } from "@/components/kunden-client";
 
+import { istVerwaltung } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 export default async function KundenPage() {
@@ -56,7 +57,7 @@ export default async function KundenPage() {
         created_at: string;
       }>}
       stats={statsMap}
-      istAdmin={profil.rolle === "admin" || profil.rolle === "besteller"}
+      istAdmin={istVerwaltung(profil.rolle) || profil.rolle === "besteller"}
     />
   );
 }

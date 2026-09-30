@@ -60,6 +60,19 @@ export default tseslint.config(
 
       "no-restricted-syntax": [
         "error",
+        // 30.09.2026 — Rollen-Gate. Seit es die Geschaeftsfuehrung gibt, ist
+        // ein direkter Vergleich auf "admin" fast immer falsch: gemeint ist
+        // "darf verwalten", und dann muss istVerwaltung() aus lib/rollen.ts
+        // her. Wirklich nur der Admin ist an genau zwei Stellen gemeint
+        // (Testdaten, DSGVO-Loeschung) — die nutzen istNurAdmin().
+        // Ohne diese Regel faellt ein neuer Vergleich niemandem auf: die
+        // Geschaeftsfuehrung wird dann still ausgesperrt, ohne Fehlermeldung.
+        {
+          selector:
+            "BinaryExpression[operator=/^[!=]==$/] > Literal[value='admin']",
+          message:
+            "Direkter Vergleich auf die Rolle \"admin\". Gemeint ist meist \"darf verwalten\" — nutze istVerwaltung() aus @/lib/rollen, sonst wird die Geschaeftsfuehrung still ausgesperrt. Ist wirklich nur der Admin gemeint (Testdaten, DSGVO-Loeschung), nutze istNurAdmin().",
+        },
         {
           selector: "Literal[value=/\\[#[0-9a-fA-F]{3,8}\\]/]",
           message:
@@ -93,5 +106,13 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // 30.09.2026 — lib/rollen.ts definiert die Rollen selbst; dort MUSS direkt
+    // verglichen werden. Steht bewusst am Ende: in der Flat Config gewinnt
+    // der spaetere Eintrag, weiter oben wuerde der allgemeine Block die
+    // Ausnahme wieder aufheben.
+    files: ["src/lib/rollen.ts"],
+    rules: { "no-restricted-syntax": "off" },
   },
 );

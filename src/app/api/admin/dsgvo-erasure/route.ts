@@ -21,6 +21,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
+import { istNurAdmin } from "@/lib/rollen";
 
 const BodySchema = z.object({
   besteller_kuerzel: z.string().min(1).max(10),
@@ -37,7 +38,9 @@ export async function POST(request: NextRequest) {
     if (!profil) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
-    if (profil.rolle !== "admin") {
+    // 30.09.2026 — bleibt streng Admin. Das Loeschen und Ausleiten von
+    // Personendaten ist nicht rueckholbar und gehoert nicht zur Verwaltung.
+    if (!istNurAdmin(profil.rolle)) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

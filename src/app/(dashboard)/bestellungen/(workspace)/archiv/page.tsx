@@ -4,6 +4,7 @@ import { LaneWorkspace } from "@/components/bestellungen/lane-workspace";
 import { LaneEmptyState } from "@/components/bestellungen/lane-empty-state";
 import { loadLaneDataSafe, HARD_CAP } from "@/lib/bestellungen-lane-loader";
 
+import { istVerwaltung } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 /**
@@ -48,7 +49,7 @@ export default async function ArchivLanePage({
             lane="archiv"
             data={data}
             profil={profil}
-            isAdmin={profil?.rolle === "admin"}
+            isAdmin={istVerwaltung(profil?.rolle)}
             projektId={params.projekt_id}
           />
         )}

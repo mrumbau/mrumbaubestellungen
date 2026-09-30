@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/sidebar";
 import { ToastProvider } from "@/components/ui/toast";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
+import { istVerwaltung } from "@/lib/rollen";
 export default async function DashboardLayout({
   children,
 }: {
@@ -21,7 +22,7 @@ export default async function DashboardLayout({
   // UNBEKANNT-Material). Single-Query, ~5-15ms. Layout-Caching durch
   // `export const dynamic = "force-dynamic"` der Pages bleibt unangetastet.
   let poolCount = 0;
-  if (profil.rolle === "admin" || profil.rolle === "besteller") {
+  if (istVerwaltung(profil.rolle) || profil.rolle === "besteller") {
     const supabase = await createServerSupabaseClient();
     const { count } = await supabase
       .from("bestellungen")

@@ -18,6 +18,20 @@ const BESTELLER_LIST = [
 ];
 
 describe("getAssignableBesteller", () => {
+  it("nimmt die Geschaeftsfuehrung mit auf, Admin bleibt draussen", () => {
+    // 30.09.2026 — CR fuehrt die Firma und bestellt trotzdem selbst
+    // (115 Bestellungen, 46 offen). Waere die Geschaeftsfuehrung hier
+    // gefiltert, koennte man CR nichts mehr zuordnen.
+    const mitGf = [
+      ...BESTELLER_LIST,
+      { kuerzel: "CR", name: "Carsten Reuter", rolle: "geschaeftsfuehrer" },
+    ];
+    const kuerzel = getAssignableBesteller(mitGf, null, "MT").map((o) => o.kuerzel);
+    expect(kuerzel).toContain("CR");
+    expect(kuerzel).not.toContain("MH");
+    expect(kuerzel).not.toContain("NJ");
+  });
+
   it("nimmt nur Besteller-Rolle, filtert Admin + Buchhaltung", () => {
     const result = getAssignableBesteller(BESTELLER_LIST, null, "MT");
     const kuerzel = result.map((o) => o.kuerzel);

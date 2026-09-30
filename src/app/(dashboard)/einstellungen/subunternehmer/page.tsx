@@ -6,6 +6,7 @@ import {
   type Subunternehmer,
 } from "./subunternehmer-client";
 
+import { istVerwaltung } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 export default async function SubunternehmerPage() {
@@ -24,7 +25,7 @@ export default async function SubunternehmerPage() {
   return (
     <SubunternehmerClient
       initialListe={(subunternehmer as Subunternehmer[]) || []}
-      canEdit={profil.rolle === "admin"}
+      canEdit={istVerwaltung(profil.rolle)}
     />
   );
 }
