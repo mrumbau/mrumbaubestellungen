@@ -21,6 +21,12 @@ import { createServiceClient } from "@/lib/supabase";
 import { logError, logInfo } from "@/lib/logger";
 import { runSecondReview } from "@/lib/email-pipeline/second-review";
 import { replayOneMessage } from "./replay";
+import {
+  bauLeerlaufBilanz,
+  ueberspringeReRun,
+  LEERLAUF_OUTCOME,
+  type LeerlaufBilanz,
+} from "./second-review-leerlauf";
 
 const MAX_BATCH_SIZE = 20;
 const MAX_RUN_MS = 55_000; // Vercel-60s-Schutz
@@ -52,6 +58,8 @@ export interface SecondReviewRunResult {
   rerun_succeeded: number;
   rerun_still_no_bestellung: number;
   rerun_failed: number;
+  /** Widerspruch erkannt, teurer Re-Run aber bewusst uebersprungen (Leerlauf-Bremse). */
+  rerun_uebersprungen: number;
   errors: number;
   duration_ms: number;
   truncated: boolean;
@@ -70,6 +78,7 @@ export async function runSecondReviewCron(): Promise<SecondReviewRunResult> {
     rerun_succeeded: 0,
     rerun_still_no_bestellung: 0,
     rerun_failed: 0,
+    rerun_uebersprungen: 0,
     errors: 0,
     duration_ms: 0,
     truncated: false,
@@ -98,6 +107,23 @@ export async function runSecondReviewCron(): Promise<SecondReviewRunResult> {
   if (filtered.length === 0) {
     result.duration_ms = Date.now() - startTime;
     return result;
+  }
+
+  // Leerlauf-Bilanz einmal pro Lauf laden (aktuell ~130 Zeilen). Faellt die
+  // Abfrage aus, laufen wir wie bisher ungebremst weiter — lieber ein
+  // ueberfluessiger Re-Run als eine uebersehene Rechnung.
+  let leerlaufBilanz: LeerlaufBilanz = new Map();
+  const { data: bilanzZeilen, error: bilanzError } = await supabase
+    .from("email_processing_log")
+    .select("sender, second_review_rerun_outcome")
+    .eq("second_review_agreed", false)
+    .not("second_review_rerun_outcome", "is", null);
+  if (bilanzError) {
+    logError("second-review/cron", "Leerlauf-Bilanz nicht ladbar — fahre ungebremst", {
+      error: bilanzError.message,
+    });
+  } else {
+    leerlaufBilanz = bauLeerlaufBilanz(bilanzZeilen ?? []);
   }
 
   for (const c of filtered.slice(0, MAX_BATCH_SIZE)) {
@@ -137,27 +163,34 @@ export async function runSecondReviewCron(): Promise<SecondReviewRunResult> {
       result.disagreed++;
 
       let rerunOutcome = "rerun_failed";
-      try {
-        const replay = await replayOneMessage(supabase, c.internet_message_id, {
-          incrementRetryCount: false,
-        });
-        if (replay.outcome === "processed" && replay.bestellung_id) {
-          rerunOutcome = "rerun_success_bestellung_angelegt";
-          result.rerun_succeeded++;
-        } else if (replay.outcome === "processed") {
-          rerunOutcome = "rerun_kein_bestellung";
-          result.rerun_still_no_bestellung++;
-        } else {
-          rerunOutcome = `rerun_${replay.outcome}`;
+      if (ueberspringeReRun(leerlaufBilanz, c.sender)) {
+        // Diese Domain hat noch nie einen Treffer geliefert. Der Verdacht wird
+        // protokolliert, der teure Lauf entfaellt.
+        rerunOutcome = LEERLAUF_OUTCOME;
+        result.rerun_uebersprungen++;
+      } else {
+        try {
+          const replay = await replayOneMessage(supabase, c.internet_message_id, {
+            incrementRetryCount: false,
+          });
+          if (replay.outcome === "processed" && replay.bestellung_id) {
+            rerunOutcome = "rerun_success_bestellung_angelegt";
+            result.rerun_succeeded++;
+          } else if (replay.outcome === "processed") {
+            rerunOutcome = "rerun_kein_bestellung";
+            result.rerun_still_no_bestellung++;
+          } else {
+            rerunOutcome = `rerun_${replay.outcome}`;
+            result.rerun_failed++;
+          }
+        } catch (err) {
+          rerunOutcome = "rerun_throw";
           result.rerun_failed++;
+          logError("second-review/cron", "Re-Run throw", {
+            internet_message_id: c.internet_message_id,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
-      } catch (err) {
-        rerunOutcome = "rerun_throw";
-        result.rerun_failed++;
-        logError("second-review/cron", "Re-Run throw", {
-          internet_message_id: c.internet_message_id,
-          error: err instanceof Error ? err.message : String(err),
-        });
       }
 
       // Log-Eintrag aktualisieren — auch bei Disagreement, damit nicht beim

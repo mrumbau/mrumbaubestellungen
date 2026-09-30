@@ -27,13 +27,18 @@
  */
 
 import { XMLParser } from "fast-xml-parser";
-import { PDFDocument } from "pdf-lib";
 import { logError, logInfo } from "@/lib/logger";
+import { ladeEingebetteteDateien } from "./pdf-anhaenge";
 import type { DokumentAnalyse } from "@/lib/openai";
 
+/**
+ * Die ueblichen Namen der eingebetteten E-Rechnung. Sie entscheiden nur die
+ * Reihenfolge, nicht mehr die Zulaessigkeit: geprueft wird jede eingebettete
+ * XML-Datei, denn der Name ist nicht genormt genug, um daran eine Rechnung
+ * scheitern zu lassen (30.09.2026).
+ */
 const ZUGFERD_EMBED_NAMES = [
-  "factur-x.xml", "zugferd-invoice.xml", "ZUGFeRD-invoice.xml",
-  "xrechnung.xml", "Rechnung.xml", "rechnung.xml",
+  "factur-x.xml", "zugferd-invoice.xml", "xrechnung.xml", "rechnung.xml",
 ];
 
 const XML_MIME_TYPES = new Set([
@@ -53,48 +58,67 @@ interface XRechnungInput {
  *
  * Liefert null wenn keine E-Rechnungs-XML gefunden.
  */
+/**
+ * Sieht der Inhalt nach einer E-Rechnung aus? Geprueft wird am Wurzelelement
+ * der beiden zugelassenen Syntaxen (DIN EN 16931), nicht am Dateinamen.
+ */
+function istERechnungsXml(xml: string): boolean {
+  return (
+    xml.includes("CrossIndustryInvoice") ||
+    xml.includes("urn:oasis:names:specification:ubl:schema")
+  );
+}
+
 export async function extractEInvoiceXml(anhang: XRechnungInput): Promise<string | null> {
   // 1. Direkter XML-Anhang
   const lowerName = anhang.name.toLowerCase();
   if (XML_MIME_TYPES.has(anhang.mime_type) || lowerName.endsWith(".xml")) {
     try {
       const xml = Buffer.from(anhang.base64, "base64").toString("utf-8");
-      // Heuristik: muss nach E-Rechnung aussehen
-      if (
-        xml.includes("CrossIndustryInvoice")
-        || xml.includes("urn:oasis:names:specification:ubl:schema")
-        || xml.includes("rsm:CrossIndustryInvoice")
-      ) {
-        return xml;
-      }
+      if (istERechnungsXml(xml)) return xml;
     } catch (err) {
       logError("xrechnung", "XML-Decode fehlgeschlagen", { datei: anhang.name, err });
     }
     return null;
   }
 
-  // 2. PDF mit Embedded ZUGFeRD-XML
+  // 2. PDF mit eingebetteter ZUGFeRD-XML.
+  //
+  // 30.09.2026 — Hier stand bis heute ein Aufruf von `pdfDoc.getAttachments()`.
+  // Die Methode gibt es in pdf-lib nicht; abgesichert mit `?.() ?? []` lief
+  // der Zweig still immer ins Leere. Deshalb wurde in sechs Monaten und 750
+  // Belegen keine einzige ZUGFeRD-Rechnung strukturiert gelesen — und genau
+  // die sind der Normalfall, weil sie wie ein gewoehnliches PDF aussehen.
   if (anhang.mime_type === "application/pdf" || lowerName.endsWith(".pdf")) {
     try {
-      const buffer = Buffer.from(anhang.base64, "base64");
-      const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
-      // pdf-lib's getAttachments funktioniert in neueren Versionen; sonst fallback
-      // auf catalog/Names traversal. Wir versuchen den happy path.
-      const attachments = (pdfDoc as unknown as { getAttachments?: () => Array<{ name: string; data: Uint8Array }> })
-        .getAttachments?.() ?? [];
-      for (const att of attachments) {
-        if (ZUGFERD_EMBED_NAMES.some((n) => att.name.toLowerCase() === n.toLowerCase())) {
-          const xml = Buffer.from(att.data).toString("utf-8");
-          logInfo("xrechnung", "ZUGFeRD-XML aus PDF extrahiert", {
-            datei: anhang.name,
-            embed_name: att.name,
-            xml_size: xml.length,
-          });
-          return xml;
-        }
+      const dateien = await ladeEingebetteteDateien(Buffer.from(anhang.base64, "base64"));
+      if (dateien.length === 0) return null;
+
+      // Die ueblichen Namen zuerst, danach jede weitere XML-Datei. Der
+      // Dateiname ist kein verlaessliches Kriterium — verworfen wird spaeter
+      // anhand des Inhalts, nicht anhand der Beschriftung.
+      const kandidaten = [
+        ...dateien.filter((d) => ZUGFERD_EMBED_NAMES.includes(d.name.toLowerCase())),
+        ...dateien.filter(
+          (d) =>
+            !ZUGFERD_EMBED_NAMES.includes(d.name.toLowerCase()) &&
+            d.name.toLowerCase().endsWith(".xml"),
+        ),
+      ];
+
+      for (const datei of kandidaten) {
+        const xml = datei.inhalt.toString("utf-8");
+        if (!istERechnungsXml(xml)) continue;
+        logInfo("xrechnung", "ZUGFeRD-XML aus PDF extrahiert", {
+          datei: anhang.name,
+          embed_name: datei.name,
+          xml_size: xml.length,
+        });
+        return xml;
       }
     } catch (err) {
-      // PDF-Loading kann an Encryption/Damage scheitern — kein Drama
+      // Beschaedigtes oder verschluesseltes PDF — kein Drama, die KI laeuft
+      // dann wie bisher.
       logInfo("xrechnung", "PDF-Embed-Check übersprungen", {
         datei: anhang.name,
         reason: err instanceof Error ? err.message : "unknown",

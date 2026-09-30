@@ -55,57 +55,73 @@ const STUFE1_SELECT =
 // =====================================================================
 // 1. EXAKTE NUMMER × HÄNDLER
 // =====================================================================
+/**
+ * Die sechs bzw. sieben Nummer×Anker-Kombinationen, die pro Suchnummer
+ * geprüft werden — in exakt der Prioritätsreihenfolge, in der sie vor dem
+ * 21.09.2026 nacheinander abgefragt wurden.
+ */
+function exactNumberKandidaten(
+  ctx: MatchContext,
+): Array<{ spalte: string; ankerSpalte: string; ankerWert: string }> {
+  const kandidaten: Array<{ spalte: string; ankerSpalte: string; ankerWert: string }> = [];
+  if (ctx.haendler?.id) {
+    for (const spalte of ["bestellnummer", "auftragsnummer", "lieferscheinnummer"]) {
+      kandidaten.push({ spalte, ankerSpalte: "haendler_id", ankerWert: ctx.haendler.id });
+    }
+  }
+  if (ctx.haendlerName) {
+    for (const spalte of ["bestellnummer", "auftragsnummer", "lieferscheinnummer"]) {
+      kandidaten.push({ spalte, ankerSpalte: "haendler_name", ankerWert: ctx.haendlerName });
+    }
+  }
+  if (ctx.subunternehmer) {
+    kandidaten.push({
+      spalte: "bestellnummer",
+      ankerSpalte: "subunternehmer_id",
+      ankerWert: ctx.subunternehmer.id,
+    });
+  }
+  return kandidaten;
+}
+
+/**
+ * 21.09.2026 — Performance: Die Kandidaten einer Suchnummer laufen jetzt
+ * parallel statt nacheinander.
+ *
+ * Vorher wurden pro Suchnummer bis zu 7 Einzelqueries sequenziell `await`-ed
+ * und bei erstem Treffer abgebrochen. Zwischen Vercel (fra1) und Supabase
+ * (eu-west-1) kostet jeder Roundtrip Latenz — im Worst Case also 7× Latenz
+ * für eine einzige Suchnummer, und das mehrfach pro eingehendem Dokument.
+ *
+ * Jetzt: alle Kandidaten einer Suchnummer gehen zusammen raus, danach
+ * gewinnt der erste Treffer in unveränderter Prioritätsreihenfolge. Das
+ * Ergebnis ist bit-identisch zur alten Implementierung — nur die Wartezeit
+ * schrumpft von bis zu 7 Latenzen auf eine.
+ *
+ * Die Schleife über `suchNummern` bleibt bewusst sequenziell mit Early-Exit:
+ * sie begrenzt die Parallelität auf max. 7 gleichzeitige Queries und
+ * verhindert, dass ein Dokument mit vielen Nummern die DB flutet.
+ */
 export async function findByExactNumber(
   supabase: SupabaseClient,
   suchNummern: string[],
   ctx: MatchContext,
 ): Promise<BestellungRow | null> {
+  const kandidaten = exactNumberKandidaten(ctx);
+  if (kandidaten.length === 0) return null;
+
   for (const suchNr of suchNummern) {
-    if (ctx.haendler?.id) {
-      const { data: d1 } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("bestellnummer", suchNr).eq("haendler_id", ctx.haendler.id)
-        .limit(1).maybeSingle();
-      if (d1) return d1 as BestellungRow;
-
-      const { data: d2 } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("auftragsnummer", suchNr).eq("haendler_id", ctx.haendler.id)
-        .limit(1).maybeSingle();
-      if (d2) return d2 as BestellungRow;
-
-      const { data: d2b } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("lieferscheinnummer", suchNr).eq("haendler_id", ctx.haendler.id)
-        .limit(1).maybeSingle();
-      if (d2b) return d2b as BestellungRow;
-    }
-    if (ctx.haendlerName) {
-      const { data: d3 } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("bestellnummer", suchNr).eq("haendler_name", ctx.haendlerName)
-        .limit(1).maybeSingle();
-      if (d3) return d3 as BestellungRow;
-
-      const { data: d4 } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("auftragsnummer", suchNr).eq("haendler_name", ctx.haendlerName)
-        .limit(1).maybeSingle();
-      if (d4) return d4 as BestellungRow;
-
-      const { data: d4b } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("lieferscheinnummer", suchNr).eq("haendler_name", ctx.haendlerName)
-        .limit(1).maybeSingle();
-      if (d4b) return d4b as BestellungRow;
-    }
-    if (ctx.subunternehmer) {
-      const { data: d5 } = await supabase
-        .from("bestellungen").select(STUFE1_SELECT)
-        .eq("bestellnummer", suchNr).eq("subunternehmer_id", ctx.subunternehmer.id)
-        .limit(1).maybeSingle();
-      if (d5) return d5 as BestellungRow;
-    }
+    const treffer = await Promise.all(
+      kandidaten.map(async ({ spalte, ankerSpalte, ankerWert }) => {
+        const { data } = await supabase
+          .from("bestellungen").select(STUFE1_SELECT)
+          .eq(spalte, suchNr).eq(ankerSpalte, ankerWert)
+          .limit(1).maybeSingle();
+        return data;
+      }),
+    );
+    const ersterTreffer = treffer.find((d) => d);
+    if (ersterTreffer) return ersterTreffer as BestellungRow;
   }
   return null;
 }
@@ -452,6 +468,17 @@ export async function findByErweiterterMatch(
       return false;
     }
 
+    // 21.09.2026 — Jede der folgenden Prüfungen kann ein Dokument ablehnen,
+    // aber nur eine tatsächlich DURCHGEFÜHRTE Prüfung kann es bestätigen.
+    // Wir merken uns deshalb, ob überhaupt ein positives Signal vorlag.
+    let bestaetigendesSignal = false;
+
+    // Identische Auftragsnummer ist der stärkste Anker den wir hier haben.
+    // (Der Ungleich-Fall wurde oben schon hart abgelehnt.)
+    if (dokumentAuftragsnummer && k.auftragsnummer && dokumentAuftragsnummer === k.auftragsnummer) {
+      bestaetigendesSignal = true;
+    }
+
     // R5c: Cross-Number-Validation jetzt FUZZY (war exakt)
     const kandidatNummern = [k.bestellnummer, k.auftragsnummer].filter((n): n is string => !!n);
     if (kandidatNummern.length > 0 && dokumentNummern.length > 0) {
@@ -459,12 +486,40 @@ export async function findByErweiterterMatch(
         kandidatNummern.some((kn) => bestellnummernFuzzyMatch(dn, kn)),
       );
       if (!hatUebereinstimmung) return false;
+      bestaetigendesSignal = true;
     }
     // Betrag-Validation (max 15% Abweichung)
     if (erkannterBetrag && k.betrag) {
       const abweichung = Math.abs(Number(k.betrag) - erkannterBetrag) / Math.max(Number(k.betrag), erkannterBetrag);
       if (abweichung > 0.15) return false;
+      bestaetigendesSignal = true;
     }
+
+    // 21.09.2026 — Fehlten Nummern UND Betrag, wurde bis hierher keine
+    // einzige inhaltliche Prüfung ausgeführt: beide Blöcke oben sind an ihre
+    // Daten gebunden und werden bei null/leer stillschweigend übersprungen.
+    // Übrig blieb dann nur "gleicher Händler + letzte 14 Tage + Typ-Flag noch
+    // frei" — und der erste Kandidat der Liste gewann.
+    //
+    // Das ist genau der Fall, in dem das System am wenigsten weiss und am
+    // aggressivsten geraten hat: schlecht erkannte Dokumente (kein Betrag,
+    // keine Nummer) wurden an irgendeine offene Bestellung desselben Händlers
+    // gehaengt. Bei Haendlern wie Bauhaus oder OBI, wo in 14 Tagen viele
+    // Bestellungen offen sind, produziert das falsch verknuepfte Lieferscheine
+    // und Rechnungen.
+    //
+    // Ohne ein einziges bestaetigendes Signal ordnen wir deshalb nicht mehr zu.
+    // Das Dokument landet stattdessen im Pool und wird dort manuell zugeordnet
+    // — eine sichtbare offene Aufgabe ist deutlich billiger als eine falsche
+    // Verknuepfung, die erst der Buchhaltung auffaellt.
+    if (!bestaetigendesSignal) {
+      logInfo("webhook/email/match", "Match abgelehnt: kein bestaetigendes Signal", {
+        kandidat_id: k.id,
+        grund: "weder Nummern- noch Betragsabgleich moeglich",
+      });
+      return false;
+    }
+
     return true;
   });
 

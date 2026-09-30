@@ -1,0 +1,21 @@
+-- 21.09.2026 — Auf Wunsch: keine automatischen Erinnerungs-Mails mehr.
+--
+-- Alle System-Mails gehen als Absender ueber bu@mrumbau.de raus
+-- (src/lib/email.ts: const ABSENDER = "bu@mrumbau.de"), weshalb sie beim
+-- Empfaenger aussehen, als kaemen sie aus der Buchhaltung.
+--
+-- Job 19 / erinnerungen-owner (taeglich 06:00)
+--   → "Erinnerung: N Lieferschein(e) fehlt noch" an jeden Besteller
+-- Job 18 / erinnerungen-pool  (taeglich 05:45)
+--   → "[Pool] N offene Bestellungen — wer uebernimmt?" an alle Besteller
+--
+-- Bewusst NICHT angefasst: Job 15 (anomaly-check-daily). Der verschickt keine
+-- Routine-Mail, sondern meldet sich nur wenn die Pipeline-Ueberwachung
+-- tatsaechlich anschlaegt. Genau so eine Meldung hat gefehlt, als
+-- trigger_discover_emails 215x stillschweigend keine Mails abgeholt hat.
+--
+-- Reaktivieren jederzeit mit:
+--   SELECT cron.alter_job(18, active := true);
+--   SELECT cron.alter_job(19, active := true);
+SELECT cron.alter_job(18, active := false);
+SELECT cron.alter_job(19, active := false);

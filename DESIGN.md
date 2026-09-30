@@ -11,7 +11,7 @@
 - **UX-R3 (03.06.2026):** Detail-Page als editoriale Akte. `BestellnummerHero` als Display-Numeral im PageHero-Wrap. Mahnung als full-width Banner statt Pill. `OwnerStatement` ersetzt `OwnerLane` (3 Render-Pfade mit editorial-DNA, Magnetic-CTA für Pool/Vorschlag). Sidebar 7 Cards → 3 Blöcke (Aktion / Meta / Aktivität). CTA-Hierarchie verschärft: Verwerfen = ghost destructive durch industrial-line getrennt, Mahnung quittieren = secondary.
 - **UX-R4 (03.06.2026):** PageHero auf Hot-Path-Pages (Dashboard, Buchhaltung, Archiv) und Stammdaten (Kunden, Projekte). Neue `UnifiedListCard`-Primitive als Foundation für künftige Listen (3 Variants: vendor-strip / title-strip / table-row). ProjektCard/KundenCard bleiben vorerst mit `borderLeft`-Brand-Identity — Migration braucht UnifiedListCard `accent-color`-Override. Settings/System-Pages behalten `PageHeader`. Build clean, 644/644 Tests grün, keine Token-Leaks.
 - **UX-R5 (03.06.2026):** Modal-Drawer-Heuristik: vier konkurrierende Patterns (Modal/Drawer/ConfirmDialog/Inline) auf zwei konsolidiert. Modal um Variants `destructive` + `confirm` (mit optional Comment-Input) erweitert. 14 ConfirmDialog-Usages migriert. Build clean.
-- **UX-R6 (03.06.2026):** Verankerung der Disziplin. ESLint-Rule gegen Tailwind-Default-Colors auf `error` gestuft (build-blockend, `/cardscan` als bewusste Sub-Brand-Ausnahme weiterhin allowlisted). Offener TODO-Marker zur Type-Scale-Migration aufgelöst, PRODUCT.md um Brand-Statements ergänzt und Sandbox-Page `/einstellungen/system/patterns` um UX-R2/3/4/5-Demos (Lanes, OwnerStatement, UnifiedListCard-Variants, Modal-Variants) erweitert, damit Visual-Drift früh sichtbar wird.
+- **UX-R6 (03.06.2026):** Verankerung der Disziplin. ESLint-Rule gegen Tailwind-Default-Colors auf `error` gestuft (build-blockend; die frühere `/cardscan`-Ausnahme entfiel am 21.09.2026 mit dem Modul). Offener TODO-Marker zur Type-Scale-Migration aufgelöst, PRODUCT.md um Brand-Statements ergänzt und Sandbox-Page `/einstellungen/system/patterns` um UX-R2/3/4/5-Demos (Lanes, OwnerStatement, UnifiedListCard-Variants, Modal-Variants) erweitert, damit Visual-Drift früh sichtbar wird.
 
 ## Color Strategy
 
@@ -25,7 +25,6 @@
   - Hero-Card-Borders im Bento-Dashboard
 - Status-Farbsystem (6 Tokens × 3-Part-Triplet): semantische Workflow-Farben (Blau Offen, Grün Vollständig, Rot Abweichung, Gelb LS-Fehlt, Smaragd Freigegeben, Grau Erwartet). Diese sind FUNKTIONAL nicht dekorativ.
 - Bestellungsart-Sub-Brand (3 × 3-Part): Cyan für Subunternehmer, Violett für Abo, neutral für Material.
-- CardScan-Sub-Brand: Emerald `#10b981` (eigene Identität, eigenes Modul).
 
 **Anti-Pattern:** Niemals MR-Red als großflächiger Background. Brand erscheint nur bei Interaktion/Akzent.
 
@@ -90,14 +89,14 @@ Dezente SVG-Patterns auf Hero-Surfaces:
 
 - `bg-grid-pattern` — fine grid `rgba(87, 0, 6, 0.04)`
 - `bg-iso-grid` — isometrisches Raster
-- `bg-dot-grid` — dot-pattern für CardScan/Sub-Brand
+- `bg-dot-grid` — dot-pattern
 - `corner-marks` — 4 Eck-Markierungen (Werkzeug-Anmutung)
 - `industrial-line` — 1px brand-tinted Separator mit kleinen Metalldetails
 - `film-grain` / `film-grain-light` — fraktale SVG-Noise (6% / 18%) als Papier-Textur
 
 Wo eingesetzt:
 - Root `/` Brand-Landing (Split-Screen Modul 01 + 02)
-- Login (kontextabhängig MR-Red vs. CardScan-Dark)
+- Login (MR-Red)
 - 404 (Editorial Centered)
 - PageHero / EditorialSection (UX-R1) — Hot-Path-Pages innen
 - Hero-StatCard im Dashboard
@@ -417,7 +416,7 @@ Aus dem heutigen UI-Audit identifiziert und bewusst eliminiert:
 - ❌ Doppel-Widget Timeline + Audit-Trail (→ Timeline mit Filter)
 - ❌ **Tab-Redundanz Pool/Meine offen/Meine erledigt/Alle** (UX-R2 → 3 Lanes)
 - ❌ **Pill-Inflation auf einer Card** (UX-R1 → Visual-Weight-Stufen, max 1 Stufe-1-Element)
-- ❌ **Tailwind-Default-Colors als Token-Bypass** (UX-R1 → ESLint-Rule blockt `bg-(slate|gray|emerald|...)-(50..900)` außerhalb /cardscan; UX-R6 → Rule auf `error` gestuft, build-blockend)
+- ❌ **Tailwind-Default-Colors als Token-Bypass** (UX-R1 → ESLint-Rule blockt `bg-(slate|gray|emerald|...)-(50..900)`; UX-R6 → Rule auf `error` gestuft, build-blockend)
 - ❌ **`transition-all` ohne spezifische Property** (UX-R1 → `transition-colors`, `transition-[width,background]`, etc., Emil-Performance-Regel)
 - ❌ **Arbitrary Text-Skalen `text-xs/sm/lg/xl/2xl`** (UX-R1 → Codemod migriert auf `.text-meta/.text-body-sm/.text-lead/.text-h2`, 270 Stellen)
 - ❌ **Card-Sediment** — fünf Listen, fünf Padding-/Hover-/Shadow-Mikro-Inkonsistenzen (UX-R4 → `UnifiedListCard`-Primitive mit drei Variants `vendor-strip`/`title-strip`/`table-row`)
@@ -427,4 +426,4 @@ Aus dem heutigen UI-Audit identifiziert und bewusst eliminiert:
 Bleibt erlaubt aus funktionalen Gründen:
 - Side-Stripe-Border 3-4px für **Projekt-Identity** (Cards) und **Status-Pills** (functional, nicht decorative)
 - Cards als primäre Affordance — bei Projekten und KPI-Tiles eigenes Werkzeug
-- `text-xs/sm` auf Brand-Surfaces (Login/Landing/404, `/cardscan`) — bewusst editorial-tier mit eigenen Skalen, vom Codemod ausgenommen
+- `text-xs/sm` auf Brand-Surfaces (Login/Landing/404) — bewusst editorial-tier mit eigenen Skalen, vom Codemod ausgenommen

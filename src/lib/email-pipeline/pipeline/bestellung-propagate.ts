@@ -42,13 +42,17 @@ export async function propagateAnalyseFields(
     faelligkeitsdatum: string | null;
     kundennummer: string | null;
     projekt_referenz: string | null;
+    haendler_id: string | null;
+    haendler_name: string | null;
+    vorausbezahlt: boolean | null;
   };
   const { data } = await supabase
     .from("bestellungen")
     .select(
       "bestellnummer, auftragsnummer, lieferscheinnummer, betrag, " +
       "voraussichtliche_lieferung, lieferadresse_erkannt, tracking_nummer, " +
-      "bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz",
+      "bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, " +
+      "haendler_id, haendler_name, vorausbezahlt",
     )
     .eq("id", bestellungId)
     .maybeSingle();
@@ -154,6 +158,74 @@ export async function propagateAnalyseFields(
     updateFields.projekt_referenz = analyse.projekt_referenz;
   }
 
+  // ----- 22.09.2026 — Fehlende Haendler-Verknuepfung nachtragen -----
+  //
+  // haendler_id wurde bisher AUSSCHLIESSLICH beim Anlegen der Bestellung
+  // gesetzt (bestellung-finden.ts). War der Haendler in diesem Moment nicht
+  // aufloesbar — etwa weil die Rechnung vor der Bestaetigung eintraf oder der
+  // Absender noch nicht im Stamm stand —, blieb das Feld fuer immer leer.
+  // Auch dann, wenn ein spaeteres Dokument den Haendler eindeutig benennt und
+  // haendler_name nachgetragen wurde.
+  //
+  // Das betraf 179 von 377 Bestellungen (47 %). Die Verknuepfung ist aber der
+  // Anker fuer die Match-Stufen 1, 4 und 5, fuer die Haendler-Affinitaet und
+  // fuer die Stammdaten (vorausbezahlt, Zahlungsziel). Fehlt sie, faellt alles
+  // auf Textvergleiche zurueck — dort entstehen die Fehlzuordnungen.
+  //
+  // Jetzt heilt sich das bei jedem weiteren Dokument selbst.
+  let haendlerId = existing.haendler_id;
+  if (!haendlerId && existing.haendler_name) {
+    const gefunden = await findeHaendlerId(supabase, existing.haendler_name);
+    if (gefunden) {
+      updateFields.haendler_id = gefunden;
+      haendlerId = gefunden;
+      logInfo("webhook/email/propagate", "Haendler-Verknuepfung nachgetragen", {
+        bestellungId, haendler: existing.haendler_name, haendlerId: gefunden,
+      });
+    }
+  }
+
+  // ----- 21.09.2026 — Haendler-Stammdaten: vorausbezahlt + Zahlungsziel -----
+  // Zwei Dinge, die das System bisher aus dem Belegtext zu erraten versuchte,
+  // obwohl sie laengst bekannt sind:
+  //
+  //   1. Bei Amazon Business wurde von 44 Rechnungen KEINE als bereits bezahlt
+  //      erkannt, bei Bernstein 4 von 4 — weil Bernstein "PayPal" auf die
+  //      Rechnung schreibt und Amazon nicht. Wo der Haendler immer
+  //      vorausbezahlt ist, gehoert das in die Stammdaten statt in die KI.
+  //   2. Die meisten Vendor-Parser setzen faelligkeitsdatum hart auf null. Mit
+  //      hinterlegtem Zahlungsziel laesst es sich aus dem Rechnungsdatum
+  //      berechnen, auch wenn auf dem Beleg nichts steht.
+  //
+  // Beides nur additiv: gesetzte Werte werden nie ueberschrieben, und ein
+  // fehlender Stammsatz aendert schlicht nichts.
+  const stamm = await ladeHaendlerStammdaten(supabase, haendlerId, existing.haendler_name);
+
+  // Wie ist_gutschrift eine ODER-Logik: einmal vorausbezahlt bleibt
+  // vorausbezahlt. Zurueckgenommen wird das nur von Hand.
+  if (stamm?.immer_vorausbezahlt && !existing.vorausbezahlt) {
+    updateFields.vorausbezahlt = true;
+    logInfo("webhook/email/propagate", "Bestellung als vorausbezahlt markiert (Haendler-Stammdaten)", {
+      bestellungId,
+      haendler: existing.haendler_name,
+    });
+  }
+
+  // Rueckfall-Faelligkeit. Greift nur, wenn die Rechnung selbst keine liefert
+  // (weder aus dem Beleg noch bereits gespeichert) — die echte Zahlfrist vom
+  // Dokument hat immer Vorrang.
+  const faelligkeitFehlt = !existing.faelligkeitsdatum && !updateFields.faelligkeitsdatum;
+  if (faelligkeitFehlt && analyse.typ === "rechnung" && stamm?.zahlungsziel_tage) {
+    const basis = analyse.datum ?? existing.bestelldatum;
+    const berechnet = addiereTage(basis, stamm.zahlungsziel_tage);
+    if (berechnet) {
+      updateFields.faelligkeitsdatum = berechnet;
+      logInfo("webhook/email/propagate", "Faelligkeit aus Zahlungsziel berechnet", {
+        bestellungId, basis, tage: stamm.zahlungsziel_tage, ergebnis: berechnet,
+      });
+    }
+  }
+
   // ----- 17.05.2026 — Gutschrift-Flag — ODER-Logik, einmal true bleibt true.
   // Wenn IRGENDEIN Doku der Bestellung eine Gutschrift ist, ist die ganze
   // Bestellung eine Gutschrift (= keine Freigabe nötig, direkt in Buchhaltung).
@@ -203,4 +275,110 @@ export async function ergaenzeFelder(
     mode: "body",
     haendlerContext: { current: haendlerName, absenderDomain },
   });
+}
+
+/**
+ * Laedt die Stammdaten des Haendlers einer Bestellung.
+ *
+ * Bevorzugt ueber haendler_id. Die Verknuepfung fehlt aber nicht selten — von
+ * 27 Amazon-Business-Bestellungen hatten sieben gar keine haendler_id —,
+ * deshalb der Rueckfall ueber den Namen. Der laeuft bewusst NUR gegen die
+ * ausdruecklich als vorausbezahlt gepflegten Haendler und nicht gegen den
+ * gesamten Stamm: "Amazon" soll "Amazon Business" treffen, aber kein
+ * Praefix-Zufall einen fremden Haendler mitnehmen.
+ *
+ * Fail-soft: bei einem Fehler gibt es keine Stammdaten und damit auch keine
+ * Aenderung — die Pipeline laeuft weiter.
+ */
+async function ladeHaendlerStammdaten(
+  supabase: SupabaseClient,
+  haendlerId: string | null,
+  haendlerName: string | null,
+): Promise<{ immer_vorausbezahlt: boolean; zahlungsziel_tage: number | null } | null> {
+  try {
+    if (haendlerId) {
+      const { data } = await supabase
+        .from("haendler").select("immer_vorausbezahlt, zahlungsziel_tage")
+        .eq("id", haendlerId).maybeSingle();
+      if (data) {
+        return {
+          immer_vorausbezahlt: data.immer_vorausbezahlt === true,
+          zahlungsziel_tage: data.zahlungsziel_tage ?? null,
+        };
+      }
+    }
+
+    if (!haendlerName) return null;
+    const { data: kandidaten } = await supabase
+      .from("haendler").select("name, immer_vorausbezahlt, zahlungsziel_tage")
+      .eq("immer_vorausbezahlt", true);
+    const name = haendlerName.toLowerCase().trim();
+    const treffer = (kandidaten ?? []).find((h) => {
+      const k = String(h.name ?? "").toLowerCase().trim();
+      return k.length > 0 && name.startsWith(k);
+    });
+    if (!treffer) return null;
+    return {
+      immer_vorausbezahlt: true,
+      zahlungsziel_tage: treffer.zahlungsziel_tage ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Addiert Tage auf ein ISO-Datum und liefert wieder YYYY-MM-DD.
+ * Unbrauchbare Eingaben ergeben null — dann bleibt die Faelligkeit leer,
+ * was ehrlicher ist als ein erfundenes Datum.
+ */
+function addiereTage(basis: string | null | undefined, tage: number): string | null {
+  if (!basis || !Number.isFinite(tage)) return null;
+  const d = new Date(basis);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + tage);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Sucht den Haendler-Stammsatz zu einem Haendlernamen.
+ *
+ * Zwei Stufen, beide case-insensitiv:
+ *   1. exakter Name
+ *   2. Praefix in beide Richtungen ("Amazon Business" ↔ "Amazon",
+ *      "Tervex bau" ↔ "Tervex Bau – Mjaltor Zekjiri")
+ *
+ * Entscheidend: Es wird NUR verknuepft, wenn genau ein Stammsatz passt. In
+ * den echten Daten trifft "Amazon Business" zwei Eintraege (amazon.de und
+ * amazon.com) — dort waere jede Wahl geraten. Lieber keine Verknuepfung als
+ * eine falsche: eine fehlende faellt beim naechsten Dokument wieder auf, eine
+ * falsche zieht Affinitaet und Stammdaten dauerhaft in die Irre.
+ *
+ * Fail-soft: bei einem Fehler bleibt es bei null, die Pipeline laeuft weiter.
+ */
+async function findeHaendlerId(
+  supabase: SupabaseClient,
+  haendlerName: string,
+): Promise<string | null> {
+  const name = haendlerName.trim();
+  if (name.length < 3) return null;
+
+  try {
+    const { data } = await supabase.from("haendler").select("id, name");
+    const alle = (data ?? []) as Array<{ id: string; name: string | null }>;
+    const ziel = name.toLowerCase();
+
+    const exakt = alle.filter((h) => String(h.name ?? "").toLowerCase().trim() === ziel);
+    if (exakt.length === 1) return exakt[0].id;
+    if (exakt.length > 1) return null;
+
+    const praefix = alle.filter((h) => {
+      const k = String(h.name ?? "").toLowerCase().trim();
+      if (k.length < 3) return false;
+      return ziel.startsWith(k) || k.startsWith(ziel);
+    });
+    return praefix.length === 1 ? praefix[0].id : null;
+  } catch {
+    return null;
+  }
 }

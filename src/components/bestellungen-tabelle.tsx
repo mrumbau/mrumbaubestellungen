@@ -525,6 +525,75 @@ export function BestellungenTabelle({
     alleBesteller: bestellerOptions,
   });
 
+  // 22.09.2026 — Die Bulk-Leiste wird an zwei Stellen gebraucht: im
+  // Tabellen-Modus unter den Filtern, im Inbox-Modus ueber dem Kartenstapel.
+  // Sie haftet per sticky am oberen Rand, deshalb muss sie im DOM VOR den
+  // Karten stehen — sonst klebt sie erst, wenn man an ihr vorbeigescrollt
+  // ist. Einmal definiert statt zweimal kopiert.
+  const bulkToolbarNode = (
+<BulkToolbar
+      count={selected.size}
+      label="Bestellungen"
+      onClear={() => setSelected(new Set())}
+      totalHint={`von ${sorted.length} sichtbar`}
+    >
+      {(() => {
+        const freigabeFaehig = bestellungen.filter(
+          (b) => selected.has(b.id) && b.hat_rechnung && b.status !== "freigegeben",
+        ).length;
+        return (
+          <Button
+            size="sm"
+            variant="primary"
+            iconLeft={<IconCheck />}
+            onClick={() => setShowFreigebenDialog(true)}
+            loading={bulkFreigebenLoading}
+            disabled={freigabeFaehig === 0}
+            title={
+              freigabeFaehig === 0
+                ? "Keine der ausgewählten Bestellungen ist freigabe-fähig (Rechnung fehlt oder bereits freigegeben)"
+                : `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben`
+            }
+          >
+            Freigeben{freigabeFaehig > 0 ? ` (${freigabeFaehig})` : ""}
+          </Button>
+        );
+      })()}
+      {/* 09.06.2026 — Bulk-Zuordnen: Dropdown mit MT/CR/.../Gemeinschaft.
+          Eigener Kürzel + aktueller Owner werden vom Helper rausgefiltert.
+          MT/CR sind aktuell die produktiven Besteller, MH (admin) wird
+          ausgeschlossen. Bei neuem Besteller-Account erscheint er auto-
+          matisch. */}
+      {profil && (
+        <ZuordnenBulkButton
+          count={selected.size}
+          options={getAssignableBesteller(
+            (bestellerOptions ?? []).map((o) => ({
+              kuerzel: o.kuerzel,
+              name: o.name,
+              rolle: o.rolle ?? "besteller",
+            })),
+            null, // Bulk: keinen aktuellen Owner — User-Wahl beliebig
+            profil.kuerzel,
+          )}
+          loading={actions.zuordnenLoading}
+          onConfirm={(kuerzel, label) =>
+            actions.handleBulkZuordnen(kuerzel, label)
+          }
+        />
+      )}
+      <Button
+        size="sm"
+        variant="destructive"
+        iconLeft={<IconTrash />}
+        onClick={() => setShowDeleteDialog(true)}
+        loading={deleteLoading}
+      >
+        Entfernen
+      </Button>
+    </BulkToolbar>
+  );
+
   return (
     <>
       {/* Projekt-Filter Banner */}
@@ -562,7 +631,31 @@ export function BestellungenTabelle({
           Inbox-Mode rendert hier UND skipped die Toolbar weiter unten. */}
       {inboxMode && profil && (
         <div className="mt-5">
+          {bulkToolbarNode}
+          {sorted.length > 0 && (
+            <div className="mb-2 flex items-center gap-3 text-meta text-foreground-muted">
+              <button
+                type="button"
+                onClick={() =>
+                  setSelected(
+                    selected.size === sorted.length
+                      ? new Set()
+                      : new Set(sorted.map((b) => b.id)),
+                  )
+                }
+                className="rounded-md border border-line px-2 py-1 hover:text-foreground transition-colors"
+              >
+                {selected.size === sorted.length ? "Auswahl aufheben" : `Alle ${sorted.length} auswählen`}
+              </button>
+              <span>
+                Mehrere auswählen und gemeinsam zuordnen — mit Umschalttaste einen
+                ganzen Bereich.
+              </span>
+            </div>
+          )}
           <PoolInbox
+            selectedIds={selected}
+            onSelectedIdsChange={setSelected}
             bestellungen={bestellungen}
             vendorDomainById={vendorDomainById}
             haendlerIdByBestellungId={haendlerIdByBestellungId}
@@ -755,72 +848,9 @@ export function BestellungenTabelle({
         </div>
       )}
 
-      {/* Bulk toolbar — sticky-top, Linear-Style.
-          Inbox-Mode hat keine Selection (Cards öffnen Drawer, Bulk-Aktionen
-          kommen in Sprint 3 via Multi-Select-Mode). */}
-      <div className={cn("mt-4", inboxMode && "hidden")}>
-        <BulkToolbar
-          count={selected.size}
-          label="Bestellungen"
-          onClear={() => setSelected(new Set())}
-          totalHint={`von ${sorted.length} sichtbar`}
-        >
-          {(() => {
-            const freigabeFaehig = bestellungen.filter(
-              (b) => selected.has(b.id) && b.hat_rechnung && b.status !== "freigegeben",
-            ).length;
-            return (
-              <Button
-                size="sm"
-                variant="primary"
-                iconLeft={<IconCheck />}
-                onClick={() => setShowFreigebenDialog(true)}
-                loading={bulkFreigebenLoading}
-                disabled={freigabeFaehig === 0}
-                title={
-                  freigabeFaehig === 0
-                    ? "Keine der ausgewählten Bestellungen ist freigabe-fähig (Rechnung fehlt oder bereits freigegeben)"
-                    : `${freigabeFaehig} Bestellung${freigabeFaehig === 1 ? "" : "en"} freigeben`
-                }
-              >
-                Freigeben{freigabeFaehig > 0 ? ` (${freigabeFaehig})` : ""}
-              </Button>
-            );
-          })()}
-          {/* 09.06.2026 — Bulk-Zuordnen: Dropdown mit MT/CR/.../Gemeinschaft.
-              Eigener Kürzel + aktueller Owner werden vom Helper rausgefiltert.
-              MT/CR sind aktuell die produktiven Besteller, MH (admin) wird
-              ausgeschlossen. Bei neuem Besteller-Account erscheint er auto-
-              matisch. */}
-          {profil && (
-            <ZuordnenBulkButton
-              count={selected.size}
-              options={getAssignableBesteller(
-                (bestellerOptions ?? []).map((o) => ({
-                  kuerzel: o.kuerzel,
-                  name: o.name,
-                  rolle: o.rolle ?? "besteller",
-                })),
-                null, // Bulk: keinen aktuellen Owner — User-Wahl beliebig
-                profil.kuerzel,
-              )}
-              loading={actions.zuordnenLoading}
-              onConfirm={(kuerzel, label) =>
-                actions.handleBulkZuordnen(kuerzel, label)
-              }
-            />
-          )}
-          <Button
-            size="sm"
-            variant="destructive"
-            iconLeft={<IconTrash />}
-            onClick={() => setShowDeleteDialog(true)}
-            loading={deleteLoading}
-          >
-            Entfernen
-          </Button>
-        </BulkToolbar>
-      </div>
+      {/* Bulk-Leiste — im Inbox-Modus steht sie oben ueber den Karten
+          (siehe weiter oben), damit sie beim Scrollen haftet. */}
+      {!inboxMode && <div className="mt-4">{bulkToolbarNode}</div>}
 
       {/* DataTable — im Inbox-Mode versteckt (PoolInbox rendert oben). */}
       <div className={cn("mt-4", inboxMode && "hidden")}>
@@ -1007,6 +1037,14 @@ export function BestellungenTabelle({
           bestellung={openBestellung}
           profil={profil}
           bestellerOptions={bestellerOptions}
+          // 22.09.2026 — Belege direkt aus dem Drawer ansehen, statt erst
+          // „Volldetails öffnen" zu müssen. Dieselbe Vorschau wie in der
+          // Tabelle, inklusive Blättern bei mehreren Dokumenten eines Typs
+          // (Teilrechnungen). Beide sind native <dialog> mit showModal, die
+          // zuletzt geöffnete liegt oben — die Vorschau deckt den Drawer
+          // also korrekt ab.
+          onPreview={(typ) => openBestellung && handlePreview(openBestellung.id, typ)}
+          onPreload={(typ) => openBestellung && preloadPreview(openBestellung.id, typ)}
         />
       )}
     </>

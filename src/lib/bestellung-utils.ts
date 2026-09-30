@@ -49,9 +49,33 @@ export interface DokumentAnforderung {
 }
 
 export const DOKUMENT_CONFIG: Record<Bestellungsart, DokumentAnforderung[]> = {
+  // 22.09.2026 — Bestätigung und Lieferschein von erforderlich auf optional.
+  //
+  // Gemessen an den echten Daten: von 286 Material-Bestellungen hatten nur 21
+  // jemals alle drei Dokumente (7 %). 316 von 377 Rechnungen kamen ohne
+  // Lieferschein, 276 ohne Bestätigung. Viele Händler schicken schlicht nur
+  // eine Rechnung.
+  //
+  // Folge der alten Regel: updateBestellungStatus verlangte alle drei, also
+  // erreichte KEINE einzige Material-Bestellung je den Status "vollstaendig"
+  // — 237 sprangen direkt von "offen" auf "freigegeben". Der Status war für
+  // Material toter Code, und "offen" sagte nichts darüber, ob etwas zu tun
+  // ist.
+  //
+  // Jetzt ist die Rechnung das Pflichtdokument: sie ist das, worauf es
+  // fachlich ankommt (freigeben, bezahlen, DATEV). "vollstaendig" heißt
+  // damit, was CLAUDE.md immer schon dazu sagte — "bereit zur Freigabe".
+  //
+  // Bestätigung und Lieferschein bleiben in der Liste und werden weiter
+  // erfasst, angezeigt (B/L/R/V-Punkte) und für den KI-Abgleich genutzt. Sie
+  // blockieren nur nicht mehr den Status. Das ist dieselbe Unterscheidung,
+  // die für die Versandbestätigung von Anfang an galt.
+  //
+  // Wer die strengere Regel zurück will, setzt erforderlich wieder auf true —
+  // Status-Berechnung und Detailkopf ziehen beide aus dieser einen Stelle.
   material: [
-    { flag: "hat_bestellbestaetigung", typ: "bestellbestaetigung", label: "Bestätigung", kurzLabel: "Best.", erforderlich: true },
-    { flag: "hat_lieferschein", typ: "lieferschein", label: "Lieferschein", kurzLabel: "LS", erforderlich: true },
+    { flag: "hat_bestellbestaetigung", typ: "bestellbestaetigung", label: "Bestätigung", kurzLabel: "Best.", erforderlich: false },
+    { flag: "hat_lieferschein", typ: "lieferschein", label: "Lieferschein", kurzLabel: "LS", erforderlich: false },
     { flag: "hat_rechnung", typ: "rechnung", label: "Rechnung", kurzLabel: "RE", erforderlich: true },
     { flag: "hat_versandbestaetigung", typ: "versandbestaetigung", label: "Versand", kurzLabel: "VS", erforderlich: false },
   ],

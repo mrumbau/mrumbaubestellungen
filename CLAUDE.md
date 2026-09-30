@@ -75,9 +75,8 @@ DNS:          All-Inkl (CNAME cloud → cname.vercel-dns.com)
   4. Buchhaltungsansicht
   5. Dashboard
 - Primärfarbe: #570006 (MR-Red, Brand-Anker), Light: #7a1a1f
-- CardScan-Sub-Brand: emerald-500 (#10b981) — separates Modul-Identity
 - Stil: "Linear meets Handwerk-Industrie", deutsch, clean, industrielle SVG-Texturen
-- Siehe globals.css für vollständiges Token-System (6 Status × 3-Part, 4 Feedback × 3-Part, CardScan 8 States, bestellungsart-Tokens)
+- Siehe globals.css für vollständiges Token-System (6 Status × 3-Part, 4 Feedback × 3-Part, bestellungsart-Tokens)
 
 ```
 
@@ -378,10 +377,9 @@ Zusätzlich: Datei-Upload Button für PC (PDF oder JPG vom Scanner).
 ### Allgemein
 - Stil: "Linear meets Handwerk-Industrie" — industrielle SVG-Texturen, editorial Typografie
 - **Bestellwesen-Brand:** Primary `#570006` (MR-Red), Light `#7a1a1f`
-- **CardScan-Sub-Brand (Modul 02):** Accent `emerald-500` (#10b981) — bewusste Visual-Trennung neben MR-Red
 - Typografie: DM Sans (sans), Barlow Condensed (display, font-headline), JetBrains Mono (font-mono-amount für Beträge mit tabular-nums)
-- Token-System in `globals.css`: 6 Bestellungs-Status × 3-Part-Triplet, 4 Feedback × 3-Part, 3 Bestellungsart × 3-Part, CardScan 8-State + Sub-Brand
-- Responsive – funktioniert auf Handy (CardScan-Mobile-Hot-Path)
+- Token-System in `globals.css`: 6 Bestellungs-Status × 3-Part-Triplet, 4 Feedback × 3-Part, 3 Bestellungsart × 3-Part
+- Responsive – funktioniert auf Handy
 - Deutsche Sprache durchgehend (Microcopy: "Erstellen"/"Anlegen"-Pattern, "Änderungen speichern" für Edit)
 - Industrielle SVG-Texturen: `bg-grid-pattern`, `bg-iso-grid`, `bg-dot-grid`, `corner-marks`, `industrial-line`
 
@@ -493,29 +491,18 @@ Das System ist fertig wenn:
 
 ---
 
-## 📇 CardScan-Modul
+## 📇 CardScan-Modul (21.09.2026 entfernt)
 
-**URL:** `/cardscan` (Route-Group `(cardscan)`, eigenes Layout ohne Sidebar)  
-**Zweck:** Kontaktdaten aus beliebigen Quellen erfassen und parallel in zwei das-programm.io CRM-Konten anlegen.
+Modul, Routen (`/cardscan`, `/api/cardscan/*`), Komponenten, Libraries, PWA-Assets
+und die Design-Tokens (`--cs-*`, Emerald-Sub-Brand) wurden vollständig entfernt.
+Ebenso die Pakete `heic2any`, `cheerio`, `pdf-parse`, `mammoth` und die
+`DAS_PROGRAMM_*`-Env-Vars.
 
-**Input-Modi:** Text, Kamera, Foto-Upload (JPEG/PNG/WebP/HEIC), PDF, DOCX, vCard (.vcf), URL-Scraping, Clipboard, Share Target  
-**KI-Pipeline:** Google Cloud Vision OCR → GPT-4o Structured Outputs (strict JSON Schema)  
-**CRM:** Dual-Write via GraphQL API, Dry-Run-Modus wenn Token leer/DRY_RUN
-
-**Neue Env-Vars (in .env.local):**
-```
-GOOGLE_CLOUD_VISION_API_KEY=AIza...
-DAS_PROGRAMM_TOKEN_CRM1=...
-DAS_PROGRAMM_TOKEN_CRM2=... (oder DRY_RUN)
-DAS_PROGRAMM_ENDPOINT=https://app.das-programm.io/api/graphql
-```
-
-**DB-Tabellen:** `cardscan_captures`, `cardscan_sync_errors` (mit RLS)  
-**Storage:** Bucket `cardscan-images` (privat, RLS)  
-**Service Worker:** `/cardscan-sw.js` auf `/cardscan` scoped – keine Interaktion mit Bestellwesen  
-**Dependencies:** `heic2any`, `cheerio`, `pdf-parse`, `mammoth`
-
-**Architektur-Prinzip:** Vollständig getrennt vom Bestellwesen. Keine Änderungen an bestehenden Tabellen, Routen oder Komponenten. Nur zentrale Utility-Libraries werden wiederverwendet (auth, csrf, rate-limit, errors, logger, supabase).
+**Ausnahme:** `GOOGLE_CLOUD_VISION_API_KEY` und der Vision-Wrapper bleiben —
+letzterer liegt jetzt unter `src/lib/vision/google-vision.ts`. Die E-Mail-Pipeline
+nutzt ihn über `pipeline/vision-fallback.ts` als OCR-Fallback für Rechnungs-
+Anhänge, die GPT nicht lesen konnte. Es war die einzige CardScan-Datei, an der
+das Bestellwesen hing.
 
 ---
 

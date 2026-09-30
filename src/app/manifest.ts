@@ -1,9 +1,7 @@
 import type { MetadataRoute } from "next";
 
 /**
- * PWA-Manifest für das Bestellwesen-Hauptmodul (cloud.mrumbau.de).
- * Beachten: CardScan hat ein eigenes Manifest unter /cardscan-manifest.json
- * weil es ein eigenes Sub-Brand (Emerald) und Service-Worker-Scope hat.
+ * PWA-Manifest für das Bestellwesen (cloud.mrumbau.de).
  *
  * Next.js leitet automatisch /manifest.webmanifest aus dieser Datei ab.
  * 12.05.2026 — UI-Audit F7.8.

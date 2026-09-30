@@ -88,11 +88,21 @@ describe("DOKUMENT_CONFIG — Schema-Konsistenz", () => {
     }
   });
 
-  it("Material: Rechnung + Bestätigung + Lieferschein sind erforderlich, Versand optional", () => {
+  /**
+   * 22.09.2026 — Regel bewusst gelockert. Vorher waren Bestätigung und
+   * Lieferschein Pflicht; das traf in den echten Daten auf 21 von 286
+   * Material-Bestellungen zu (7 %). Folge: KEINE Material-Bestellung
+   * erreichte je "vollstaendig", der Status war toter Code.
+   *
+   * Pflicht ist jetzt nur die Rechnung — das Dokument, auf das es fachlich
+   * ankommt. Die anderen werden weiter erfasst und angezeigt, blockieren
+   * aber den Status nicht mehr.
+   */
+  it("Material: nur die Rechnung ist Pflicht, der Rest wird erfasst aber blockiert nicht", () => {
     const map = Object.fromEntries(DOKUMENT_CONFIG.material.map((d) => [d.typ, d.erforderlich]));
-    expect(map.bestellbestaetigung).toBe(true);
-    expect(map.lieferschein).toBe(true);
     expect(map.rechnung).toBe(true);
+    expect(map.bestellbestaetigung).toBe(false);
+    expect(map.lieferschein).toBe(false);
     expect(map.versandbestaetigung).toBe(false);
   });
 

@@ -43,8 +43,6 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
 
-  const isCardScan = redirectTo?.startsWith("/cardscan");
-
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -90,32 +88,9 @@ function LoginForm() {
     <div className="min-h-dvh flex flex-col lg:flex-row">
       {/* ─── Left: Brand Panel ──────────────────────────────────────── */}
       <aside className={`hidden lg:flex lg:w-[45%] relative overflow-hidden flex-col justify-between p-12 ${
-        isCardScan ? "bg-sidebar" : "bg-mr-gradient"
+        "bg-mr-gradient"
       }`}>
-        {isCardScan ? (
-          <>
-            <div className="absolute inset-0 bg-dot-grid opacity-60" />
-            <div className="absolute top-[40%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-cs-accent/[0.08] to-transparent" />
-            <div className="absolute top-[60%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-cs-accent/[0.05] to-transparent" />
-            <div className="absolute top-0 left-0 w-64 h-64 opacity-[0.06]">
-              <svg viewBox="0 0 260 260" fill="none">
-                <line x1="0" y1="60" x2="200" y2="260" stroke="white" strokeWidth="0.75" />
-                <line x1="0" y1="100" x2="160" y2="260" stroke="white" strokeWidth="0.75" />
-                <line x1="0" y1="140" x2="120" y2="260" stroke="white" strokeWidth="0.75" />
-                <rect x="0" y="0" width="3" height="40" fill="white" opacity="0.4" />
-                <rect x="0" y="0" width="40" height="3" fill="white" opacity="0.4" />
-              </svg>
-            </div>
-            <div className="absolute bottom-0 right-0 w-48 h-48 opacity-[0.04]">
-              <svg viewBox="0 0 200 200" fill="none">
-                <circle cx="200" cy="200" r="80" stroke="white" strokeWidth="0.5" />
-                <circle cx="200" cy="200" r="120" stroke="white" strokeWidth="0.5" />
-                <circle cx="200" cy="200" r="160" stroke="white" strokeWidth="0.5" />
-              </svg>
-            </div>
-          </>
-        ) : (
-          <>
+        <>
             <div className="absolute inset-0 bg-grid-pattern" />
             <div className="absolute inset-0 bg-diagonal-lines" />
             <div className="absolute inset-0 bg-iso-grid" />
@@ -142,69 +117,17 @@ function LoginForm() {
             <div className="absolute top-1/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
             <div className="absolute top-2/3 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
           </>
-        )}
         {/* Film-grain finalisiert den haptischen Papier-Charakter */}
         <div className="film-grain" aria-hidden="true" />
 
         {/* Logo */}
         <div className="relative z-10 reveal-up">
-          {isCardScan ? (
-            <div className="flex items-center gap-3">
-              <Logo size={44} className="text-foreground-inverse" />
-              <div className="h-5 w-px bg-white/10" />
-              <span className="text-[10px] text-white/20 tracking-[0.15em] uppercase font-mono-amount">Scan</span>
-            </div>
-          ) : (
-            <Logo size={56} className="text-foreground-inverse" />
-          )}
+          <Logo size={56} className="text-foreground-inverse" />
         </div>
 
         {/* Content */}
         <div className="relative z-10 max-w-md">
-          {isCardScan ? (
-            <>
-              <div className="flex items-center gap-2 mb-4 reveal-up stagger-1">
-                <span className="inline-flex items-center gap-2 rounded-full border border-cs-accent/30 bg-cs-accent/[0.06] px-3 py-1">
-                  <span className="block w-1.5 h-1.5 rounded-full bg-cs-accent" aria-hidden="true" />
-                  <span className="text-[10px] text-cs-accent-light/70 tracking-[0.2em] uppercase font-mono-amount">
-                    Modul 02 · CardScan
-                  </span>
-                </span>
-              </div>
-
-              <h2
-                className="reveal-up stagger-2 font-headline text-foreground-inverse leading-[0.95] tracking-[-0.02em]"
-                style={{ fontSize: "clamp(40px, 5vw, 64px)" }}
-              >
-                Card<span className="text-cs-accent/55">Scan</span>
-              </h2>
-
-              <div className="reveal-up stagger-3 w-16 h-[2px] bg-cs-accent/30 mt-6 mb-5" aria-hidden="true" />
-
-              <p className="reveal-up stagger-4 text-white/35 text-sm leading-relaxed max-w-xs">
-                Kontaktdaten aus Visitenkarten, E-Mails, Webseiten erfassen und direkt ins CRM übertragen.
-              </p>
-
-              <ul className="mt-8 space-y-2.5">
-                {["Foto & Kamera", "Text & Clipboard", "URL & Dateien", "Dual-CRM Write"].map((label, i) => (
-                  <li
-                    key={label}
-                    className={`reveal-up stagger-${i + 5} flex items-center gap-3`}
-                  >
-                    <span className="w-5 h-5 border border-cs-accent/15 rounded flex items-center justify-center">
-                      <span className="font-mono-amount text-[10px] text-cs-accent/40">{String(i + 1).padStart(2, "0")}</span>
-                    </span>
-                    <span className="text-white/35 text-[12px] tracking-wide">{label}</span>
-                    <span className="flex-1 h-px bg-white/[0.06]" aria-hidden="true" />
-                    <svg className="w-3 h-3 text-cs-accent/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <>
+          <>
               <div className="flex items-center gap-2 mb-4 reveal-up stagger-1">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1">
                   <span className="block w-1.5 h-1.5 rounded-full bg-white/60" aria-hidden="true" />
@@ -251,7 +174,6 @@ function LoginForm() {
                 ))}
               </ul>
             </>
-          )}
         </div>
 
         {/* Footer */}
@@ -277,7 +199,7 @@ function LoginForm() {
           <div className="lg:hidden mb-10 flex justify-center reveal-up">
             <Logo
               size={40}
-              className={isCardScan ? "text-foreground" : "text-brand"}
+              className={"text-brand"}
             />
           </div>
 
@@ -299,9 +221,7 @@ function LoginForm() {
             Anmelden
           </h1>
           <p className="reveal-up stagger-3 mt-3 text-foreground-muted text-center lg:text-left leading-relaxed">
-            {isCardScan
-              ? "Melde dich an, um CardScan zu nutzen."
-              : "Melde dich mit deinem Firmenkonto an."}
+            {"Melde dich mit deinem Firmenkonto an."}
           </p>
 
           {/* Doppelrand-wrapped Form */}
@@ -380,7 +300,7 @@ function LoginForm() {
                   type="submit"
                   disabled={loading}
                   className={`group w-full relative overflow-hidden rounded-full pl-6 pr-2 py-2 text-[16px] font-semibold text-foreground-inverse flex items-center justify-between gap-3 transition-[background-color,transform] duration-200 ease-fluid active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)] min-h-[56px] ${
-                    isCardScan ? "bg-sidebar hover:bg-sidebar-hover" : "bg-brand hover:bg-brand-light"
+                    "bg-brand hover:bg-brand-light"
                   }`}
                 >
                   <span className="relative z-10 flex items-center gap-2">
@@ -392,7 +312,7 @@ function LoginForm() {
                   <span
                     aria-hidden="true"
                     className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-[background-color,transform] duration-200 ease-fluid group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105 ${
-                      isCardScan ? "bg-cs-accent/15 group-hover:bg-cs-accent/25" : "bg-white/15 group-hover:bg-white/22"
+                      "bg-white/15 group-hover:bg-white/22"
                     }`}
                   >
                     <svg
@@ -429,9 +349,7 @@ function LoginForm() {
 
           {/* Akzent-Linie + URL-Label */}
           <div className={`reveal-up stagger-7 mt-10 mb-4 h-px ${
-            isCardScan
-              ? "bg-gradient-to-r from-transparent via-cs-accent/15 to-transparent"
-              : "bg-gradient-to-r from-transparent via-brand/15 to-transparent"
+            "bg-gradient-to-r from-transparent via-brand/15 to-transparent"
           }`} aria-hidden="true" />
 
           <div className="reveal-up stagger-8 flex items-center justify-center">

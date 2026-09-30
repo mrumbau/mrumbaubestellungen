@@ -37,6 +37,11 @@ export interface Bestellung {
   doku_nummern?: string[];
   // 17.05.2026 — Gutschrift-Flag (Rückerstattung, Geld kommt zurück)
   ist_gutschrift?: boolean | null;
+  // 21.09.2026 — Händler ist grundsätzlich vorausbezahlt (Amazon Business,
+  // PayPal-Shops). Keine Rechnungsfreigabe nötig, analog ist_gutschrift —
+  // die Bestellung bleibt aber sichtbar, damit die Lieferung kontrolliert
+  // werden kann. Quelle sind die Stammdaten, nicht die KI-Erkennung am Beleg.
+  vorausbezahlt?: boolean | null;
   // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance (optional).
   // Wird in BestellerCell als ghost-Pill angezeigt wenn besteller_kuerzel
   // UNBEKANNT ist. Bleibt auch nach Claim erhalten (Audit-Anker).

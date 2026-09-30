@@ -14,6 +14,8 @@ import { describe, it, expect } from "vitest";
 import {
   bestellnummernFuzzyMatch,
   haendlerNamesMatch,
+  findByExactNumber,
+  findByErweiterterMatch,
 } from "../bestellung-match";
 
 describe("bestellnummernFuzzyMatch — R5c-Bugfix Substring-Match", () => {
@@ -108,5 +110,288 @@ describe("haendlerNamesMatch — Cross-Match-Logic", () => {
   it("Sonderzeichen werden in Token normalisiert", () => {
     // & und Bindestriche werden zu Leerzeichen
     expect(haendlerNamesMatch("Hold & Spada", "Hold-Spada")).toBe(true); // beide haben Token "hold" + "spada"
+  });
+});
+
+// =====================================================================
+// findByExactNumber — Prioritätsreihenfolge
+// =====================================================================
+
+/**
+ * 21.09.2026 — Die Kandidaten-Queries laufen seit dem Performance-Umbau
+ * parallel statt sequenziell. Vorher garantierte das `await` + `return` die
+ * Prioritätsreihenfolge implizit; jetzt muss sie explizit beim Einsammeln
+ * der Ergebnisse hergestellt werden. Diese Tests pinnen genau das fest —
+ * ohne sie könnte ein späterer Umbau unbemerkt die falsche Bestellung
+ * zurückgeben, und Fehlzuordnungen sind hier das teuerste Fehlverhalten.
+ */
+
+type MockTreffer = {
+  spalte: string;
+  wert: string;
+  ankerSpalte: string;
+  ankerWert: string;
+  id: string;
+};
+
+function makeSupabaseMock(treffer: MockTreffer[]) {
+  const calls: Array<Record<string, string>> = [];
+  const client = {
+    from() {
+      return {
+        select() {
+          const eqs: Record<string, string> = {};
+          const builder = {
+            eq(spalte: string, wert: string) {
+              eqs[spalte] = wert;
+              return builder;
+            },
+            limit() {
+              return builder;
+            },
+            async maybeSingle() {
+              calls.push({ ...eqs });
+              const hit = treffer.find(
+                (t) => eqs[t.spalte] === t.wert && eqs[t.ankerSpalte] === t.ankerWert,
+              );
+              return { data: hit ? { id: hit.id } : null };
+            },
+          };
+          return builder;
+        },
+      };
+    },
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { client: client as any, calls };
+}
+
+describe("findByExactNumber — Prioritätsreihenfolge bleibt trotz Parallelität erhalten", () => {
+  const ctx = {
+    haendler: { id: "h-1", name: "Bauhaus" },
+    subunternehmer: null,
+    haendlerName: "Bauhaus GmbH",
+  };
+
+  it("haendler_id schlägt haendler_name bei gleichzeitigem Treffer", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-id" },
+      { spalte: "bestellnummer", wert: "A1000", ankerSpalte: "haendler_name", ankerWert: "Bauhaus GmbH", id: "via-name" },
+    ]);
+    const res = await findByExactNumber(client, ["A1000"], ctx);
+    expect(res?.id).toBe("via-id");
+  });
+
+  it("bestellnummer schlägt auftragsnummer und lieferscheinnummer", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "lieferscheinnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-ls" },
+      { spalte: "auftragsnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-auf" },
+      { spalte: "bestellnummer", wert: "A1000", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "via-best" },
+    ]);
+    const res = await findByExactNumber(client, ["A1000"], ctx);
+    expect(res?.id).toBe("via-best");
+  });
+
+  it("erste Suchnummer gewinnt vor späteren", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "ERSTE", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "treffer-erste" },
+      { spalte: "bestellnummer", wert: "ZWEITE", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "treffer-zweite" },
+    ]);
+    const res = await findByExactNumber(client, ["ERSTE", "ZWEITE"], ctx);
+    expect(res?.id).toBe("treffer-erste");
+  });
+
+  it("bricht nach Treffer der ersten Suchnummer ab — zweite wird nicht mehr abgefragt", async () => {
+    const { client, calls } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "ERSTE", ankerSpalte: "haendler_id", ankerWert: "h-1", id: "treffer-erste" },
+    ]);
+    await findByExactNumber(client, ["ERSTE", "ZWEITE"], ctx);
+    expect(calls.some((c) => Object.values(c).includes("ZWEITE"))).toBe(false);
+  });
+
+  it("findet über subunternehmer_id wenn kein Händler-Anker greift", async () => {
+    const { client } = makeSupabaseMock([
+      { spalte: "bestellnummer", wert: "SU-9", ankerSpalte: "subunternehmer_id", ankerWert: "su-1", id: "via-su" },
+    ]);
+    const res = await findByExactNumber(
+      client,
+      ["SU-9"],
+      { haendler: null, subunternehmer: { id: "su-1", firma: "Elektro Meier" }, haendlerName: null },
+    );
+    expect(res?.id).toBe("via-su");
+  });
+
+  it("liefert null und fragt gar nicht ab, wenn kein Anker vorhanden ist", async () => {
+    const { client, calls } = makeSupabaseMock([]);
+    const res = await findByExactNumber(
+      client,
+      ["A1000"],
+      { haendler: null, subunternehmer: null, haendlerName: null },
+    );
+    expect(res).toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("liefert null wenn keine Kombination trifft", async () => {
+    const { client } = makeSupabaseMock([]);
+    const res = await findByExactNumber(client, ["A1000", "B2000"], ctx);
+    expect(res).toBeNull();
+  });
+});
+
+// =====================================================================
+// findByErweiterterMatch — Guard gegen Zuordnung ohne Signal
+// =====================================================================
+
+/**
+ * 21.09.2026 — Stufe 5 ist die letzte, schwächste Stufe der Match-Kaskade:
+ * sie hat keine Nummer als Anker, sondern nur "gleicher Händler + letzte 14
+ * Tage + Dokumenttyp noch frei". Die beiden inhaltlichen Prüfungen
+ * (Nummern-Fuzzy, Betrag ±15%) sind an ihre Daten gebunden und wurden bei
+ * fehlenden Werten stillschweigend übersprungen — wodurch ausgerechnet
+ * schlecht erkannte Dokumente ohne jede Validierung zugeordnet wurden.
+ *
+ * Diese Tests pinnen fest, dass mindestens ein bestätigendes Signal
+ * vorliegen muss.
+ */
+
+function makeKandidatenMock(kandidaten: Array<Record<string, unknown>>) {
+  const builder: Record<string, unknown> = {};
+  for (const methode of ["select", "in", "gte", "eq", "ilike", "order"]) {
+    builder[methode] = () => builder;
+  }
+  builder.limit = async () => ({ data: kandidaten });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { from: () => builder } as any;
+}
+
+const erweiterterCtx = {
+  haendler: { id: "h-bauhaus", name: "Bauhaus" },
+  subunternehmer: null,
+  haendlerName: "Bauhaus",
+};
+
+describe("findByErweiterterMatch — ordnet nicht ohne bestätigendes Signal zu", () => {
+  it("lehnt ab, wenn weder Nummern noch Betrag vorliegen", async () => {
+    // Genau das Fehlverhalten: Rechnung ohne erkannte Nummer und ohne Betrag
+    // wurde an die erstbeste offene Bauhaus-Bestellung gehängt.
+    const client = makeKandidatenMock([
+      { id: "fremde-bestellung", bestellnummer: "B-111", auftragsnummer: null, betrag: 250, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: [],
+      dokumentAuftragsnummer: null,
+      erkannterBetrag: null,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res).toBeNull();
+  });
+
+  it("lehnt ab, wenn der Kandidat gar keine Nummern hat und kein Betrag vorliegt", async () => {
+    const client = makeKandidatenMock([
+      { id: "leer", bestellnummer: null, auftragsnummer: null, betrag: null, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: ["RE-4711"],
+      dokumentAuftragsnummer: null,
+      erkannterBetrag: 199.9,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res).toBeNull();
+  });
+
+  it("ordnet zu, wenn die Nummer fuzzy passt", async () => {
+    const client = makeKandidatenMock([
+      { id: "treffer", bestellnummer: "CBEPFVF", auftragsnummer: null, betrag: null, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: ["CP-CBEPFVF-128671457-1"],
+      dokumentAuftragsnummer: null,
+      erkannterBetrag: null,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res?.bestellungId).toBe("treffer");
+  });
+
+  it("ordnet zu, wenn der Betrag innerhalb der 15%-Toleranz liegt", async () => {
+    const client = makeKandidatenMock([
+      { id: "treffer", bestellnummer: null, auftragsnummer: null, betrag: 100, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: [],
+      dokumentAuftragsnummer: null,
+      erkannterBetrag: 105,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res?.bestellungId).toBe("treffer");
+  });
+
+  it("lehnt ab, wenn der Betrag zu weit abweicht", async () => {
+    const client = makeKandidatenMock([
+      { id: "zu-weit", bestellnummer: null, auftragsnummer: null, betrag: 100, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: [],
+      dokumentAuftragsnummer: null,
+      erkannterBetrag: 500,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res).toBeNull();
+  });
+
+  it("ordnet zu, wenn die Auftragsnummer exakt übereinstimmt", async () => {
+    const client = makeKandidatenMock([
+      { id: "treffer", bestellnummer: null, auftragsnummer: "2030393220", betrag: null, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: [],
+      dokumentAuftragsnummer: "2030393220",
+      erkannterBetrag: null,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res?.bestellungId).toBe("treffer");
+  });
+
+  it("Raab-Karcher-Fall: abweichende Auftragsnummer bleibt hart abgelehnt", async () => {
+    const client = makeKandidatenMock([
+      { id: "anderer-auftrag", bestellnummer: null, auftragsnummer: "2030485657", betrag: 100, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: [],
+      dokumentAuftragsnummer: "2030393220",
+      erkannterBetrag: 100,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res).toBeNull();
+  });
+
+  it("überspringt Kandidaten, deren Typ-Flag schon belegt ist", async () => {
+    const client = makeKandidatenMock([
+      { id: "schon-belegt", bestellnummer: "B-111", auftragsnummer: null, betrag: 100, hat_rechnung: true },
+      { id: "frei", bestellnummer: "B-111", auftragsnummer: null, betrag: 100, hat_rechnung: false },
+    ]);
+    const res = await findByErweiterterMatch(client, {
+      analyseTypen: ["rechnung"],
+      dokumentNummern: ["B-111"],
+      dokumentAuftragsnummer: null,
+      erkannterBetrag: 100,
+      ctx: erweiterterCtx,
+      bestellerKuerzel: "MT",
+    });
+    expect(res?.bestellungId).toBe("frei");
   });
 });

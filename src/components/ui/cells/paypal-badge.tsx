@@ -65,8 +65,7 @@ export function PayPalBadge({
 
   // Blau für PayPal (Brand-Farbe), neutral für andere Methoden.
   // Wir hardcoden den exakten Hex für PayPal-Blau (#0070BA) — DESIGN.md
-  // erlaubt das explizit für externe Marken-Identitäten (gleiches Pattern
-  // wie CardScan-Emerald-Sub-Brand).
+  // erlaubt das explizit für externe Marken-Identitäten.
   const sizeClasses =
     size === "md"
       ? "h-5 w-5 text-[12px]"

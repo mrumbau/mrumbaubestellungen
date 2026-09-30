@@ -81,38 +81,15 @@ export default tseslint.config(
         // Stub als WARN, damit der Build nicht bricht solange wir die
         // 249-Default-Color-Leaks aus dem Audit noch nicht alle migriert
         // haben. Wird in UX-R6 auf "error" hochgestuft.
-        // CardScan ist über die files-Section ausgenommen weil
-        // /cardscan/-Komponenten emerald-* aus eigener Sub-Brand nutzen.
         {
           selector: "Literal[value=/\\b(bg|text|border|ring|fill|stroke|from|via|to|outline|divide|placeholder|accent|caret|decoration)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\\b/]",
           message:
-            "UX-R1 Token-Bypass: Tailwind-Default-Color (z.B. text-slate-500). Nutze stattdessen Design-Tokens: text-foreground-muted, bg-canvas, border-line, status-*-bg/-text, --feedback-*. Wenn nötig im /cardscan-Scope: dort sind cs-* und Emerald-Skalen ok.",
+            "UX-R1 Token-Bypass: Tailwind-Default-Color (z.B. text-slate-500). Nutze stattdessen Design-Tokens: text-foreground-muted, bg-canvas, border-line, status-*-bg/-text, --feedback-*.",
         },
         {
           selector: "TemplateElement[value.raw=/\\b(bg|text|border|ring|fill|stroke|from|via|to|outline|divide|placeholder|accent|caret|decoration)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\\b/]",
           message:
             "UX-R1 Token-Bypass: Tailwind-Default-Color in Template-Literal. Nutze Design-Tokens (siehe Sister-Rule).",
-        },
-      ],
-    },
-  },
-  // CardScan-Sub-Brand-Ausnahme: emerald-* und cs-* Tokens dürfen im
-  // CardScan-Scope frei genutzt werden. Override deaktiviert die UX-R1-Regeln
-  // nur für die zwei Default-Color-Selectors (Indices 2 und 3 oben).
-  {
-    files: ["src/app/(cardscan)/**/*.{ts,tsx}", "src/components/cardscan/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "Literal[value=/\\[#[0-9a-fA-F]{3,8}\\]/]",
-          message:
-            "Hardcoded hex color in Tailwind arbitrary value. Use design tokens.",
-        },
-        {
-          selector: "TemplateElement[value.raw=/\\[#[0-9a-fA-F]{3,8}\\]/]",
-          message:
-            "Hardcoded hex color in Tailwind arbitrary value (template literal). Use design tokens.",
         },
       ],
     },

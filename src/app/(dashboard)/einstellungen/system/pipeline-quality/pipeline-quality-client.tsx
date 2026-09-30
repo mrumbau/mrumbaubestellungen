@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { IconActivity, IconAlertCircle, IconAlertTriangle } from "@/components/ui/icons";
 import { haendlerDisplay } from "@/lib/haendler-display";
+import { LEERLAUF_OUTCOME } from "@/lib/email-sync/second-review-leerlauf";
 import type {
   PipelineQualityRow,
   IncompleteBestellung,
@@ -363,8 +364,22 @@ export function PipelineQualityClient({
                               Bestellung →
                             </Link>
                           ) : (
-                            <Badge tone="warning" size="sm">
-                              {d.second_review_rerun_outcome ?? "kein Bestellung"}
+                            <Badge
+                              tone={
+                                d.second_review_rerun_outcome === LEERLAUF_OUTCOME
+                                  ? "muted"
+                                  : "warning"
+                              }
+                              size="sm"
+                              title={
+                                d.second_review_rerun_outcome === LEERLAUF_OUTCOME
+                                  ? "Dieser Absender hat bei bisher jedem Neuversuch nichts geliefert — der teure Durchlauf wurde gespart. Ein einziger Treffer hebt die Bremse wieder auf."
+                                  : undefined
+                              }
+                            >
+                              {d.second_review_rerun_outcome === LEERLAUF_OUTCOME
+                                ? "Neuversuch gespart"
+                                : (d.second_review_rerun_outcome ?? "kein Bestellung")}
                             </Badge>
                           )}
                           <span className="text-[10px] text-foreground-faint">

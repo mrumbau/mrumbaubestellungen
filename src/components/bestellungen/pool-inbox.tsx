@@ -45,7 +45,9 @@ import { ReserveBadge } from "@/components/ui/cells/reserve-badge";
 import { ScoreBadge } from "@/components/ui/cells/score-badge";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { haendlerDisplay } from "@/lib/haendler-display";
-import { agingWashFromCreatedAt, ageInDays, describeAge } from "@/lib/pool-utils";
+import { agingWashFromCreatedAt, ageInDays, describeAge,
+  naechsteAuswahl,
+} from "@/lib/pool-utils";
 import { smartSnoozeOptions } from "@/lib/pool-inbox-state";
 import {
   computeScore,
@@ -101,6 +103,15 @@ export interface PoolInboxProps {
    * jeder Pool-Card. Optional gehalten damit alte Caller weiterhin gehen.
    */
   alleBesteller?: Array<{ kuerzel: string; name: string; rolle?: string }>;
+  /**
+   * 22.09.2026 — Mehrfachauswahl. Die Auswahl selbst liegt beim Aufrufer
+   * (BestellungenTabelle), damit sie sich dieselbe Bulk-Leiste mit dem
+   * Tabellen-Modus teilt. Hier liegt nur die Darstellung und die
+   * Bereichsauswahl per Umschalt-Klick — die braucht die sichtbare
+   * Reihenfolge, und die kennt nur diese Komponente.
+   */
+  selectedIds?: Set<string>;
+  onSelectedIdsChange?: (next: Set<string>) => void;
 }
 
 export function PoolInbox({
@@ -119,7 +130,11 @@ export function PoolInbox({
   onSnooze,
   onDefer,
   alleBesteller = [],
+  selectedIds,
+  onSelectedIdsChange,
 }: PoolInboxProps) {
+  // Anker für die Bereichsauswahl: zuletzt per Klick gesetzte Karte.
+  const lastTouchedRef = useRef<string | null>(null);
   const reservationMap = usePoolReservationsRealtime(initialReservations);
 
   // Initial unread-Set für Seen-Tracker
@@ -177,6 +192,33 @@ export function PoolInbox({
   // Snooze-Optionen werden bei jedem Render frisch berechnet (relativ zu now)
   const snoozeOptions = useMemo(() => smartSnoozeOptions(), []);
 
+  const auswahlAktiv = !!selectedIds && !!onSelectedIdsChange;
+
+  /**
+   * Umschalten einer Karte. Mit gedrückter Umschalttaste wird der Bereich
+   * zwischen der zuletzt angeklickten und dieser Karte übernommen — in der
+   * SICHTBAREN Reihenfolge, nicht in der Datenreihenfolge. Genau dafür sitzt
+   * die Logik hier und nicht beim Aufrufer.
+   */
+  const toggleSelect = useCallback(
+    (id: string, shiftKey: boolean) => {
+      if (!selectedIds || !onSelectedIdsChange) return;
+      // Die Auswahl-Logik selbst liegt als reine Funktion in pool-utils und
+      // ist dort getestet — hier bleibt nur das Durchreichen der sichtbaren
+      // Reihenfolge und des Ankers.
+      const next = naechsteAuswahl(
+        selectedIds,
+        id,
+        shiftKey,
+        lastTouchedRef.current,
+        sortedBestellungen.map((x) => x.id),
+      );
+      lastTouchedRef.current = id;
+      onSelectedIdsChange(next);
+    },
+    [selectedIds, onSelectedIdsChange, sortedBestellungen],
+  );
+
   return (
     <div className="space-y-2">
       {sortedBestellungen.map((b) => (
@@ -197,6 +239,9 @@ export function PoolInbox({
           onDefer={onDefer}
           snoozeOptions={snoozeOptions}
           alleBesteller={alleBesteller}
+          auswahlAktiv={auswahlAktiv}
+          isSelected={!!selectedIds?.has(b.id)}
+          onToggleSelect={toggleSelect}
         />
       ))}
       {sortedBestellungen.length === 0 && (
@@ -225,6 +270,10 @@ interface PoolInboxCardProps {
   snoozeOptions: ReadonlyArray<{ key: string; label: string; until: string }>;
   /** 09.06.2026 — Besteller-Liste für Zuordnen-Submenü. */
   alleBesteller: Array<{ kuerzel: string; name: string; rolle?: string }>;
+  /** 22.09.2026 — Mehrfachauswahl. */
+  auswahlAktiv: boolean;
+  isSelected: boolean;
+  onToggleSelect: (bestellungId: string, shiftKey: boolean) => void;
 }
 
 function PoolInboxCard({
@@ -242,6 +291,9 @@ function PoolInboxCard({
   onSnooze,
   onDefer,
   snoozeOptions,
+  auswahlAktiv,
+  isSelected,
+  onToggleSelect,
   alleBesteller,
 }: PoolInboxCardProps) {
   const articleRef = useRef<HTMLElement | null>(null);
@@ -332,8 +384,22 @@ function PoolInboxCard({
       ref={setArticleRef}
       data-bestellung-id={b.id}
       onClick={(e) => {
+        // 22.09.2026 — Sobald irgendetwas ausgewählt ist, schaltet die ganze
+        // Karte auf Auswählen um. Sonst müsste man beim Zuordnen von zehn
+        // Bestellungen zehnmal das kleine Kästchen treffen — genau das soll
+        // hier schneller gehen. Ohne Auswahl bleibt es beim Drawer.
+        if (auswahlAktiv && isSelected) {
+          onToggleSelect(b.id, e.shiftKey);
+          return;
+        }
         // Cmd/Shift/Middle-Click → klassische Navigation via Link
-        if (e.metaKey || e.shiftKey || e.ctrlKey) return;
+        if (e.metaKey || e.shiftKey || e.ctrlKey) {
+          if (auswahlAktiv && e.shiftKey) {
+            e.preventDefault();
+            onToggleSelect(b.id, true);
+          }
+          return;
+        }
         onOpenDrawer(b.id);
       }}
       className={cn(
@@ -341,9 +407,40 @@ function PoolInboxCard({
         "transition-[transform,box-shadow,background-color] duration-150 ease-out",
         "hover:shadow-card hover:border-line-strong hover:-translate-y-px",
         isDeferred && "opacity-65",
+        isSelected && "border-brand ring-1 ring-brand/30 bg-brand/[0.03]",
         wash,
       )}
     >
+      {/* 22.09.2026 — Kontrollkästchen für die Mehrfachauswahl.
+          Unausgewählt bleibt es dezent und wird erst beim Überfahren der
+          Karte deutlich, damit der Kartenstapel ruhig bleibt. Sobald etwas
+          ausgewählt ist, sind alle Kästchen sichtbar — sonst sieht man nicht,
+          was noch zur Auswahl steht. */}
+      {auswahlAktiv && (
+        <label
+          className={cn(
+            "absolute top-2 left-2 z-10 flex h-6 w-6 items-center justify-center rounded-md",
+            "transition-opacity",
+            isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100",
+          )}
+          onClick={(e) => {
+            // Der Klick darf nicht zusätzlich die Karte treffen.
+            e.stopPropagation();
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              const evt = e.nativeEvent as unknown as { shiftKey?: boolean };
+              onToggleSelect(b.id, !!evt.shiftKey);
+            }}
+            aria-label={`Bestellung ${b.bestellnummer ?? b.haendler_name ?? ""} auswählen`}
+            className="h-4 w-4 accent-[var(--mr-red)] cursor-pointer"
+          />
+        </label>
+      )}
+
       {/* Read-Dot (Stufe 3, subtle): zeigt unseen-State. */}
       {isUnread && (
         <span

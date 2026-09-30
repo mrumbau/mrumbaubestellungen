@@ -48,14 +48,6 @@ function IconProjekte({ className }: { className?: string }) {
   );
 }
 
-function IconKunden({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-    </svg>
-  );
-}
-
 function IconArchiv({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -97,7 +89,6 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
     { href: "/todo", label: "Todo", Icon: IconTodo },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
-    { href: "/kunden", label: "Kunden", Icon: IconKunden },
     { href: "/archiv", label: "Archiv", Icon: IconArchiv },
     { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
     { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
@@ -107,7 +98,6 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
     { href: "/todo", label: "Todo", Icon: IconTodo },
     { href: "/projekte", label: "Projekte", Icon: IconProjekte },
-    { href: "/kunden", label: "Kunden", Icon: IconKunden },
     { href: "/archiv", label: "Archiv", Icon: IconArchiv },
     { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
     { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
@@ -208,32 +198,6 @@ export function Sidebar({ profil, poolCount = 0 }: { profil: BenutzerProfil; poo
           );
         })}
       </nav>
-
-      {/* Andere Module — Separator + Eyebrow distancen CardScan visuell vom
-          Bestellwesen-Nav, damit der Emerald-Akzent nicht als Status-Indikator
-          missverstanden wird. */}
-      <div className="px-5 pt-2 pb-1.5 border-t border-white/[0.06]">
-        <span className="text-[10px] font-semibold tracking-widest uppercase text-white/30">
-          Andere Module
-        </span>
-      </div>
-      <div className="px-3 pb-3">
-        <Link
-          href="/cardscan"
-          onClick={() => setMobileOpen(false)}
-          className={`flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-colors duration-150 ${
-            pathname.startsWith("/cardscan")
-              ? "bg-cs-accent/10 text-cs-accent-light font-medium"
-              : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
-          }`}
-        >
-          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-          </svg>
-          CardScan
-        </Link>
-      </div>
 
       {/* Thin separator */}
       <div className="mx-5 h-px bg-white/[0.06]" />

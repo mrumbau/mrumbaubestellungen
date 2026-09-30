@@ -10,14 +10,6 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // PWA-Manifest braucht den korrekten MIME-Type, sonst meckert Chrome
-        // mit "Manifest: Syntax error" obwohl die JSON valide ist.
-        source: "/cardscan-manifest.json",
-        headers: [
-          { key: "Content-Type", value: "application/manifest+json; charset=utf-8" },
-        ],
-      },
-      {
         // 22.05.2026 — Bestellwesen-Manifest (next-generated aus manifest.ts).
         // Ohne expliziten Content-Type liefert Next/Vercel application/octet-stream
         // oder text/plain → Chrome wirft "Manifest: Syntax error".

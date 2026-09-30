@@ -72,6 +72,11 @@ export default async function SystemLayout({
       icon: <IconKey />,
     },
     {
+      label: "Rechnungseingang",
+      href: "/einstellungen/system/rechnungseingang",
+      icon: <IconMail />,
+    },
+    {
       label: "Pipeline-Qualität",
       href: "/einstellungen/system/pipeline-quality",
       icon: <IconActivity />,

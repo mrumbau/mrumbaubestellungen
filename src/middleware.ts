@@ -175,8 +175,8 @@ export async function middleware(request: NextRequest) {
   }
 
   if (rolle) {
-    // Buchhaltung darf /buchhaltung, /einstellungen, /cardscan und API-Routes sehen
-    if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung") && !pathname.startsWith("/einstellungen") && !pathname.startsWith("/cardscan") && !pathname.startsWith("/api/")) {
+    // Buchhaltung darf /buchhaltung, /einstellungen und API-Routes sehen
+    if (rolle === "buchhaltung" && !pathname.startsWith("/buchhaltung") && !pathname.startsWith("/einstellungen") && !pathname.startsWith("/api/")) {
       const url = request.nextUrl.clone();
       url.pathname = "/buchhaltung";
       return NextResponse.redirect(url);

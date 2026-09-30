@@ -42,7 +42,10 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, domain, url_muster, email_absender } = body;
+    const {
+      name, domain, url_muster, email_absender,
+      immer_vorausbezahlt, zahlungsziel_tage,
+    } = body;
 
     if (name && !validateTextLength(name, 200)) {
       return NextResponse.json({ error: "Name zu lang (max. 200 Zeichen)" }, { status: 400 });
@@ -52,6 +55,28 @@ export async function PUT(
       return NextResponse.json({ error: "Ungültige Domain" }, { status: 400 });
     }
 
+    // 21.09.2026 — Zahlungsziel. null loescht den Wert (= unbekannt, dann
+    // bleibt die Faelligkeit leer). Obergrenze 365 Tage: alles darueber ist
+    // in der Praxis ein Tippfehler, und ein falsches Faelligkeitsdatum ist
+    // schaedlicher als gar keins.
+    const zahlungszielGesetzt = zahlungsziel_tage !== undefined && zahlungsziel_tage !== null;
+    if (zahlungszielGesetzt) {
+      const tage = Number(zahlungsziel_tage);
+      if (!Number.isInteger(tage) || tage < 0 || tage > 365) {
+        return NextResponse.json(
+          { error: "Zahlungsziel muss eine ganze Zahl zwischen 0 und 365 Tagen sein" },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (immer_vorausbezahlt !== undefined && typeof immer_vorausbezahlt !== "boolean") {
+      return NextResponse.json(
+        { error: "„Immer vorausbezahlt“ muss ja oder nein sein" },
+        { status: 400 },
+      );
+    }
+
     const { data, error } = await supabase
       .from("haendler")
       .update({
@@ -59,6 +84,10 @@ export async function PUT(
         domain,
         url_muster: url_muster || [],
         email_absender: email_absender || [],
+        ...(immer_vorausbezahlt !== undefined ? { immer_vorausbezahlt } : {}),
+        ...(zahlungsziel_tage !== undefined
+          ? { zahlungsziel_tage: zahlungszielGesetzt ? Number(zahlungsziel_tage) : null }
+          : {}),
       })
       .eq("id", id)
       .select()

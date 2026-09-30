@@ -25,6 +25,12 @@ export interface BestellerZuordnungContext {
   haendlerDomain: string;
   haendlerName: string;
   absenderDomain: string;
+  /**
+   * 30.09.2026 — Die vollstaendige Absenderadresse. Bis dahin bekam die
+   * Regel-Engine als "Absender" den Haendlernamen uebergeben, weshalb jede
+   * Regel vom Typ `absender_pattern` still ins Leere lief.
+   */
+  emailAbsender: string;
   vorfilterBestellnummer: string | null;
   analyseErgebnisse: AnalyseErgebnis[];
   emailText: string;
@@ -67,7 +73,7 @@ export async function assignBesteller(
   supabase: SupabaseClient,
   ctx: BestellerZuordnungContext,
 ): Promise<BestellerZuordnungResult> {
-  const { haendlerDomain, haendlerName, absenderDomain, analyseErgebnisse, emailText, email_betreff } = ctx;
+  const { haendlerDomain, haendlerName, absenderDomain, emailAbsender, analyseErgebnisse, emailText, email_betreff } = ctx;
   let bestellerKuerzel = "";
   let zuordnungsMethode = "";
   // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance, getrennt vom
@@ -75,6 +81,28 @@ export async function assignBesteller(
   // gesetzt, wenn die Affinitäts-Historie einen Best-Guess hergibt.
   let vorschlagKuerzel: string | null = null;
   let vorschlagKonfidenz: number | null = null;
+
+  // 21.09.2026 — Personen, die keine neuen Bestellungen mehr annehmen
+  // (benutzer_rollen.nimmt_neue_bestellungen = false), z.B. weil sie die
+  // Firma verlassen oder ins Studium gehen.
+  //
+  // Ihre Historie bleibt in `bestellungen` stehen, und genau das ist das
+  // Problem: Stufe 3 (Haendler-Affinitaet) und Stufe 4.5 (KI-Historie)
+  // schliessen aus den letzten 50 Bestellungen je Haendler auf den Besteller.
+  // Ohne diesen Filter wuerde ein ausgeschiedener Kollege mit langer Historie
+  // weiter jede neue Bestellung zugewiesen bekommen.
+  //
+  // Fail-open: schlaegt die Abfrage fehl, filtern wir niemanden. Lieber eine
+  // Zuordnung an die falsche Person als eine Pipeline, die stehenbleibt.
+  let inaktiveBesteller = new Set<string>();
+  try {
+    const { data: inaktive } = await supabase
+      .from("benutzer_rollen").select("kuerzel")
+      .eq("nimmt_neue_bestellungen", false);
+    inaktiveBesteller = new Set((inaktive ?? []).map((b) => String(b.kuerzel)));
+  } catch (e) {
+    logError("webhook/email", "Laden inaktiver Besteller fehlgeschlagen (fail-open)", e);
+  }
 
   // 06.05.2026 (Welle 4 O8) — STUFE -1: Rules-Engine.
   // Admin-konfigurierbare Regeln aus besteller_rules-Tabelle. Wenn DB-Match
@@ -86,20 +114,32 @@ export async function assignBesteller(
       .rpc("match_besteller_rules", {
         p_haendler_domain: haendlerDomain,
         p_haendler_id: null,
-        p_email_absender: ctx.haendlerName ?? null,  // Absender-Domain via haendlerDomain abgedeckt; pattern matcht haendlerName auch
+        p_email_absender: emailAbsender || null,
         p_email_betreff: email_betreff ?? null,
       });
     if (ruleMatch && Array.isArray(ruleMatch) && ruleMatch.length > 0) {
       const match = ruleMatch[0] as { rule_id: string; target_kuerzel: string; confidence: number; rule_name: string };
-      bestellerKuerzel = match.target_kuerzel;
-      zuordnungsMethode = `rule:${match.rule_name}`;
-      vorschlagKuerzel = match.target_kuerzel;
-      vorschlagKonfidenz = typeof match.confidence === "number" ? match.confidence : 0.95;
-      logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
-        target_kuerzel: match.target_kuerzel,
-        confidence: match.confidence,
-        rule_id: match.rule_id,
-      });
+      // 30.09.2026 — Eine Regel darf niemanden zuweisen, der keine neuen
+      // Bestellungen mehr annimmt. Die Regel kann aelter sein als der
+      // Weggang; ohne diese Pruefung laeuft sie stumm weiter ins Leere.
+      // Der Treffer wird verworfen und die Mail faellt in die naechsten
+      // Stufen — besser im Pool als bei einem Ausgeschiedenen.
+      if (inaktiveBesteller.has(match.target_kuerzel)) {
+        logInfo("webhook/email", `Rules-Engine: Regel "${match.rule_name}" uebersprungen — Ziel nimmt keine neuen Bestellungen mehr`, {
+          target_kuerzel: match.target_kuerzel,
+          rule_id: match.rule_id,
+        });
+      } else {
+        bestellerKuerzel = match.target_kuerzel;
+        zuordnungsMethode = `rule:${match.rule_name}`;
+        vorschlagKuerzel = match.target_kuerzel;
+        vorschlagKonfidenz = typeof match.confidence === "number" ? match.confidence : 0.95;
+        logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
+          target_kuerzel: match.target_kuerzel,
+          confidence: match.confidence,
+          rule_id: match.rule_id,
+        });
+      }
     }
   } catch (e) {
     logError("webhook/email", "match_besteller_rules fehlgeschlagen (fail-open, weiter mit STUFE 3+)", e);
@@ -118,7 +158,18 @@ export async function assignBesteller(
       .order("created_at", { ascending: false })
       .limit(50);
 
-    historieCache = affinitaet || [];
+    // Inaktive Besteller aus der Stichprobe nehmen, BEVOR gezaehlt wird.
+    // Der Cache wird von Stufe 4.5 weiterverwendet, der Filter wirkt also
+    // fuer Affinitaet und KI-Historie gleichermassen.
+    //
+    // Der Anteil bezieht sich damit auf "wer von den aktiven Bestellern kauft
+    // hier am meisten". Die >= 3-Schwelle greift jetzt auf der gefilterten
+    // Liste — bei zu duenner Historie faellt die Zuordnung sauber auf
+    // UNBEKANNT und landet im Pool, statt aus zwei Restbestellungen eine
+    // Scheinsicherheit zu bauen.
+    historieCache = (affinitaet || []).filter(
+      (b) => !inaktiveBesteller.has(String(b.besteller_kuerzel)),
+    );
 
     if (historieCache.length >= 3) {
       const zaehler = new Map<string, number>();
@@ -147,7 +198,11 @@ export async function assignBesteller(
   if (!bestellerKuerzel) {
     const { data: benutzerListe } = await supabase
       .from("benutzer_rollen").select("kuerzel, name, email")
-      .in("rolle", ["besteller", "admin"]);
+      .in("rolle", ["besteller", "admin"])
+      // 21.09.2026 — wer keine neuen Bestellungen mehr annimmt, ist auch
+      // dann kein Ziel, wenn sein Name noch im Dokument oder im Mailtext
+      // auftaucht (alte Lieferadressen, Altbestellungen im Verlauf).
+      .neq("nimmt_neue_bestellungen", false);
 
     if (benutzerListe) {
       const gptBesteller = analyseErgebnisse.find((e) => e.analyse.besteller_im_dokument)?.analyse.besteller_im_dokument?.toLowerCase() || "";

@@ -61,10 +61,16 @@ export function ApprovalPanel({
   variant?: "sidebar" | "mobile" | "mobile-bar";
 }) {
   const istGutschrift = bestellung.ist_gutschrift === true;
+  // 21.09.2026 — Vorausbezahlt (Amazon Business, PayPal-Shops) braucht wie
+  // eine Gutschrift keine Freigabe: das Geld ist weg, es gibt nichts mehr
+  // freizugeben. Die Bestellung bleibt trotzdem sichtbar — kontrolliert
+  // werden muss ja noch, ob die Ware angekommen ist.
+  const istVorausbezahlt = bestellung.vorausbezahlt === true;
+  const ohneFreigabe = istGutschrift || istVorausbezahlt;
 
   // Mobile bottom bar — only Freigabe CTA, no other controls
   if (variant === "mobile-bar") {
-    if (istGutschrift) return null;
+    if (ohneFreigabe) return null;
     if (!kannFreigeben || freigabe || !hatRechnung) return null;
     return (
       <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-surface/95 backdrop-blur-sm border-t border-line z-50 safe-area-bottom">
@@ -113,6 +119,22 @@ export function ApprovalPanel({
         </div>
       )}
 
+      {/* Vorausbezahlt-Banner — ersetzt den Freigabe-CTA.
+          Im Gegensatz zum "Bereits bezahlt"-Hinweis oben stammt das hier aus
+          den Händler-Stammdaten und nicht aus der KI-Erkennung am Beleg. */}
+      {istVorausbezahlt && !freigabe && (
+        <Card padding="md" className="bg-success-bg border-success-border">
+          <div className="flex items-center gap-2">
+            <IconCheck className="h-4 w-4 text-success" />
+            <p className="font-headline text-body-sm text-success">Vorausbezahlt</p>
+          </div>
+          <p className="text-meta text-success/80 mt-1.5 ml-6">
+            Bei diesem Händler wird im Voraus bezahlt — keine Freigabe nötig.
+            Bitte nur prüfen, ob die Ware angekommen ist.
+          </p>
+        </Card>
+      )}
+
       {/* Gutschrift-Info-Banner — ersetzt den Freigabe-CTA */}
       {istGutschrift && !freigabe && (
         <Card padding="md" className="bg-success-bg border-success-border">
@@ -127,7 +149,7 @@ export function ApprovalPanel({
       )}
 
       {/* Primary CTA — Freigeben ODER bereits-freigegeben-State ODER helper */}
-      {!istGutschrift && freigabe ? (
+      {!ohneFreigabe && freigabe ? (
         <Card padding="md" className="bg-success-bg border-success-border">
           <div className="flex items-center gap-2">
             <IconCheck className="h-4 w-4 text-success" />
@@ -143,7 +165,7 @@ export function ApprovalPanel({
             </p>
           )}
         </Card>
-      ) : kannFreigeben && !istGutschrift ? (
+      ) : kannFreigeben && !ohneFreigabe ? (
         hatRechnung ? (
           <Card
             padding={isMobile ? "none" : "md"}

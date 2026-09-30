@@ -27,7 +27,7 @@ export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> 
   // Email-Pipeline (Reasoning für Multi-Doc-Logik)
   "gpt-5.5": { input: 5.00, output: 30.00 },
   "gpt-5.5-pro": { input: 30.00, output: 180.00 },
-  // CardScan (kein Reasoning nötig, json_schema strict garantiert Struktur)
+  // Günstige Varianten (kein Reasoning nötig, json_schema strict garantiert Struktur)
   "gpt-5-mini": { input: 0.25, output: 2.00 },
   "gpt-5-nano": { input: 0.05, output: 0.40 },
   // Legacy — bleiben für Cost-Calc historischer Mails (vor Migration verarbeitet)

@@ -137,6 +137,12 @@ export type Bestellung = {
   // Jahresabrechnung mit Überzahlung). UI: anderes Badge, keine Freigabe,
   // direkt für Buchhaltung sichtbar.
   ist_gutschrift?: boolean | null;
+  // 21.09.2026 — Händler ist grundsätzlich vorausbezahlt (Amazon Business,
+  // PayPal-Shops). Wie ist_gutschrift keine Freigabe nötig — das Geld ist
+  // weg, es gibt nichts freizugeben. Die Bestellung bleibt aber sichtbar,
+  // damit die Lieferung kontrolliert werden kann. Quelle sind die
+  // Händler-Stammdaten, nicht die KI-Erkennung am Beleg.
+  vorausbezahlt?: boolean | null;
   // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag als unverbindlicher Hinweis.
   // Wird in BestellerCell als ghost-Pill angezeigt wenn besteller_kuerzel
   // UNBEKANNT ist. Beide bleiben auch nach Claim erhalten (Audit-Provenance).

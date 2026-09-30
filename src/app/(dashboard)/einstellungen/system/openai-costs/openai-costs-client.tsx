@@ -11,13 +11,11 @@ import type { CostRow } from "./page";
 
 const SOURCE_LABEL: Record<string, string> = {
   email: "E-Mail-Pipeline",
-  cardscan: "CardScan",
   billing_api: "OpenAI Billing-API",
 };
 
 const SOURCE_TONE: Record<string, "brand" | "info" | "muted"> = {
   email: "brand",
-  cardscan: "info",
   billing_api: "muted",
 };
 
@@ -113,7 +111,7 @@ export function OpenAICostsClient({ rows, days }: { rows: CostRow[]; days: numbe
           { label: "OpenAI-Kosten" },
         ]}
         title="OpenAI-Kosten"
-        description={`Tagesweise OpenAI-Aufwendungen aus E-Mail-Pipeline, CardScan und Billing-API der letzten ${days} Tage.`}
+        description={`Tagesweise OpenAI-Aufwendungen aus E-Mail-Pipeline und Billing-API der letzten ${days} Tage.`}
         meta={
           <span className="text-[12px] text-foreground-subtle font-mono-amount">
             {formatEur(aggregates.cost30d)} in {days} Tagen
@@ -125,7 +123,7 @@ export function OpenAICostsClient({ rows, days }: { rows: CostRow[]; days: numbe
         <EmptyState
           icon={<IconKey className="h-5 w-5" />}
           title="Keine Kosten erfasst"
-          description="Noch keine OpenAI-Calls in der E-Mail-Pipeline oder CardScan registriert. Sobald die Pipeline läuft, erscheinen hier die Tagesaufwendungen."
+          description="Noch keine OpenAI-Calls in der E-Mail-Pipeline registriert. Sobald die Pipeline läuft, erscheinen hier die Tagesaufwendungen."
         />
       ) : (
         <>

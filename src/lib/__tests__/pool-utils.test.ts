@@ -5,6 +5,7 @@ import {
   agingWashClass,
   agingWashFromCreatedAt,
   describeAge,
+  naechsteAuswahl,
 } from "../pool-utils";
 
 const NOW = new Date("2026-06-03T12:00:00Z");
@@ -119,5 +120,53 @@ describe("describeAge — deutsche Microcopy", () => {
 
   it("30+ Tage → 'über einem Monat'", () => {
     expect(describeAge(45)).toBe("seit über einem Monat");
+  });
+});
+
+// =====================================================================
+// naechsteAuswahl — Pool-Mehrfachauswahl (22.09.2026)
+// =====================================================================
+
+describe("naechsteAuswahl", () => {
+  const reihenfolge = ["a", "b", "c", "d", "e"];
+
+  it("schaltet einzeln um", () => {
+    expect([...naechsteAuswahl(new Set(), "b", false, null, reihenfolge)]).toEqual(["b"]);
+    expect([...naechsteAuswahl(new Set(["b"]), "b", false, "b", reihenfolge)]).toEqual([]);
+  });
+
+  it("wählt mit Umschalttaste den Bereich vorwärts aus", () => {
+    const res = naechsteAuswahl(new Set(["b"]), "d", true, "b", reihenfolge);
+    expect([...res].sort()).toEqual(["b", "c", "d"]);
+  });
+
+  it("wählt den Bereich auch rückwärts aus", () => {
+    const res = naechsteAuswahl(new Set(["d"]), "b", true, "d", reihenfolge);
+    expect([...res].sort()).toEqual(["b", "c", "d"]);
+  });
+
+  it("wählt den Bereich ab, wenn der Anker nicht ausgewählt war", () => {
+    // a..e ausgewählt, Anker b ist abgewählt → b..d fliegen raus
+    const start = new Set(["a", "c", "d", "e"]);
+    const res = naechsteAuswahl(start, "d", true, "b", reihenfolge);
+    expect([...res].sort()).toEqual(["a", "e"]);
+  });
+
+  it("bezieht sich auf die sichtbare Reihenfolge, nicht auf die Datenreihenfolge", () => {
+    // Umgekehrt sortierte Ansicht: der Bereich zwischen e und c ist e,d,c
+    const sichtbar = ["e", "d", "c", "b", "a"];
+    const res = naechsteAuswahl(new Set(["e"]), "c", true, "e", sichtbar);
+    expect([...res].sort()).toEqual(["c", "d", "e"]);
+  });
+
+  it("fällt auf einfaches Umschalten zurück, wenn der Anker nicht mehr sichtbar ist", () => {
+    const res = naechsteAuswahl(new Set(["x"]), "c", true, "x", reihenfolge);
+    expect([...res].sort()).toEqual(["c", "x"]);
+  });
+
+  it("ändert die übergebene Menge nicht", () => {
+    const start = new Set(["a"]);
+    naechsteAuswahl(start, "b", false, null, reihenfolge);
+    expect([...start]).toEqual(["a"]);
   });
 });
