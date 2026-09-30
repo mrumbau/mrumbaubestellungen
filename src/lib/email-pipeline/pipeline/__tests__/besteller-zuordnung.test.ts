@@ -25,11 +25,17 @@ vi.mock("@/lib/openai", () => ({
 
 type HistorieZeile = { besteller_kuerzel: string; besteller_name: string | null; haendler_name: string | null };
 
+type RegelTreffer = { rule_id: string; target_kuerzel: string; confidence: number; rule_name: string };
+
 function makeSupabaseMock(opts: {
   historie: HistorieZeile[];
   inaktiv: string[];
   benutzer?: Array<{ kuerzel: string; name: string; email: string }>;
   inaktivWirftFehler?: boolean;
+  /** Was die Regel-Engine (Stufe -1) zurueckgibt. Leer = keine Regel greift. */
+  regeln?: RegelTreffer[];
+  /** Faengt die Argumente auf, mit denen die Regel-Engine gerufen wurde. */
+  rpcArgs?: { letzte?: Record<string, unknown> };
 }) {
   const benutzer = opts.benutzer ?? [
     { kuerzel: "MT", name: "Marlon Tschon", email: "mt@mrumbau.de" },
@@ -37,7 +43,10 @@ function makeSupabaseMock(opts: {
   ];
 
   const client = {
-    rpc: async () => ({ data: [] }),            // Rules-Engine: keine Regeln
+    rpc: async (_name: string, args: Record<string, unknown>) => {
+      if (opts.rpcArgs) opts.rpcArgs.letzte = args;
+      return { data: opts.regeln ?? [] };
+    },
     from(tabelle: string) {
       if (tabelle === "bestellungen") {
         const b: Record<string, unknown> = {
@@ -72,6 +81,7 @@ const ctx = {
   haendlerDomain: "bauhaus.de",
   haendlerName: "Bauhaus",
   absenderDomain: "bauhaus.de",
+  emailAbsender: "rechnung@bauhaus.de",
   vorfilterBestellnummer: null,
   analyseErgebnisse: [],
   emailText: "",
@@ -120,5 +130,41 @@ describe("assignBesteller — ausgeschiedene Besteller bekommen nichts Neues", (
     const res = await assignBesteller(supabase, ctx);
     // Ohne Filterliste greift das alte Verhalten — Hauptsache kein Throw.
     expect(res.bestellerKuerzel).toBe("MT");
+  });
+});
+
+describe("assignBesteller — Stufe -1 (Regel-Engine)", () => {
+  it("weist nach Regel zu, wenn das Ziel noch Bestellungen annimmt", async () => {
+    const supabase = makeSupabaseMock({
+      historie: [],
+      inaktiv: ["MT"],
+      regeln: [{ rule_id: "r1", target_kuerzel: "CR", confidence: 0.9, rule_name: "Bauhaus an CR" }],
+    });
+    const res = await assignBesteller(supabase, ctx);
+    expect(res.bestellerKuerzel).toBe("CR");
+    expect(res.zuordnungsMethode).toBe("rule:Bauhaus an CR");
+    expect(res.vorschlagKonfidenz).toBe(0.9);
+  });
+
+  it("verwirft den Treffer, wenn die Regel auf einen Ausgeschiedenen zeigt", async () => {
+    // Die Regel ist aelter als der Weggang. Ohne Pruefung liefe sie weiter
+    // auf MT — die Bestellung soll stattdessen in den Pool fallen.
+    const supabase = makeSupabaseMock({
+      historie: [],
+      inaktiv: ["MT"],
+      regeln: [{ rule_id: "r1", target_kuerzel: "MT", confidence: 0.99, rule_name: "Alte Regel auf MT" }],
+    });
+    const res = await assignBesteller(supabase, ctx);
+    expect(res.bestellerKuerzel).toBe("UNBEKANNT");
+    expect(res.zuordnungsMethode).toBe("unbekannt");
+  });
+
+  it("uebergibt der Regel-Engine die echte Absenderadresse, nicht den Haendlernamen", async () => {
+    // Bis 30.09.2026 kam hier der Haendlername an, weshalb jede Regel vom
+    // Typ absender_pattern still nie griff.
+    const rpcArgs: { letzte?: Record<string, unknown> } = {};
+    const supabase = makeSupabaseMock({ historie: [], inaktiv: [], rpcArgs });
+    await assignBesteller(supabase, ctx);
+    expect(rpcArgs.letzte?.p_email_absender).toBe("rechnung@bauhaus.de");
   });
 });

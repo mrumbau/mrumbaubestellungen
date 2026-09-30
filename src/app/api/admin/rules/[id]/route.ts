@@ -11,6 +11,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { pruefeZiel } from "@/lib/besteller-rules-ziel";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -80,6 +81,16 @@ export async function PATCH(
     }
 
     const supabase = await createTypedServerSupabaseClient();
+
+    // 30.09.2026 — wie beim Anlegen: ein Regelziel, das es nicht gibt oder
+    // keine Bestellungen mehr annimmt, ergibt eine still wirkungslose Regel.
+    if (parsed.data.target_kuerzel !== undefined) {
+      const zielFehler = await pruefeZiel(supabase, parsed.data.target_kuerzel);
+      if (zielFehler) {
+        return NextResponse.json({ error: zielFehler }, { status: 400 });
+      }
+    }
+
     const { data, error } = await supabase
       .from("besteller_rules")
       .update(parsed.data)

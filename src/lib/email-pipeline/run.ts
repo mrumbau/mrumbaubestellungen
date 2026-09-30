@@ -267,6 +267,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   const { bestellerKuerzel, zuordnungsMethode, vorschlagKuerzel, vorschlagKonfidenz } =
     await assignBesteller(supabase, {
       haendlerDomain,
+      emailAbsender: email_absender,
       haendlerName,
       absenderDomain,
       vorfilterBestellnummer,

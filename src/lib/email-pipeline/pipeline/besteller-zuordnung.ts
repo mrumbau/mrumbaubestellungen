@@ -25,6 +25,12 @@ export interface BestellerZuordnungContext {
   haendlerDomain: string;
   haendlerName: string;
   absenderDomain: string;
+  /**
+   * 30.09.2026 — Die vollstaendige Absenderadresse. Bis dahin bekam die
+   * Regel-Engine als "Absender" den Haendlernamen uebergeben, weshalb jede
+   * Regel vom Typ `absender_pattern` still ins Leere lief.
+   */
+  emailAbsender: string;
   vorfilterBestellnummer: string | null;
   analyseErgebnisse: AnalyseErgebnis[];
   emailText: string;
@@ -67,7 +73,7 @@ export async function assignBesteller(
   supabase: SupabaseClient,
   ctx: BestellerZuordnungContext,
 ): Promise<BestellerZuordnungResult> {
-  const { haendlerDomain, haendlerName, absenderDomain, analyseErgebnisse, emailText, email_betreff } = ctx;
+  const { haendlerDomain, haendlerName, absenderDomain, emailAbsender, analyseErgebnisse, emailText, email_betreff } = ctx;
   let bestellerKuerzel = "";
   let zuordnungsMethode = "";
   // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance, getrennt vom
@@ -108,20 +114,32 @@ export async function assignBesteller(
       .rpc("match_besteller_rules", {
         p_haendler_domain: haendlerDomain,
         p_haendler_id: null,
-        p_email_absender: ctx.haendlerName ?? null,  // Absender-Domain via haendlerDomain abgedeckt; pattern matcht haendlerName auch
+        p_email_absender: emailAbsender || null,
         p_email_betreff: email_betreff ?? null,
       });
     if (ruleMatch && Array.isArray(ruleMatch) && ruleMatch.length > 0) {
       const match = ruleMatch[0] as { rule_id: string; target_kuerzel: string; confidence: number; rule_name: string };
-      bestellerKuerzel = match.target_kuerzel;
-      zuordnungsMethode = `rule:${match.rule_name}`;
-      vorschlagKuerzel = match.target_kuerzel;
-      vorschlagKonfidenz = typeof match.confidence === "number" ? match.confidence : 0.95;
-      logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
-        target_kuerzel: match.target_kuerzel,
-        confidence: match.confidence,
-        rule_id: match.rule_id,
-      });
+      // 30.09.2026 — Eine Regel darf niemanden zuweisen, der keine neuen
+      // Bestellungen mehr annimmt. Die Regel kann aelter sein als der
+      // Weggang; ohne diese Pruefung laeuft sie stumm weiter ins Leere.
+      // Der Treffer wird verworfen und die Mail faellt in die naechsten
+      // Stufen — besser im Pool als bei einem Ausgeschiedenen.
+      if (inaktiveBesteller.has(match.target_kuerzel)) {
+        logInfo("webhook/email", `Rules-Engine: Regel "${match.rule_name}" uebersprungen — Ziel nimmt keine neuen Bestellungen mehr`, {
+          target_kuerzel: match.target_kuerzel,
+          rule_id: match.rule_id,
+        });
+      } else {
+        bestellerKuerzel = match.target_kuerzel;
+        zuordnungsMethode = `rule:${match.rule_name}`;
+        vorschlagKuerzel = match.target_kuerzel;
+        vorschlagKonfidenz = typeof match.confidence === "number" ? match.confidence : 0.95;
+        logInfo("webhook/email", `Rules-Engine: Besteller via Regel "${match.rule_name}" zugeordnet`, {
+          target_kuerzel: match.target_kuerzel,
+          confidence: match.confidence,
+          rule_id: match.rule_id,
+        });
+      }
     }
   } catch (e) {
     logError("webhook/email", "match_besteller_rules fehlgeschlagen (fail-open, weiter mit STUFE 3+)", e);

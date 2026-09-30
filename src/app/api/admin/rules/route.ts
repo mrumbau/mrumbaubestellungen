@@ -13,6 +13,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { pruefeZiel } from "@/lib/besteller-rules-ziel";
 
 const CONDITION_TYPE_ENUM = z.enum([
   "haendler_domain",
@@ -75,6 +76,15 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createTypedServerSupabaseClient();
+
+    // 30.09.2026 — Regelziel gegen die Stammdaten pruefen. Ein Tippfehler im
+    // Kuerzel oder ein Kollege, der keine neuen Bestellungen mehr annimmt,
+    // haette sonst eine Regel ergeben, die still nie greift.
+    const zielFehler = await pruefeZiel(supabase, parsed.data.target_kuerzel);
+    if (zielFehler) {
+      return NextResponse.json({ error: zielFehler }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("besteller_rules")
       .insert({
@@ -82,6 +92,10 @@ export async function POST(request: NextRequest) {
         priority: parsed.data.priority,
         enabled: parsed.data.enabled,
         condition: parsed.data.condition,
+        // 30.09.2026 — combiner wurde validiert, aber nicht gespeichert:
+        // eine als ODER angelegte Regel lief in der Datenbank als UND und
+        // griff damit nur, wenn ALLE Bedingungen zutrafen.
+        ...(parsed.data.combiner ? { combiner: parsed.data.combiner } : {}),
         target_kuerzel: parsed.data.target_kuerzel,
         confidence: parsed.data.confidence,
         notes: parsed.data.notes ?? null,
