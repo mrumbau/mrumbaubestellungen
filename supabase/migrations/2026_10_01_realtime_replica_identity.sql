@@ -1,0 +1,25 @@
+-- 01.10.2026 — Realtime konnte Aenderungen nicht verlaesslich zustellen.
+--
+-- Die Bestellliste laedt sich seit dem 22.05.2026 ausschliesslich ueber ein
+-- Realtime-Abo nach; der ausdrueckliche Refresh nach einer Freigabe wurde
+-- damals entfernt. In der Praxis blieb die Zeile nach "Rechnung freigeben"
+-- aber einfach stehen.
+--
+-- Ein Grund dafuer steht hier: `bestellungen` und `events` liegen zwar in der
+-- Publikation supabase_realtime, haben aber REPLICA IDENTITY DEFAULT. Damit
+-- enthaelt der alte Datensatz im WAL nur den Primaerschluessel. Realtime
+-- braucht aber die ganze Zeile, um bei aktiver Zeilensicherheit zu
+-- entscheiden, wer das Ereignis sehen darf — ohne sie faellt ein UPDATE
+-- unter Umstaenden still unter den Tisch.
+--
+-- Kosten: etwas groessere WAL-Eintraege pro Aenderung, weil die alte Zeile
+-- mitgeschrieben wird. Bei 377 Bestellungen ist das nicht messbar.
+--
+-- Wichtig: das allein reicht nicht. Eine Oberflaeche, die fuer die Rueckmeldung
+-- auf die eigene Aktion an einer Websocket-Verbindung haengt, ist immer
+-- wackelig — Tab im Hintergrund, schlechtes Netz, Verbindung abgelaufen.
+-- Deshalb laedt die Liste nach einer eigenen Freigabe wieder ausdruecklich
+-- nach (use-bestellungen-actions.ts). Realtime ist jetzt wieder das, wofuer
+-- es gedacht war: Aenderungen ANDERER mitbekommen.
+ALTER TABLE public.bestellungen REPLICA IDENTITY FULL;
+ALTER TABLE public.events REPLICA IDENTITY FULL;
