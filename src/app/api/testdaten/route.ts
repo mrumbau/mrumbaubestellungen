@@ -6,6 +6,7 @@ import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { istNurAdmin } from "@/lib/rollen";
 
 // =====================================================================
 // Testdaten-Definition: 12 Bestellungen die alle Features abdecken
@@ -352,7 +353,10 @@ export async function POST(request: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    if (!requireRoles(profil, "admin")) {
+    // 30.09.2026 — bewusst istNurAdmin statt requireRoles: requireRoles laesst
+    // seit heute auch die Geschaeftsfuehrung durch, Testdaten sollen aber
+    // ausdruecklich niemandem ausser der IT offenstehen.
+    if (!istNurAdmin(profil?.rolle)) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

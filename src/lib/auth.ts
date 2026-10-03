@@ -2,7 +2,10 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerSupabaseClient } from "./supabase-server";
 
-export type Rolle = "besteller" | "buchhaltung" | "admin";
+// 30.09.2026 — Rollen liegen jetzt in lib/rollen.ts, damit Client-Code sie
+// nutzen kann, ohne dieses Server-only-Modul zu ziehen.
+export type { Rolle } from "./rollen";
+import { ROLLEN, istVerwaltung, type Rolle } from "./rollen";
 
 // PASSWORD_MIN_LENGTH ist nach src/lib/auth-config.ts ausgelagert (Client-safe),
 // weil dieses Modul via supabase-server.ts → next/headers Server-only ist.
@@ -26,7 +29,7 @@ export interface BenutzerProfil {
 }
 
 const PROFIL_COOKIE_NAME = "mr_profil_cache";
-const ERLAUBTE_ROLLEN: readonly string[] = ["admin", "besteller", "buchhaltung"];
+const ERLAUBTE_ROLLEN: readonly string[] = ROLLEN;
 
 /** Kürzel die per Default kein Dashboard sehen wollen (siehe BenutzerProfil.dashboardEnabled). */
 const DASHBOARD_DISABLED_BY_DEFAULT: readonly string[] = ["MT", "CR"];
@@ -137,8 +140,23 @@ export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> 
 // 18.05.2026 (A1.8) — Signatur auf {rolle: string} gelockert, weil generated
 // DB-Types `rolle: string` liefern (DB-Spalte hat CHECK-Constraint, kein Enum).
 // Funktional unverändert: rollen.includes() prüft Set-Membership zur Laufzeit.
+/**
+ * Rollen-Pruefung fuer API-Routen.
+ *
+ * 30.09.2026 — Wer "admin" verlangt, meint an rund hundert Stellen im Code
+ * "jemand, der verwalten darf". Die Geschaeftsfuehrung faellt deshalb hier
+ * mit hinein, statt in jeder einzelnen Route nachgetragen zu werden — das
+ * waere nicht mehr zu ueberpruefen gewesen.
+ *
+ * Die zwei Stellen, an denen wirklich nur ein Admin gemeint ist (Testdaten,
+ * DSGVO-Loeschung), fragen mit istNurAdmin() aus lib/rollen.ts und gehen
+ * bewusst nicht ueber diesen Helfer.
+ */
 export function requireRoles(profil: { rolle: string } | null, ...rollen: Rolle[]): boolean {
-  return !!profil && (rollen as readonly string[]).includes(profil.rolle);
+  if (!profil) return false;
+  const erlaubt = rollen as readonly string[];
+  if (erlaubt.includes(profil.rolle)) return true;
+  return erlaubt.includes("admin") && istVerwaltung(profil.rolle);
 }
 
 // Redirect-Pfad basierend auf Rolle
@@ -149,6 +167,10 @@ export function getRedirectForRolle(rolle: Rolle): string {
     case "admin":
       return "/dashboard";
     case "besteller":
+    case "geschaeftsfuehrer":
+      // Die Geschaeftsfuehrung bestellt selbst und landet deshalb bewusst
+      // bei den Bestellungen, nicht auf dem Dashboard.
+      return "/bestellungen";
     default:
       return "/bestellungen";
   }

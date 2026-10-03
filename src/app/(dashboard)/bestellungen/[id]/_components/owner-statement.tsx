@@ -35,6 +35,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { useBestellungPresence } from "@/lib/hooks/use-bestellung-presence";
 import { PresenceBanner } from "./presence-banner";
 
+import { istVerwaltung } from "@/lib/rollen";
 export interface BestellerOption {
   kuerzel: string;
   name: string;
@@ -142,7 +143,7 @@ export function OwnerStatement(props: OwnerStatementProps) {
   const isFreigegeben = props.status === "freigegeben";
   const isUnbekannt = effectiveKuerzel === "UNBEKANNT" || !effectiveKuerzel;
   const isOwner = effectiveKuerzel === props.profil.kuerzel;
-  const isAdmin = props.profil.rolle === "admin";
+  const isAdmin = istVerwaltung(props.profil.rolle);
 
   if (!isMaterial) return null;
   if (isFreigegeben) return null;

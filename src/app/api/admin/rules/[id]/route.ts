@@ -13,6 +13,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { pruefeZiel } from "@/lib/besteller-rules-ziel";
 
+import { istVerwaltung } from "@/lib/rollen";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CONDITION_TYPE_ENUM = z.enum([
@@ -54,7 +55,7 @@ const PatchSchema = z.object({
 async function ensureAdmin() {
   const profil = await getBenutzerProfil();
   if (!profil) return { profil: null, error: NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 }) };
-  if (profil.rolle !== "admin") return { profil, error: NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 }) };
+  if (!istVerwaltung(profil.rolle)) return { profil, error: NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 }) };
   return { profil, error: null as null };
 }
 

@@ -12,9 +12,16 @@
  *   - freigabeLoadingId, freigabeConfirmId, setFreigabeConfirmId, handleQuickFreigabe
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
+
+/**
+ * Wie lange die Erfolgs-Animation laufen darf, bevor die Liste neu geladen
+ * wird und die Zeile aus dem Filter faellt. Etwas kuerzer als die 1300ms der
+ * Animation, damit der Gruenblitz noch sichtbar ist, wenn die Zeile geht.
+ */
+const REFRESH_NACH_FREIGABE_MS = 1100;
 
 export function useBestellungenActions({
   selected,
@@ -41,6 +48,42 @@ export function useBestellungenActions({
   const [freigabeLoadingId, setFreigabeLoadingId] = useState<string | null>(null);
   const [freigabeConfirmId, setFreigabeConfirmId] = useState<string | null>(null);
 
+  /**
+   * 01.10.2026 — Nachladen nach einer eigenen Freigabe.
+   *
+   * Am 22.05.2026 wurde der ausdrueckliche router.refresh() hier entfernt,
+   * weil das Realtime-Abo (useBestellungenListRealtime) das UPDATE ohnehin
+   * faengt. In der Praxis tut es das nicht verlaesslich: `bestellungen` hat
+   * REPLICA IDENTITY DEFAULT, und bei aktiver Zeilensicherheit kann Realtime
+   * ein UPDATE damit nicht immer zustellen. Dazu kommt alles, was an einer
+   * Websocket-Verbindung haengt — Tab im Hintergrund, schlechtes Netz,
+   * abgelaufene Verbindung.
+   *
+   * Ergebnis fuer MH: man tippt auf "Rechnung freigeben", und die Zeile
+   * bleibt einfach stehen. Genau die eine Rueckmeldung, auf die es ankommt.
+   *
+   * Deshalb: fuer die EIGENE Aktion wird wieder ausdruecklich nachgeladen.
+   * Das Realtime-Abo bleibt — es ist weiterhin dafuer da, Aenderungen
+   * ANDERER mitzubekommen. Ein doppeltes Nachladen ist unkritisch, ein
+   * ausbleibendes nicht.
+   */
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
+  /** Laedt die Liste nach, sobald die Erfolgs-Animation gelaufen ist. */
+  function refreshNachAnimation() {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      router.refresh();
+    }, REFRESH_NACH_FREIGABE_MS);
+  }
+
   async function handleQuickFreigabe(bestellungId: string) {
     setFreigabeConfirmId(null);
     setFreigabeLoadingId(bestellungId);
@@ -59,6 +102,7 @@ export function useBestellungenActions({
         // nach API-Success — Flash läuft 1300ms, also ~500ms Flash sichtbar
         // bevor Row aus "offen"-Filter fällt.
         onAffectedRows?.([bestellungId]);
+        refreshNachAnimation();
         toast.success("Bestellung freigegeben");
         return;
       }
@@ -209,6 +253,10 @@ export function useBestellungenActions({
       if (onAffectedRows && freigegebenIds.length > 0) {
         onAffectedRows(freigegebenIds);
       }
+      // Auch wenn nichts freigegeben wurde nachladen: dann stimmt die Liste
+      // eben aus einem anderen Grund nicht mehr (bereits freigegeben, ohne
+      // Rechnung), und stehenlassen waere genauso verwirrend.
+      refreshNachAnimation();
 
       // 12.05.2026 (Freigabe-Bug-Härtung): differenzierte Toast-Meldungen
       // statt pauschal "teilweise erfolgreich". Wenn 0 freigegeben +

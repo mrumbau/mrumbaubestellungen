@@ -19,19 +19,14 @@ import {
   IconArrowRight,
 } from "@/components/ui/icons";
 
+import { istVerwaltung, ROLLEN_LABEL } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
-
-const ROLLEN_LABEL: Record<string, string> = {
-  admin: "Administrator",
-  besteller: "Besteller",
-  buchhaltung: "Buchhaltung",
-};
 
 export default async function EinstellungenIndexPage() {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 
-  const istAdmin = profil.rolle === "admin";
+  const istAdmin = istVerwaltung(profil.rolle);
   const istBuchhaltung = profil.rolle === "buchhaltung";
 
   // Counts für fachliche Stammdaten: Admin + Besteller brauchen sie.

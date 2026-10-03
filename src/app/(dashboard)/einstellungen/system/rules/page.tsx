@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { PageHeader } from "@/components/ui/page-header";
 import { RulesClient, type Rule, type BestellerRoleEntry } from "./rules-client";
 
+import { BESTELL_ROLLEN } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 /**
@@ -35,7 +36,7 @@ export default async function RulesPage() {
     supabase
       .from("benutzer_rollen")
       .select("kuerzel, name, rolle")
-      .in("rolle", ["besteller", "admin"])
+      .in("rolle", [...BESTELL_ROLLEN])
       .order("name"),
   ]);
 

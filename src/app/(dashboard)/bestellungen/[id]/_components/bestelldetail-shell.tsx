@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
 
+import { istVerwaltung } from "@/lib/rollen";
 /**
  * BestelldetailShell — thin orchestrator replacing the 1.729-LOC monolith.
  *
@@ -111,7 +112,7 @@ export function BestelldetailShell({
   const kannFreigeben =
     !freigabe &&
     bestellung.status !== "freigegeben" &&
-    (profil.rolle === "admin" ||
+    (istVerwaltung(profil.rolle) ||
       profil.kuerzel === bestellung.besteller_kuerzel ||
       istSuOderAbo);
 

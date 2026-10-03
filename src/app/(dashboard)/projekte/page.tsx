@@ -4,6 +4,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ProjekteClient } from "@/components/projekte-client";
 
+import { istVerwaltung } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 export default async function ProjektePage() {
@@ -42,7 +43,7 @@ export default async function ProjektePage() {
       projekte={(projekte || []) as unknown as React.ComponentProps<typeof ProjekteClient>["projekte"]}
       stats={statsMap}
       kunden={kunden || []}
-      istAdmin={profil.rolle === "admin" || profil.rolle === "besteller"}
+      istAdmin={istVerwaltung(profil.rolle) || profil.rolle === "besteller"}
     />
   );
 }

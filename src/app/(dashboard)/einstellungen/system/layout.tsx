@@ -11,6 +11,7 @@ import {
   IconKey,
 } from "@/components/ui/icons";
 
+import { istVerwaltung, istNurAdmin } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 /**
@@ -32,7 +33,7 @@ export default async function SystemLayout({
 }) {
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
-  if (profil.rolle !== "admin") redirect("/einstellungen");
+  if (!istVerwaltung(profil.rolle)) redirect("/einstellungen");
 
   const items: SubNavItem[] = [
     {
@@ -82,16 +83,22 @@ export default async function SystemLayout({
       icon: <IconActivity />,
     },
     {
-      label: "Testdaten",
-      href: "/einstellungen/system/testdaten",
-      icon: <IconTool />,
-    },
-    {
       label: "Patterns",
       href: "/einstellungen/system/patterns",
       icon: <IconSettings />,
     },
   ];
+
+  // 30.09.2026 — Testdaten bleiben der IT vorbehalten. Die Seite selbst und
+  // /api/testdaten pruefen streng auf Admin; hier verschwindet nur der
+  // Einstiegspunkt, damit die Geschaeftsfuehrung gar nicht erst darauf stoesst.
+  if (istNurAdmin(profil.rolle)) {
+    items.push({
+      label: "Testdaten",
+      href: "/einstellungen/system/testdaten",
+      icon: <IconTool />,
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">

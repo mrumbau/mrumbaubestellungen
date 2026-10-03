@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { IconUsers, IconShield, IconDownload } from "@/components/ui/icons";
 
+import { ROLLEN, ROLLEN_LABEL } from "@/lib/rollen";
 export type Benutzer = {
   id: string;
   email: string;
@@ -20,18 +21,16 @@ export type Benutzer = {
   rolle: string;
 };
 
-const ROLLE_LABEL: Record<string, string> = {
-  admin: "Administrator",
-  buchhaltung: "Buchhaltung",
-  besteller: "Besteller",
-};
+const ROLLE_LABEL: Record<string, string> = ROLLEN_LABEL;
 
 export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
+  // eslint-disable-next-line no-restricted-syntax -- Gruppierung der Anzeige nach echter Rolle, keine Rechtefrage
   const admins = benutzer.filter((b) => b.rolle === "admin");
+  const geschaeftsfuehrung = benutzer.filter((b) => b.rolle === "geschaeftsfuehrer");
   const buchhaltung = benutzer.filter((b) => b.rolle === "buchhaltung");
   const besteller = benutzer.filter((b) => b.rolle === "besteller");
   const sonstige = benutzer.filter(
-    (b) => !["admin", "buchhaltung", "besteller"].includes(b.rolle),
+    (b) => !(ROLLEN as readonly string[]).includes(b.rolle),
   );
 
   const { toast } = useToast();
@@ -93,7 +92,8 @@ export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
             </span>
             <span className="text-[12px] text-foreground-subtle">·</span>
             <span className="text-[12px] text-foreground-subtle">
-              {admins.length} Admin · {buchhaltung.length} Buchhaltung · {besteller.length} Besteller
+              {admins.length} Admin · {geschaeftsfuehrung.length} Geschäftsführung ·{" "}
+              {buchhaltung.length} Buchhaltung · {besteller.length} Besteller
             </span>
           </>
         }
@@ -115,6 +115,13 @@ export function BenutzerClient({ benutzer }: { benutzer: Benutzer[] }) {
         <>
           {admins.length > 0 && (
             <Gruppe title="Administratoren" rolle="admin" benutzer={admins} />
+          )}
+          {geschaeftsfuehrung.length > 0 && (
+            <Gruppe
+              title="Geschäftsführung"
+              rolle="geschaeftsfuehrer"
+              benutzer={geschaeftsfuehrung}
+            />
           )}
           {buchhaltung.length > 0 && (
             <Gruppe title="Buchhaltung" rolle="buchhaltung" benutzer={buchhaltung} />
@@ -221,7 +228,8 @@ function Gruppe({
 
 function RolleBadge({ rolle }: { rolle: string }) {
   const label = ROLLE_LABEL[rolle] ?? rolle;
-  if (rolle === "admin") {
+  // eslint-disable-next-line no-restricted-syntax -- Farbe der Marke je echter Rolle, keine Rechtefrage
+  if (rolle === "admin" || rolle === "geschaeftsfuehrer") {
     return (
       <Badge tone="brand" size="md">
         {label}

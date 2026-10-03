@@ -13,6 +13,7 @@ import { VersandIcon } from "./dokument-icons";
 import type { Bestellung, ProjektOption, ProjektStats, SubunternehmerInfo } from "./types";
 import type { BenutzerProfil } from "@/lib/auth";
 
+import { istVerwaltung } from "@/lib/rollen";
 /**
  * Sidebar-Metadata — the top half of the right column on desktop.
  *
@@ -51,7 +52,7 @@ export function SidebarMetadata({
   const [showProjektSelect, setShowProjektSelect] = useState(false);
   const [projektSuche, setProjektSuche] = useState("");
   const canEdit =
-    profil.rolle === "admin" || profil.kuerzel === bestellung.besteller_kuerzel;
+    istVerwaltung(profil.rolle) || profil.kuerzel === bestellung.besteller_kuerzel;
 
   const filteredProjekte = useMemo(() => {
     if (!projektSuche.trim()) return projekte;

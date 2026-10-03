@@ -38,6 +38,7 @@ import {
 // Reuse den Bestellungs-Type aus dem existing Modul
 import type { Bestellung, ProjektOption } from "@/components/bestellungen/types";
 
+import { istVerwaltung } from "./rollen";
 export const HARD_CAP = 500;
 
 // 03.06.2026 — bezahlt_am/bezahlt_von für PayPal-Badge + Mahnung-Logik.
@@ -107,7 +108,7 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
       .eq("bestellungsart", "material");
   }
 
-  const isAdmin = profil?.rolle === "admin";
+  const isAdmin = istVerwaltung(profil?.rolle);
   const showAllOwners = isAdmin && owner === "alle";
 
   if (lane === "in-arbeit") {

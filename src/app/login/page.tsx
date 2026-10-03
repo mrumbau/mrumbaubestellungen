@@ -76,6 +76,7 @@ function LoginForm() {
       if (!safeRedirect) {
         if (profil?.rolle === "buchhaltung") {
           ziel = "/buchhaltung";
+        // eslint-disable-next-line no-restricted-syntax -- Startseite je echter Rolle: Admins aufs Dashboard, die Geschaeftsfuehrung bewusst zu den Bestellungen
         } else if (profil?.rolle === "admin") {
           ziel = "/dashboard";
         }

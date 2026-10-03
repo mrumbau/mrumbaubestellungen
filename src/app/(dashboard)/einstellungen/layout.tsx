@@ -12,6 +12,7 @@ import {
   IconTrash,
 } from "@/components/ui/icons";
 
+import { istVerwaltung } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 export default async function EinstellungenLayout({
@@ -22,7 +23,7 @@ export default async function EinstellungenLayout({
   const profil = await getBenutzerProfil();
   if (!profil) redirect("/login");
 
-  const istAdmin = profil.rolle === "admin";
+  const istAdmin = istVerwaltung(profil.rolle);
   const istBuchhaltung = profil.rolle === "buchhaltung";
 
   // 21.05.2026 — Buchhaltung bekommt jetzt auch eine SubNav (Passwort +

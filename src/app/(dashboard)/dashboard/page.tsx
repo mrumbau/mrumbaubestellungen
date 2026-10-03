@@ -7,6 +7,7 @@ import { parseTimeRange, computeRangeBounds, sparklineBuckets } from "@/lib/time
 import { PoolHeroCard } from "@/components/dashboard/pool-hero-card";
 import { PageHero } from "@/components/ui/page-hero";
 
+import { istVerwaltung } from "@/lib/rollen";
 // 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1144-LOC-Mega-Component.
 // SSR bleibt aktiv (Default), nur der JS-Chunk wird lazy gesplittet → kleinerer
 // Initial-JS-Download für die Dashboard-Route, FCP/LCP früher.
@@ -338,7 +339,7 @@ export default async function DashboardPage({
         freigegebenBetrag={freigegebenBetrag}
         gesamtVolumen={gesamtVolumen}
         topProjekte={topProjekte as unknown as React.ComponentProps<typeof DashboardWidgets>["topProjekte"]}
-        isAdmin={profil.rolle === "admin"}
+        isAdmin={istVerwaltung(profil.rolle)}
         aktionenNoetig={aktionenNoetig}
         letzte={letzte}
         aboHinweise={aboHinweise}

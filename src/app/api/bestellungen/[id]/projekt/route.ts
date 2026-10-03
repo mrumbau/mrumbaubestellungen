@@ -6,6 +6,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 
+import { istVerwaltung } from "@/lib/rollen";
 // POST /api/bestellungen/[id]/projekt – Projekt zuordnen
 export async function POST(
   request: NextRequest,
@@ -44,7 +45,7 @@ export async function POST(
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 
-    if (profil.rolle !== "admin") {
+    if (!istVerwaltung(profil.rolle)) {
       const { data: bestellung } = await serviceClient
         .from("bestellungen")
         .select("besteller_kuerzel, bestellungsart")

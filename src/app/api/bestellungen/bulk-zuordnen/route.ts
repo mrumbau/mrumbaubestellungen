@@ -43,6 +43,8 @@ import { logError, logInfo } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { isValidKuerzel } from "@/lib/validation";
 
+import { istVerwaltung } from "@/lib/rollen";
+import { darfBestellungenErhalten } from "@/lib/rollen";
 export const dynamic = "force-dynamic";
 
 const ROUTE_TAG = "/api/bestellungen/bulk-zuordnen";
@@ -112,7 +114,9 @@ export async function POST(request: NextRequest) {
       // werden. Sonst landen Bestellungen bei MH (IT-Support) statt bei
       // produktiven Bestellern. Dropdown filtert das vorne weg, hier
       // Defense-in-Depth.
-      if (zielBenutzer.rolle !== "besteller") {
+      // 30.09.2026 — die Geschaeftsfuehrung ist davon ausgenommen: CR fuehrt
+      // die Firma und bestellt trotzdem selbst (115 Bestellungen, 46 offen).
+      if (!darfBestellungenErhalten(zielBenutzer.rolle)) {
         return NextResponse.json(
           { error: "Ziel-Account ist kein Besteller — Zuordnung nicht erlaubt" },
           { status: 400 },
@@ -163,7 +167,7 @@ export async function POST(request: NextRequest) {
 
         const vorher = bestellung.besteller_kuerzel ?? POOL_MARKER;
         const zuordnungsMethode =
-          profil.rolle === "admin" ? "manuell_admin" : "manuell_besteller";
+          istVerwaltung(profil.rolle) ? "manuell_admin" : "manuell_besteller";
 
         // UPDATE direkt — wir gehen NICHT durch pool_reassign_bestellung,
         // weil das nur für besetzte Bestellungen die Race-Cond löst und

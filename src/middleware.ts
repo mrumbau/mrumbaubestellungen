@@ -116,7 +116,7 @@ export async function middleware(request: NextRequest) {
   let rolle = "";
   const profilCookie = request.cookies.get(ROLLE_COOKIE_NAME)?.value;
 
-  const ERLAUBTE_ROLLEN = ["admin", "besteller", "buchhaltung"];
+  const ERLAUBTE_ROLLEN = ["admin", "geschaeftsfuehrer", "besteller", "buchhaltung"];
   if (profilCookie) {
     try {
       const cached = JSON.parse(profilCookie);

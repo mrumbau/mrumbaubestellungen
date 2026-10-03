@@ -15,6 +15,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { pruefeZiel } from "@/lib/besteller-rules-ziel";
 
+import { istVerwaltung } from "@/lib/rollen";
 const CONDITION_TYPE_ENUM = z.enum([
   "haendler_domain",
   "haendler_domain_contains",
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (!profil) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
-    if (profil.rolle !== "admin") {
+    if (!istVerwaltung(profil.rolle)) {
       return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
     }
 

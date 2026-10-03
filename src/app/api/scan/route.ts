@@ -9,6 +9,7 @@ import { logError, logInfo } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 
+import { istVerwaltung } from "@/lib/rollen";
 // Body-Limit auf 6 MB erhöhen (Base64 ist ~33% größer als die Originaldatei)
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     const istSuOderAbo = bestellungCheck.bestellungsart === "subunternehmer" || bestellungCheck.bestellungsart === "abo";
-    if (profil.rolle !== "admin" && bestellungCheck.besteller_kuerzel !== profil.kuerzel && !istSuOderAbo) {
+    if (!istVerwaltung(profil.rolle) && bestellungCheck.besteller_kuerzel !== profil.kuerzel && !istSuOderAbo) {
       return NextResponse.json({ error: "Keine Berechtigung für diese Bestellung" }, { status: 403 });
     }
 
