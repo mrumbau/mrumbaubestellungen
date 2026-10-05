@@ -55,7 +55,7 @@ export function withRequestId<T>(fn: () => Promise<T>, id?: string): Promise<T> 
 }
 
 /** Liefert die aktuelle Request-ID oder null wenn außerhalb withRequestId. */
-export function getRequestId(): string | null {
+function getRequestId(): string | null {
   if (!requestIdStore) return null;
   return requestIdStore.getStore() ?? null;
 }

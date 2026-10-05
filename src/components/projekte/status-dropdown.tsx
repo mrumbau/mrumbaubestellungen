@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from "react";
 
 // 19.05.2026 (A4.11) — alle Pill-Farben über Tokens; "abgeschlossen" nutzt
 // neutrale canvas-soft+foreground-muted+line-Tokens statt bg-gray-*.
-export const STATUS_OPTIONS = [
+const STATUS_OPTIONS = [
   { value: "aktiv", label: "Aktiv", icon: "circle", color: "var(--success)", bg: "bg-success-bg", text: "text-success", border: "border-success-border" },
   { value: "pausiert", label: "Pausiert", icon: "pause", color: "var(--warning)", bg: "bg-warning-bg", text: "text-warning", border: "border-warning-border" },
   { value: "abgeschlossen", label: "Abgeschlossen", icon: "check", color: "var(--text-tertiary)", bg: "bg-input", text: "text-foreground-muted", border: "border-line" },

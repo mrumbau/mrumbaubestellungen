@@ -22,7 +22,6 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => mockCreateServerClient(),
-  createTypedServerSupabaseClient: () => mockCreateServerClient(),
 }));
 vi.mock("@/lib/supabase", () => ({
   createServiceClient: () => mockCreateServiceClient(),

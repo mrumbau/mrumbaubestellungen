@@ -202,26 +202,6 @@ export interface PriorisierungErgebnis {
   zusammenfassung: string;
 }
 
-export interface BestellerHinweiseErgebnis {
-  gefundene_hinweise: {
-    typ: "name" | "adresse" | "kundennummer" | "ansprechpartner" | "telefon" | "abteilung";
-    wert: string;
-    quelle: string;
-  }[];
-  vorgeschlagenes_kuerzel: string | null;
-  konfidenz: number;
-  begruendung: string;
-}
-
-export interface ProjektMatchErgebnis {
-  projekt_id: string | null;
-  konfidenz: number;
-  methode: "lieferadresse" | "projektname_text" | "kundenname" | "besteller_affinitaet" | "unbekannt";
-  begruendung: string;
-  extrahierte_lieferadresse?: string | null;
-  extrahierter_projektname?: string | null;
-}
-
 export const ANALYSE_PROMPT = `Du bist ein Assistent der Geschäftsdokumente für eine deutsche Baufirma (MR Umbau GmbH) analysiert.
 Analysiere das folgende Dokument und gib NUR ein JSON-Objekt zurück. KEIN Markdown, KEINE Backticks, KEIN Text davor oder danach — nur rohes JSON.
 

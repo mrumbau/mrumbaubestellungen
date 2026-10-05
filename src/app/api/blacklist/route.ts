@@ -6,7 +6,7 @@ import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 
 // GET /api/blacklist – Alle Blacklist-Einträge laden
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabaseAuth = await createServerSupabaseClient();
     const { data: { user } } = await supabaseAuth.auth.getUser();

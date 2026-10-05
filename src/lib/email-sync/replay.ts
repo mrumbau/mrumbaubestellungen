@@ -21,7 +21,7 @@ import { withCostTracking } from "@/lib/openai";
 import { markIrrelevant, markProcessed, markFailed } from "./idempotency";
 import { logError, logInfo, withRequestId } from "@/lib/logger";
 
-export type ReplayOutcome = "processed" | "irrelevant" | "failed" | "gone";
+type ReplayOutcome = "processed" | "irrelevant" | "failed" | "gone";
 
 export interface ReplayResult {
   outcome: ReplayOutcome;

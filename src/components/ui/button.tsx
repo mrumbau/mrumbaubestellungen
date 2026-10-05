@@ -14,7 +14,7 @@ import { Spinner } from "./spinner";
  * destructive  — semantic red; irreversible actions (Delete, Archive)
  * subtle       — filled neutral; sits inside cards without stealing focus
  */
-export const buttonVariants = cva(
+const buttonVariants = cva(
   [
     "inline-flex items-center justify-center whitespace-nowrap font-medium select-none",
     "transition-[background-color,border-color,box-shadow,transform,color] duration-150",
@@ -69,7 +69,7 @@ export const buttonVariants = cva(
   },
 );
 
-export type ButtonVariants = VariantProps<typeof buttonVariants>;
+type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 export type ButtonProps = ButtonVariants &
   Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {

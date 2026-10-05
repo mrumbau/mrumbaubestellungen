@@ -23,7 +23,7 @@ export interface CostBucket {
 }
 
 /** USD pro 1M Tokens. Stand 2026-05. Anpassen wenn OpenAI-Preise ändern. */
-export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> = {
+const MODEL_COSTS_USD: Record<string, { input: number; output: number }> = {
   // Email-Pipeline (Reasoning für Multi-Doc-Logik)
   "gpt-5.5": { input: 5.00, output: 30.00 },
   "gpt-5.5-pro": { input: 30.00, output: 180.00 },
@@ -38,7 +38,7 @@ export const MODEL_COSTS_USD: Record<string, { input: number; output: number }> 
 };
 
 /** Grobe USD→EUR-Konversion. Bei Bedarf pro Quartal aktualisieren. */
-export const USD_TO_EUR = 0.93;
+const USD_TO_EUR = 0.93;
 
 /**
  * Hard-Cap pro Mail-Verarbeitung. Bei Überschreitung wird die Pipeline mit

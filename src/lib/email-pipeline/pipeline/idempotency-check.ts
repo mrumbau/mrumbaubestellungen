@@ -28,7 +28,7 @@ import { logError } from "@/lib/logger";
  * keine False-Positive-Unterschiede erzeugen. Idempotent (kann mehrfach
  * angewendet werden).
  */
-export function normalizeForIdempotency(text: string): string {
+function normalizeForIdempotency(text: string): string {
   if (!text) return "";
   let s = text;
   // Reply/Forward-Prefixe iterativ strippen ("Re: Re: Aw: Original")

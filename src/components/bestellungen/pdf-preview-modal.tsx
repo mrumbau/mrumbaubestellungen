@@ -16,7 +16,7 @@
 import { useEffect } from "react";
 import { Modal } from "@/components/ui/modal";
 
-export interface PdfPreviewDoc {
+interface PdfPreviewDoc {
   id: string;
   created_at: string | null;
   gesamtbetrag: number | null;

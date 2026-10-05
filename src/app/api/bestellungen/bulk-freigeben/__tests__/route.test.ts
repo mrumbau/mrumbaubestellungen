@@ -5,7 +5,6 @@
  * freigegeben / already_freigegeben / no_rechnung / no_permission / not_found / errors.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 import { makeRequest, TEST_PROFIL, TEST_UUID } from "@/test-helpers/api-route";
 
 const mockGetProfil = vi.fn();
@@ -21,7 +20,6 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => mockCreateClient(),
-  createTypedServerSupabaseClient: () => mockCreateClient(),
 }));
 vi.mock("@/lib/logger", () => ({
   logError: vi.fn(),

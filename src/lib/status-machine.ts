@@ -38,7 +38,7 @@ export type BestellStatus = (typeof BESTELL_STATUS)[number];
  *
  * `freigegeben` ist Endzustand: kein outbound transition.
  */
-export const ALLOWED_TRANSITIONS: Record<BestellStatus, readonly BestellStatus[]> = {
+const ALLOWED_TRANSITIONS: Record<BestellStatus, readonly BestellStatus[]> = {
   erwartet: ["erwartet", "offen", "ls_fehlt"],
   // offen → offen ist erlaubt (idempotent), plus Pipeline kann zurück bei Doku-Löschung
   offen: ["offen", "vollstaendig", "abweichung", "ls_fehlt"],

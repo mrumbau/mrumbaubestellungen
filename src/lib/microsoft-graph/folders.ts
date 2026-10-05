@@ -103,30 +103,3 @@ export async function listAllFolders(): Promise<MailFolder[]> {
   return result;
 }
 
-/**
- * Holt einen einzelnen Folder per ID (für Refresh nach Outlook-Rename etc.).
- * Pfad wird NICHT auto-konstruiert (würde extra Roundtrips kosten) — falls
- * benötigt, verwendet listAllFolders() und filtert.
- */
-export async function getFolderById(folderId: string): Promise<Omit<MailFolder, "path"> | null> {
-  const mailbox = encodeURIComponent(getMailbox());
-  try {
-    const folder = await graphFetch<GraphMailFolder>(
-      `/users/${mailbox}/mailFolders/${encodeURIComponent(folderId)}`,
-    );
-    return {
-      id: folder.id,
-      displayName: folder.displayName,
-      parentFolderId: folder.parentFolderId ?? null,
-      childFolderCount: folder.childFolderCount,
-      totalItemCount: folder.totalItemCount,
-      unreadItemCount: folder.unreadItemCount,
-    };
-  } catch (err) {
-    // Bei 404 → Folder gelöscht/umbenannt. Caller entscheidet wie damit umzugehen.
-    if (err instanceof Error && err.message.includes("404")) {
-      return null;
-    }
-    throw err;
-  }
-}

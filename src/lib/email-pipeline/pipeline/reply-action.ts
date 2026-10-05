@@ -28,7 +28,7 @@ export const TOKEN_RE = /\[REF:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 
 export type ReplyActionType = "freigeben" | "bezahlt" | "ablehnen" | "uebernehmen";
 
-export const ACTION_KEYWORDS: Record<ReplyActionType, RegExp[]> = {
+const ACTION_KEYWORDS: Record<ReplyActionType, RegExp[]> = {
   // Match nur am Anfang einer Zeile (gestrippter Reply-Header) für Quote-Resistance
   freigeben: [
     /^\s*(freigeben|freigabe|freigegeben|ja|ok|bestätig(e|t|ung)|bestaetig(e|t|ung)|approved?)\b/im,

@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createTypedServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -81,7 +81,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Body invalid", issues: parsed.error.issues }, { status: 400 });
     }
 
-    const supabase = await createTypedServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
 
     // 30.09.2026 — wie beim Anlegen: ein Regelziel, das es nicht gibt oder
     // keine Bestellungen mehr annimmt, ergibt eine still wirkungslose Regel.
@@ -127,7 +127,7 @@ export async function DELETE(
     const guard = await ensureAdmin();
     if (guard.error) return guard.error;
 
-    const supabase = await createTypedServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
     const { error } = await supabase
       .from("besteller_rules")
       .delete()

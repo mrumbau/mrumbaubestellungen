@@ -46,8 +46,6 @@ export default async function DashboardPage({
 
   const supabase = await createServerSupabaseClient();
 
-  const siebenTageZurueck = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
   // Besteller: nur eigene Bestellungen im Dashboard (RLS erlaubt auch freigegebene anderer)
   const istBesteller = profil!.rolle === "besteller";
   const kuerzel = profil!.kuerzel;
@@ -133,7 +131,6 @@ export default async function DashboardPage({
   const kpi = (kpiRow as KpiRow | null) ?? null;
   const offen = kpi?.offen_count ?? 0;
   const freigegeben = kpi?.freigegeben_count ?? 0;
-  const erwartet = 0; // nicht mehr verwendet
   const vollstaendig = kpi?.vollstaendig_count ?? 0;
   const gesamtAnzahl = istBesteller ? (kpi?.aktiv_count ?? 0) : (kpi?.total_count ?? 0);
   const ueberfaelligCount = kpi?.ueberfaellig_count ?? 0;

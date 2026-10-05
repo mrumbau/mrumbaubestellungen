@@ -192,14 +192,6 @@ export function IconAlertCircle(props: IconProps) {
   );
 }
 
-export function IconPuzzle(props: IconProps) {
-  return (
-    <svg {...iconProps} {...props}>
-      <path d="M7 2.5a1.5 1.5 0 013 0V4h2.5v2.5H14a1.5 1.5 0 010 3h-1.5V12H10v-1.5a1.5 1.5 0 01-3 0V12H4.5V9.5H3a1.5 1.5 0 010-3h1.5V4H7V2.5z" />
-    </svg>
-  );
-}
-
 export function IconDotsHorizontal(props: IconProps) {
   return (
     <svg {...iconProps} {...props} strokeWidth={0} fill="currentColor">
@@ -266,14 +258,6 @@ export function IconAlertTriangle(props: IconProps) {
     <svg {...iconProps} {...props}>
       <path d="M8 2.5L1.5 13h13L8 2.5z" />
       <path d="M8 6.5v3M8 11.5v0.5" />
-    </svg>
-  );
-}
-
-export function IconHourglass(props: IconProps) {
-  return (
-    <svg {...iconProps} {...props}>
-      <path d="M4 2.5h8M4 13.5h8M5 2.5v3l3 2.5-3 2.5v3M11 2.5v3L8 8l3 2.5v3" />
     </svg>
   );
 }

@@ -7,7 +7,6 @@
  * Integration-Tests sobald Test-Container existieren.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 import { makeRequest, TEST_UUID } from "@/test-helpers/api-route";
 
 const mockCheckCsrf = vi.fn(() => true);
@@ -23,7 +22,6 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => mockCreateServerClient(),
-  createTypedServerSupabaseClient: () => mockCreateServerClient(),
 }));
 vi.mock("@/lib/supabase", () => ({ createServiceClient: () => mockCreateServiceClient() }));
 vi.mock("@/lib/openai", () => ({

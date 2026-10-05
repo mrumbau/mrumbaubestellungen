@@ -24,7 +24,7 @@ const STABILITY_DELAY_MS = 1500;
 const REFRESH_INTERVAL_MS = 4 * 60 * 1000;
 const SOURCE: "drawer_open" = "drawer_open";
 
-export interface ReservationHolder {
+interface ReservationHolder {
   kuerzel: string;
   name: string;
   expiresAtIso: string;

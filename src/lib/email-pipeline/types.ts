@@ -32,7 +32,7 @@ export interface ClassifyEmailResult {
   ki_begruendung?: string | null;
 }
 
-export interface EmailAttachment {
+interface EmailAttachment {
   name: string;
   contentType: string;
   /** Base64 */

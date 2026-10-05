@@ -17,12 +17,12 @@
 import { type RefObject } from "react";
 import { IconSearch, IconX } from "@/components/ui/icons";
 
-export interface StatusOption {
+interface StatusOption {
   value: string;
   label: string;
 }
 
-export interface FilterBarProjekt {
+interface FilterBarProjekt {
   id: string;
   name: string;
 }

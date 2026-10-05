@@ -18,7 +18,6 @@ type HealthStatus = {
   make_webhook: string;
 };
 
-type Besteller = { id: string; name: string; kuerzel: string };
 
 export type CrossDuplikat = {
   content_hash: string;

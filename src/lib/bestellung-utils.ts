@@ -112,8 +112,6 @@ export const GEWERKE = [
   "Sonstiges",
 ] as const;
 
-export type Gewerk = (typeof GEWERKE)[number];
-
 /**
  * Display-Priorität für die Bestellungs-Anzeige in der UI.
  *

@@ -5,7 +5,6 @@
  * Sequenzieller DATEV-Versand (SMTP-rate-limit-safe) via after().
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 import { makeRequest, TEST_PROFIL, TEST_UUID } from "@/test-helpers/api-route";
 
 const mockCheckCsrf = vi.fn(() => true);
@@ -20,7 +19,6 @@ vi.mock("next/server", async () => {
 vi.mock("@/lib/csrf", () => ({ checkCsrf: () => mockCheckCsrf() }));
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => mockCreateServerClient(),
-  createTypedServerSupabaseClient: () => mockCreateServerClient(),
 }));
 vi.mock("@/lib/supabase", () => ({ createServiceClient: () => mockCreateServiceClient() }));
 vi.mock("@/lib/email", () => ({

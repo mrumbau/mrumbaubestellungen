@@ -16,21 +16,21 @@
  * (`{ name, contentType, contentBytes }`), damit ingest.ts unverändert bleibt.
  */
 
-import { graphFetch, GraphError } from "./client";
+import { graphFetch } from "./client";
 import { logError } from "@/lib/logger";
 
 /**
  * F3.A4: Eigener Error-Type statt GraphError(200) das semantisch falsch ist
  * (200 ist ein Erfolgs-Status, nicht ein Anhang-leer-Fehler).
  */
-export class AttachmentError extends Error {
+class AttachmentError extends Error {
   constructor(message: string, public readonly attachmentName?: string) {
     super(message);
     this.name = "AttachmentError";
   }
 }
 
-export interface AttachmentMeta {
+interface AttachmentMeta {
   id: string;
   name: string;
   contentType: string;
@@ -85,7 +85,7 @@ interface GraphAttachmentListPaged extends GraphAttachmentList {
  * F3.A3 Fix: Listet ALLE Attachment-Metadaten via Pagination (war 25-Hard-Cap).
  * In der Praxis erwarten wir <100, deswegen Soft-Cap auf 100 zur Sicherheit.
  */
-export async function listAttachments(messageId: string): Promise<AttachmentMeta[]> {
+async function listAttachments(messageId: string): Promise<AttachmentMeta[]> {
   const mailbox = encodeURIComponent(getMailbox());
   const SOFT_CAP = 100;
   const out: AttachmentMeta[] = [];
@@ -119,7 +119,7 @@ export async function listAttachments(messageId: string): Promise<AttachmentMeta
  * Itemattachments und Referenceattachments werden NICHT unterstützt — Caller
  * muss sie vorher rausfiltern.
  */
-export async function getAttachmentBytes(
+async function getAttachmentBytes(
   messageId: string,
   attachment: AttachmentMeta,
 ): Promise<AttachmentWithBytes> {

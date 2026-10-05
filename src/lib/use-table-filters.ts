@@ -26,7 +26,7 @@ export type FaelligkeitsFilter =
   | "diese_woche"            // faelligkeitsdatum heute..+7d UND bezahlt_am IS NULL
   | "next_30d";              // faelligkeitsdatum heute..+30d UND bezahlt_am IS NULL
 
-export interface TableFiltersConfig {
+interface TableFiltersConfig {
   suche: string;
   statusFilter: string;
   artFilter: ArtFilter;

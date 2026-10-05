@@ -30,25 +30,6 @@ export const LANES: ReadonlyArray<Lane> = ["pool", "in-arbeit", "archiv"];
  */
 export type PoolLayout = "inbox" | "table";
 
-/**
- * Layout-DNA pro Lane.
- *
- * Pool = Inbox (Card-Feed, editorial-DNA mit Vendor-Hero, Score, Reserve).
- * In-Arbeit = Tabelle (dichte Datentabelle, Bulk-Edit, Sortierung).
- * Archiv = Tabelle (gleiche DNA wie In-Arbeit + CSV-Export).
- *
- * **Kein Toggle.** Die Lane bestimmt das Layout. Das alte Inbox-vs-Tabelle-
- * Switching war Quelle des Layout-Dualismus (Inbox zeigte ungefiltert,
- * Tabelle filtert — bei Toggle änderte sich die Datenmenge, audit-Wurzel #2).
- */
-export type LaneLayout = "inbox" | "table";
-
-export const LANE_LAYOUT: Record<Lane, LaneLayout> = {
-  pool: "inbox",
-  "in-arbeit": "table",
-  archiv: "table",
-};
-
 export interface LaneCopy {
   /** Display-Label in der LaneNav. */
   label: string;

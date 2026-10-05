@@ -73,7 +73,7 @@ export default async function PoolLanePage({
 function LanePageCrashFallback({ err }: { err: unknown }) {
   const msg = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
-  // eslint-disable-next-line no-console
+   
   console.error("[pool/page] crash:", { msg, stack });
 
   return (

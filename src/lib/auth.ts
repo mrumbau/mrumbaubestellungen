@@ -7,11 +7,6 @@ import { createServerSupabaseClient } from "./supabase-server";
 export type { Rolle } from "./rollen";
 import { ROLLEN, istVerwaltung, type Rolle } from "./rollen";
 
-// PASSWORD_MIN_LENGTH ist nach src/lib/auth-config.ts ausgelagert (Client-safe),
-// weil dieses Modul via supabase-server.ts → next/headers Server-only ist.
-// Re-Export für Server-Code-Komfort.
-export { PASSWORD_MIN_LENGTH } from "./auth-config";
-
 export interface BenutzerProfil {
   id: string;
   user_id: string;
@@ -157,21 +152,4 @@ export function requireRoles(profil: { rolle: string } | null, ...rollen: Rolle[
   const erlaubt = rollen as readonly string[];
   if (erlaubt.includes(profil.rolle)) return true;
   return erlaubt.includes("admin") && istVerwaltung(profil.rolle);
-}
-
-// Redirect-Pfad basierend auf Rolle
-export function getRedirectForRolle(rolle: Rolle): string {
-  switch (rolle) {
-    case "buchhaltung":
-      return "/buchhaltung";
-    case "admin":
-      return "/dashboard";
-    case "besteller":
-    case "geschaeftsfuehrer":
-      // Die Geschaeftsfuehrung bestellt selbst und landet deshalb bewusst
-      // bei den Bestellungen, nicht auf dem Dashboard.
-      return "/bestellungen";
-    default:
-      return "/bestellungen";
-  }
 }

@@ -115,7 +115,6 @@ export function SubunternehmerClient({
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   // Bestaetigen ist eine zusätzliche Mutation außerhalb des Standard-CRUD
-  const [bestaetigenLoading, setBestaetigenLoading] = useState(false);
 
   function resetForm() {
     setForm(emptyForm);
@@ -165,7 +164,6 @@ export function SubunternehmerClient({
   }
 
   async function handleBestaetigen(id: string) {
-    setBestaetigenLoading(true);
     try {
       const res = await fetch("/api/subunternehmer/bestaetigen", {
         method: "POST",
@@ -184,8 +182,6 @@ export function SubunternehmerClient({
       toast.error("Bestätigung fehlgeschlagen", {
         description: err instanceof Error ? err.message : undefined,
       });
-    } finally {
-      setBestaetigenLoading(false);
     }
   }
 

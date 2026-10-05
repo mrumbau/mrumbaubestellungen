@@ -28,7 +28,7 @@
 import { type Bestellungsart } from "@/lib/besteller-display";
 import { resolveBestellerState, type BestellerCellKind } from "./besteller-cell-state";
 
-export type BestellerVariant = "pill-only" | "with-name";
+type BestellerVariant = "pill-only" | "with-name";
 
 export interface BestellerCellProps {
   besteller_kuerzel: string | null | undefined;

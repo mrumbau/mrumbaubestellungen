@@ -18,7 +18,7 @@
  *
  *   vi.mock("@/lib/auth", () => ({ getBenutzerProfil: () => mockGetProfil(), requireRoles: () => true }));
  *   vi.mock("@/lib/csrf", () => ({ checkCsrf: (r: NextRequest) => mockCheckCsrf(r) }));
- *   vi.mock("@/lib/supabase-server", () => ({ createServerSupabaseClient: () => mockCreateClient(), createTypedServerSupabaseClient: () => mockCreateClient() }));
+ *   vi.mock("@/lib/supabase-server", () => ({ createServerSupabaseClient: () => mockCreateClient(), createServerSupabaseClient: () => mockCreateClient() }));
  *   vi.mock("@/lib/logger", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
  */
 import { NextRequest } from "next/server";
@@ -31,7 +31,7 @@ export interface Profil {
   rolle: "admin" | "besteller" | "buchhaltung";
 }
 
-export function makeProfil(overrides: Partial<Profil> = {}): Profil {
+function makeProfil(overrides: Partial<Profil> = {}): Profil {
   return {
     user_id: "test-user-id",
     kuerzel: "MT",

@@ -31,7 +31,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { cn } from "@/lib/cn";
 
-export type UnifiedListCardVariant = "vendor-strip" | "title-strip" | "table-row";
+type UnifiedListCardVariant = "vendor-strip" | "title-strip" | "table-row";
 
 export interface UnifiedListCardProps {
   variant: UnifiedListCardVariant;

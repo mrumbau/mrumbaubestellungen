@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
  * (border + shadow-card + bg-surface + rounded-lg) from globals.css
  * so elevation is tied to the global shadow scale.
  */
-export const cardVariants = cva("card", {
+const cardVariants = cva("card", {
   variants: {
     padding: {
       none: "",

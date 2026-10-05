@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createTypedServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createTypedServerSupabaseClient();
+    const supabase = await createServerSupabaseClient();
 
     // 30.09.2026 — Regelziel gegen die Stammdaten pruefen. Ein Tippfehler im
     // Kuerzel oder ein Kollege, der keine neuen Bestellungen mehr annimmt,
