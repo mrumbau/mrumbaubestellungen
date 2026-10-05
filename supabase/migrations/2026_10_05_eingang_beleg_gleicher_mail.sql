@@ -39,7 +39,14 @@ SELECT
   END                                                      AS kontrolle,
   e.gesichtet_am,
   e.gesichtet_von,
-  (COALESCE(e.bestellung_id, dup.bestellung_id) IS NULL AND e.gesichtet_am IS NULL) AS offen
+  -- DATEV-Rueckläufer ("Fehler beim Hochladen") sind bestaetigtes Rauschen:
+  -- 177 von 287 offenen Mails am 05.10. Sie zaehlen nicht als offen, sonst
+  -- muesste Carsten woechentlich ein Dutzend davon wegklicken. Sichtbar
+  -- bleiben sie unter "Aussortiert".
+  (COALESCE(e.bestellung_id, dup.bestellung_id) IS NULL
+   AND e.gesichtet_am IS NULL
+   AND NOT (e.status = 'irrelevant' AND e.error_msg LIKE 'system_domain%'
+            AND lower(e.sender) LIKE '%@%datev.de')) AS offen
 FROM public.email_processing_log e
 LEFT JOIN public.mail_sync_folders f ON f.id = e.folder_id
 LEFT JOIN LATERAL (
