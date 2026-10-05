@@ -52,11 +52,15 @@ const SYSTEM_KEYWORDS = [
   "leasingantrag", "bonitätsprüfung", "bonitaetspruefung",
 ];
 
+// 05.10.2026 — all-inkl.com und aldautomotive.com standen hier als
+// "System-Domains" und wurden damit still verworfen. Beide schicken aber
+// echte Rechnungen (Hosting, Fahrzeug-Leasing): in 90 Tagen 9 Rechnungen mit
+// Anhang im Rechnungsordner, die nie jemand gesehen hat. Was bleibt, sind
+// Absender, die wirklich nur Systemmeldungen senden — die 86 DATEV-Mails
+// derselben Zeit waren allesamt "Fehler beim Hochladen"-Rueckläufer.
 const SYSTEM_DOMAINS = new Set([
   "3cx.net", "3cx.com",
   "creditreform.de", "muenchen.creditreform.de",
-  "all-inkl.com",
-  "aldautomotive.com", "oms.aldautomotive.com",
   "datev.de", "uploadmail.datev.de",
 ]);
 
