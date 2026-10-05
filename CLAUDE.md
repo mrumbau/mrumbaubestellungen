@@ -18,15 +18,13 @@
 
 | Name | E-Mail | Rolle in Webapp | Kürzel |
 |---|---|---|---|
-| Marlon Tschon | mt@mrumbau.de | besteller | MT |
-| Carsten Reuter | cr@reuter-mr.de | besteller | CR |
-| Mohammed Hawrami | it@mrumbau.de | besteller | MH |
+| Mohammed Hawrami | it@mrumbau.de | admin | MH |
+| Marlon Tschon | mt@mrumbau.de | admin (nimmt keine neuen Bestellungen, Studium) | MT |
+| Carsten Reuter | cr@reuter-mr.de | geschaeftsfuehrer (einziger aktiver Besteller) | CR |
 | Nada Jerinic | bu@mrumbau.de | buchhaltung | NJ |
-| Admin | (du) | admin | — |
 
-**Besteller** sehen nur ihre eigenen Bestellungen.  
-**Buchhaltung** sieht nur freigegebene Rechnungen.  
-**Admin** sieht alles.
+Stand 05.10.2026. Rollen und Rechte: `docs/ARCHITEKTUR.md`. Zwei Bauleiter kommen später als Besteller dazu.
+**Architektur-Karte zuerst lesen:** `docs/ARCHITEKTUR.md` — eine Seite, beantwortet „wo muss ich hin, wenn ich X ändern will".
 
 ---
 

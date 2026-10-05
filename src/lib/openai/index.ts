@@ -64,9 +64,6 @@ export {
 export {
   erkenneBestellerIntelligent,
   erkenneHaendlerAusEmail,
-  erkenneProjektAusInhalt,
-  erkenneSubunternehmerAusEmail,
-  extrahiereBestellerHinweise,
   pruefePreisanomalien,
 } from "./extraction";
 
@@ -77,7 +74,4 @@ export {
   priorisiereBestellungen,
 } from "./digests";
 
-export {
-  aktualisiereBestellerAffinitaet,
-  berechneAffinitaet,
-} from "./affinitaet";
+export { aktualisiereBestellerAffinitaet } from "./affinitaet";
