@@ -65,6 +65,14 @@ function IconEinstellungen({ className }: { className?: string }) {
   );
 }
 
+function IconEingang({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z" />
+    </svg>
+  );
+}
+
 // 22.05.2026 — Nav-Items mit optionalem `requireDashboard`-Flag. Dashboard wird
 // nur gerendert wenn `profil.dashboardEnabled` true ist (Default: false für
 // MT/CR, true für andere — siehe lib/auth.computeDashboardEnabled).
@@ -80,39 +88,50 @@ type NavItem = {
    * Counter-Badge (Pool-Count) angezeigt. Aktuell nur "bestellungen-pool"
    * verwendet — falls weitere Counter dazukommen, hier als Schlüssel listen.
    */
-  badge?: "bestellungen-pool";
+  badge?: "bestellungen-pool" | "eingang-offen";
 };
 
-const NAV_ITEMS: Record<string, NavItem[]> = {
-  admin: [
-    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
-    { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
-    { href: "/todo", label: "Todo", Icon: IconTodo },
-    { href: "/projekte", label: "Projekte", Icon: IconProjekte },
-    { href: "/archiv", label: "Archiv", Icon: IconArchiv },
-    { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
-    { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
-  ],
-  besteller: [
-    { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
-    { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
-    { href: "/todo", label: "Todo", Icon: IconTodo },
-    { href: "/projekte", label: "Projekte", Icon: IconProjekte },
-    { href: "/archiv", label: "Archiv", Icon: IconArchiv },
-    { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
-    { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
-  ],
-  buchhaltung: [
-    { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
-    { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
-  ],
-};
+// 03.10.2026 — Die Navigation war nach Rollen-NAMEN verzweigt. Eine Rolle,
+// die hier fehlte, bekam eine LEERE Navigation — genau das, was MH am 1.10.
+// erlebt hat, als CR kurz Geschaeftsfuehrung war. Jetzt gibt es zwei
+// Fassungen: die volle fuer alle, die Bestellungen bearbeiten, und die
+// kurze fuer die Buchhaltung. Eine neue Rolle landet damit nie im Leeren.
+const NAV_VOLL: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
+  { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
+  // 03.10.2026 — Eingang: jede Mail aus dem Rechnungsordner, mit Zustand.
+  // Lag bis heute unter Einstellungen → System, wo sie niemand fand.
+  { href: "/eingang", label: "Eingang", Icon: IconEingang, badge: "eingang-offen" },
+  { href: "/todo", label: "Todo", Icon: IconTodo },
+  { href: "/projekte", label: "Projekte", Icon: IconProjekte },
+  { href: "/archiv", label: "Archiv", Icon: IconArchiv },
+  { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
+  { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
+];
 
-export function Sidebar({ profil, poolCount = 0 }: { profil: BenutzerProfil; poolCount?: number }) {
+const NAV_BUCHHALTUNG: NavItem[] = [
+  { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
+  { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
+];
+
+function navFuer(rolle: string): NavItem[] {
+  return rolle === "buchhaltung" ? NAV_BUCHHALTUNG : NAV_VOLL;
+}
+
+export function Sidebar({
+  profil,
+  poolCount = 0,
+  eingangCount = 0,
+}: {
+  profil: BenutzerProfil;
+  poolCount?: number;
+  /** Mails im Rechnungsordner ohne Bestellung, die noch niemand gesichtet hat. */
+  eingangCount?: number;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const items = (NAV_ITEMS[profil.rolle] || []).filter(
+  const items = navFuer(profil.rolle).filter(
     (item) => !item.requireDashboard || profil.dashboardEnabled,
   );
 
@@ -168,7 +187,15 @@ export function Sidebar({ profil, poolCount = 0 }: { profil: BenutzerProfil; poo
           const active = pathname.startsWith(item.href);
           // 02.06.2026 (Pool Phase 2) — Counter-Badge nur wenn Wert > 0.
           // Brand-Aesthetik: Anker-Farbe MR-Red, ohne Pulse (industrial-tone).
-          const showBadge = item.badge === "bestellungen-pool" && poolCount > 0;
+          const badgeWert =
+            item.badge === "bestellungen-pool" ? poolCount
+            : item.badge === "eingang-offen" ? eingangCount
+            : 0;
+          const showBadge = badgeWert > 0;
+          const badgeLabel =
+            item.badge === "eingang-offen"
+              ? `${badgeWert} ungesichtete Mails im Eingang`
+              : `${badgeWert} Pool-Bestellungen`;
           return (
             <Link
               key={item.href}
@@ -188,10 +215,10 @@ export function Sidebar({ profil, poolCount = 0 }: { profil: BenutzerProfil; poo
               <span className="flex-1">{item.label}</span>
               {showBadge && (
                 <span
-                  aria-label={`${poolCount} Pool-Bestellungen`}
+                  aria-label={badgeLabel}
                   className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-brand text-white text-[10px] font-bold font-mono-amount tabular-nums"
                 >
-                  {poolCount}
+                  {badgeWert}
                 </span>
               )}
             </Link>

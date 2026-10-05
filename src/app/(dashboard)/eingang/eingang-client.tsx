@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectionCard } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +25,7 @@ export const KONTROLLE_KEYS = [
 
 export type KontrolleKey = (typeof KONTROLLE_KEYS)[number];
 
-export type RechnungseingangZeile = {
+export type EingangZeile = {
   id: string;
   eingang: string | null;
   ordner: string;
@@ -41,6 +44,11 @@ export type RechnungseingangZeile = {
   besteller_kuerzel: string | null;
   bestellung_status: string | null;
   kontrolle: KontrolleKey;
+  /** 03.10.2026 — wann und von wem gesichtet; null = noch von niemandem. */
+  gesichtet_am: string | null;
+  gesichtet_von: string | null;
+  /** keine Bestellung UND nicht gesichtet — braucht einen Blick. */
+  offen: boolean;
 };
 
 type Tone = "success" | "warning" | "error" | "muted" | "info";
@@ -85,39 +93,53 @@ function formatBetrag(betrag: number | null): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(betrag);
 }
 
+type Auswahl = KontrolleKey | "alle" | "offen";
+
 /**
- * Rechnungseingang — beantwortet "ist alles verbucht, was im Ordner lag?".
+ * Eingang — beantwortet "ist alles verbucht, was im Ordner lag, und hat
+ * jemand gesehen, was nicht verbucht wurde?".
  *
- * Die Vorauswahl steht bewusst auf "Ohne Bestellung": das Verbuchte muss
- * niemand durchsehen, die Lücken schon.
+ * 03.10.2026 (Umbau 1): Die Vorauswahl steht auf "Offen" — keine Bestellung
+ * und noch von niemandem gesichtet. Das Verbuchte muss niemand durchsehen,
+ * das Gesichtete auch nicht; die Lücken schon. Sichten ist ein Haken, kein
+ * Loeschen: die Mail bleibt in der Liste, nur nicht mehr als offen.
  */
-export function RechnungseingangClient({
+export function EingangClient({
   ordner,
   ordnerListe,
   zeilen,
   counts,
+  offenCount,
   zeilenLimit,
   ladeFehler,
+  istRechnungsordner,
 }: {
   ordner: string;
   ordnerListe: string[];
-  zeilen: RechnungseingangZeile[];
+  zeilen: EingangZeile[];
   counts: Record<KontrolleKey, number>;
+  /** Offene Mails im ganzen Ordner (eigene Count-Abfrage, nicht aus der Liste). */
+  offenCount: number;
   zeilenLimit: number;
   ladeFehler: string | null;
+  /** Nur im Rechnungsordner gilt die Sichtungspflicht; andere Ordner sind Rauschen. */
+  istRechnungsordner: boolean;
 }) {
-  const [aktiv, setAktiv] = useState<KontrolleKey | "alle">("ohne_bestellung");
+  const router = useRouter();
+  const { toast } = useToast();
+  const [aktiv, setAktiv] = useState<Auswahl>("offen");
   const [suche, setSuche] = useState("");
+  const [ausgewaehlt, setAusgewaehlt] = useState<Set<string>>(new Set());
+  const [laeuft, setLaeuft] = useState(false);
 
   const gesamt = KONTROLLE_KEYS.reduce((s, k) => s + (counts[k] ?? 0), 0);
-  const offen =
-    (counts.ohne_bestellung ?? 0) + (counts.aussortiert ?? 0) + (counts.fehlgeschlagen ?? 0);
   const quote = gesamt > 0 ? Math.round(((counts.verbucht ?? 0) / gesamt) * 100) : 0;
 
   const gefiltert = useMemo(() => {
     const q = suche.trim().toLowerCase();
     return zeilen.filter((z) => {
-      if (aktiv !== "alle" && z.kontrolle !== aktiv) return false;
+      if (aktiv === "offen" && !z.offen) return false;
+      if (aktiv !== "alle" && aktiv !== "offen" && z.kontrolle !== aktiv) return false;
       if (!q) return true;
       return [z.absender, z.betreff, z.bestellnummer, z.haendler_name]
         .filter(Boolean)
@@ -126,16 +148,53 @@ export function RechnungseingangClient({
   }, [zeilen, aktiv, suche]);
 
   const limitErreicht = zeilen.length >= zeilenLimit;
+  const offeneSichtbar = gefiltert.filter((z) => z.offen);
+
+  function toggle(id: string) {
+    setAusgewaehlt((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function sichten(ids: string[], gesichtet: boolean) {
+    if (ids.length === 0) return;
+    setLaeuft(true);
+    try {
+      const res = await fetch("/api/eingang/sichten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, gesichtet }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error("Sichten fehlgeschlagen", { description: data.error || "Bitte erneut versuchen." });
+        return;
+      }
+      toast.success(
+        gesichtet
+          ? `${data.gesichtet} ${data.gesichtet === 1 ? "Mail" : "Mails"} gesichtet`
+          : "Sichtung zurückgenommen",
+      );
+      setAusgewaehlt(new Set());
+      router.refresh();
+    } finally {
+      setLaeuft(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Kontrolle"
-        title="Rechnungseingang"
+        eyebrow="Eingang"
+        title="Eingang"
         description={
           <>
-            Jede Mail aus den überwachten Ordnern — mit der Antwort, ob sie an einer
-            Bestellung gelandet ist. Damit nichts unbemerkt verschwindet.
+            Jede Mail aus dem Rechnungsordner — mit der Antwort, ob sie an einer
+            Bestellung gelandet ist. Was nicht verbucht ist, bleibt offen, bis jemand
+            es gesichtet hat. Damit nichts unbemerkt verschwindet.
           </>
         }
       />
@@ -154,7 +213,7 @@ export function RechnungseingangClient({
         {ordnerListe.map((o) => (
           <Link
             key={o}
-            href={`/einstellungen/system/rechnungseingang?ordner=${encodeURIComponent(o)}`}
+            href={`/eingang?ordner=${encodeURIComponent(o)}`}
             className={`rounded-full px-3 py-1 text-[12px] transition-colors ${
               o === ordner
                 ? "bg-brand text-white"
@@ -170,12 +229,23 @@ export function RechnungseingangClient({
       <SectionCard
         title={`${gesamt} Mails in „${ordner}"`}
         description={
-          offen === 0
-            ? "Alles verbucht."
-            : `${offen} davon sind an keiner Bestellung gelandet — Verbuchungsquote ${quote} %.`
+          offenCount === 0
+            ? `Nichts offen — alles verbucht oder gesichtet. Verbuchungsquote ${quote} %.`
+            : `${offenCount} ${offenCount === 1 ? "Mail wartet" : "Mails warten"} darauf, dass jemand sie ansieht — Verbuchungsquote ${quote} %.`
         }
       >
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setAktiv("offen")}
+            className={`rounded-full px-3 py-1.5 text-[12px] transition-colors ${
+              aktiv === "offen"
+                ? "bg-brand text-white"
+                : "border border-brand text-brand hover:bg-brand/10"
+            }`}
+          >
+            Offen {offenCount}
+          </button>
           <button
             type="button"
             onClick={() => setAktiv("alle")}
@@ -204,7 +274,14 @@ export function RechnungseingangClient({
           ))}
         </div>
 
-        {aktiv !== "alle" && (
+        {aktiv === "offen" && (
+          <p className="mt-3 text-body-sm text-foreground-muted">
+            {istRechnungsordner
+              ? "An keiner Bestellung gelandet und noch von niemandem gesichtet. Was hier steht, hat noch keiner gesehen — bitte ansehen und abhaken."
+              : "An keiner Bestellung gelandet und noch nicht gesichtet. In diesem Ordner ist das meist Rauschen; die Pflicht gilt nur im Rechnungsordner."}
+          </p>
+        )}
+        {aktiv !== "alle" && aktiv !== "offen" && (
           <p className="mt-3 text-body-sm text-foreground-muted">
             {KONTROLLE_META[aktiv].erklaerung}
           </p>
@@ -215,13 +292,40 @@ export function RechnungseingangClient({
       <SectionCard
         title="Einzelne Mails"
         action={
-          <Input
-            value={suche}
-            onChange={(e) => setSuche(e.target.value)}
-            placeholder="Absender, Betreff, Nummer…"
-            iconLeft={<IconSearch />}
-            aria-label="Liste durchsuchen"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            {offeneSichtbar.length > 0 && (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={laeuft}
+                  onClick={() =>
+                    setAusgewaehlt(
+                      ausgewaehlt.size === offeneSichtbar.length
+                        ? new Set()
+                        : new Set(offeneSichtbar.map((z) => z.id)),
+                    )
+                  }
+                >
+                  {ausgewaehlt.size === offeneSichtbar.length ? "Auswahl aufheben" : `Alle ${offeneSichtbar.length} auswählen`}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={laeuft || ausgewaehlt.size === 0}
+                  onClick={() => sichten(Array.from(ausgewaehlt), true)}
+                >
+                  {ausgewaehlt.size > 0 ? `${ausgewaehlt.size} als gesichtet abhaken` : "Als gesichtet abhaken"}
+                </Button>
+              </>
+            )}
+            <Input
+              value={suche}
+              onChange={(e) => setSuche(e.target.value)}
+              placeholder="Absender, Betreff, Nummer…"
+              iconLeft={<IconSearch />}
+              aria-label="Liste durchsuchen"
+            />
+          </div>
         }
       >
         {limitErreicht && (
@@ -234,11 +338,13 @@ export function RechnungseingangClient({
         {gefiltert.length === 0 ? (
           <EmptyState
             tone={aktiv === "verbucht" || gesamt === 0 ? "info" : "success"}
-            title={suche ? "Nichts gefunden" : "Keine Einträge"}
+            title={suche ? "Nichts gefunden" : aktiv === "offen" ? "Nichts offen" : "Keine Einträge"}
             description={
               suche
                 ? "Zu dieser Suche gibt es in der aktuellen Auswahl keine Mail."
-                : "In dieser Auswahl liegt nichts an."
+                : aktiv === "offen"
+                  ? "Jede Mail in diesem Ordner ist verbucht oder wurde gesichtet."
+                  : "In dieser Auswahl liegt nichts an."
             }
           />
         ) : (
@@ -246,17 +352,33 @@ export function RechnungseingangClient({
             <table className="w-full text-left text-body-sm">
               <thead>
                 <tr className="border-b border-line text-meta uppercase tracking-[0.1em] text-foreground-muted">
+                  <th className="py-2 pr-2 w-6" aria-label="Auswahl" />
                   <th className="py-2 pr-3 font-medium">Eingang</th>
                   <th className="py-2 pr-3 font-medium">Absender</th>
                   <th className="py-2 pr-3 font-medium">Betreff</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
                   <th className="py-2 pr-3 font-medium">Bestellung</th>
                   <th className="py-2 pr-3 font-medium text-right">Betrag</th>
+                  <th className="py-2 pr-3 font-medium">Gesichtet</th>
                 </tr>
               </thead>
               <tbody>
                 {gefiltert.map((z) => (
-                  <tr key={z.id} className="border-b border-line/60 align-top">
+                  <tr
+                    key={z.id}
+                    className={`border-b border-line/60 align-top ${z.offen ? "" : "text-foreground-muted"}`}
+                  >
+                    <td className="py-2 pr-2">
+                      {z.offen && (
+                        <input
+                          type="checkbox"
+                          checked={ausgewaehlt.has(z.id)}
+                          onChange={() => toggle(z.id)}
+                          aria-label={`Mail auswählen: ${z.betreff ?? z.absender ?? ""}`}
+                          className="h-4 w-4 accent-brand"
+                        />
+                      )}
+                    </td>
                     <td className="py-2 pr-3 whitespace-nowrap font-mono-amount text-foreground-muted">
                       {formatDatum(z.eingang)}
                     </td>
@@ -308,6 +430,30 @@ export function RechnungseingangClient({
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap text-right font-mono-amount">
                       {formatBetrag(z.betrag)}
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      {z.bestellung_id ? (
+                        <span className="text-foreground-muted">—</span>
+                      ) : z.gesichtet_am ? (
+                        <button
+                          type="button"
+                          disabled={laeuft}
+                          onClick={() => sichten([z.id], false)}
+                          title="Sichtung zurücknehmen"
+                          className="text-meta text-foreground-muted hover:text-foreground"
+                        >
+                          {z.gesichtet_von ?? "?"} · {formatDatum(z.gesichtet_am)}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={laeuft}
+                          onClick={() => sichten([z.id], true)}
+                          className="text-meta text-brand hover:underline"
+                        >
+                          abhaken
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 import { istVerwaltung } from "@/lib/rollen";
+import { RECHNUNGSORDNER } from "@/lib/eingang";
 export default async function DashboardLayout({
   children,
 }: {
@@ -22,15 +23,26 @@ export default async function DashboardLayout({
   // UNBEKANNT-Material). Single-Query, ~5-15ms. Layout-Caching durch
   // `export const dynamic = "force-dynamic"` der Pages bleibt unangetastet.
   let poolCount = 0;
+  let eingangCount = 0;
   if (istVerwaltung(profil.rolle) || profil.rolle === "besteller") {
     const supabase = await createServerSupabaseClient();
-    const { count } = await supabase
-      .from("bestellungen")
-      .select("id", { count: "exact", head: true })
-      .is("archiviert_am", null)
-      .eq("besteller_kuerzel", "UNBEKANNT")
-      .eq("bestellungsart", "material");
-    poolCount = count ?? 0;
+    // 03.10.2026 — Eingangs-Zaehler parallel zum Pool-Zaehler: Mails im
+    // Rechnungsordner ohne Bestellung, die noch niemand gesichtet hat.
+    const [pool, eingang] = await Promise.all([
+      supabase
+        .from("bestellungen")
+        .select("id", { count: "exact", head: true })
+        .is("archiviert_am", null)
+        .eq("besteller_kuerzel", "UNBEKANNT")
+        .eq("bestellungsart", "material"),
+      supabase
+        .from("v_rechnungseingang")
+        .select("id", { count: "exact", head: true })
+        .eq("ordner", RECHNUNGSORDNER)
+        .eq("offen", true),
+    ]);
+    poolCount = pool.count ?? 0;
+    eingangCount = eingang.count ?? 0;
   }
 
   return (
@@ -47,7 +59,7 @@ export default async function DashboardLayout({
           h-dvh+overflow-hidden, das Detail-Layouts mit eigener Scroll-Logic
           zerschießt. */}
       <div className="flex min-h-dvh bg-canvas">
-        <Sidebar profil={profil} poolCount={poolCount} />
+        <Sidebar profil={profil} poolCount={poolCount} eingangCount={eingangCount} />
         <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 p-4 pt-16 md:p-8 md:pt-8 focus:outline-none">{children}</main>
       </div>
     </ToastProvider>

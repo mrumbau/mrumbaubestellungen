@@ -92,7 +92,8 @@ export interface LaneLoadResult {
  * - **in-arbeit:** Besteller sieht eigene + Abo/SU, status ≠ freigegeben +
  *   archiv-states. Admin sieht alle aktiven (oder via `?owner=alle` explizit).
  * - **archiv:** Besteller sieht eigene + Abo/SU, status IN
- *   (freigegeben, verworfen, storniert). Admin sieht alle.
+ *   (freigegeben, verworfen, storniert) ODER erledigt_am gesetzt (Gutschrift /
+ *   vorausbezahlt mit vollstaendigen Belegen). Admin sieht alle.
  *
  * Hinweis: Supabase-Filter-Builder-Types sind 6-Level-deep verschachtelt
  * (PostgrestQuery → PostgrestFilter mit Schema-Shape). Hier pragmatisch
@@ -126,7 +127,12 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
     q = q
       .neq("status", "freigegeben")
       .neq("status", "verworfen")
-      .neq("status", "storniert");
+      .neq("status", "storniert")
+      // 03.10.2026 (Umbau 1) — erledigt_am wird vom Trigger gesetzt, wenn
+      // ein Vorgang keine Freigabe braucht (Gutschrift, vorausbezahlt) und
+      // seine Belege vollstaendig sind. Vorher hatten solche Vorgaenge keinen
+      // Ausgang aus "In Arbeit": 5 Gutschriften standen dort dauerhaft.
+      .is("erledigt_am", null);
     return q;
   }
 
@@ -137,8 +143,10 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
         `besteller_kuerzel.eq.${profil.kuerzel},bestellungsart.in.(abo,subunternehmer)`,
       );
     }
-    // `.in()` ist robust (anders als das tükische `.not("col", "in", ...)`).
-    q = q.in("status", ["freigegeben", "verworfen", "storniert"]);
+    // 03.10.2026 (Umbau 1) — erledigte Vorgaenge ohne Freigabe gehoeren
+    // hierher. PostgREST-OR-Syntax wie weiter oben bei besteller_kuerzel;
+    // `.in` innerhalb von `.or` braucht die Klammerform.
+    q = q.or("status.in.(freigegeben,verworfen,storniert),erledigt_am.not.is.null");
     return q;
   }
 
