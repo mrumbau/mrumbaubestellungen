@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 
-export interface DatevExportProjekt {
+interface DatevExportProjekt {
   id: string;
   name: string;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
+import { cva } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 import { IconChevronDown } from "./icons";
 
@@ -30,7 +30,7 @@ import { IconChevronDown } from "./icons";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-export type SortDirection = "asc" | "desc";
+type SortDirection = "asc" | "desc";
 export type SortState = { key: string; direction: SortDirection } | null;
 export type Density = "compact" | "comfortable" | "spacious";
 
@@ -832,7 +832,6 @@ export function DensityToggle({
   );
 }
 
-export type DensityToggleVariants = VariantProps<typeof densityButtonVariants>;
 
 /**
  * useTableDensity — localStorage-persisted density state.

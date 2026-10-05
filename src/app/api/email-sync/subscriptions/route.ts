@@ -6,7 +6,7 @@
  *        die noch keine haben. Idempotent — re-callable.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 import { getBenutzerProfil, requireRoles } from "@/lib/auth";
 import { createSubscription } from "@/lib/microsoft-graph/subscriptions";

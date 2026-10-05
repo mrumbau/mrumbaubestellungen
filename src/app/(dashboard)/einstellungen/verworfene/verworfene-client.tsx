@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { IconTrash, IconSearch } from "@/components/ui/icons";
 
-export type VerworfeneDokuSnapshot = {
+type VerworfeneDokuSnapshot = {
   id: string;
   typ: string;
   storage_pfad: string | null;

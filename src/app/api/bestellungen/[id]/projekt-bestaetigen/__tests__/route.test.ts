@@ -5,7 +5,6 @@
  * Permission-Pfad: Admin oder Besteller (own oder SU/Abo). Drei Aktions-Branches.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 import { makeRequest, params, TEST_UUID } from "@/test-helpers/api-route";
 
 const mockCheckCsrf = vi.fn(() => true);
@@ -15,7 +14,6 @@ const mockAktAffinitaet = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/csrf", () => ({ checkCsrf: () => mockCheckCsrf() }));
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => mockCreateClient(),
-  createTypedServerSupabaseClient: () => mockCreateClient(),
 }));
 vi.mock("@/lib/openai", () => ({
   aktualisiereBestellerAffinitaet: (...args: unknown[]) => mockAktAffinitaet(...args),

@@ -29,9 +29,6 @@ import {
   parseArtFilter,
 } from "@/lib/bestellungen-art";
 
-// Re-Export für bestehende Importeure von dieser Datei.
-export { type Bestellungsart, ALL_BESTELLUNGSARTEN, parseArtFilter };
-
 const LABELS: Record<Bestellungsart, string> = {
   material: "Material",
   subunternehmer: "Subunternehmer",

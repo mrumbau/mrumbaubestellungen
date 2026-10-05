@@ -35,7 +35,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";

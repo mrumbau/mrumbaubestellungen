@@ -69,7 +69,7 @@ function LanePageCrashFallback({
 }) {
   const msg = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
-  // eslint-disable-next-line no-console
+   
   console.error(`[archiv/page] crash:`, { msg, stack });
 
   return (

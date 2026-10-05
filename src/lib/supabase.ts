@@ -26,13 +26,6 @@ export function createServiceClient() {
 
 // Typed Variants — für Hot-Paths die gen-types nutzen wollen.
 // Compile-Time-Validation für .from/.insert/.update/.rpc/.eq.
-export function createTypedBrowserSupabaseClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
 export function createTypedServiceClient() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

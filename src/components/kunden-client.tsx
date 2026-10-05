@@ -21,7 +21,7 @@ import { Modal } from "@/components/ui/modal";
 import { PageHero } from "@/components/ui/page-hero";
 import { exportToCsv, csvFilename } from "@/lib/export-csv";
 import { deepEqual } from "@/lib/deep-equal";
-import { IconCheck, IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
+import { IconEdit, IconTrash, IconPlus, IconUsers } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 type ViewMode = "grid" | "table";

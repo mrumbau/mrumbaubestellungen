@@ -25,7 +25,6 @@ import type {
   Kommentar,
   ProjektOption,
   SubunternehmerInfo,
-  WidgetId,
 } from "./types";
 import { DOKUMENT_CONFIG } from "@/lib/bestellung-utils";
 

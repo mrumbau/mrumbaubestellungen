@@ -2,7 +2,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-export const badgeVariants = cva(
+const badgeVariants = cva(
   "inline-flex items-center gap-1 rounded font-semibold uppercase tracking-wide whitespace-nowrap",
   {
     variants: {
@@ -41,71 +41,3 @@ export function Badge({ tone, size, className, children, ...rest }: BadgeProps) 
   );
 }
 
-/**
- * StatusBadge — reuses the existing `.status-tag` rule (linker Farbbalken)
- * from globals.css for Bestellungs-Workflow states. Keep this aligned with
- * the DB status enum in `bestellungen.status`.
- */
-type BestellungStatus =
-  | "erwartet"
-  | "offen"
-  | "vollstaendig"
-  | "abweichung"
-  | "ls_fehlt"
-  | "freigegeben";
-
-const statusMeta: Record<BestellungStatus, { label: string; color: string; bg: string }> = {
-  erwartet: { label: "Erwartet", color: "var(--status-erwartet)", bg: "rgba(139,139,139,0.08)" },
-  offen: { label: "Offen", color: "var(--status-offen)", bg: "rgba(37,99,235,0.08)" },
-  vollstaendig: {
-    label: "Vollständig",
-    color: "var(--status-vollstaendig)",
-    bg: "rgba(22,163,74,0.08)",
-  },
-  abweichung: {
-    label: "Abweichung",
-    color: "var(--status-abweichung)",
-    bg: "rgba(220,38,38,0.08)",
-  },
-  ls_fehlt: {
-    label: "LS fehlt",
-    color: "var(--status-ls-fehlt)",
-    bg: "rgba(217,119,6,0.08)",
-  },
-  freigegeben: {
-    label: "Freigegeben",
-    color: "var(--status-freigegeben)",
-    bg: "rgba(5,150,105,0.08)",
-  },
-};
-
-export function StatusBadge({
-  status,
-  label,
-  className,
-}: {
-  status: BestellungStatus;
-  label?: string;
-  className?: string;
-}) {
-  const meta = statusMeta[status];
-  return (
-    <span
-      className={cn("status-tag", className)}
-      style={{ color: meta.color, backgroundColor: meta.bg }}
-    >
-      <span
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 3,
-          backgroundColor: meta.color,
-        }}
-      />
-      {label ?? meta.label}
-    </span>
-  );
-}

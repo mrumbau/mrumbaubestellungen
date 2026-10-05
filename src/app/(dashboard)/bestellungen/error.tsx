@@ -15,7 +15,7 @@ export default function BestellungenError({
   // auf Production sofort sehen kann was crasht.
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // eslint-disable-next-line no-console
+       
       console.error("[bestellungen/error.tsx] crash:", {
         message: error?.message,
         digest: error?.digest,

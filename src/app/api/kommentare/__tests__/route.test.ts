@@ -5,7 +5,6 @@
  * Bestellung sehen können (via RLS-SELECT) bevor er kommentieren darf.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 import { makeRequest, TEST_PROFIL, TEST_UUID } from "@/test-helpers/api-route";
 
 const mockGetProfil = vi.fn();
@@ -19,7 +18,6 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/csrf", () => ({ checkCsrf: () => mockCheckCsrf() }));
 vi.mock("@/lib/supabase-server", () => ({
   createServerSupabaseClient: () => mockCreateClient(),
-  createTypedServerSupabaseClient: () => mockCreateClient(),
 }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
 

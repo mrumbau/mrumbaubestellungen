@@ -5,7 +5,7 @@
  * adversarial PDF, Vendor-Parser-Dauer-Fail).
  */
 import { describe, it, expect } from "vitest";
-import { withCostTracking, CostCapExceededError, MAX_COST_PER_MAIL_EUR } from "../openai";
+import { withCostTracking, CostCapExceededError, MAX_COST_PER_MAIL_EUR } from "../openai/cost";
 
 describe("withCostTracking + Hard-Cap", () => {
   it("liefert normalen Result wenn keine Cost-Calls", async () => {

@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
  */
 export type TimeRange = "7d" | "30d" | "90d" | "month" | "prev-month";
 
-export const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; ariaLabel: string }[] = [
+const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; ariaLabel: string }[] = [
   { value: "7d", label: "7 T", ariaLabel: "Letzte 7 Tage" },
   { value: "30d", label: "30 T", ariaLabel: "Letzte 30 Tage" },
   { value: "90d", label: "90 T", ariaLabel: "Letzte 90 Tage" },

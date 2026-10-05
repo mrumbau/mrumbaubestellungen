@@ -117,7 +117,3 @@ export async function deleteSubscription(graphSubscriptionId: string): Promise<v
   }
 }
 
-/** Listet alle aktiven Subscriptions (Diagnose). */
-export async function listSubscriptions(): Promise<{ value: GraphSubscription[] }> {
-  return graphFetch<{ value: GraphSubscription[] }>("/subscriptions");
-}

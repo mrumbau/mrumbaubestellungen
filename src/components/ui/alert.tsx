@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
  * Alert — persistent, non-dismissable feedback bound to a region.
  * For transient feedback use <Toast> via useToast() instead.
  */
-export const alertVariants = cva(
+const alertVariants = cva(
   "flex items-start gap-2.5 rounded-md border px-3 py-2.5 text-[14px] leading-relaxed",
   {
     variants: {

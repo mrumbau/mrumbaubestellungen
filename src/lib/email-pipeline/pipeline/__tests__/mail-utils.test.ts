@@ -13,7 +13,6 @@ import {
   effectiveMimeType,
   extractEmailAddress,
   extractDomain,
-  isIrrelevantDomain,
   isVersandDomain,
   safeBase64ToBuffer,
   stripHtml,

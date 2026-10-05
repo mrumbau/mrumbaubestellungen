@@ -73,12 +73,7 @@ const DokumentAnalyseSchema = z.object({
   konfidenz: z.number().min(0).max(1),
 }).passthrough();
 
-export type {
-  VendorParser,
-  VendorParseResult,
-  VendorParserInput,
-} from "./types";
-export { VENDOR_CONFIDENCE_THRESHOLD } from "./types";
+export type { VendorParserInput } from "./types";
 
 /**
  * Registry. Reihenfolge = Priorität. Erster Match gewinnt.
@@ -173,10 +168,6 @@ export async function tryParseVendor(
 /**
  * Liste der registrierten Vendor-Namen — für Telemetrie-Aggregation.
  */
-export function listRegisteredVendors(): { name: string; version: string }[] {
-  return PARSERS.map((p) => ({ name: p.name, version: p.version }));
-}
-
 import type { DokumentAnalyse } from "@/lib/openai";
 
 /**

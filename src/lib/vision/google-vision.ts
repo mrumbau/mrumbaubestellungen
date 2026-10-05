@@ -21,7 +21,7 @@ const VISION_API_URL = "https://vision.googleapis.com/v1/images:annotate";
 // Loggen wir pro Call zur Sichtbarkeit. Für aggregierte Caps siehe
 // die separate Daily-Cap-Logik (R2.6).
 const VISION_COST_USD_PER_CALL = 0.0015;
-const USD_TO_EUR = 0.93;
+const USD_TO_EUR = 0.93; // gleicher Kurs wie in lib/openai/cost.ts
 
 interface VisionOcrResult {
   text: string;

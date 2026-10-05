@@ -24,7 +24,7 @@ import type * as React from "react";
 
 type IconComponent = (props: React.SVGProps<SVGSVGElement>) => React.JSX.Element;
 
-export const STATUS_CONFIG: Record<
+const STATUS_CONFIG: Record<
   string,
   { label: string; color: string; bg: string; text: string; Icon: IconComponent }
 > = {

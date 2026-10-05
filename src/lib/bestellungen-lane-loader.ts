@@ -159,7 +159,7 @@ function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owne
  * PageHero, Empty-State) zeigen, statt die ganze Page auf error.tsx zu
  * eskalieren.
  */
-export function emptyLaneResult(): LaneLoadResult {
+function emptyLaneResult(): LaneLoadResult {
   return {
     bestellungen: [],
     projekte: [],
@@ -193,13 +193,13 @@ export async function loadLaneDataSafe(
   try {
     return await loadLaneData(supabase, params, profil);
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error("[loadLaneDataSafe] crash in loadLaneData:", err);
     return emptyLaneResult();
   }
 }
 
-export async function loadLaneData(
+async function loadLaneData(
   supabase: SupabaseClient,
   params: LaneLoadParams,
   profil: UserProfil | null,
@@ -266,7 +266,7 @@ export async function loadLaneData(
     Promise.resolve(p).then(
       (r) => r ?? { data: null },
       (err) => {
-        // eslint-disable-next-line no-console
+         
         console.error("[lane-loader] sub-query failed:", err);
         return { data: null };
       },

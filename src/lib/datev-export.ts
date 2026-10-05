@@ -42,7 +42,7 @@ export interface FreigegebeneRechnung {
  * Händler werden alphabetisch sortiert → gleicher Händler = immer gleiches Konto.
  * Bereich: 70001, 70002, ...
  */
-export function generiereKreditorenkonto(haendlerIndex: number): string {
+function generiereKreditorenkonto(haendlerIndex: number): string {
   return String(70000 + haendlerIndex + 1);
 }
 
@@ -50,7 +50,7 @@ export function generiereKreditorenkonto(haendlerIndex: number): string {
  * Formatiert Betrag für DATEV: Punkt als Dezimal.
  * DATEV Version 700 erwartet bei WKZ=EUR den Punkt als Dezimaltrenner.
  */
-export function formatiereBetrag(betrag: number): string {
+function formatiereBetrag(betrag: number): string {
   return betrag.toFixed(2);
 }
 
@@ -58,7 +58,7 @@ export function formatiereBetrag(betrag: number): string {
  * Formatiert Datum im DATEV-Format.
  * TTMM = Belegdatum (ohne Jahr), TTMMJJJJ = Header-Datum
  */
-export function formatiereDatum(date: Date, format: "TTMM" | "TTMMJJJJ" | "JJJJMMTT"): string {
+function formatiereDatum(date: Date, format: "TTMM" | "TTMMJJJJ" | "JJJJMMTT"): string {
   const tt = String(date.getDate()).padStart(2, "0");
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const jjjj = String(date.getFullYear());
@@ -76,7 +76,7 @@ export function formatiereDatum(date: Date, format: "TTMM" | "TTMMJJJJ" | "JJJJM
 /**
  * Generiert die DATEV-Header-Zeile (Zeile 1 mit Metadaten).
  */
-export function generiereHEADER(options: DATEVExportOptions): string {
+function generiereHEADER(options: DATEVExportOptions): string {
   const jetzt = new Date();
   const datumZeit = jetzt.toISOString().replace(/[-:T]/g, "").slice(0, 14);
   const wjBeginn = `${new Date(options.von).getFullYear()}0101`;
@@ -95,7 +95,7 @@ export function generiereHEADER(options: DATEVExportOptions): string {
 /**
  * Generiert die Spaltenbezeichnungen (Zeile 2).
  */
-export function generiereKOPFZEILE(): string {
+function generiereKOPFZEILE(): string {
   return [
     "Umsatz", "Soll/Haben-Kennzeichen", "WKZ Umsatz", "Kurs",
     "Basis-Umsatz", "WKZ Basis-Umsatz", "Konto",
@@ -118,7 +118,7 @@ export function generiereKOPFZEILE(): string {
 /**
  * Generiert eine Buchungszeile für eine freigegebene Rechnung.
  */
-export function generiereZEILE(
+function generiereZEILE(
   rechnung: FreigegebeneRechnung,
   kreditorenkonto: string,
   gegenKonto: string,
@@ -192,7 +192,7 @@ export function generiereZEILE(
  * Erstellt einen Händler-Index für konsistente Kreditorenkonten.
  * Alphabetisch sortiert → gleiche Zuordnung bei jedem Export.
  */
-export function erstelleHaendlerIndex(haendlerNamen: string[]): Map<string, number> {
+function erstelleHaendlerIndex(haendlerNamen: string[]): Map<string, number> {
   const sortiert = [...new Set(haendlerNamen)].sort((a, b) =>
     a.localeCompare(b, "de-DE")
   );

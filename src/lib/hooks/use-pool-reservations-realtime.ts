@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 
-export interface ReservationView {
+interface ReservationView {
   bestellung_id: string;
   user_kuerzel: string;
   user_name: string;

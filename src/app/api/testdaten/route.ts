@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
-import { requireRoles } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { istNurAdmin } from "@/lib/rollen";

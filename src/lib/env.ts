@@ -60,7 +60,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
-export type Env = z.infer<typeof envSchema>;
+type Env = z.infer<typeof envSchema>;
 
 let cachedEnv: Env | null = null;
 
@@ -68,7 +68,7 @@ let cachedEnv: Env | null = null;
  * Liefert validierte Env. Wirft beim ersten Aufruf wenn Schema fehlschlägt.
  * Cached danach — kein Re-Parse pro Aufruf.
  */
-export function getEnv(): Env {
+function getEnv(): Env {
   if (cachedEnv) return cachedEnv;
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {

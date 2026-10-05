@@ -39,7 +39,7 @@ export interface SecondReviewInput {
   anhang_count: number;
 }
 
-export type SecondReviewVerdict =
+type SecondReviewVerdict =
   /** Eindeutig kein Handelsdokument (Spam/Newsletter/intern). */
   | "irrelevant_bestaetigt"
   /** Wahrscheinlich ein Handelsdokument das übersehen wurde — Pipeline neu starten. */

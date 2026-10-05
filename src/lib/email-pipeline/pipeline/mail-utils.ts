@@ -24,7 +24,7 @@ export const ALLOWED_MIME_TYPES = new Set([
   "application/octet-stream",
 ]);
 
-export const PDF_MIME_ALIASES = new Set([
+const PDF_MIME_ALIASES = new Set([
   "application/pdf",
   "application/pdfa",
   "application/x-pdf",

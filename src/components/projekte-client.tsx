@@ -453,12 +453,6 @@ export function ProjekteClient({
     return Math.min(100, (volumen / budget) * 100);
   };
 
-  const getBudgetColor = (percent: number) => {
-    if (percent < 70) return "#059669";
-    if (percent < 90) return "#d97706";
-    return "#dc2626";
-  };
-
   return (
     <div className="space-y-6">
       <PageHero

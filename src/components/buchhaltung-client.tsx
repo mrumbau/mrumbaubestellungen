@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { formatDatum, formatBetrag } from "@/lib/formatters";
+import { formatDatum } from "@/lib/formatters";
 import type { Rolle } from "@/lib/auth";
 import { DatevExportModal } from "@/components/buchhaltung/datev-export-modal";
 import { BuchhaltungSummaryCards } from "@/components/buchhaltung/summary-cards";
@@ -38,7 +38,6 @@ export function BuchhaltungClient({
   // Jetzt: rows enthält ALLE freigegebenen (bis HARD_CAP) → Filter+Pagination
   // arbeiten auf der Gesamt-Menge.
   const PAGE_SIZE = 20;
-  const totalCount = rows.length;
   const [suche, setSuche] = useState("");
   const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
