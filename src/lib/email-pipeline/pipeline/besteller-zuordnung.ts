@@ -5,6 +5,7 @@
  *   STUFE 3  — Händler-Affinität (50-Bestellungen-Stichprobe ≥60% gleicher Besteller)
  *   STUFE 4  — Name im Text (besteller_im_dokument + Volltext-Match auf benutzer_rollen)
  *   STUFE 4.5 — KI-Historisch (erkenneBestellerIntelligent mit Artikel-Vergleich)
+ *   STUFE 5  — Einziger aktiver Besteller (05.10.2026): gibt es nur einen, bekommt er sie
  *   Fallback — "UNBEKANNT" + Methode "unbekannt"
  *
  * 19.05.2026 (A2.1) — aus run.ts extrahiert. Verhalten unverändert.
@@ -68,6 +69,7 @@ const METHOD_CONFIDENCE: Record<string, number> = {
   besteller_im_dokument: 0.85,
   name_im_text: 0.75,
   ki_historisch: 0.7, // wird überschrieben durch erkenneBestellerIntelligent
+  einziger_besteller: 1, // keine Schaetzung: es gibt niemanden sonst
 };
 
 export async function assignBesteller(
@@ -288,6 +290,37 @@ export async function assignBesteller(
       } catch (e) {
         logError("webhook/email", "erkenneBestellerIntelligent fehlgeschlagen", e);
       }
+    }
+  }
+
+  // STUFE 5 — einziger aktiver Besteller (05.10.2026, Umbau 2).
+  //
+  // Seit Marlons Weggang bestellt nur noch Carsten. Jede Bestellung, die die
+  // Stufen oben nicht zuordnen konnten, lag trotzdem im Pool — 96 Stueck, im
+  // Mittel 68 Tage alt — und wartete darauf, dass der einzige Mensch, der sie
+  // bekommen kann, sie sich selbst zuweist. Das ist Arbeit ohne Entscheidung.
+  //
+  // Gibt es genau EINEN, der neue Bestellungen annimmt, bekommt er sie.
+  // Die Regel schaltet sich von selbst ab, sobald die zwei Bauleiter dazukommen:
+  // dann sind es mehrere, und die Entscheidung gehoert wieder in den Pool.
+  // Fail-open: scheitert die Abfrage, bleibt es bei UNBEKANNT wie bisher.
+  if (!bestellerKuerzel) {
+    try {
+      const { data: aktive } = await supabase
+        .from("benutzer_rollen").select("kuerzel")
+        .in("rolle", [...BESTELL_ROLLEN])
+        .neq("nimmt_neue_bestellungen", false);
+      if (aktive && aktive.length === 1) {
+        bestellerKuerzel = String(aktive[0].kuerzel);
+        zuordnungsMethode = "einziger_besteller";
+        vorschlagKuerzel = bestellerKuerzel;
+        vorschlagKonfidenz = METHOD_CONFIDENCE.einziger_besteller;
+        logInfo("webhook/email", "Einziger aktiver Besteller — direkt zugeordnet", {
+          kuerzel: bestellerKuerzel,
+        });
+      }
+    } catch (e) {
+      logError("webhook/email", "Einziger-Besteller-Pruefung fehlgeschlagen (fail-open)", e);
     }
   }
 

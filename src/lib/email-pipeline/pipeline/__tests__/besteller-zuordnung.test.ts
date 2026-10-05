@@ -108,16 +108,23 @@ describe("assignBesteller — ausgeschiedene Besteller bekommen nichts Neues", (
     expect(res.bestellerKuerzel).toBe("CR");
   });
 
+  const zweiAktive = [
+    { kuerzel: "MT", name: "Marlon Tschon", email: "mt@mrumbau.de" },
+    { kuerzel: "CR", name: "Carsten Reuter", email: "cr@reuter-mr.de" },
+    { kuerzel: "BL", name: "Bau Leiter", email: "bl@mrumbau.de" },
+  ];
+
   it("faellt auf UNBEKANNT statt auf duenne Restdaten zu raten", async () => {
     // Nach dem Filter bleiben 2 CR-Zeilen — unter der >= 3-Schwelle.
-    const supabase = makeSupabaseMock({ historie: [...mt(20), ...cr(2)], inaktiv: ["MT"] });
+    // Zwei aktive Besteller (CR, BL): die Einziger-Besteller-Stufe greift nicht.
+    const supabase = makeSupabaseMock({ historie: [...mt(20), ...cr(2)], inaktiv: ["MT"], benutzer: zweiAktive });
     const res = await assignBesteller(supabase, ctx);
     expect(res.bestellerKuerzel).toBe("UNBEKANNT");
     expect(res.zuordnungsMethode).toBe("unbekannt");
   });
 
   it("schlaegt MT auch nicht mehr als Pool-Hinweis vor", async () => {
-    const supabase = makeSupabaseMock({ historie: mt(20), inaktiv: ["MT"] });
+    const supabase = makeSupabaseMock({ historie: mt(20), inaktiv: ["MT"], benutzer: zweiAktive });
     const res = await assignBesteller(supabase, ctx);
     expect(res.bestellerKuerzel).toBe("UNBEKANNT");
     expect(res.vorschlagKuerzel).not.toBe("MT");
@@ -152,6 +159,11 @@ describe("assignBesteller — Stufe -1 (Regel-Engine)", () => {
     const supabase = makeSupabaseMock({
       historie: [],
       inaktiv: ["MT"],
+      benutzer: [
+        { kuerzel: "MT", name: "Marlon Tschon", email: "mt@mrumbau.de" },
+        { kuerzel: "CR", name: "Carsten Reuter", email: "cr@reuter-mr.de" },
+        { kuerzel: "BL", name: "Bau Leiter", email: "bl@mrumbau.de" },
+      ],
       regeln: [{ rule_id: "r1", target_kuerzel: "MT", confidence: 0.99, rule_name: "Alte Regel auf MT" }],
     });
     const res = await assignBesteller(supabase, ctx);
@@ -166,5 +178,32 @@ describe("assignBesteller — Stufe -1 (Regel-Engine)", () => {
     const supabase = makeSupabaseMock({ historie: [], inaktiv: [], rpcArgs });
     await assignBesteller(supabase, ctx);
     expect(rpcArgs.letzte?.p_email_absender).toBe("rechnung@bauhaus.de");
+  });
+});
+
+describe("assignBesteller — Stufe 5 (einziger aktiver Besteller)", () => {
+  it("ordnet dem einzigen aktiven Besteller direkt zu, statt in den Pool zu legen", async () => {
+    // MT inaktiv, CR der einzige, der Bestellungen annimmt — keine Historie,
+    // keine Regel. Vorher: UNBEKANNT und 68 Tage im Pool.
+    const supabase = makeSupabaseMock({ historie: [], inaktiv: ["MT"] });
+    const res = await assignBesteller(supabase, ctx);
+    expect(res.bestellerKuerzel).toBe("CR");
+    expect(res.zuordnungsMethode).toBe("einziger_besteller");
+    expect(res.vorschlagKonfidenz).toBe(1);
+  });
+
+  it("schaltet sich ab, sobald mehr als einer aktiv ist", async () => {
+    const supabase = makeSupabaseMock({ historie: [], inaktiv: [] });
+    const res = await assignBesteller(supabase, ctx);
+    expect(res.bestellerKuerzel).toBe("UNBEKANNT");
+  });
+
+  it("greift nicht vor den anderen Stufen — eine Regel gewinnt weiterhin", async () => {
+    const supabase = makeSupabaseMock({
+      historie: [], inaktiv: ["MT"],
+      regeln: [{ rule_id: "r1", target_kuerzel: "CR", confidence: 0.9, rule_name: "Bauhaus an CR" }],
+    });
+    const res = await assignBesteller(supabase, ctx);
+    expect(res.zuordnungsMethode).toBe("rule:Bauhaus an CR");
   });
 });
