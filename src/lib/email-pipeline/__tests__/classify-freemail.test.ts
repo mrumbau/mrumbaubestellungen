@@ -302,3 +302,48 @@ describe("Freemail-Inhalts-Override (Bug-Fix 09.06.2026)", () => {
     // Wichtig: nicht „freemail" — der KI-Pfad hat entschieden, nicht der Domain-Drop
   });
 });
+
+/**
+ * 05.10.2026 — all-inkl.com und aldautomotive.com waren als System-Domains
+ * eingetragen und wurden damit still verworfen; beide schicken echte
+ * Rechnungen (in 90 Tagen 9 mit Anhang im Rechnungsordner). Diese Tests
+ * pinnen fest, dass solche Mails die Vorpruefung erreichen — und dass die
+ * echten Systemabsender (DATEV-Rueckläufer) weiterhin draussen bleiben.
+ */
+describe("classifyEmailLogic — System-Domains", () => {
+  beforeEach(() => {
+    vi.mocked(createServiceClient).mockReturnValue(makeSupabase() as never);
+    mockChat.mockResolvedValue(makeChatCompletion(true, "Rechnung erkannt"));
+  });
+
+  it("verwirft eine Rechnung von all-inkl.com nicht mehr als Systemmeldung", async () => {
+    const result = await classifyEmailLogic({
+      email_absender: "rechnung@all-inkl.com",
+      email_betreff: "Rechnung 2261754272",
+      email_vorschau: "anbei Ihre Rechnung",
+      hat_anhaenge: true,
+    });
+    expect(result.grund).not.toBe("system_domain");
+  });
+
+  it("verwirft eine Leasing-Rechnung von aldautomotive.com nicht mehr als Systemmeldung", async () => {
+    const result = await classifyEmailLogic({
+      email_absender: "noreply@oms.aldautomotive.com",
+      email_betreff: "Rechnung 61535548 vom 24.08.2026",
+      email_vorschau: "",
+      hat_anhaenge: true,
+    });
+    expect(result.grund).not.toBe("system_domain");
+  });
+
+  it("haelt DATEV-Rueckläufer weiterhin draussen", async () => {
+    const result = await classifyEmailLogic({
+      email_absender: "noreply@uploadmail.datev.de",
+      email_betreff: "Fehler beim Hochladen AW: WG: Rechnung für Ihre Bestellung",
+      email_vorschau: "",
+      hat_anhaenge: true,
+    });
+    expect(result.relevant).toBe(false);
+    expect(result.grund).toBe("system_domain");
+  });
+});
