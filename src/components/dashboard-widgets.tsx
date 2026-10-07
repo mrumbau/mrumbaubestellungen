@@ -941,7 +941,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                 </svg>
               }
               badge={
-                <Link href="/bestellungen" className="text-meta text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+                <Link href="/bestellungen" prefetch={false} className="text-meta text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
                   Alle anzeigen
                 </Link>
               }
@@ -1101,7 +1101,7 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
               </svg>
             }
             badge={
-              <Link href="/projekte" className="text-meta text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
+              <Link href="/projekte" prefetch={false} className="text-meta text-brand hover:text-brand-light font-medium transition-colors ml-auto" onClick={(e) => e.stopPropagation()}>
                 Alle anzeigen
               </Link>
             }
