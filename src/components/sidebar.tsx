@@ -159,6 +159,7 @@ export function Sidebar({
         <div className="flex items-center justify-between">
           <Link
             href={profil.dashboardEnabled ? "/dashboard" : "/bestellungen"}
+            prefetch={false}
             onClick={() => setMobileOpen(false)}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
@@ -200,6 +201,12 @@ export function Sidebar({
             <Link
               key={item.href}
               href={item.href}
+              // Kein Vorabladen: Jeder Navigationspunkt ist eine dynamische
+              // Server-Seite mit eigenen Datenbankabfragen. Mit Prefetch hat
+              // der Browser nach jedem Seitenwechsel alle acht Ziele erneut
+              // beim Server angefordert (gemessen am 07.10.2026: 16 bis 29
+              // Serveraufrufe pro Klick), was alles traege gemacht hat.
+              prefetch={false}
               onClick={() => setMobileOpen(false)}
               className={`relative flex items-center gap-3 px-3 py-3 md:py-2.5 min-h-[44px] md:min-h-0 rounded-lg text-[14px] transition-colors duration-150 ${
                 active
