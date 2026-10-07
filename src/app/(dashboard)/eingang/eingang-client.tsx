@@ -11,19 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { IconSearch } from "@/components/ui/icons";
+import { KONTROLLE_KEYS, type KontrolleKey } from "@/lib/eingang";
 
-/**
- * Die vier Kontroll-Zustaende aus `v_rechnungseingang`.
- * Reihenfolge = Anzeigereihenfolge der Filter-Pillen.
- */
-export const KONTROLLE_KEYS = [
-  "ohne_bestellung",
-  "aussortiert",
-  "fehlgeschlagen",
-  "verbucht",
-] as const;
-
-export type KontrolleKey = (typeof KONTROLLE_KEYS)[number];
 
 export type EingangZeile = {
   id: string;

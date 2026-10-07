@@ -12,3 +12,10 @@ describe("postgrestListe", () => {
     expect(postgrestListe(['a"b', "c\\d"])).toBe('"a\\"b","c\\\\d"');
   });
 });
+
+describe("KONTROLLE_KEYS", () => {
+  it("liegt im Server-sicheren Modul und kennt die vier Zustaende in Anzeigereihenfolge", async () => {
+    const { KONTROLLE_KEYS } = await import("../eingang");
+    expect([...KONTROLLE_KEYS]).toEqual(["ohne_bestellung", "aussortiert", "fehlgeschlagen", "verbucht"]);
+  });
+});

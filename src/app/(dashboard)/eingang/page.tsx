@@ -1,13 +1,8 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
-import { RECHNUNGSORDNER } from "@/lib/eingang";
-import {
-  EingangClient,
-  KONTROLLE_KEYS,
-  type EingangZeile,
-  type KontrolleKey,
-} from "./eingang-client";
+import { KONTROLLE_KEYS, RECHNUNGSORDNER, type KontrolleKey } from "@/lib/eingang";
+import { EingangClient, type EingangZeile } from "./eingang-client";
 
 export const dynamic = "force-dynamic";
 

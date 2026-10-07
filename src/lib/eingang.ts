@@ -8,6 +8,23 @@
  */
 export const RECHNUNGSORDNER = "In Sachen Rechnungen";
 
+/**
+ * Die vier Kontroll-Zustaende aus `v_rechnungseingang`.
+ * Reihenfolge = Anzeigereihenfolge der Filter-Pillen.
+ *
+ * Liegt hier und nicht in der Client-Datei: Eine Server-Seite, die einen
+ * Wert aus einem "use client"-Modul importiert, bekommt im Produktionsbuild
+ * nur einen Verweis statt des Arrays — `.map` darauf war der 500er im Eingang.
+ */
+export const KONTROLLE_KEYS = [
+  "ohne_bestellung",
+  "aussortiert",
+  "fehlgeschlagen",
+  "verbucht",
+] as const;
+
+export type KontrolleKey = (typeof KONTROLLE_KEYS)[number];
+
 /** Hoechstens so viele Mails auf einmal sichten — analog zu den Bulk-Routen. */
 export const SICHTEN_MAX = 200;
 
