@@ -17,6 +17,9 @@ import { Spinner } from "./spinner";
 const buttonVariants = cva(
   [
     "inline-flex items-center justify-center whitespace-nowrap font-medium select-none",
+    // Icons bekommen ihre Groesse vom Knopf, nicht vom Aufrufer (ohne Angabe
+    // rendert ein SVG 300x150 Pixel gross).
+    "[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
     "transition-[background-color,border-color,box-shadow,transform,color] duration-150",
     "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
     "relative",

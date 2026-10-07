@@ -12,7 +12,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ActiveFilterPills, BulkToolbar, Button, type ActiveFilterPill } from "@/components/ui";
 import { Modal } from "@/components/ui/modal";
-import { PageHero } from "@/components/ui/page-hero";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconTrash } from "@/components/ui/icons";
 import {
   groupByMonth as _groupByMonth, // re-import to keep tree-shaking happy in IDEs
@@ -229,12 +229,10 @@ export function ArchivClient({
 
   return (
     <div className="space-y-6">
-      <PageHero
+      <PageHeader
         eyebrow="Historie"
         title="Archiv"
         description="Abgeschlossene Projekte, alte Bestellungen, Statistiken über Zeit."
-        tone="brand"
-        marks
       />
 
       {/* Summary Stats */}

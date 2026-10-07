@@ -5,7 +5,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { parseTimeRange, computeRangeBounds, sparklineBuckets } from "@/lib/time-range";
 import { PoolHeroCard } from "@/components/dashboard/pool-hero-card";
-import { PageHero } from "@/components/ui/page-hero";
+import { PageHeader } from "@/components/ui/page-header";
 
 import { istVerwaltung } from "@/lib/rollen";
 // 22.05.2026 (Perf Stufe 4 / Item 5) — Bundle-Split für 1144-LOC-Mega-Component.
@@ -310,13 +310,9 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6">
-      <PageHero
+      <PageHeader
         eyebrow="Übersicht"
         title="Dashboard"
-        description={`Willkommen, ${profil.name}.`}
-        tone="brand"
-        marks
-        grain="subtle"
       />
 
       {/* 02.06.2026 (Pool Phase 6) — Pool-HeroStatCard als asymmetrische

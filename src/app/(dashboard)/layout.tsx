@@ -60,7 +60,7 @@ export default async function DashboardLayout({
           zerschießt. */}
       <div className="flex min-h-dvh bg-canvas">
         <Sidebar profil={profil} poolCount={poolCount} eingangCount={eingangCount} />
-        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 p-4 pt-16 md:p-8 md:pt-8 focus:outline-none">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 p-4 pt-16 md:p-8 focus:outline-none">{children}</main>
       </div>
     </ToastProvider>
   );

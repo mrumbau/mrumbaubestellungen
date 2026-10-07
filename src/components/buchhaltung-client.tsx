@@ -7,7 +7,7 @@ import type { Rolle } from "@/lib/auth";
 import { DatevExportModal } from "@/components/buchhaltung/datev-export-modal";
 import { BuchhaltungSummaryCards } from "@/components/buchhaltung/summary-cards";
 import { BuchhaltungTable } from "@/components/buchhaltung/buchhaltung-table";
-import { PageHero } from "@/components/ui/page-hero";
+import { PageHeader } from "@/components/ui/page-header";
 import type { BuchhaltungRow } from "@/components/buchhaltung/types";
 
 import { istVerwaltung } from "@/lib/rollen";
@@ -342,12 +342,10 @@ export function BuchhaltungClient({
         projekte={projekte}
       />
 
-      <PageHero
+      <PageHeader
         eyebrow="Buchhaltung"
         title="Rechnungen"
         description={rolle === "besteller" ? "Zahlungsstatus deiner freigegebenen Rechnungen mit DATEV-Export." : "Freigegebene Rechnungen mit DATEV-Export und Bezahlt-Tracking."}
-        tone="brand"
-        marks
         actions={
           kannBezahlen && (
             <>

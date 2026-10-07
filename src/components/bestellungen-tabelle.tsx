@@ -703,7 +703,9 @@ export function BestellungenTabelle({
           projekte={projekte.map((p) => ({ id: p.id, name: p.name }))}
           searchInputRef={searchInputRef}
         >
-          <DensityToggle density={density} onChange={setDensity} />
+          <div className="hidden sm:block">
+            <DensityToggle density={density} onChange={setDensity} />
+          </div>
           <button
             type="button"
             onClick={() => {

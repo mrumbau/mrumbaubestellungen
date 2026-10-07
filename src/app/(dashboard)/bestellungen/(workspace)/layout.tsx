@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
-import { PageHero } from "@/components/ui/page-hero";
+import { PageHeader } from "@/components/ui/page-header";
 import { LaneNav } from "@/components/bestellungen/lane-nav";
 import { CmdKSearchTrigger } from "@/components/bestellungen/cmdk-search";
 import { loadLaneDataSafe } from "@/lib/bestellungen-lane-loader";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * Workspace-Layout (UX-R2, 03.06.2026) — gemeinsamer Rahmen für die drei
  * Bestellungen-Lanes (`/bestellungen/pool`, `/in-arbeit`, `/archiv`).
  *
- * Rendert die editorial PageHero ("Posteingang · Bestellungen") plus die
+ * Rendert die editorial PageHeader ("Posteingang · Bestellungen") plus die
  * LaneNav mit Live-Counts aus loadLaneData. Children sind die jeweilige
  * Lane-Page mit ArtFilterChips + Body.
  *
@@ -48,11 +48,9 @@ export default async function BestellungenWorkspaceLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHero
+      <PageHeader
         eyebrow="Posteingang"
         title="Bestellungen"
-        description="Pool für gemeinsame Triage, persönliche Lane für aktive Aufgaben, Archiv für Erledigtes. Cmd+K für lane-übergreifende Suche."
-        marks
         actions={<CmdKSearchTrigger />}
       />
       <LaneNav counts={counts} />
