@@ -81,6 +81,7 @@ export function DashboardNeueSubunternehmer({
                   OK
                 </button>
                 <Link
+                  prefetch={false}
                   href="/einstellungen"
                   className="flex items-center gap-1 px-2.5 py-1.5 text-meta font-medium text-foreground-subtle bg-line-subtle rounded-lg hover:bg-line transition-colors"
                 >
