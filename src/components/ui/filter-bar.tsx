@@ -59,7 +59,7 @@ const inputBase =
 // Mobile-User konnte gar nicht filtern, nur suchen. Selects jetzt auf
 // allen Viewports sichtbar, aber stacken via flex-col im Mobile-Layout.
 const selectBase =
-  "w-full sm:w-auto px-3.5 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors";
+  "w-auto max-w-[45%] sm:max-w-none px-3 py-2.5 min-h-[44px] bg-surface border border-line rounded-lg text-body-sm text-foreground focus:outline-none focus:border-brand focus-visible:shadow-[var(--shadow-focus-ring)] transition-colors";
 
 export function FilterBar({
   suche, onSucheChange,
@@ -73,7 +73,8 @@ export function FilterBar({
   children,
 }: FilterBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:contents">
       <div className="relative flex-1 min-w-0">
         <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-subtle pointer-events-none" />
         <input
@@ -127,8 +128,9 @@ export function FilterBar({
           <IconX className="w-4 h-4" />
         </button>
       )}
+      </div>
 
-      {children}
+      {children && <div className="flex flex-wrap items-center gap-2 sm:contents">{children}</div>}
     </div>
   );
 }

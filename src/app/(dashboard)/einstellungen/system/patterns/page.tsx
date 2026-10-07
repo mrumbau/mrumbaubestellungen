@@ -1,4 +1,4 @@
-import { PageHero } from "@/components/ui/page-hero";
+import { PageHeader } from "@/components/ui/page-header";
 import { EditorialSection } from "@/components/ui/editorial-section";
 import { BestellnummerHero } from "@/components/ui/bestellnummer-hero";
 import { PatternsClient } from "./patterns-client";
@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function PatternsPage() {
   return (
     <div className="flex flex-col gap-8">
-      <PageHero
+      <PageHeader
         eyebrow="Admin · Design-Sandbox"
         title="Patterns"
         description="Visuelles Vokabular: Foundation-Primitives, Drei-Sprachen-Disziplin, Modal/Drawer-Varianten. Bricht eine Komponente hier, bricht sie überall."
@@ -35,7 +35,6 @@ export default async function PatternsPage() {
           { label: "System", href: "/einstellungen/system" },
           { label: "Patterns" },
         ]}
-        marks
       />
 
       <section className="flex flex-col gap-3">
@@ -140,7 +139,7 @@ export default async function PatternsPage() {
               text-h1 · 28px · Page-Titles
             </div>
             <div className="text-display-section font-headline text-foreground">
-              text-display-section · clamp(28, 4vw, 40) · PageHero
+              text-display-section · clamp(28, 4vw, 40) · PageHeader
             </div>
             <div className="text-display-numeral font-headline text-foreground tabular-nums">
               text-display-numeral · clamp(36, 5vw, 64) · BestellnummerHero
