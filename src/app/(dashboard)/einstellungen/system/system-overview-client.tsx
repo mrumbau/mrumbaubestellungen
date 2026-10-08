@@ -16,6 +16,7 @@ type HealthStatus = {
   supabase: string;
   openai: string;
   make_webhook: string;
+  selbsttest: { zeitpunkt: string; ok: boolean; text: string } | null;
 };
 
 
@@ -55,6 +56,7 @@ export function SystemOverviewClient({
         supabase: "error",
         openai: "error",
         make_webhook: "error",
+        selbsttest: null,
       });
     } finally {
       setHealthLoading(false);
@@ -115,7 +117,7 @@ export function SystemOverviewClient({
       {/* HEALTH */}
       <SectionCard
         title="Health-Status"
-        description="Externe Dienste: Supabase, OpenAI und Make.com-Webhook."
+        description="Externe Dienste und der taegliche Selbsttest aller Hauptseiten (06:10 Uhr)."
         action={
           <Button
             variant="secondary"
@@ -136,6 +138,12 @@ export function SystemOverviewClient({
               ok={health.make_webhook === "configured"}
               okLabel="Konfiguriert"
               failLabel="Nicht konfiguriert"
+            />
+            <HealthCell
+              label="Selbsttest Seiten"
+              ok={health.selbsttest?.ok === true}
+              okLabel={health.selbsttest ? `OK, ${formatZeitpunkt(health.selbsttest.zeitpunkt)}` : "Noch nicht gelaufen"}
+              failLabel={health.selbsttest ? `Fehler, ${formatZeitpunkt(health.selbsttest.zeitpunkt)}` : "Noch nicht gelaufen"}
             />
             <div className="flex items-center gap-2.5 p-2.5 rounded-md bg-canvas border border-line-subtle">
               <div className="text-foreground-subtle [&_svg]:h-4 [&_svg]:w-4">
@@ -161,6 +169,11 @@ export function SystemOverviewClient({
           <div className="flex items-center justify-center py-6">
             <Spinner size={20} />
           </div>
+        )}
+        {health?.selbsttest && !health.selbsttest.ok && (
+          <pre className="mt-3 whitespace-pre-wrap rounded-md border border-line-subtle bg-canvas p-3 text-[12px] text-foreground-muted">
+            {health.selbsttest.text}
+          </pre>
         )}
       </SectionCard>
 
@@ -301,3 +314,12 @@ function HealthCell({
   );
 }
 
+
+function formatZeitpunkt(iso: string): string {
+  return new Date(iso).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
