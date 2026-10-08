@@ -28,6 +28,7 @@ export async function GET() {
 
   // E-Mail-Sync-Status: aggregiert aus mail_sync_folders + email_processing_log
   const emailSync = await checkEmailSyncHealth();
+  const selbsttest = await letzterSelbsttest();
 
   const status = supabaseStatus === "ok" ? "ok" : "error";
 
@@ -40,6 +41,7 @@ export async function GET() {
       make_webhook: makeWebhookStatus,
       microsoft_graph: graphStatus,
       email_sync: emailSync,
+      selbsttest,
     },
     { status: status === "ok" ? 200 : 503 }
   );
@@ -209,4 +211,25 @@ async function checkEmailSyncHealth(): Promise<EmailSyncHealth> {
   }
 
   return result;
+}
+
+/**
+ * Letzter Lauf des taeglichen Selbsttests (cron/selbsttest), damit die
+ * System-Uebersicht zeigt, ob gestern frueh alle Seiten geantwortet haben.
+ */
+async function letzterSelbsttest(): Promise<{ zeitpunkt: string; ok: boolean; text: string } | null> {
+  try {
+    const sb = createServiceClient();
+    const { data } = await sb
+      .from("webhook_logs")
+      .select("created_at, status, fehler_text")
+      .eq("typ", "selbsttest")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return { zeitpunkt: data.created_at, ok: data.status === "ok", text: data.fehler_text ?? "" };
+  } catch {
+    return null;
+  }
 }
