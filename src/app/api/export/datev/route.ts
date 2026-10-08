@@ -3,12 +3,13 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { exportiereAlsDATEV, type FreigegebeneRechnung } from "@/lib/datev-export";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // GET /api/export/datev – DATEV Buchungsstapel CSV Export
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

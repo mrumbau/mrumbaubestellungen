@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isValidUUID } from "@/lib/validation";
 import { ERRORS } from "@/lib/errors";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // GET /api/projekte/[id]/stats – Projekt-Statistiken
 export async function GET(
@@ -15,7 +16,7 @@ export async function GET(
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

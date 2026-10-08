@@ -5,6 +5,7 @@ import { isValidUUID, sanitizeFilename } from "@/lib/validation";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import JSZip from "jszip";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 export const maxDuration = 30;
 
@@ -19,9 +20,7 @@ export async function GET(request: NextRequest) {
 
     const supabaseAuth = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

@@ -4,6 +4,7 @@ import { isValidUUID } from "@/lib/validation";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // POST /api/subunternehmer/bestaetigen – Subunternehmer als geprüft markieren (nur Admin)
 export async function POST(request: NextRequest) {
@@ -13,9 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

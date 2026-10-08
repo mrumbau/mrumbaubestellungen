@@ -8,6 +8,7 @@ import { updateBestellungStatus } from "@/lib/bestellung-utils";
 import { requireRoles } from "@/lib/auth";
 
 import { istVerwaltung } from "@/lib/rollen";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 // GET /api/bestellungen/[id] – Details + Dokumente + Abgleich
 export async function GET(
   _request: NextRequest,
@@ -22,9 +23,7 @@ export async function GET(
 
     const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
@@ -109,7 +108,7 @@ export async function PATCH(
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

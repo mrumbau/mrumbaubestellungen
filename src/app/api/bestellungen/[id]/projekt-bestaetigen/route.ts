@@ -5,6 +5,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 import { aktualisiereBestellerAffinitaet } from "@/lib/openai";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // POST /api/bestellungen/[id]/projekt-bestaetigen
 export async function POST(
@@ -22,7 +23,7 @@ export async function POST(
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

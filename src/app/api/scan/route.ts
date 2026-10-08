@@ -10,6 +10,7 @@ import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
 
 import { istVerwaltung } from "@/lib/rollen";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 // Body-Limit auf 6 MB erhöhen (Base64 ist ~33% größer als die Originaldatei)
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -30,9 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Auth-Check
     const supabaseAuth = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

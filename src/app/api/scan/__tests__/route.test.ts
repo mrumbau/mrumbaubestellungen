@@ -37,7 +37,7 @@ function makeAuthClient(user: { id: string } | null, profil?: { kuerzel: string;
   const select = vi.fn().mockReturnValue({ eq });
   const from = vi.fn().mockReturnValue({ select });
   return {
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }) },
+    auth: { getClaims: vi.fn().mockImplementation(async () => { const r = { data: { user }, error: null }; const u = r?.data?.user ?? null; return { data: u ? { claims: { sub: u.id } } : null, error: null }; }) },
     from,
   };
 }

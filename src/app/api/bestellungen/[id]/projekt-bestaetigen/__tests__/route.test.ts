@@ -63,7 +63,7 @@ function makeClient(opts: {
     return { select, update };
   });
   return {
-    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: opts.user ?? null }, error: null }) },
+    auth: { getClaims: vi.fn().mockImplementation(async () => { const r = { data: { user: opts.user ?? null }, error: null }; const u = r?.data?.user ?? null; return { data: u ? { claims: { sub: u.id } } : null, error: null }; }) },
     from,
     _insert: insert,
     _update: update,

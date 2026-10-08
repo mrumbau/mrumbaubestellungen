@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID, sanitizeFilename } from "@/lib/validation";
 import { ERRORS } from "@/lib/errors";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // GET /api/pdfs/[id] – PDF/Bild aus Supabase Storage abrufen
 export async function GET(
@@ -18,9 +19,7 @@ export async function GET(
 
     const supabaseAuth = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

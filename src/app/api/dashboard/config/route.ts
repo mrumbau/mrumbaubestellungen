@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // PUT /api/dashboard/config – Dashboard-Konfiguration speichern
 export async function PUT(request: NextRequest) {
@@ -11,7 +12,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
