@@ -20,6 +20,7 @@ import { ingestEmail } from "@/lib/email-pipeline/ingest";
 import { withCostTracking } from "@/lib/openai";
 import { markIrrelevant, markProcessed, markFailed } from "./idempotency";
 import { logError, logInfo, withRequestId } from "@/lib/logger";
+import { findeMailPerInternetMessageId } from "@/lib/microsoft-graph/messages";
 
 type ReplayOutcome = "processed" | "irrelevant" | "failed" | "gone";
 
@@ -28,6 +29,8 @@ export interface ReplayResult {
   bestellung_id?: string;
   fehler?: string;
 }
+
+const MESSAGE_SELECT = "id,internetMessageId,receivedDateTime,subject,bodyPreview,body,from,hasAttachments";
 
 interface FullMessage {
   id: string;
@@ -145,22 +148,41 @@ async function replayOneMessageWithLock(
   let message: FullMessage;
   try {
     message = await graphFetch<FullMessage>(
-      `/users/${mailbox}/messages/${encodeURIComponent(graphMessageId)}?$select=id,internetMessageId,receivedDateTime,subject,bodyPreview,body,from,hasAttachments`,
+      `/users/${mailbox}/messages/${encodeURIComponent(graphMessageId)}?$select=${MESSAGE_SELECT}`,
       { headers: { Prefer: 'outlook.body-content-type="text"' } },
     );
   } catch (err) {
     if (err instanceof GraphError && err.status === 404) {
-      await markFailed(
-        supabase,
+      // 08.10.2026 — Verschobene Mails haben eine neue Graph-ID. Zweiter
+      // Versuch ueber die Internet-Message-ID; bei Treffer wird die neue ID
+      // gemerkt, damit der naechste Lauf direkt trifft.
+      const gefunden = await findeMailPerInternetMessageId<FullMessage>(
+        mailbox,
         internetMessageId,
-        "mail_in_outlook_geloescht_oder_verschoben",
-      );
-      return { outcome: "gone", fehler: "Mail in Outlook nicht mehr verfügbar" };
-    }
+        MESSAGE_SELECT,
+      ).catch(() => null);
+      if (!gefunden) {
+        await markFailed(
+          supabase,
+          internetMessageId,
+          "mail_in_outlook_geloescht_oder_verschoben",
+        );
+        return { outcome: "gone", fehler: "Mail in Outlook nicht mehr verfügbar" };
+      }
+      message = gefunden;
+      await supabase
+        .from("email_processing_log")
+        .update({ graph_message_id: gefunden.id })
+        .eq("internet_message_id", internetMessageId);
+      logInfo("email-sync/replay", "Mail unter neuer Graph-ID wiedergefunden", {
+        internet_message_id: internetMessageId,
+      });
+    } else {
     logError("email-sync/replay", "Graph-Fehler", err);
     const msg = err instanceof Error ? err.message : "graph_fehler";
     await markFailed(supabase, internetMessageId, msg);
     return { outcome: "failed", fehler: msg };
+    }
   }
 
   // Re-Backfill-Idempotenz (05.05.2026): wenn bei einer früheren Pipeline-Run
