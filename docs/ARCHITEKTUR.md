@@ -79,7 +79,11 @@ In der Datenbank bildet `get_user_rolle()` die Geschäftsführung auf `admin` ab
 | `besteller_rules` + `match_besteller_rules()` | Regel-Engine, Stufe −1 |
 | `v_rechnungseingang` | Grundlage der Eingangs-Seite |
 | `get_user_rolle()` | Rolle für RLS (Geschäftsführung = admin) |
-| pg_cron Jobs | Mailabruf, KPI-Refresh, Cron-Log-Retention |
+| pg_cron Jobs | Mailabruf, KPI-Refresh, Cron-Log-Retention, `selbsttest-daily` (06:10), `warmhalten` (alle 5 min, Mo–Sa 6–20 Uhr) |
+| `webhook_logs` mit `typ = 'selbsttest'` | ein Eintrag je Selbsttest-Lauf, sichtbar unter Einstellungen → System |
+
+Rechte: SECURITY-DEFINER-Funktionen sind für `anon` nicht ausführbar; Pool-Funktionen nur für angemeldete Nutzer,
+Pipeline- und Trigger-Funktionen nur `service_role` (Migration `2026_10_08_security_definer_rechte.sql`).
 
 Migrationen liegen unter `supabase/migrations/`, Dateiname = Datum + Thema, Kommentar = Warum.
 **Reihenfolge bei Änderungen: erst Code live, dann Daten.** Rollen- und Kennzeichen-Änderungen nie vor dem Deployment.
@@ -98,6 +102,18 @@ Betriebsnotiz: Das Supabase-MCP-Werkzeug hängt bei Funktionskörpern mit nackte
 | Einstellungen → System | `einstellungen/system/*` | E-Mail-Sync, Benutzer, Regeln, Pipeline-Qualität, Testdaten (nur Admin) |
 
 Navigation: `components/sidebar.tsx` — zwei Fassungen (voll / Buchhaltung), nie nach Rollen-Namen verzweigen.
+Die Zähler in der Navigation (Pool, Eingang) kommen aus `lib/nav-zaehler.ts` und sind pro Server-Instanz 30 s alt.
+Navigationslinks laden ihre Ziele nicht vorab (`prefetch={false}`); jede Seite ist eine dynamische Server-Seite.
+
+## Anmeldung und Tempo
+
+- `middleware.ts` prüft das Sitzungs-Token lokal gegen den öffentlichen Schlüssel (`getClaims()`), kein Netzaufruf
+  pro Seite. Das Profil (Rolle, Kürzel) liegt 5 Minuten im Cookie `mr_profil_cache`; `getBenutzerProfil()` liest es.
+- Der tägliche Selbsttest (`api/cron/selbsttest`, Logik in `lib/selbsttest.ts`) meldet sich als
+  `selbsttest@mrumbau.de` an, lädt acht Hauptseiten und mailt den Admins bei Fehlern. Seine Zeiten pro Seite sind
+  die ehrlichste Tempo-Messung, weil sie aus derselben Region kommen wie der Server.
+- Messen statt raten: Supabase-Logs (`edge_logs`, Feld `response.origin_time`) zeigen, welche Abfrage wie lange
+  braucht; der Browser aus einer anderen Weltregion täuscht.
 Die Liste lädt nach einer eigenen Aktion ausdrücklich nach (`use-bestellungen-actions.ts`); Realtime ist nur für die Änderungen anderer.
 
 ## Prüfen vor jedem Push
