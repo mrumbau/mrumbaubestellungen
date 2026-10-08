@@ -122,6 +122,8 @@ Navigationslinks laden ihre Ziele nicht vorab (`prefetch={false}`); jede Seite i
 
 - `middleware.ts` prüft das Sitzungs-Token lokal gegen den öffentlichen Schlüssel (`getClaims()`), kein Netzaufruf
   pro Seite. Das Profil (Rolle, Kürzel) liegt 5 Minuten im Cookie `mr_profil_cache`; `getBenutzerProfil()` liest es.
+  API-Routen holen die Nutzer-ID mit `angemeldeterNutzer()` aus `lib/auth-claims.ts`, ebenfalls ohne Netzaufruf.
+  `supabase.auth.getUser()` hat im App-Code nichts mehr verloren.
 - Der tägliche Selbsttest (`api/cron/selbsttest`, Logik in `lib/selbsttest.ts`) meldet sich als
   `selbsttest@mrumbau.de` an, lädt acht Hauptseiten und mailt den Admins bei Fehlern. Seine Zeiten pro Seite sind
   die ehrlichste Tempo-Messung, weil sie aus derselben Region kommen wie der Server.
