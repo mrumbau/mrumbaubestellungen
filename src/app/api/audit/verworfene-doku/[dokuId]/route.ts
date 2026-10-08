@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase";
 import { isValidUUID } from "@/lib/validation";
 import { ERRORS } from "@/lib/errors";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 /**
  * GET /api/audit/verworfene-doku/[dokuId]
@@ -27,9 +28,7 @@ export async function GET(
     }
 
     const supabaseAuth = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

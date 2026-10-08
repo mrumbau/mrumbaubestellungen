@@ -4,12 +4,13 @@ import { createServiceClient } from "@/lib/supabase";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // GET /api/blacklist – Alle Blacklist-Einträge laden
 export async function GET() {
   try {
     const supabaseAuth = await createServerSupabaseClient();
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAuth = await createServerSupabaseClient();
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
@@ -120,7 +121,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const supabaseAuth = await createServerSupabaseClient();
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

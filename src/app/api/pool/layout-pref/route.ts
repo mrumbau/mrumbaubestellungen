@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 /**
  * PUT /api/pool/layout-pref — User-Layout-Präferenz für Pool-Scope.
@@ -26,7 +27,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

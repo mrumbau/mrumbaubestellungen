@@ -8,6 +8,7 @@ import { requireRoles } from "@/lib/auth";
 
 import { istVerwaltung } from "@/lib/rollen";
 import { darfBestellungenErhalten } from "@/lib/rollen";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 // POST /api/bestellungen/zuordnen – Bestellung einem Besteller zuordnen.
 // 22.05.2026 — von admin-only auf admin+besteller geöffnet, weil "Nicht zugeordnet"
 // jetzt auf der /todo-Page für alle sichtbar ist (jeder soll claimen können).
@@ -18,9 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAuth = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

@@ -7,6 +7,7 @@ import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 
 import { istVerwaltung } from "@/lib/rollen";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 // POST /api/bestellungen/[id]/projekt – Projekt zuordnen
 export async function POST(
   request: NextRequest,
@@ -23,7 +24,7 @@ export async function POST(
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

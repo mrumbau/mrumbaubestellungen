@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { ERRORS } from "@/lib/errors";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
@@ -10,9 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

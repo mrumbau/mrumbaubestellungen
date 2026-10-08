@@ -7,6 +7,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
 import { sendeRechnungAnDatev, stempelPdfMitDatev } from "@/lib/email";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // POST /api/dokumente/[id]/bezahlt — Rechnungs-Dokument als bezahlt markieren.
 //
@@ -33,7 +34,7 @@ export async function POST(
     const bezahlt = body.bezahlt === true;
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

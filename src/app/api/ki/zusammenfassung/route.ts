@@ -4,15 +4,14 @@ import { generiereWochenzusammenfassung } from "@/lib/openai";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { parseTimeRange, computeRangeBounds } from "@/lib/time-range";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // GET /api/ki/zusammenfassung?range=30d – KI-Dashboard-Zusammenfassung für Zeitraum
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

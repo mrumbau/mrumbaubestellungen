@@ -6,6 +6,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 import { logError, logInfo } from "@/lib/logger";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // POST /api/bestellungen/verwerfen – Bestellung verwerfen (Spam/irrelevant)
 //
@@ -34,9 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAuth = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

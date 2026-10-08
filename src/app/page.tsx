@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 /**
  * Landing — Brand-Statement-Tier (12.05.2026, /high-end-visual-design).
@@ -28,9 +29,7 @@ import { Logo } from "@/components/logo";
  */
 export default async function Home() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await angemeldeterNutzer(supabase);
 
   const isLoggedIn = !!user;
   const bestellwesenHref = isLoggedIn ? "/dashboard" : "/login?redirect=/dashboard";

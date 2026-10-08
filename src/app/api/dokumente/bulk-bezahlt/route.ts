@@ -20,6 +20,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
 import { sendeRechnungAnDatev, stempelPdfMitDatev } from "@/lib/email";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 const ROUTE_TAG = "/api/dokumente/bulk-bezahlt";
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

@@ -5,6 +5,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireRoles } from "@/lib/auth";
 import { logError } from "@/lib/logger";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // PUT /api/subunternehmer/[id] – Subunternehmer aktualisieren
 export async function PUT(
@@ -19,9 +20,7 @@ export async function PUT(
     const { id } = await params;
     const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
@@ -93,9 +92,7 @@ export async function DELETE(
     const { id } = await params;
     const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
 
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });

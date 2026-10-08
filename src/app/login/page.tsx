@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
 import { Logo } from "@/components/logo";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 export default function LoginPage() {
   return (
@@ -60,9 +61,7 @@ function LoginForm() {
       return;
     }
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
 
     if (user) {
       const { data: profil } = await supabase

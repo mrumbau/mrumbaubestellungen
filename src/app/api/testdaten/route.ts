@@ -6,6 +6,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { istNurAdmin } from "@/lib/rollen";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // =====================================================================
 // Testdaten-Definition: 12 Bestellungen die alle Features abdecken
@@ -341,7 +342,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAuth = await createServerSupabaseClient();
-    const { data: { user } } = await supabaseAuth.auth.getUser();
+    const user = await angemeldeterNutzer(supabaseAuth);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

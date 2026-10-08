@@ -6,6 +6,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // POST /api/ki/bestellung-zusammenfassung – KI-Zusammenfassung einer Bestellung
 export async function POST(request: NextRequest) {
@@ -23,9 +24,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createServerSupabaseClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }

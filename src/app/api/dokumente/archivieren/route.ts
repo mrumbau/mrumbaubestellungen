@@ -6,6 +6,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
+import { angemeldeterNutzer } from "@/lib/auth-claims";
 
 // POST /api/dokumente/archivieren — Bezahlte Rechnungs-Dokumente archivieren.
 //
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await angemeldeterNutzer(supabase);
     if (!user) {
       return NextResponse.json({ error: ERRORS.NICHT_AUTHENTIFIZIERT }, { status: 401 });
     }
