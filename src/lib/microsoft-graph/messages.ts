@@ -81,3 +81,26 @@ export async function* listMessagesSince(
     nextUrl = page["@odata.nextLink"];
   }
 }
+
+/**
+ * 08.10.2026 — Verschobene Mails bekommen in Outlook eine neue Graph-ID; die
+ * Internet-Message-ID bleibt. Damit laesst sich eine Mail nach dem Verschieben
+ * wiederfinden (Replay aus dem Eingang).
+ */
+export function graphFilterInternetMessageId(internetMessageId: string): string {
+  return `internetMessageId eq '${internetMessageId.replace(/'/g, "''")}'`;
+}
+
+export async function findeMailPerInternetMessageId<T>(
+  mailboxSegment: string,
+  internetMessageId: string,
+  select: string,
+): Promise<T | null> {
+  const url =
+    `/users/${mailboxSegment}/messages?$filter=${encodeURIComponent(graphFilterInternetMessageId(internetMessageId))}` +
+    `&$select=${select}&$top=1`;
+  const res = await graphFetch<{ value: T[] }>(url, {
+    headers: { Prefer: 'outlook.body-content-type="text"' },
+  });
+  return res.value?.[0] ?? null;
+}
