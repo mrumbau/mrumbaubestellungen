@@ -168,7 +168,12 @@ export async function classifyEmailLogic(
   }
 
   // ── 2. System-Mails ──
-  if (SYSTEM_KEYWORDS.some(k => betreff.includes(k) || vorschau.includes(k) || absenderAdresse.includes(k))) {
+  // 08.10.2026 — Bei Mails MIT Anhang zaehlt nur Betreff + Absender, nicht die
+  // Vorschau: Rechnungsmails tragen im Fusstext "Newsletter abmelden" o. ae.
+  // Die Telekom-Rechnungen (Abo-Anbieter, 5 Stueck in 60 Tagen) fielen so als
+  // "system_mail" durch, bevor der Abo-Abgleich ueberhaupt dran war.
+  const systemText = hat_anhaenge ? betreff : betreff + " " + vorschau;
+  if (SYSTEM_KEYWORDS.some(k => systemText.includes(k) || absenderAdresse.includes(k))) {
     return { relevant: false, grund: "system_mail" };
   }
 
@@ -369,8 +374,11 @@ export async function classifyEmailLogic(
       return { relevant: false, grund: "mahnung_markiert" };
     }
 
-    // Marketing-Filter
-    const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => combined.includes(k));
+    // Marketing-Filter — bei Mails mit Anhang nur der Betreff (siehe Stufe 2):
+    // Dewetech-Rechnungen ("RE-Nr. 526166307") hatten "jetzt bewerten" im
+    // Fusstext und galten als Werbung.
+    const marketingText = hat_anhaenge ? betreff : combined;
+    const istMarketing = HAENDLER_IRRELEVANT_KEYWORDS.some(k => marketingText.includes(k));
     if (istMarketing) {
       return { relevant: false, grund: "haendler_marketing" };
     }
