@@ -20,6 +20,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
 import { SICHTEN_MAX, postgrestListe } from "@/lib/eingang";
+import { navZaehlerVergessen } from "@/lib/nav-zaehler";
 
 const BodySchema = z.object({
   ids: z.array(z.string().min(1).max(500)).min(1).max(SICHTEN_MAX),
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
       logError("/api/eingang/sichten", "Update fehlgeschlagen", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    navZaehlerVergessen();
     return NextResponse.json({ gesichtet: data?.length ?? 0 });
   } catch (err) {
     logError("/api/eingang/sichten", "Unerwarteter Fehler", err);
