@@ -145,7 +145,15 @@ export async function runPreBestellungsChecks(
       anhaenge_count,
     });
     if (idem.isDuplicate) {
-      return { success: true, deduplicated: true };
+      // Grund und Bestellung landen im Log — der Eingang zeigt die Mail dann
+      // als verbucht statt als "ohne Bestellung".
+      return {
+        success: true,
+        skipped: true,
+        deduplicated: true,
+        reason: "duplikat_24h",
+        bestellung_id: idem.bestellungId,
+      };
     }
   } else {
     logInfo("webhook/email", "24h-Hash-Idempotenz übersprungen wegen existing_bestellung_id (Re-Backfill)", {

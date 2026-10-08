@@ -60,6 +60,42 @@ export interface IdempotencyResult {
   hash: string;
   /** True = Mail wurde innerhalb der letzten 24h schon verarbeitet. */
   isDuplicate: boolean;
+  /** Bei Duplikat: die Bestellung, auf der die erste Zustellung gelandet ist (wenn bekannt). */
+  bestellungId?: string;
+}
+
+/**
+ * Waehlt aus den juengsten verbuchten Mails desselben Absenders die mit
+ * gleichem (normalisiertem) Betreff. 08.10.2026: Vorher endete ein Duplikat
+ * als "processed" ohne Bestellung und ohne Grund, und der Eingang zeigte es
+ * als "ohne Bestellung", obwohl die erste Zustellung laengst verbucht war.
+ */
+export function waehleOriginal(
+  rows: ReadonlyArray<{ subject: string | null; bestellung_id: string | null }>,
+  subjectNorm: string,
+): string | undefined {
+  const treffer = rows.find(
+    (r) => !!r.bestellung_id && normalizeForIdempotency(r.subject ?? "") === subjectNorm,
+  );
+  return treffer?.bestellung_id ?? undefined;
+}
+
+async function findeOriginalBestellung(
+  supabase: SupabaseClient,
+  absenderNorm: string,
+  subjectNorm: string,
+  cutoff: string,
+): Promise<string | undefined> {
+  if (!absenderNorm) return undefined;
+  const { data } = await supabase
+    .from("email_processing_log")
+    .select("subject, bestellung_id")
+    .ilike("sender", absenderNorm)
+    .not("bestellung_id", "is", null)
+    .gte("created_at", cutoff)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  return waehleOriginal(data ?? [], subjectNorm);
 }
 
 /**
@@ -122,7 +158,8 @@ export async function checkAndClaimIdempotency(
       .limit(1);
 
     if (existing && existing.length > 0) {
-      return { hash, isDuplicate: true };
+      const bestellungId = await findeOriginalBestellung(supabase, absenderNorm, subjectNorm, cutoff);
+      return { hash, isDuplicate: true, bestellungId };
     }
 
     // Hash existiert aber älter als 24h → alten Eintrag aktualisieren

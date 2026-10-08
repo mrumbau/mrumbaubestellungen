@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
+import { istVerwaltung } from "@/lib/rollen";
 import { KONTROLLE_KEYS, RECHNUNGSORDNER, type KontrolleKey } from "@/lib/eingang";
 import { EingangClient, type EingangZeile } from "./eingang-client";
 
@@ -94,6 +95,7 @@ export default async function EingangPage({
       zeilenLimit={ZEILEN_LIMIT}
       ladeFehler={zeilenRes.error?.message ?? null}
       istRechnungsordner={ordner === RECHNUNGSORDNER}
+      darfZuordnen={istVerwaltung(profil.rolle)}
     />
   );
 }
