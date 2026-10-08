@@ -30,6 +30,11 @@ Outlook-Ordner ──discover (pg_cron)──▶ email_processing_log (pending)
 Zweiter Pass: `second-review-runner.ts` schaut sich still verworfene Mails noch einmal an;
 `second-review-leerlauf.ts` bremst Absender, bei denen das nie etwas brachte.
 
+Gelernte Verwerfungen (`verworfene_emails`, entstehen beim „Bestellung verwerfen") sortieren nur Mails **ohne Anhang**
+aus. Am 13.08.2026 hat eine Aufräumaktion sonst zwei Monate lang alle Belege von Raab-Karcher und Speedmaster
+verschluckt. Belege haben einen Anhang und werden immer erkannt; dauerhaft unerwünschte Absender gehören auf die
+Blacklist (Einstellungen → Blacklist), nicht in die Verwerfungen.
+
 Jede Mail endet mit einem Grund. Was verarbeitet wurde, hat eine `bestellung_id`; was nicht, hat in `error_msg`
 ein `skipped: <grund>` (z. B. `duplikat_24h`, `keine_konkreten_daten`). Eine Zeile ohne beides ist ein Fehler
 im Code, nicht ein Zustand.
