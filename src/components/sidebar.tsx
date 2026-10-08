@@ -48,14 +48,6 @@ function IconProjekte({ className }: { className?: string }) {
   );
 }
 
-function IconArchiv({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-    </svg>
-  );
-}
-
 function IconEinstellungen({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -96,6 +88,9 @@ type NavItem = {
 // erlebt hat, als CR kurz Geschaeftsfuehrung war. Jetzt gibt es zwei
 // Fassungen: die volle fuer alle, die Bestellungen bearbeiten, und die
 // kurze fuer die Buchhaltung. Eine neue Rolle landet damit nie im Leeren.
+// 08.10.2026 — "Archiv" aus der Navigation genommen: Archivierte Projekte
+// und bezahlte Bestellungen stehen schon unter Bestellungen → Archiv und
+// Buchhaltung → Bezahlt. Die Seite /archiv bleibt erreichbar.
 const NAV_VOLL: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", Icon: IconDashboard, requireDashboard: true },
   { href: "/bestellungen", label: "Bestellungen", Icon: IconBestellungen, badge: "bestellungen-pool" },
@@ -104,7 +99,6 @@ const NAV_VOLL: NavItem[] = [
   { href: "/eingang", label: "Eingang", Icon: IconEingang, badge: "eingang-offen" },
   { href: "/todo", label: "Todo", Icon: IconTodo },
   { href: "/projekte", label: "Projekte", Icon: IconProjekte },
-  { href: "/archiv", label: "Archiv", Icon: IconArchiv },
   { href: "/buchhaltung", label: "Buchhaltung", Icon: IconBuchhaltung },
   { href: "/einstellungen", label: "Einstellungen", Icon: IconEinstellungen },
 ];
