@@ -234,11 +234,21 @@ export async function classifyEmailLogic(
   }
 
   // ── 3b. Gelernte Muster aus verworfenen Bestellungen ──
-  const { data: verworfene } = await sb
-    .from("verworfene_emails")
-    .select("absender_adresse, absender_domain, email_betreff")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  //
+  // 08.10.2026 — Gilt nur noch fuer Mails OHNE Anhang. Befund: Am 13.08. wurden
+  // Bestellungen von Raab-Karcher, Speedmaster, Boettcher u. a. verworfen; die
+  // gelernten Muster ("Rechnung von Raab-Karcher, eine Marke der STARK ...")
+  // haben danach zwei Monate lang jede Rechnung und jeden Lieferschein dieser
+  // Lieferanten ungesehen aussortiert (35 Mails mit PDF). Werbung und
+  // Versandbenachrichtigungen haben keinen Anhang; Belege haben einen. Fuer
+  // Mails mit Anhang entscheidet die Erkennung weiter unten.
+  const { data: verworfene } = hat_anhaenge
+    ? { data: null }
+    : await sb
+        .from("verworfene_emails")
+        .select("absender_adresse, absender_domain, email_betreff")
+        .order("created_at", { ascending: false })
+        .limit(200);
 
   if (verworfene && verworfene.length > 0) {
     const exakterMatch = verworfene.find((v) => {
