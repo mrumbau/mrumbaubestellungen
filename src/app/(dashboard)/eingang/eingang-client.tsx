@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,14 @@ import { Input } from "@/components/ui/input";
 import { IconSearch } from "@/components/ui/icons";
 import { KONTROLLE_KEYS, type KontrolleKey } from "@/lib/eingang";
 
+
+type ZuordnenTreffer = {
+  id: string;
+  bestellnummer: string | null;
+  haendler_name: string | null;
+  besteller_kuerzel: string;
+  betrag: number | null;
+};
 
 export type EingangZeile = {
   id: string;
@@ -102,6 +110,7 @@ export function EingangClient({
   zeilenLimit,
   ladeFehler,
   istRechnungsordner,
+  darfZuordnen,
 }: {
   ordner: string;
   ordnerListe: string[];
@@ -113,6 +122,8 @@ export function EingangClient({
   ladeFehler: string | null;
   /** Nur im Rechnungsordner gilt die Sichtungspflicht; andere Ordner sind Rauschen. */
   istRechnungsordner: boolean;
+  /** Verwaltung darf Mails erneut verarbeiten und einer Bestellung zuordnen. */
+  darfZuordnen: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -120,6 +131,23 @@ export function EingangClient({
   const [suche, setSuche] = useState("");
   const [ausgewaehlt, setAusgewaehlt] = useState<Set<string>>(new Set());
   const [laeuft, setLaeuft] = useState(false);
+  // Zuordnen: welche Zeile hat gerade das Suchfeld offen, was wurde getippt, was kam zurueck.
+  const [zuordnenFuer, setZuordnenFuer] = useState<string | null>(null);
+  const [zuordnenSuche, setZuordnenSuche] = useState("");
+  const [zuordnenTreffer, setZuordnenTreffer] = useState<ZuordnenTreffer[]>([]);
+
+  useEffect(() => {
+    if (!zuordnenFuer || zuordnenSuche.trim().length < 2) {
+      setZuordnenTreffer([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/bestellungen/search?q=${encodeURIComponent(zuordnenSuche.trim())}`);
+      const data = await res.json().catch(() => ({ results: [] }));
+      setZuordnenTreffer(Array.isArray(data.results) ? data.results.slice(0, 8) : []);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [zuordnenFuer, zuordnenSuche]);
 
   const gesamt = KONTROLLE_KEYS.reduce((s, k) => s + (counts[k] ?? 0), 0);
   const quote = gesamt > 0 ? Math.round(((counts.verbucht ?? 0) / gesamt) * 100) : 0;
@@ -146,6 +174,42 @@ export function EingangClient({
       else next.add(id);
       return next;
     });
+  }
+
+  /**
+   * Mail erneut durch die Pipeline schicken; mit bestellungId wird sie dieser
+   * Bestellung zugeordnet, auch wenn die KI sie fuer nicht relevant hielt.
+   */
+  async function verarbeiten(id: string, bestellungId?: string) {
+    setLaeuft(true);
+    try {
+      const res = await fetch(`/api/email-sync/log/${encodeURIComponent(id)}/replay`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bestellungId ? { bestellung_id: bestellungId } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error("Verarbeitung fehlgeschlagen", {
+          description: data.fehler || data.error || "Bitte erneut versuchen.",
+        });
+        return;
+      }
+      if (data.outcome === "processed" && data.bestellung_id) {
+        toast.success("Verbucht", { description: "Die Mail hängt jetzt an der Bestellung." });
+      } else if (data.outcome === "irrelevant") {
+        toast.info("Weiterhin nicht relevant", {
+          description: "Mit „zuordnen“ einer Bestellung zuweisen, wenn das falsch ist.",
+        });
+      } else {
+        toast.info("Erneut verarbeitet", { description: "Keine Bestellung erkannt." });
+      }
+      setZuordnenFuer(null);
+      setZuordnenSuche("");
+      router.refresh();
+    } finally {
+      setLaeuft(false);
+    }
   }
 
   async function sichten(ids: string[], gesichtet: boolean) {
@@ -353,8 +417,8 @@ export function EingangClient({
               </thead>
               <tbody>
                 {gefiltert.map((z) => (
+                  <Fragment key={z.id}>
                   <tr
-                    key={z.id}
                     className={`border-b border-line/60 align-top ${z.offen ? "" : "text-foreground-muted"}`}
                   >
                     <td className="py-2 pr-2">
@@ -443,8 +507,70 @@ export function EingangClient({
                           abhaken
                         </button>
                       )}
+                      {darfZuordnen && !z.bestellung_id && (
+                        <span className="ml-2 inline-flex gap-2 text-meta">
+                          <button
+                            type="button"
+                            disabled={laeuft}
+                            onClick={() => verarbeiten(z.id)}
+                            title="Noch einmal durch die Erkennung schicken"
+                            className="text-foreground-muted hover:text-foreground"
+                          >
+                            erneut
+                          </button>
+                          <button
+                            type="button"
+                            disabled={laeuft}
+                            onClick={() => {
+                              setZuordnenFuer(zuordnenFuer === z.id ? null : z.id);
+                              setZuordnenSuche("");
+                            }}
+                            title="Einer Bestellung zuordnen, auch wenn die Erkennung Nein gesagt hat"
+                            className={zuordnenFuer === z.id ? "text-brand underline" : "text-brand hover:underline"}
+                          >
+                            zuordnen
+                          </button>
+                        </span>
+                      )}
                     </td>
                   </tr>
+                  {zuordnenFuer === z.id && (
+                    <tr className="bg-canvas">
+                      <td colSpan={8} className="px-3 py-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                          <Input
+                            autoFocus
+                            value={zuordnenSuche}
+                            onChange={(e) => setZuordnenSuche(e.target.value)}
+                            placeholder="Bestellnummer, Händler oder Projekt …"
+                            aria-label="Bestellung suchen"
+                            className="sm:max-w-sm"
+                          />
+                          <ul className="flex flex-col gap-1 text-body-sm">
+                            {zuordnenTreffer.map((t) => (
+                              <li key={t.id}>
+                                <button
+                                  type="button"
+                                  disabled={laeuft}
+                                  onClick={() => verarbeiten(z.id, t.id)}
+                                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-left hover:border-brand"
+                                >
+                                  <span className="font-mono-amount font-medium">{t.bestellnummer ?? "ohne Nr."}</span>
+                                  {" · "}{t.haendler_name ?? "?"}
+                                  {" · "}{t.besteller_kuerzel}
+                                  {" · "}{formatBetrag(t.betrag)}
+                                </button>
+                              </li>
+                            ))}
+                            {zuordnenSuche.trim().length >= 2 && zuordnenTreffer.length === 0 && (
+                              <li className="text-foreground-muted">Keine Bestellung gefunden.</li>
+                            )}
+                          </ul>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

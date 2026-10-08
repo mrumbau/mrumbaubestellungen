@@ -24,21 +24,31 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(_request: NextRequest, context: RouteContext) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * POST /api/email-sync/log/[id]/replay — Mail erneut durch die Pipeline schicken.
+ *
+ * [id] darf die Graph-ID (so heisst die Zeile im Eingang) oder die
+ * Internet-Message-ID sein. Optionaler Body `{ bestellung_id }`: dann wird
+ * die Mail dieser Bestellung zugeordnet, auch wenn die KI sie fuer nicht
+ * relevant hielt.
+ */
+export async function POST(request: NextRequest, context: RouteContext) {
   const profil = await getBenutzerProfil();
   if (!requireRoles(profil, "admin")) {
     return NextResponse.json({ error: ERRORS.KEINE_BERECHTIGUNG }, { status: 403 });
   }
 
-  const { id: internetMessageId } = await context.params;
+  const { id } = await context.params;
 
   // F3.E10: Format-Check für RFC822 internet_message_id (`<...@...>`).
   // Verhindert dass arbiträre Strings den Replay-Pfad triggern oder logs spammen.
   if (
-    typeof internetMessageId !== "string"
-    || internetMessageId.length < 3
-    || internetMessageId.length > 998
-    || !/^<.+@.+>$|^[A-Za-z0-9_.@+\-=]+$/.test(internetMessageId)
+    typeof id !== "string"
+    || id.length < 3
+    || id.length > 998
+    || !/^<.+@.+>$|^[A-Za-z0-9_.@+\-=]+$/.test(id)
   ) {
     return NextResponse.json(
       { error: "Invalid internet_message_id format" },
@@ -46,10 +56,22 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     );
   }
 
+  const body = await request.json().catch(() => ({}));
+  const erzwingeBestellungId =
+    body && typeof body.bestellung_id === "string" && UUID.test(body.bestellung_id)
+      ? body.bestellung_id
+      : null;
+
   const supabase = createServiceClient();
+
+  const internetMessageId = await loeseMessageIdAuf(supabase, id);
+  if (!internetMessageId) {
+    return NextResponse.json({ error: "Mail nicht im Protokoll" }, { status: 404 });
+  }
 
   const result = await replayOneMessage(supabase, internetMessageId, {
     incrementRetryCount: false,
+    erzwingeBestellungId,
   });
 
   if (result.outcome === "gone") {
@@ -70,4 +92,23 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     outcome: result.outcome,
     bestellung_id: result.bestellung_id,
   });
+}
+
+async function loeseMessageIdAuf(
+  supabase: ReturnType<typeof createServiceClient>,
+  id: string,
+): Promise<string | null> {
+  if (/^<.+@.+>$/.test(id)) return id;
+  const { data } = await supabase
+    .from("email_processing_log")
+    .select("internet_message_id")
+    .eq("graph_message_id", id)
+    .maybeSingle();
+  if (data?.internet_message_id) return data.internet_message_id;
+  const { data: direkt } = await supabase
+    .from("email_processing_log")
+    .select("internet_message_id")
+    .eq("internet_message_id", id)
+    .maybeSingle();
+  return direkt?.internet_message_id ?? null;
 }

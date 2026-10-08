@@ -30,6 +30,10 @@ Outlook-Ordner ──discover (pg_cron)──▶ email_processing_log (pending)
 Zweiter Pass: `second-review-runner.ts` schaut sich still verworfene Mails noch einmal an;
 `second-review-leerlauf.ts` bremst Absender, bei denen das nie etwas brachte.
 
+Jede Mail endet mit einem Grund. Was verarbeitet wurde, hat eine `bestellung_id`; was nicht, hat in `error_msg`
+ein `skipped: <grund>` (z. B. `duplikat_24h`, `keine_konkreten_daten`). Eine Zeile ohne beides ist ein Fehler
+im Code, nicht ein Zustand.
+
 ## Wer bekommt die Bestellung? (`besteller-zuordnung.ts`)
 
 | Stufe | Quelle | Greift wenn |
@@ -96,7 +100,7 @@ Betriebsnotiz: Das Supabase-MCP-Werkzeug hängt bei Funktionskörpern mit nackte
 | --- | --- | --- |
 | Bestellungen (Pool / In Arbeit / Archiv) | `app/(dashboard)/bestellungen/(workspace)/*` → `components/bestellungen-tabelle.tsx`, `pool-inbox.tsx` | tägliche Arbeit |
 | Bestelldetail | `app/(dashboard)/bestellungen/[id]/_components/*` | Belege, Freigabe (`approval-panel.tsx`) |
-| Eingang | `app/(dashboard)/eingang/*` | Kontrolle des Rechnungsordners, Sichtung |
+| Eingang | `app/(dashboard)/eingang/*` | Kontrolle des Rechnungsordners: abhaken, erneut verarbeiten, einer Bestellung zuordnen (Replay mit `bestellung_id`) |
 | Buchhaltung | `components/buchhaltung-client.tsx` | Bezahlt markieren, DATEV |
 | Einstellungen → Händler | `einstellungen/haendler/*` | vorausbezahlt, Zahlungsziel |
 | Einstellungen → System | `einstellungen/system/*` | E-Mail-Sync, Benutzer, Regeln, Pipeline-Qualität, Testdaten (nur Admin) |

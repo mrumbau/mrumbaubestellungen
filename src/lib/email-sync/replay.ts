@@ -48,10 +48,20 @@ interface FullMessage {
  * @param internetMessageId PK des Log-Eintrags
  * @param incrementRetryCount true bei Auto-Retry-Cron, false bei manuellem Replay
  */
+export interface ReplayOptions {
+  incrementRetryCount?: boolean;
+  /**
+   * 08.10.2026 — Ein Mensch hat im Eingang entschieden: diese Mail gehoert zu
+   * dieser Bestellung. Dann zaehlt das KI-Urteil "nicht relevant" nicht mehr,
+   * und die Dokumente werden an genau diese Bestellung gehaengt.
+   */
+  erzwingeBestellungId?: string | null;
+}
+
 export async function replayOneMessage(
   supabase: SupabaseClient,
   internetMessageId: string,
-  options: { incrementRetryCount?: boolean } = {},
+  options: ReplayOptions = {},
 ): Promise<ReplayResult> {
   // 06.05.2026 — request_id-Wrap: alle nested logInfo/logError-Calls bekommen
   // die internet_message_id als request_id. Damit lassen sich Pipeline-Logs
@@ -64,7 +74,7 @@ export async function replayOneMessage(
 async function replayOneMessageInner(
   supabase: SupabaseClient,
   internetMessageId: string,
-  options: { incrementRetryCount?: boolean } = {},
+  options: ReplayOptions = {},
 ): Promise<ReplayResult> {
   // 06.05.2026 — Advisory-Lock pro internet_message_id.
   // Verhindert Race-Conditions wenn zwei Worker (Cron + Retry, oder paralleler
@@ -92,7 +102,7 @@ async function replayOneMessageInner(
 async function replayOneMessageWithLock(
   supabase: SupabaseClient,
   internetMessageId: string,
-  options: { incrementRetryCount?: boolean } = {},
+  options: ReplayOptions = {},
 ): Promise<ReplayResult> {
   const { data: logEntry } = await supabase
     .from("email_processing_log")
@@ -161,7 +171,7 @@ async function replayOneMessageWithLock(
     .select("bestellung_id")
     .eq("internet_message_id", internetMessageId)
     .maybeSingle();
-  const existingBestellungId = prevLog?.bestellung_id ?? null;
+  const existingBestellungId = options.erzwingeBestellungId ?? prevLog?.bestellung_id ?? null;
 
   // R5c: Komplette Pipeline (classify + ingest) in withCostTracking-Bucket
   // → AsyncLocalStorage-Bucket fließt durch alle OpenAI-Calls und wird in
@@ -178,11 +188,18 @@ async function replayOneMessageWithLock(
         internet_message_id: message.internetMessageId,
       });
 
-      if (!classifyResult.relevant) {
+      if (!classifyResult.relevant && !options.erzwingeBestellungId) {
         return {
           outcome: "irrelevant" as const,
           grund: classifyResult.grund,
         };
+      }
+      if (!classifyResult.relevant) {
+        logInfo("email-sync/replay", "KI-Urteil 'nicht relevant' durch manuelle Zuordnung uebersteuert", {
+          internet_message_id: internetMessageId,
+          bestellung_id: options.erzwingeBestellungId,
+          grund: classifyResult.grund,
+        });
       }
 
       const attachments = message.hasAttachments
