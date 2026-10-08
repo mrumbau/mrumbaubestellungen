@@ -65,11 +65,12 @@ async function runCron(request: NextRequest) {
     }
 
     const zusammenfassung = fasseZusammen(ergebnisse);
-    await sb.from("webhook_logs").insert({
+    const { error: logFehler } = await sb.from("webhook_logs").insert({
       typ: "selbsttest",
-      status: zusammenfassung.ok ? "ok" : "fehler",
+      status: zusammenfassung.ok ? "success" : "error",
       fehler_text: zusammenfassung.text,
     });
+    if (logFehler) logError(ROUTE, "Selbsttest-Ergebnis nicht gespeichert", logFehler);
     logInfo(ROUTE, zusammenfassung.ok ? "Selbsttest in Ordnung" : "Selbsttest mit Fehlern", {
       ok: zusammenfassung.ok,
       seiten: ergebnisse.length,
@@ -81,11 +82,12 @@ async function runCron(request: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
     logError(ROUTE, "Selbsttest konnte nicht laufen", err);
-    await sb.from("webhook_logs").insert({
+    const { error: logFehler } = await sb.from("webhook_logs").insert({
       typ: "selbsttest",
-      status: "fehler",
+      status: "error",
       fehler_text: `Selbsttest konnte nicht laufen: ${msg}`,
     });
+    if (logFehler) logError(ROUTE, "Selbsttest-Ergebnis nicht gespeichert", logFehler);
     await benachrichtigeAdmins(sb, `Der Selbsttest konnte nicht laufen:\n${msg}`);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }

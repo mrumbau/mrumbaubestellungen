@@ -228,7 +228,7 @@ async function letzterSelbsttest(): Promise<{ zeitpunkt: string; ok: boolean; te
       .limit(1)
       .maybeSingle();
     if (!data) return null;
-    return { zeitpunkt: data.created_at, ok: data.status === "ok", text: data.fehler_text ?? "" };
+    return { zeitpunkt: data.created_at, ok: data.status === "success", text: data.fehler_text ?? "" };
   } catch {
     return null;
   }

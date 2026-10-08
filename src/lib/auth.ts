@@ -103,16 +103,15 @@ export const getBenutzerProfil = cache(async (): Promise<BenutzerProfil | null> 
 
   // Slow-Path: voller DB-Lookup (Cookie-Miss, abgelaufen, oder Profil-Aktualisierung)
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
+  // Lokale Signaturpruefung statt Netzaufruf, siehe middleware.ts.
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims.sub;
+  if (!userId) return null;
 
   const { data } = await supabase
     .from("benutzer_rollen")
     .select("id, user_id, email, name, kuerzel, rolle, dashboard_config")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .single();
 
   if (!data || !data.user_id) return null;
