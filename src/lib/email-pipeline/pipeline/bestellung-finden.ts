@@ -28,6 +28,7 @@ import {
   type MatchContext,
   type BestellungRow,
 } from "./bestellung-match";
+import type { ZuordnungsMethode } from "@/lib/zuordnung-begruendung";
 
 export interface FindOrCreateInput {
   existing_bestellung_id?: string | null;
@@ -58,6 +59,8 @@ export type FindOrCreateResult =
       kind: "ok";
       bestellungId: string;
       bestellungNeuErstellt: boolean;
+      /** Wie die Bestellung gefunden wurde — landet an jedem Dokument. */
+      methode: ZuordnungsMethode;
       /** Final geltender Wert nach Sanitization / GPT-Übernahme. */
       haendlerName: string;
       /** Final geltender Wert nach vermutete_bestellungsart-Promotion. */
@@ -99,6 +102,7 @@ export async function findeOderErstelleBestellung(
   let haendlerName = input.haendlerName;
 
   let existierendeBestellung: BestellungRow | null = null;
+  let methode: ZuordnungsMethode = "neu";
 
   // Re-Backfill-Idempotenz (05.05.2026): Wenn diese Mail in einer früheren
   // Pipeline-Run schon einer Bestellung zugeordnet war, diese als Match nehmen
@@ -112,6 +116,7 @@ export async function findeOderErstelleBestellung(
       .maybeSingle();
     if (prev) {
       existierendeBestellung = prev as BestellungRow;
+      methode = "manuell";
       logInfo("webhook/email", "Re-Backfill-Idempotenz: existing_bestellung_id Match übernommen", {
         bestellung_id: existing_bestellung_id,
         bestellnummer: prev.bestellnummer,
@@ -121,11 +126,13 @@ export async function findeOderErstelleBestellung(
 
   if (!existierendeBestellung) {
     existierendeBestellung = await findByExactNumber(supabase, suchNummern, matchCtx);
+    if (existierendeBestellung) methode = "bestellnummer";
   }
 
   // R5c-Bugfix: Fuzzy-Match (Substring + Token)
   if (!existierendeBestellung) {
     existierendeBestellung = await findByFuzzyNumber(supabase, suchNummern, matchCtx);
+    if (existierendeBestellung) methode = "bestellnummer_aehnlich";
   }
 
   // 07.05.2026 — Auftragsnummer-Konflikt-Veto (Defense-in-Depth).
@@ -204,6 +211,7 @@ export async function findeOderErstelleBestellung(
   // Cross-Match (ohne Händler-Filter)
   if (!existierendeBestellung && suchNummern.length > 0) {
     existierendeBestellung = await findByCrossMatch(supabase, suchNummern);
+    if (existierendeBestellung) methode = "querverweis";
   }
 
   if (existierendeBestellung) {
@@ -211,6 +219,7 @@ export async function findeOderErstelleBestellung(
       kind: "ok",
       bestellungId: existierendeBestellung.id,
       bestellungNeuErstellt: false,
+      methode,
       haendlerName,
       bestellungsart,
     };
@@ -286,6 +295,7 @@ export async function findeOderErstelleBestellung(
       kind: "ok",
       bestellungId: erweiterterMatch,
       bestellungNeuErstellt: false,
+      methode: "haendler_offen",
       haendlerName,
       bestellungsart,
     };
@@ -440,6 +450,7 @@ export async function findeOderErstelleBestellung(
         kind: "ok",
         bestellungId,
         bestellungNeuErstellt: false,
+        methode: "bestellnummer",
         haendlerName,
         bestellungsart,
       };
@@ -455,6 +466,7 @@ export async function findeOderErstelleBestellung(
     kind: "ok",
     bestellungId,
     bestellungNeuErstellt: true,
+    methode: "neu",
     haendlerName,
     bestellungsart,
   };

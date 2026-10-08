@@ -13,6 +13,7 @@ import {
 import { IconChevronDown } from "@/components/ui/icons";
 import { DOK_ICON_MAP, RechnungIcon } from "./dokument-icons";
 import type { Bestellung, Dokument } from "./types";
+import { beschreibeZuordnung, zuordnungAus } from "@/lib/zuordnung-begruendung";
 
 /**
  * DocumentPanel — the main content column on desktop, the "dokumente" tab on mobile.
@@ -186,6 +187,24 @@ export function DocumentPanel({
         )}
       </div>
 
+      {/* 08.10.2026 — Warum haengt dieses Dokument hier? Unsichere Zuordnungen
+          (aehnliche Nummer, Querverweis, nur Haendler) werden gelb markiert. */}
+      {(() => {
+        const z = zuordnungAus(aktiveDokumente[safeIndex]?.ki_roh_daten);
+        if (!z) return null;
+        const b = beschreibeZuordnung(z);
+        return (
+          <div
+            className={cn(
+              "px-3 py-1.5 text-[12px] border-b border-line-subtle",
+              b.unsicher ? "bg-warning-bg text-warning" : "bg-canvas text-foreground-muted",
+            )}
+            title="So hat die Erkennung dieses Dokument dieser Bestellung zugeordnet"
+          >
+            Zuordnung: {b.text}
+          </div>
+        );
+      })()}
       {/* Sub-Selector wenn mehrere Dokumente vom gleichen Typ existieren (z.B. mehrere Teilrechnungen).
           02.06.2026 (UX-Polish): wenn zwei Dokumente identische bestellnummer_erkannt+gesamtbetrag
           haben, kennzeichnen wir das als Duplikat-Verdacht (Sub-Selector-Eyebrow

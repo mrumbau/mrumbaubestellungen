@@ -18,6 +18,7 @@ import { isStrictVersandBetreff, safeBase64ToBuffer } from "./mail-utils";
 import { BEKANNTE_TYPEN } from "./constants";
 import { applyAnalyseToBestellung } from "./bestellung-propagate";
 import type { AnalyseErgebnis } from "./anhang-analyse";
+import type { ZuordnungsBegruendung } from "@/lib/zuordnung-begruendung";
 
 // Supabase Storage akzeptiert nur ASCII-safe Pfade. Deutsche Filenames mit
 // Umlauten/Sonderzeichen (Brillux, Süd-Metall, Raab-Karcher) führen zu
@@ -52,6 +53,8 @@ function inferTypFromSubject(subject: string | null | undefined): DokuTyp | null
 
 export interface PersistAnhangInput {
   bestellungId: string;
+  /** Warum die Dokumente an diese Bestellung kommen — wird in ki_roh_daten._zuordnung abgelegt. */
+  zuordnung?: ZuordnungsBegruendung;
   analyseErgebnisse: AnalyseErgebnis[];
   email_betreff: string;
   email_absender: string;
@@ -199,7 +202,10 @@ export async function persistAnhangDokumente(
       p_email_betreff: email_betreff ?? null,
       p_email_absender: email_absender ?? null,
       p_email_datum: email_datum ?? null,
-      p_ki_roh_daten: analyse as unknown as Record<string, unknown>,
+      p_ki_roh_daten: {
+        ...(analyse as unknown as Record<string, unknown>),
+        _zuordnung: input.zuordnung ?? null,
+      },
       p_bestellnummer_erkannt: analyse.bestellnummer ?? null,
       p_auftragsnummer: analyse.auftragsnummer || null,
       p_lieferscheinnummer: analyse.lieferscheinnummer || null,

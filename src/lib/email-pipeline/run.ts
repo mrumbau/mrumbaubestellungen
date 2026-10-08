@@ -424,6 +424,10 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
   // 13. Dokumente speichern — siehe pipeline/dokument-persist.ts
   const persistResult = await persistAnhangDokumente(supabase, {
     bestellungId,
+    zuordnung: {
+      methode: findResult.methode,
+      nummer: erkannteBestellnummer ?? erkannteAuftragsnummer ?? null,
+    },
     analyseErgebnisse,
     email_betreff: email_betreff ?? "",
     email_absender: email_absender ?? "",
