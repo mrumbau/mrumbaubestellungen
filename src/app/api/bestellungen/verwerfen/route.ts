@@ -201,6 +201,24 @@ export async function POST(request: NextRequest) {
 
     for (const id of ids) {
       try {
+        // 10.10.2026 — Die Mails dieser Bestellung bekommen ihren Grund, BEVOR
+        // der Loeschvorgang die Verknuepfung kappt (FK: ON DELETE SET NULL).
+        // Vorher blieben sie als "verarbeitet, ohne Bestellung, ohne Grund"
+        // im Protokoll und zaehlten im Eingang als offen — 139 Zeilen, die
+        // in Wahrheit ein Mensch bewusst verworfen hatte.
+        const { error: protokollFehler } = await supabase
+          .from("email_processing_log")
+          .update({
+            status: "irrelevant",
+            error_msg: `verworfen: ${profil!.kuerzel}`,
+            gesichtet_am: new Date().toISOString(),
+            gesichtet_von: profil!.kuerzel,
+          })
+          .eq("bestellung_id", id);
+        if (protokollFehler) {
+          logInfo("verwerfen", "Mail-Protokoll nicht markiert (nicht-fatal)", { bestellungId: id, err: protokollFehler.message });
+        }
+
         // 08.06.2026 — pool_reservations + pool_user_state ergänzt (Bug-Fix).
         // bestellung_signale (Chrome-Ext-Legacy, stillgelegt 22.05.2026) hat
         // die FK-Spalte matched_bestellung_id (NICHT bestellung_id) und blieb

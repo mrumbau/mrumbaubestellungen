@@ -41,7 +41,9 @@ Fußtext einer Rechnung haben Telekom- und Dewetech-Rechnungen zwei Monate lang 
 
 Jede Mail endet mit einem Grund. Was verarbeitet wurde, hat eine `bestellung_id`; was nicht, hat in `error_msg`
 ein `skipped: <grund>` (z. B. `duplikat_24h`, `keine_konkreten_daten`). Eine Zeile ohne beides ist ein Fehler
-im Code, nicht ein Zustand.
+im Code, nicht ein Zustand. Wird eine Bestellung verworfen, bekommen ihre Mails vor dem Löschen
+`verworfen: <Kürzel>` und gelten als gesichtet (`api/bestellungen/verwerfen`); die Verknüpfung selbst kappt die
+Datenbank beim Löschen (`ON DELETE SET NULL`). Bis 10.10.2026 blieben so 139 Mails als „offen, ohne Grund“ zurück.
 
 Bestellung finden (`bestellung-match.ts`): **„ähnlich“ heißt enthalten, nicht nur ähnlich.** Die Trigramm-Suche
 der Datenbank (`fuzzy_match_bestellung`) liefert nur Kandidaten; einer zählt erst, wenn die gesuchte Nummer als ganze
