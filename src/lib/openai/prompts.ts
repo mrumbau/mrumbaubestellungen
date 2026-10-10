@@ -334,7 +334,7 @@ Gib folgende Struktur zurück:
 
 Extrahiere auch:
 - "lieferadressen": Array aller Lieferadressen, Versandadressen und Empfängeradressen die du im Dokument findest (Lieferschein-Header, Rechnungsadresse, Versandadresse). Leeres Array wenn keine gefunden.
-- "volltext": Der gesamte erkannte Text des Dokuments als String.
+- "volltext": Der erkannte Text des Dokuments als String, höchstens etwa 6000 Zeichen. Bei längeren Dokumenten: Kopf (Absender, Empfänger, Nummern, Daten, Besteller, Projekt), dann die Summenzeilen, dann so viele Positionen wie noch hineinpassen.
 - "tracking_nummer": Sendungsnummer / Tracking-Nummer / Paketnummer falls vorhanden (nur bei Versandbestätigungen).
 - "versanddienstleister": Name des Versanddienstleisters (z.B. "DHL", "DPD", "Hermes", "UPS", "GLS"). Normalisiert als Kurzname.
 - "tracking_url": Direkte URL zur Sendungsverfolgung falls im Dokument vorhanden.
