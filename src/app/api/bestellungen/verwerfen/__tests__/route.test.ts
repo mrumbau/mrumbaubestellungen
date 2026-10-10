@@ -77,6 +77,7 @@ function makeServiceClient(opts: ServiceOpts = {}) {
     bestellung_signale: 0,
   };
   const deletedBestellungenIds: string[] = [];
+  const logMarkierungen: Array<{ bestellungId: string; werte: Record<string, unknown>; vorDelete: boolean }> = [];
 
   // dokumente.SELECT.eq() → for verworfene_emails-learning
   const eqDok = vi.fn().mockResolvedValue({ data: opts.dokumente ?? [], error: null });
@@ -151,6 +152,17 @@ function makeServiceClient(opts: ServiceOpts = {}) {
     if (table === "verworfene_emails") {
       return { insert };
     }
+    // 10.10.2026 — Mails der Bestellung bekommen vor dem Loeschen ihren Grund.
+    if (table === "email_processing_log") {
+      return {
+        update: (werte: Record<string, unknown>) => ({
+          eq: (_c: string, bestellungId: string) => {
+            logMarkierungen.push({ bestellungId, werte, vorDelete: !deletedBestellungenIds.includes(bestellungId) });
+            return Promise.resolve({ data: null, error: null });
+          },
+        }),
+      };
+    }
     // Fallback
     return {
       select: vi.fn(),
@@ -160,7 +172,7 @@ function makeServiceClient(opts: ServiceOpts = {}) {
       }),
     };
   });
-  return { from, cleanupCounts, deletedBestellungenIds, insertVerworfene: insert };
+  return { from, cleanupCounts, deletedBestellungenIds, insertVerworfene: insert, logMarkierungen };
 }
 
 const ID_A = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
@@ -383,5 +395,44 @@ describe("POST /api/bestellungen/verwerfen", () => {
     expect(json.deleted).toBe(0);
     expect(json.failed).toHaveLength(2);
     expect(json.error).toContain("DB-Lock");
+  });
+});
+
+// =====================================================================
+// 10.10.2026 — Die Mails einer verworfenen Bestellung bekommen ihren Grund
+// =====================================================================
+
+/**
+ * Befund: 139 Mails standen als "verarbeitet, ohne Bestellung, ohne Grund"
+ * im Protokoll und zaehlten im Eingang als offen, obwohl ein Mensch ihre
+ * Bestellung bewusst verworfen hatte. Der Loeschvorgang kappt die
+ * Verknuepfung (FK ON DELETE SET NULL) — die Markierung muss davor passieren.
+ */
+describe("POST /api/bestellungen/verwerfen — Mail-Protokoll", () => {
+  beforeEach(() => {
+    mockCheckCsrf.mockReset().mockReturnValue(true);
+    mockCreateServerClient.mockReset();
+    mockCreateServiceClient.mockReset();
+  });
+
+  it("markiert die Mails der Bestellung als verworfen und gesichtet, bevor sie geloescht wird", async () => {
+    mockCreateServerClient.mockReturnValue(makeAuthClient(TEST_PROFIL.besteller_MT));
+    const svc = makeServiceClient({
+      bestellungen: [{ id: ID_A, besteller_kuerzel: "MT", bestellungsart: "material" }],
+    });
+    mockCreateServiceClient.mockReturnValue(svc);
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ bestellung_id: ID_A }));
+    expect(res.status).toBe(200);
+
+    expect(svc.logMarkierungen).toHaveLength(1);
+    const m = svc.logMarkierungen[0];
+    expect(m.bestellungId).toBe(ID_A);
+    expect(m.vorDelete).toBe(true);
+    expect(m.werte.status).toBe("irrelevant");
+    expect(m.werte.error_msg).toBe("verworfen: MT");
+    expect(m.werte.gesichtet_von).toBe("MT");
+    expect(typeof m.werte.gesichtet_am).toBe("string");
+    expect(svc.deletedBestellungenIds).toEqual([ID_A]);
   });
 });
