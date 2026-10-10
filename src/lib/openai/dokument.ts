@@ -19,6 +19,9 @@ import {
   type KategorisierungErgebnis,
 } from "./prompts";
 
+/** Antwortbudget der Dokumentanalyse in Token (siehe Kommentar in analysiereDokument). */
+export const MAX_ANTWORT_TOKEN = 8000;
+
 // PDF/Bild analysieren mit GPT-4o
 export async function analysiereDokument(
   base64: string,
@@ -55,11 +58,19 @@ export async function analysiereDokument(
 
   const systemPrompt = ANALYSE_PROMPT + folderHintPromptAddition(options?.folderHint);
 
-  // F4.17 Fix: Adaptive max_tokens.
-  let maxTokens = 2000;
+  // 10.10.2026 — Antwortbudget. Bis heute 2000 Token: Das Schema verlangt den
+  // Volltext des Dokuments, und bei gpt-5.5 zaehlen die unsichtbaren
+  // Denk-Token mit in dieses Budget. Jede mehrseitige Rechnung lief damit in
+  // "length limit was reached" — erst beim Hauptmodell, dann beim
+  // Ersatzmodell — und endete als parse_fehler: 32 von 351 Belegen in zehn
+  // Wochen, darunter Boettcher-, Feistbaur- und Raab-Karcher-Rechnungen.
+  // Die Protokolle zeigen Antworten bis 7.400 Token. Der Volltext ist im
+  // Prompt jetzt auf rund 6000 Zeichen begrenzt; das Budget deckt das plus
+  // Denk-Token ab. Fuer reinen Text bleibt es an der Eingabegroesse orientiert.
+  let maxTokens = MAX_ANTWORT_TOKEN;
   if (isText) {
     const inputBytes = Buffer.byteLength(base64, "base64");
-    maxTokens = Math.min(2000, Math.max(500, Math.ceil(inputBytes / 5)));
+    maxTokens = Math.min(MAX_ANTWORT_TOKEN, Math.max(1500, Math.ceil(inputBytes / 3)));
   }
 
   // F4.3 Fix: Structured Outputs via zodResponseFormat. Kein safeParseGptJson

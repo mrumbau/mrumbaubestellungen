@@ -45,6 +45,11 @@ im Code, nicht ein Zustand. Wird eine Bestellung verworfen, bekommen ihre Mails 
 `verworfen: <Kürzel>` und gelten als gesichtet (`api/bestellungen/verwerfen`); die Verknüpfung selbst kappt die
 Datenbank beim Löschen (`ON DELETE SET NULL`). Bis 10.10.2026 blieben so 139 Mails als „offen, ohne Grund“ zurück.
 
+Anhänge lesen (`lib/openai/dokument.ts`): Antwortbudget `MAX_ANTWORT_TOKEN` (8000). Das Schema verlangt den
+Volltext (im Prompt auf rund 6000 Zeichen begrenzt), und bei gpt-5.5 zählen die Denk-Token mit. Mit 2000 Token
+endete jede mehrseitige Rechnung als `parse_fehler` („length limit was reached“), 32 von 351 Belegen bis 10.10.2026.
+Ein `parse_fehler` in `ki_roh_daten` heißt: Beleg gespeichert, aber ohne Nummer und Betrag, Status bleibt unsicher.
+
 Bestellung finden (`bestellung-match.ts`): **„ähnlich“ heißt enthalten, nicht nur ähnlich.** Die Trigramm-Suche
 der Datenbank (`fuzzy_match_bestellung`) liefert nur Kandidaten; einer zählt erst, wenn die gesuchte Nummer als ganze
 Bausteine in einer seiner Nummern steckt (`117957 MR015/0027` ⊃ `MR015/0027`). Nachbarnummern desselben Händlers
