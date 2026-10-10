@@ -51,6 +51,32 @@ export function zuordnungAus(kiRohDaten: unknown): ZuordnungsBegruendung | null 
   return { methode: methode as ZuordnungsMethode, nummer: typeof nummer === "string" ? nummer : null };
 }
 
+const TYP_LABEL: Record<string, string> = {
+  rechnung: "Rechnung",
+  lieferschein: "Lieferschein",
+  bestellbestaetigung: "Bestellbestätigung",
+  versandbestaetigung: "Versandbestätigung",
+};
+
+/**
+ * Hinweis fuer die Liste (10.10.2026): die erste unsichere Beleg-Zuordnung
+ * einer Bestellung als Text, sonst null. Die Belege kommen mit
+ * `zuordnung:ki_roh_daten->_zuordnung` aus PostgREST; so sieht man in der
+ * Liste, welche Vorgaenge man aufmachen sollte, ohne jeden aufzumachen.
+ * Gemessen: 6 von 67 Belegen in drei Tagen waren nur "aehnlich" zugeordnet.
+ */
+export function zuordnungsHinweis(
+  dokumente: ReadonlyArray<{ typ?: string | null; zuordnung?: unknown }>,
+): string | null {
+  for (const d of dokumente) {
+    const z = zuordnungAus({ _zuordnung: d.zuordnung });
+    if (!z) continue;
+    const b = beschreibeZuordnung(z);
+    if (b.unsicher) return `${TYP_LABEL[d.typ ?? ""] ?? "Beleg"}: ${b.text}`;
+  }
+  return null;
+}
+
 const METHODEN: Record<ZuordnungsMethode, true> = {
   manuell: true,
   bestellnummer: true,
