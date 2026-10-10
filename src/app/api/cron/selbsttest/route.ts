@@ -63,6 +63,10 @@ async function runCron(request: NextRequest) {
     for (const pfad of SELBSTTEST_SEITEN) {
       ergebnisse.push(await ladeSeite(basis, pfad, cookie));
     }
+    // 10.10.2026 — Die Detailseite ist die komplexeste Seite und hat keine
+    // feste Adresse: der Selbsttest nimmt die neueste Bestellung.
+    const detailPfad = await neuesteBestellungPfad(sb);
+    if (detailPfad) ergebnisse.push(await ladeSeite(basis, detailPfad, cookie));
 
     const zusammenfassung = fasseZusammen(ergebnisse);
     const { error: logFehler } = await sb.from("webhook_logs").insert({
@@ -160,6 +164,17 @@ async function meldePruefkontoAn(sb: ReturnType<typeof createServiceClient>): Pr
   });
   if (jar.size === 0) throw new Error("Sitzung ergab keine Cookies");
   return [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
+}
+
+/** Adresse der neuesten Bestellung, oder null, wenn es (noch) keine gibt. */
+async function neuesteBestellungPfad(sb: ReturnType<typeof createServiceClient>): Promise<string | null> {
+  const { data } = await sb
+    .from("bestellungen")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.id ? `/bestellungen/${data.id}` : null;
 }
 
 async function ladeSeite(basis: string, pfad: string, cookie: string): Promise<SeitenErgebnis> {
