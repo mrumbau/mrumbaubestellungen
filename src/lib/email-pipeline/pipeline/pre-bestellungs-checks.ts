@@ -30,6 +30,8 @@ export interface PreChecksInput {
   email_text: string | undefined;
   email_body: string | undefined;
   anhaenge_count: number;
+  /** Die eigene Mail — fuer den 24h-Hash-Check (siehe idempotency-check.ts). */
+  internet_message_id?: string | null;
 }
 
 export type PreChecksResult =
@@ -143,6 +145,7 @@ export async function runPreBestellungsChecks(
       email_datum,
       email_body: email_text || email_body || "",
       anhaenge_count,
+      internet_message_id: input.internet_message_id ?? null,
     });
     if (idem.isDuplicate) {
       // Grund und Bestellung landen im Log — der Eingang zeigt die Mail dann

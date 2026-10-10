@@ -60,6 +60,13 @@ export interface IngestEmailInput {
    * anzulegen — verhindert Duplikat-Bestellungen beim Re-Backfill.
    */
   existing_bestellung_id?: string | null;
+  /**
+   * 10.10.2026 — Die Mail selbst. Beim erneuten Verarbeiten (Eingang
+   * "erneut", Retry-Cron) darf die Mail nicht an ihrem eigenen
+   * 24-Stunden-Hash scheitern; ein Duplikat ist nur, was eine ANDERE Mail
+   * schon verbucht hat.
+   */
+  internet_message_id?: string | null;
 }
 
 export interface IngestEmailResult {
