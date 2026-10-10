@@ -64,8 +64,11 @@ export interface PersistAnhangInput {
 }
 
 export interface PersistAnhangResult {
+  /** Belege, die jetzt an der Bestellung liegen: neu gespeichert plus schon vorhanden. */
   dokumenteGespeichert: number;
   gespeicherteTypen: string[];
+  /** Davon schon vorhanden (gleiches PDF, gleiche Bestellung) — nur fuer Logs. */
+  bereitsVorhanden: number;
 }
 
 export async function persistAnhangDokumente(
@@ -74,6 +77,7 @@ export async function persistAnhangDokumente(
 ): Promise<PersistAnhangResult> {
   const { bestellungId, analyseErgebnisse, email_betreff, email_absender, email_datum, bodyExtractedBetrag } = input;
   let dokumenteGespeichert = 0;
+  let bereitsVorhanden = 0;
   const gespeicherteTypen: string[] = [];
 
   for (const ergebnis of analyseErgebnisse) {
@@ -169,6 +173,12 @@ export async function persistAnhangDokumente(
         bestellungId, typ: analyse.typ, content_hash: contentHash.slice(0, 16),
         bestehender_pfad: existingDoku[0].storage_pfad,
       });
+      // 10.10.2026 — Der Beleg liegt schon an dieser Bestellung; fuer die
+      // Schritte danach zaehlt er wie gespeichert. Vorher zaehlte er nicht,
+      // und "erneut"/"zuordnen" im Eingang legte fuer eine laengst verbuchte
+      // Mail einen zweiten Beleg ohne PDF aus dem Mailtext an (Schritt 16).
+      bereitsVorhanden++;
+      gespeicherteTypen.push(analyse.typ);
       continue;
     }
 
@@ -304,5 +314,5 @@ export async function persistAnhangDokumente(
     dokumenteGespeichert++;
   }
 
-  return { dokumenteGespeichert, gespeicherteTypen };
+  return { dokumenteGespeichert: dokumenteGespeichert + bereitsVorhanden, gespeicherteTypen, bereitsVorhanden };
 }

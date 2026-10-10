@@ -122,7 +122,7 @@ Betriebsnotiz: Das Supabase-MCP-Werkzeug hängt bei Funktionskörpern mit nackte
 | Bestellungen (Pool / In Arbeit / Archiv) | `app/(dashboard)/bestellungen/(workspace)/*` → `components/bestellungen-tabelle.tsx`, `pool-inbox.tsx` | tägliche Arbeit |
 | Bestelldetail | `app/(dashboard)/bestellungen/[id]/_components/*` | Belege, Freigabe (`approval-panel.tsx`); unter jedem Beleg steht, warum er hier hängt |
 | Listenhinweis „Zuordnung prüfen“ | `lib/zuordnung-begruendung.ts` → `zuordnungsHinweis()` | ein Beleg hängt nur über ähnliche Nummer, Querverweis oder Händler am Vorgang |
-| Eingang | `app/(dashboard)/eingang/*` | Kontrolle des Rechnungsordners: abhaken, erneut verarbeiten, einer Bestellung zuordnen (Replay mit `bestellung_id`) |
+| Eingang | `app/(dashboard)/eingang/*` | Kontrolle des Rechnungsordners: abhaken, erneut verarbeiten, einer Bestellung zuordnen (Replay mit `bestellung_id`). Ein schon vorhandener Beleg zählt beim Replay wie gespeichert, sonst entstünde ein zweiter Beleg ohne PDF aus dem Mailtext |
 | Buchhaltung | `components/buchhaltung-client.tsx` | Bezahlt markieren, DATEV |
 | Einstellungen → Händler | `einstellungen/haendler/*` | vorausbezahlt, Zahlungsziel |
 | Einstellungen → System | `einstellungen/system/*` | E-Mail-Sync, Benutzer, Regeln, Pipeline-Qualität, Testdaten (nur Admin) |
