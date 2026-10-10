@@ -108,6 +108,19 @@ export function useBestellungColumns({
                     ?
                   </span>
                 )}
+                {/* 10.10.2026 — Ein Beleg haengt nur unsicher an diesem Vorgang
+                    (aehnliche Nummer, Querverweis, gleicher Haendler). Der
+                    Tooltip nennt Beleg und Grund; die Detailseite zeigt es
+                    unter dem Beleg noch einmal. */}
+                {b.zuordnung_hinweis && (
+                  <span
+                    title={b.zuordnung_hinweis}
+                    className="inline-flex items-center gap-1 rounded bg-warning-bg px-1.5 py-0.5 text-[10px] font-semibold text-warning shrink-0 cursor-help"
+                  >
+                    <IconAlertCircle className="w-3 h-3" />
+                    Zuordnung prüfen
+                  </span>
+                )}
                 {isSub && (
                   <Badge tone="warning" size="sm">
                     SUB

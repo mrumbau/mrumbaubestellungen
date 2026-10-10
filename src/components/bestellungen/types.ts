@@ -63,6 +63,10 @@ export interface Bestellung {
   // erkannte Methode ("paypal", "vorkasse", ...) oder null.
   bezahlt_bereits?: boolean | null;
   zahlungsmethode?: string | null;
+  // 10.10.2026 — Erster Beleg, der nur unsicher (aehnliche Nummer, Querverweis,
+  // gleicher Haendler) zugeordnet wurde, als Text. Die Liste zeigt dann
+  // "Zuordnung pruefen", damit man weiss, welche Vorgaenge man aufmachen muss.
+  zuordnung_hinweis?: string | null;
 }
 
 export interface ProjektOption {

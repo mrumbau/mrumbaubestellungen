@@ -1,5 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { beschreibeZuordnung, zuordnungAus } from "../zuordnung-begruendung";
+import { beschreibeZuordnung, zuordnungAus, zuordnungsHinweis } from "../zuordnung-begruendung";
+
+describe("zuordnungsHinweis", () => {
+  it("nennt den ersten unsicheren Beleg mit Typ und Grund", () => {
+    const text = zuordnungsHinweis([
+      { typ: "bestellbestaetigung", zuordnung: { methode: "neu", nummer: "MR015/0027" } },
+      { typ: "rechnung", zuordnung: { methode: "bestellnummer_aehnlich", nummer: "117957 MR015/0027" } },
+      { typ: "lieferschein", zuordnung: { methode: "querverweis" } },
+    ]);
+    expect(text).toBe("Rechnung: Nummer 117957 MR015/0027 nur ähnlich, bitte prüfen");
+  });
+
+  it("ist null, wenn alle Belege sicher zugeordnet sind oder nichts dazu wissen", () => {
+    expect(zuordnungsHinweis([{ typ: "rechnung", zuordnung: { methode: "bestellnummer", nummer: "1" } }])).toBeNull();
+    expect(zuordnungsHinweis([{ typ: "rechnung", zuordnung: null }, { typ: "rechnung" }])).toBeNull();
+    expect(zuordnungsHinweis([])).toBeNull();
+  });
+
+  it("unbekannter Belegtyp heisst Beleg", () => {
+    expect(zuordnungsHinweis([{ typ: "sonstiges", zuordnung: { methode: "haendler_offen" } }])).toMatch(/^Beleg: /);
+  });
+});
 
 describe("beschreibeZuordnung", () => {
   it("exakte Bestellnummer ist sicher und nennt die Nummer", () => {
