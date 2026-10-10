@@ -242,6 +242,7 @@ async function replayOneMessageWithLock(
         anhaenge: attachments,
         document_hint: folderHint,
         existing_bestellung_id: existingBestellungId,
+        internet_message_id: internetMessageId,
       });
 
       return { outcome: "ingested" as const, ingestResult };

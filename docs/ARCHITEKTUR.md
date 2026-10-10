@@ -45,6 +45,11 @@ im Code, nicht ein Zustand. Wird eine Bestellung verworfen, bekommen ihre Mails 
 `verworfen: <Kürzel>` und gelten als gesichtet (`api/bestellungen/verwerfen`); die Verknüpfung selbst kappt die
 Datenbank beim Löschen (`ON DELETE SET NULL`). Bis 10.10.2026 blieben so 139 Mails als „offen, ohne Grund“ zurück.
 
+24-Stunden-Duplikat (`idempotency-check.ts`): ein Hash-Treffer ist nur ein Duplikat, wenn eine **andere** Mail die
+Bestellung schon trägt. Die Mail selbst (Eingang „erneut“, Retry-Cron) darf nicht an ihrem eigenen Lock scheitern;
+dafür reicht die Pipeline `internet_message_id` bis in den Check durch. Bis 10.10.2026 endete jedes „erneut“ binnen
+24 Stunden als `duplikat_24h`.
+
 Anhänge lesen (`lib/openai/dokument.ts`): Antwortbudget `MAX_ANTWORT_TOKEN` (8000). Das Schema verlangt den
 Volltext (im Prompt auf rund 6000 Zeichen begrenzt), und bei gpt-5.5 zählen die Denk-Token mit. Mit 2000 Token
 endete jede mehrseitige Rechnung als `parse_fehler` („length limit was reached“), 32 von 351 Belegen bis 10.10.2026.

@@ -80,6 +80,8 @@ export interface EmailPipelineInput {
    * eine neue anzulegen — verhindert Duplikate beim Re-Backfill.
    */
   existing_bestellung_id?: string | null;
+  /** 10.10.2026 — Die eigene Mail; sie darf nicht an ihrem eigenen 24h-Hash scheitern. */
+  internet_message_id?: string | null;
 }
 
 export interface EmailPipelineResult {
@@ -142,6 +144,7 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
     email_text: input.email_text,
     email_body: input.email_body,
     anhaenge_count: Array.isArray(input.anhaenge) ? input.anhaenge.length : 0,
+    internet_message_id: input.internet_message_id ?? null,
   });
   if (preCheck) return preCheck;
 

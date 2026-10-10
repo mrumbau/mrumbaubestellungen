@@ -53,6 +53,13 @@ export interface IdempotencyInput {
   email_datum: string | null | undefined;
   email_body: string | null | undefined;
   anhaenge_count: number;
+  /**
+   * 10.10.2026 — Die eigene Mail. Wenn gesetzt, zaehlt ein Hash-Treffer nur
+   * als Duplikat, wenn eine ANDERE Mail die Bestellung schon traegt. Vorher
+   * lief "erneut" im Eingang binnen 24 Stunden immer in "duplikat_24h" —
+   * die Mail fand ihren eigenen Lock aus dem ersten Versuch.
+   */
+  internet_message_id?: string | null;
 }
 
 export interface IdempotencyResult {
@@ -85,17 +92,35 @@ async function findeOriginalBestellung(
   absenderNorm: string,
   subjectNorm: string,
   cutoff: string,
+  ausserMessageId: string | null,
 ): Promise<string | undefined> {
   if (!absenderNorm) return undefined;
-  const { data } = await supabase
+  let q = supabase
     .from("email_processing_log")
     .select("subject, bestellung_id")
     .ilike("sender", absenderNorm)
     .not("bestellung_id", "is", null)
-    .gte("created_at", cutoff)
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .gte("created_at", cutoff);
+  if (ausserMessageId) q = q.neq("internet_message_id", ausserMessageId);
+  const { data } = await q.order("created_at", { ascending: false }).limit(10);
   return waehleOriginal(data ?? [], subjectNorm);
+}
+
+/**
+ * Entscheidet nach einem Hash-Treffer binnen 24 Stunden: Duplikat, oder die
+ * eigene Mail noch einmal? Rein, damit es testbar ist.
+ */
+export function bewerteHashTreffer(input: {
+  eigeneMessageId: string | null | undefined;
+  fremdeBestellungId: string | undefined;
+}): { isDuplicate: boolean; bestellungId?: string } {
+  if (input.fremdeBestellungId) return { isDuplicate: true, bestellungId: input.fremdeBestellungId };
+  // Ohne eigene Kennung (Webhook-Pfad) bleibt es beim alten Verhalten:
+  // Hash-Treffer = Duplikat.
+  if (!input.eigeneMessageId) return { isDuplicate: true };
+  // Eigene Wiederholung, und keine andere Mail traegt die Bestellung:
+  // kein Duplikat — die Mail wird erneut verarbeitet.
+  return { isDuplicate: false };
 }
 
 /**
@@ -158,11 +183,16 @@ export async function checkAndClaimIdempotency(
       .limit(1);
 
     if (existing && existing.length > 0) {
-      const bestellungId = await findeOriginalBestellung(supabase, absenderNorm, subjectNorm, cutoff);
-      return { hash, isDuplicate: true, bestellungId };
+      const eigeneMessageId = input.internet_message_id ?? null;
+      const fremdeBestellungId = await findeOriginalBestellung(
+        supabase, absenderNorm, subjectNorm, cutoff, eigeneMessageId,
+      );
+      const urteil = bewerteHashTreffer({ eigeneMessageId, fremdeBestellungId });
+      if (urteil.isDuplicate) return { hash, ...urteil };
+      // Eigene Wiederholung: Lock auffrischen und normal weiterverarbeiten.
     }
 
-    // Hash existiert aber älter als 24h → alten Eintrag aktualisieren
+    // Hash existiert aber älter als 24h (oder eigene Wiederholung) → Eintrag aktualisieren
     await supabase
       .from("webhook_logs")
       .update({ status: "processing", created_at: new Date().toISOString() })
