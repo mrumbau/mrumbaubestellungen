@@ -24,8 +24,10 @@
  * für die LaneNav, nicht die "wieviel zeigt grade meine Tabelle".
  */
 
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { type Lane, isLane } from "@/components/bestellungen/lane-config";
 // 03.06.2026 — Server-safe Pure-Helpers aus /lib/bestellungen-art.ts,
 // NICHT aus art-filter-chips.tsx (Client-Component, würde Server-Crash
@@ -101,8 +103,11 @@ export interface LaneLoadResult {
  * head:true count) als auch die select(...).is(...).order(...)-Query
  * (für Daten) angewandt wird — beide Branches der fluent API.
  */
+/** Was die Lane-Filter vom Profil brauchen: Kuerzel und Rolle, sonst nichts. */
+type LaneProfil = Pick<UserProfil, "kuerzel" | "rolle">;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyLaneFilter(query: any, lane: Lane, profil: UserProfil | null, owner?: string | null): any {
+function applyLaneFilter(query: any, lane: Lane, profil: LaneProfil | null, owner?: string | null): any {
   if (lane === "pool") {
     return query
       .eq("besteller_kuerzel", "UNBEKANNT")
@@ -181,6 +186,39 @@ function emptyLaneResult(): LaneLoadResult {
 }
 
 /**
+ * Die drei Lane-Zahlen (Pool, In Arbeit, Archiv) — einmal pro Request.
+ *
+ * 10.10.2026 — Das Workspace-Layout hat fuer die LaneNav bisher die ganze
+ * Pool-Lane geladen (zwoelf Abfragen samt Bestellungsliste), und die
+ * Pool-Seite direkt danach dasselbe noch einmal. React `cache` haelt das
+ * Ergebnis fuer die Dauer des Requests: Layout und Seite teilen sich die
+ * drei Count-Abfragen. Die Argumente sind Primitive, damit der Cache greift.
+ */
+export const ladeLaneZaehler = cache(
+  async (
+    kuerzel: string | null,
+    rolle: string | null,
+    owner: string | null,
+  ): Promise<Record<Lane, number>> => {
+    const supabase = await createServerSupabaseClient();
+    const profil: LaneProfil | null = kuerzel ? { kuerzel, rolle: rolle ?? "" } : null;
+    const zaehle = (lane: Lane): PromiseLike<{ count: number | null }> =>
+      applyLaneFilter(
+        supabase.from("bestellungen").select("id", { count: "exact", head: true }).is("archiviert_am", null),
+        lane,
+        profil,
+        lane === "pool" ? null : owner,
+      );
+    const [pool, inArbeit, archiv] = await Promise.all([
+      zaehle("pool"),
+      zaehle("in-arbeit"),
+      zaehle("archiv"),
+    ]);
+    return { pool: pool.count ?? 0, "in-arbeit": inArbeit.count ?? 0, archiv: archiv.count ?? 0 };
+  },
+);
+
+/**
  * Top-level safe Variant von loadLaneData. Verwende diese in Layouts/Pages
  * — sie fängt jeden Throw der Hauptqueries und gibt einen sauberen
  * Empty-Result statt rejected Promise zurück.
@@ -228,32 +266,10 @@ async function loadLaneData(
     dataQuery = dataQuery.eq("projekt_id", params.projektId);
   }
 
-  // Lane-Counts — drei head:true count-queries parallel, NUR Schicht-1-Filter
-  const poolCountQuery = applyLaneFilter(
-    supabase
-      .from("bestellungen")
-      .select("id", { count: "exact", head: true })
-      .is("archiviert_am", null),
-    "pool",
-    profil,
-    null,
-  );
-  const inArbeitCountQuery = applyLaneFilter(
-    supabase
-      .from("bestellungen")
-      .select("id", { count: "exact", head: true })
-      .is("archiviert_am", null),
-    "in-arbeit",
-    profil,
-    params.owner ?? null,
-  );
-  const archivCountQuery = applyLaneFilter(
-    supabase
-      .from("bestellungen")
-      .select("id", { count: "exact", head: true })
-      .is("archiviert_am", null),
-    "archiv",
-    profil,
+  // Lane-Counts — NUR Schicht-1-Filter; pro Request einmal, siehe ladeLaneZaehler.
+  const zaehlerPromise = ladeLaneZaehler(
+    profil?.kuerzel ?? null,
+    profil?.rolle ?? null,
     params.owner ?? null,
   );
 
@@ -324,9 +340,7 @@ async function loadLaneData(
     { data: bestellungenRaw },
     { data: projekteRaw },
     { data: bestellerRollenRaw },
-    { count: poolCount },
-    { count: inArbeitCount },
-    { count: archivCount },
+    counts,
     { data: poolUserStateRows },
     { data: reservationRows },
     { data: haendlerRows },
@@ -357,9 +371,7 @@ async function loadLaneData(
       .select("kuerzel, name, rolle")
       .eq("rolle", "besteller")
       .order("kuerzel"),
-    poolCountQuery,
-    inArbeitCountQuery,
-    archivCountQuery,
+    zaehlerPromise,
     poolUserStateQuery,
     reservationQuery,
     haendlerQuery,
@@ -438,12 +450,6 @@ async function loadLaneData(
     name: string;
     rolle: string;
   }>).map((b) => ({ kuerzel: b.kuerzel, name: b.name, rolle: b.rolle }));
-
-  const counts: Record<Lane, number> = {
-    pool: poolCount ?? 0,
-    "in-arbeit": inArbeitCount ?? 0,
-    archiv: archivCount ?? 0,
-  };
 
   const result: LaneLoadResult = {
     bestellungen: bestellungenAngereichert as unknown as Bestellung[],

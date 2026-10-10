@@ -28,6 +28,35 @@ export type KontrolleKey = (typeof KONTROLLE_KEYS)[number];
 /** Hoechstens so viele Mails auf einmal sichten — analog zu den Bulk-Routen. */
 export const SICHTEN_MAX = 200;
 
+/** Eine Zeile aus `eingang_zaehler(p_ordner)`: je Kontroll-Zustand Anzahl und Offen-Zahl. */
+export interface EingangZaehlerZeile {
+  kontrolle: string;
+  anzahl: number;
+  offen: number;
+}
+
+/**
+ * Kopfzahlen der Eingang-Seite aus dem Ergebnis von `eingang_zaehler`
+ * (10.10.2026, vorher fuenf einzelne Count-Abfragen auf die Sicht).
+ *
+ * Fehlende Zustaende zaehlen 0. Unbekannte Zustaende zaehlen nicht in die
+ * Pillen, aber in "offen" — offen ist ein eigenes Merkmal der Mail, nicht
+ * des Zustands. Zahlen koennen als Text ankommen (bigint ueber JSON).
+ */
+export function eingangZaehlerAus(
+  zeilen: ReadonlyArray<EingangZaehlerZeile> | null | undefined,
+): { counts: Record<KontrolleKey, number>; offen: number } {
+  const counts = Object.fromEntries(KONTROLLE_KEYS.map((k) => [k, 0])) as Record<KontrolleKey, number>;
+  let offen = 0;
+  for (const z of zeilen ?? []) {
+    if ((KONTROLLE_KEYS as readonly string[]).includes(z.kontrolle)) {
+      counts[z.kontrolle as KontrolleKey] = Number(z.anzahl) || 0;
+    }
+    offen += Number(z.offen) || 0;
+  }
+  return { counts, offen };
+}
+
 /**
  * PostgREST-Listenwert fuer `.in.(...)` innerhalb eines `.or()`-Filters.
  * Jeder Wert in doppelte Anfuehrungszeichen; Backslash und Anfuehrungszeichen
