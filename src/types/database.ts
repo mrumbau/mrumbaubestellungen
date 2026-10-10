@@ -1617,6 +1617,14 @@ export type Database = {
           target_kuerzel: string
         }[]
       }
+      eingang_zaehler: {
+        Args: { p_ordner: string }
+        Returns: {
+          kontrolle: string
+          anzahl: number
+          offen: number
+        }[]
+      }
       persist_dokument_atomic:
         | {
             Args: {

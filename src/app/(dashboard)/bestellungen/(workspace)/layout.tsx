@@ -1,9 +1,8 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { LaneNav } from "@/components/bestellungen/lane-nav";
 import { CmdKSearchTrigger } from "@/components/bestellungen/cmdk-search";
-import { loadLaneDataSafe } from "@/lib/bestellungen-lane-loader";
+import { ladeLaneZaehler } from "@/lib/bestellungen-lane-loader";
 
 // 03.06.2026 — Edge-Runtime auskommentiert nach Pool-Lane-Crash auf Production.
 // Sub-Queries (vw_user_*_affinity, firma_einstellungen) hatten möglicherweise
@@ -20,10 +19,11 @@ export const dynamic = "force-dynamic";
  * LaneNav mit Live-Counts aus loadLaneData. Children sind die jeweilige
  * Lane-Page mit ArtFilterChips + Body.
  *
- * **Counts** werden hier geladen, nicht in jeder Lane-Page einzeln — sie
- * sind Lane-global und konstant pro Render. `loadLaneData` mit Lane="pool"
- * als Trigger liefert immer alle 3 Counts. Die Lane-Pages laden ihre
- * eigenen Daten parallel (Layouts + Pages werden gestreamt).
+ * **Counts** kommen aus `ladeLaneZaehler` — drei Count-Abfragen, per React
+ * `cache` einmal pro Request. Die Lane-Page ruft dieselbe Funktion ueber
+ * `loadLaneData` auf und bekommt das gleiche Ergebnis, ohne zweite Abfrage.
+ * Bis 10.10.2026 hat das Layout hier die komplette Pool-Lane geladen, nur
+ * um an die Zahlen zu kommen; die Pool-Seite lud sie danach noch einmal.
  *
  * **Aktive Lane:** Die LaneNav nutzt selber usePathname() — Layout muss
  * keinen aktiven Lane-Param durchreichen.
@@ -39,12 +39,7 @@ export default async function BestellungenWorkspaceLayout({
   children: React.ReactNode;
 }) {
   const profil = await getBenutzerProfil();
-  const supabase = await createServerSupabaseClient();
-
-  // 03.06.2026 — `loadLaneDataSafe` wirft NIE, gibt im Crash-Case einen
-  // emptyLaneResult zurück. Layout + LaneNav (mit 0-counts) bleiben sichtbar.
-  const data = await loadLaneDataSafe(supabase, { lane: "pool" }, profil);
-  const counts = data.counts;
+  const counts = await ladeLaneZaehler(profil?.kuerzel ?? null, profil?.rolle ?? null, null);
 
   return (
     <div className="flex flex-col gap-6">

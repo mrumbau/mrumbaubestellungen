@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { istVerwaltung } from "@/lib/rollen";
-import { KONTROLLE_KEYS, RECHNUNGSORDNER, type KontrolleKey } from "@/lib/eingang";
+import { RECHNUNGSORDNER, eingangZaehlerAus } from "@/lib/eingang";
 import { EingangClient, type EingangZeile } from "./eingang-client";
 
 export const dynamic = "force-dynamic";
@@ -48,35 +48,22 @@ export default async function EingangPage({
     .order("eingang", { ascending: false })
     .limit(ZEILEN_LIMIT);
 
-  const countQueries = KONTROLLE_KEYS.map((k) =>
-    supabase
-      .from("v_rechnungseingang")
-      .select("id", { count: "exact", head: true })
-      .eq("ordner", ordner)
-      .eq("kontrolle", k),
-  );
-  const offenQuery = supabase
-    .from("v_rechnungseingang")
-    .select("id", { count: "exact", head: true })
-    .eq("ordner", ordner)
-    .eq("offen", true);
+  // 10.10.2026 — Ein Aufruf statt fuenf: `eingang_zaehler` liefert je
+  // Kontroll-Zustand Anzahl und Offen-Zahl (Migration 2026_10_10).
+  const zaehlerQuery = supabase.rpc("eingang_zaehler", { p_ordner: ordner });
 
   const ordnerQuery = supabase
     .from("mail_sync_folders")
     .select("folder_name")
     .order("folder_name");
 
-  const [zeilenRes, ordnerRes, offenRes, ...countRes] = await Promise.all([
+  const [zeilenRes, ordnerRes, zaehlerRes] = await Promise.all([
     zeilenQuery,
     ordnerQuery,
-    offenQuery,
-    ...countQueries,
+    zaehlerQuery,
   ]);
 
-  const counts = {} as Record<KontrolleKey, number>;
-  KONTROLLE_KEYS.forEach((k, i) => {
-    counts[k] = countRes[i]?.count ?? 0;
-  });
+  const { counts, offen: offenCount } = eingangZaehlerAus(zaehlerRes.data);
 
   const ordnerListe = Array.from(
     new Set([
@@ -91,7 +78,7 @@ export default async function EingangPage({
       ordnerListe={ordnerListe}
       zeilen={(zeilenRes.data ?? []) as unknown as EingangZeile[]}
       counts={counts}
-      offenCount={offenRes.count ?? 0}
+      offenCount={offenCount}
       zeilenLimit={ZEILEN_LIMIT}
       ladeFehler={zeilenRes.error?.message ?? null}
       istRechnungsordner={ordner === RECHNUNGSORDNER}
