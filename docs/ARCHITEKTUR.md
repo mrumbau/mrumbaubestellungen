@@ -45,6 +45,10 @@ im Code, nicht ein Zustand. Wird eine Bestellung verworfen, bekommen ihre Mails 
 `verworfen: <Kürzel>` und gelten als gesichtet (`api/bestellungen/verwerfen`); die Verknüpfung selbst kappt die
 Datenbank beim Löschen (`ON DELETE SET NULL`). Bis 10.10.2026 blieben so 139 Mails als „offen, ohne Grund“ zurück.
 
+Eigene Belege (`pipeline/eigene-firma.ts`): Ein Anhang, dessen Aussteller die eigene Firma ist, wird ignoriert; sind
+alle Anhänge eigene, endet die Mail mit `skipped: eigene_rechnung`. Ein Kunde, der unsere Schlussrechnung mit
+Rückfragen zurückschickt, erzeugte am 10.10.2026 sonst eine Subunternehmer-Bestellung mit Händler „MR Umbau“.
+
 24-Stunden-Duplikat (`idempotency-check.ts`): ein Hash-Treffer ist nur ein Duplikat, wenn eine **andere** Mail die
 Bestellung schon trägt. Die Mail selbst (Eingang „erneut“, Retry-Cron) darf nicht an ihrem eigenen Lock scheitern;
 dafür reicht die Pipeline `internet_message_id` bis in den Check durch. Bis 10.10.2026 endete jedes „erneut“ binnen

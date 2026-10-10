@@ -33,6 +33,7 @@ import {
 import { normalizeAnhaenge } from "./pipeline/anhang-handling";
 import { tryParseEInvoiceFromAttachments } from "./pipeline/xrechnung";
 import { analysiereAnhaenge } from "./pipeline/anhang-analyse";
+import { ohneEigeneBelege } from "./pipeline/eigene-firma";
 import { type MatchContext } from "./pipeline/bestellung-match";
 import { handleVersandEmail } from "./pipeline/versand-handler";
 import { PRIMAER_TYPEN, BEKANNTE_TYPEN } from "./pipeline/constants";
@@ -262,6 +263,22 @@ export async function runEmailPipeline(input: EmailPipelineInput): Promise<Email
       base64: "",
       mime_type: "application/xml",
     });
+  }
+
+  // 10b. Eigene Belege (10.10.2026) — eine Rechnung, die wir selbst gestellt
+  // haben und die ein Kunde mit Rueckfragen zurueckschickt, ist nie eine
+  // Bestellung. Siehe pipeline/eigene-firma.ts.
+  const { fremde: fremdeBelege, eigene: eigeneBelege } = ohneEigeneBelege(analyseErgebnisse);
+  if (eigeneBelege.length > 0) {
+    logInfo("webhook/email", `${eigeneBelege.length} eigene Belege ignoriert (Aussteller ist die eigene Firma)`, {
+      dateien: eigeneBelege.map((e) => e.dateiName),
+      email_absender,
+      email_betreff,
+    });
+    if (fremdeBelege.length === 0) {
+      return { success: true, skipped: true, reason: "eigene_rechnung" };
+    }
+    analyseErgebnisse.splice(0, analyseErgebnisse.length, ...fremdeBelege);
   }
 
   // 11. Besteller zuordnen
