@@ -15,6 +15,7 @@ import {
   bestellnummernFuzzyMatch,
   haendlerNamesMatch,
   findByExactNumber,
+  findByFuzzyNumber,
   findByErweiterterMatch,
 } from "../bestellung-match";
 
@@ -54,6 +55,69 @@ describe("bestellnummernFuzzyMatch — R5c-Bugfix Substring-Match", () => {
 
   it("trimt Whitespace", () => {
     expect(bestellnummernFuzzyMatch("  CBEPFVF  ", "CP-CBEPFVF-1")).toBe(true);
+  });
+
+  // 10.10.2026 — fuenf von sechs "aehnlichen" Zuordnungen in drei Tagen
+  // waren falsch: Nachbarnummern desselben Haendlers.
+  it("Nachbarnummern desselben Händlers sind verschiedene Bestellungen", () => {
+    expect(bestellnummernFuzzyMatch("260815895", "260815984")).toBe(false);
+    expect(bestellnummernFuzzyMatch("260816396", "260816379")).toBe(false);
+    expect(bestellnummernFuzzyMatch("2031460950", "2031600283")).toBe(false);
+    expect(bestellnummernFuzzyMatch("4313411210", "2031600283")).toBe(false);
+    expect(bestellnummernFuzzyMatch("R-00333", "R-00310")).toBe(false);
+  });
+
+  it("enthalten heisst: als ganze Bausteine, nicht irgendwo im Text", () => {
+    expect(bestellnummernFuzzyMatch("117957 MR015/0027", "MR015/0027")).toBe(true);
+    expect(bestellnummernFuzzyMatch("MR015-0027", "MR015/0027")).toBe(true);
+    expect(bestellnummernFuzzyMatch("2031460950", "12031460950")).toBe(false);
+    expect(bestellnummernFuzzyMatch("CBEPFVF", "CPCBEPFVF1")).toBe(false);
+  });
+
+  it("reine Ziffernfolgen unter fuenf Stellen tragen keine Zuordnung", () => {
+    expect(bestellnummernFuzzyMatch("0027", "MR015/0027")).toBe(false);
+    expect(bestellnummernFuzzyMatch("10027", "RE 10027 2026")).toBe(true);
+    expect(bestellnummernFuzzyMatch("AB12", "X-AB12-9")).toBe(true);
+  });
+});
+
+// =====================================================================
+// findByFuzzyNumber — Trigramm-Treffer sind nur Kandidaten
+// =====================================================================
+
+function makeFuzzyMock(opts: {
+  rpc: Array<Record<string, unknown>>;
+  row: Record<string, unknown> | null;
+  kandidaten: Array<Record<string, unknown>>;
+}) {
+  const builder: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "gte", "order", "limit", "ilike", "in"]) builder[m] = () => builder;
+  builder.maybeSingle = async () => ({ data: opts.row });
+  builder.then = (resolve: (v: unknown) => void) => resolve({ data: opts.kandidaten });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { rpc: async () => ({ data: opts.rpc }), from: () => builder } as any;
+}
+
+describe("findByFuzzyNumber — Trigramm-Aehnlichkeit allein ordnet nicht zu", () => {
+  const ctx = { haendler: { id: "h-speedmaster", name: "Speedmaster" }, subunternehmer: null, haendlerName: "Speedmaster" };
+
+  it("verwirft den Treffer, wenn die Nummer nur aehnlich ist (Nachbarauftrag)", async () => {
+    const client = makeFuzzyMock({
+      rpc: [{ id: "nachbar", match_field: "bestellnummer", similarity_score: 0.6, haendler_name: "Speedmaster" }],
+      row: { id: "nachbar", bestellnummer: "260815984", auftragsnummer: null, lieferscheinnummer: null },
+      kandidaten: [{ id: "nachbar", bestellnummer: "260815984", auftragsnummer: null, lieferscheinnummer: null, haendler_name: "Speedmaster" }],
+    });
+    expect(await findByFuzzyNumber(client, ["260815895"], ctx)).toBeNull();
+  });
+
+  it("nimmt den Treffer, wenn die Nummer als Baustein enthalten ist", async () => {
+    const client = makeFuzzyMock({
+      rpc: [{ id: "engelhard", match_field: "bestellnummer", similarity_score: 0.7, haendler_name: "Rolf Engelhard GmbH" }],
+      row: { id: "engelhard", bestellnummer: "MR015/0027", auftragsnummer: null, lieferscheinnummer: null },
+      kandidaten: [],
+    });
+    const res = await findByFuzzyNumber(client, ["117957 MR015/0027"], ctx);
+    expect(res?.id).toBe("engelhard");
   });
 });
 
