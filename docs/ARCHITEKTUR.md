@@ -81,6 +81,11 @@ In der Datenbank bildet `get_user_rolle()` die Geschäftsführung auf `admin` ab
 
 `erledigt_am` setzt ausschließlich der Trigger `trg_bestellungen_erledigt`: Gutschrift oder vorausbezahlt **und** Status `vollstaendig`.
 
+Die drei Zahlen der Lane-Navigation kommen aus `ladeLaneZaehler()` (drei Count-Abfragen, per React `cache` einmal pro
+Request). Das Workspace-Layout ruft nur diese Funktion; die ganze Liste lädt allein die jeweilige Lane-Seite.
+Die Kopfzahlen des Eingangs liefert `eingang_zaehler(p_ordner)` in einem Aufruf; der Index `idx_dokumente_mail_zwilling`
+hält den Zwillings-Abgleich der Sicht schnell (Migration `2026_10_10_eingang_zaehler_und_index.sql`).
+
 ## Datenbank — die Objekte, die man kennen muss
 
 | Objekt | Zweck |
@@ -125,8 +130,12 @@ Navigationslinks laden ihre Ziele nicht vorab (`prefetch={false}`); jede Seite i
   API-Routen holen die Nutzer-ID mit `angemeldeterNutzer()` aus `lib/auth-claims.ts`, ebenfalls ohne Netzaufruf.
   `supabase.auth.getUser()` hat im App-Code nichts mehr verloren.
 - Der tägliche Selbsttest (`api/cron/selbsttest`, Logik in `lib/selbsttest.ts`) meldet sich als
-  `selbsttest@mrumbau.de` an, lädt acht Hauptseiten und mailt den Admins bei Fehlern. Seine Zeiten pro Seite sind
-  die ehrlichste Tempo-Messung, weil sie aus derselben Region kommen wie der Server.
+  `selbsttest@mrumbau.de` an, lädt acht Hauptseiten plus die Detailseite der neuesten Bestellung und mailt den
+  Admins bei Fehlern. Seine Zeiten pro Seite sind die ehrlichste Tempo-Messung, weil sie aus derselben Region
+  kommen wie der Server. Von Hand auslösen: `SELECT net.http_post(...)` wie im Cron-Job `selbsttest-daily`, Ergebnis
+  in `net._http_response`.
+- Buchhaltung lädt ihre Zeilen in einer Abfrage (`dokumente` → `bestellungen!inner` → `freigaben`), die Zeilen baut
+  `lib/buchhaltung-zeilen.ts`.
 - Messen statt raten: Supabase-Logs (`edge_logs`, Feld `response.origin_time`) zeigen, welche Abfrage wie lange
   braucht; der Browser aus einer anderen Weltregion täuscht.
 Die Liste lädt nach einer eigenen Aktion ausdrücklich nach (`use-bestellungen-actions.ts`); Realtime ist nur für die Änderungen anderer.
