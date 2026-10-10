@@ -168,18 +168,41 @@ export function haendlerNamesMatch(a: string | null | undefined, b: string | nul
   return false;
 }
 
+/** Bausteine einer Nummer: Gross-Schreibung, getrennt an allem, was kein Buchstabe oder keine Ziffer ist. */
+function nummerBausteine(s: string): string[] {
+  return s.toUpperCase().split(/[^A-Z0-9ÄÖÜ]+/).filter(Boolean);
+}
+
 /**
- * Prüft ob zwei Bestellnummern "fuzzy gleich" sind: exakter Match,
- * oder eine ist Substring der anderen (Mindest-Länge 4 chars).
- * Beispiel: "CBEPFVF" ⊂ "CP-CBEPFVF-128671457-1" → true.
+ * Prüft ob zwei Bestellnummern "fuzzy gleich" sind: exakt, oder die eine
+ * steckt als ganze Bausteine in der anderen.
+ * Beispiel: "CBEPFVF" ⊂ "CP-CBEPFVF-128671457-1" → true,
+ * "MR015/0027" ⊂ "117957 MR015/0027" → true, "MR015-0027" = "MR015/0027".
+ *
+ * 10.10.2026 — Enthalten heisst: an Baustein-Grenzen, nicht irgendwo im
+ * Text. Vorher reichte ein Teilstring ab 4 Zeichen, und die Trigramm-
+ * Aehnlichkeit der Datenbank (Schwelle 0,4) hielt Nachbarnummern desselben
+ * Haendlers fuer dieselbe Bestellung: 260815895 landete an 260815984,
+ * Lieferschein und Rechnung zu Auftrag 2031460950 an 2031600283 — fuenf
+ * von sechs "aehnlichen" Zuordnungen in drei Tagen waren falsch. Reine
+ * Ziffernfolgen unter fuenf Stellen tragen keine Zuordnung.
  */
 export function bestellnummernFuzzyMatch(a: string | null | undefined, b: string | null | undefined): boolean {
   if (!a || !b) return false;
   const an = a.trim();
   const bn = b.trim();
   if (an === bn) return true;
-  if (an.length < 4 || bn.length < 4) return false;
-  return an.includes(bn) || bn.includes(an);
+  const ta = nummerBausteine(an);
+  const tb = nummerBausteine(bn);
+  if (ta.length === 0 || tb.length === 0) return false;
+  const [kurz, lang] = ta.join("").length <= tb.join("").length ? [ta, tb] : [tb, ta];
+  const kurzText = kurz.join("");
+  if (kurzText.length < 4) return false;
+  if (kurzText.length < 5 && !/[A-Z]/.test(kurzText)) return false;
+  for (let i = 0; i + kurz.length <= lang.length; i++) {
+    if (kurz.every((baustein, j) => lang[i + j] === baustein)) return true;
+  }
+  return false;
 }
 
 /**
@@ -222,6 +245,34 @@ export async function findByFuzzyNumber(
             continue; // nächster suchNr
           }
         }
+        // Lade vollständige Row für Caller (BestellungRow-Shape) — mit den
+        // Nummern, denn Aehnlichkeit allein reicht nicht (siehe unten).
+        const { data: full } = await supabase
+          .from("bestellungen")
+          .select(`${STUFE1_SELECT}, bestellnummer, auftragsnummer, lieferscheinnummer`)
+          .eq("id", top.id as string)
+          .maybeSingle();
+        if (!full) continue;
+
+        // 10.10.2026 — Der Trigramm-Treffer ist nur ein Kandidat. Er zaehlt
+        // erst, wenn die gesuchte Nummer in einer seiner Nummern als ganze
+        // Bausteine steckt (oder umgekehrt). Nachbarnummern desselben
+        // Haendlers (260815895 vs 260815984) sind sich zu 0,6 aehnlich und
+        // trotzdem zwei Bestellungen.
+        const row = full as BestellungRow;
+        const dbNummern = [row.bestellnummer, row.auftragsnummer, row.lieferscheinnummer].filter(
+          (n): n is string => !!n,
+        );
+        if (!dbNummern.some((dbNr) => bestellnummernFuzzyMatch(suchNr, dbNr))) {
+          logInfo("webhook/email/match", "pg_trgm-Treffer verworfen: Nummer nur aehnlich, nicht enthalten", {
+            bestellungId: top.id,
+            erkannte_nummer: suchNr,
+            db_nummern: dbNummern,
+            similarity: top.similarity_score,
+          });
+          continue;
+        }
+
         logInfo("webhook/email/match", "pg_trgm Fuzzy-Match gefunden", {
           bestellungId: top.id,
           db_nummer_field: top.match_field,
@@ -229,14 +280,7 @@ export async function findByFuzzyNumber(
           similarity: top.similarity_score,
           haendler_kandidat: top.haendler_name,
         });
-
-        // Lade vollständige Row für Caller (BestellungRow-Shape)
-        const { data: full } = await supabase
-          .from("bestellungen")
-          .select(STUFE1_SELECT)
-          .eq("id", top.id as string)
-          .maybeSingle();
-        if (full) return full as BestellungRow;
+        return row;
       }
     } catch (err) {
       logInfo("webhook/email/match", "pg_trgm RPC Fehler — Fallback auf JS-Match", {

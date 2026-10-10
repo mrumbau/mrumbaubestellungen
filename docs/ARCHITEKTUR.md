@@ -43,6 +43,13 @@ Jede Mail endet mit einem Grund. Was verarbeitet wurde, hat eine `bestellung_id`
 ein `skipped: <grund>` (z. B. `duplikat_24h`, `keine_konkreten_daten`). Eine Zeile ohne beides ist ein Fehler
 im Code, nicht ein Zustand.
 
+Bestellung finden (`bestellung-match.ts`): **„ähnlich“ heißt enthalten, nicht nur ähnlich.** Die Trigramm-Suche
+der Datenbank (`fuzzy_match_bestellung`) liefert nur Kandidaten; einer zählt erst, wenn die gesuchte Nummer als ganze
+Bausteine in einer seiner Nummern steckt (`117957 MR015/0027` ⊃ `MR015/0027`). Nachbarnummern desselben Händlers
+(`260815895` / `260815984`) sind zwei Bestellungen. Am 10.10.2026 waren fünf von sechs „ähnlichen“ Zuordnungen
+falsch, eine davon hatte den Betrag der Bestellung überschrieben. Jeder Beleg trägt seine Methode in
+`ki_roh_daten._zuordnung`; Liste und Detailseite zeigen „Zuordnung prüfen“, solange sie nicht exakt war.
+
 ## Wer bekommt die Bestellung? (`besteller-zuordnung.ts`)
 
 | Stufe | Quelle | Greift wenn |
