@@ -42,6 +42,8 @@ interface BestellungShape {
   besteller_kuerzel: string;
   status: string;
   ist_gutschrift?: boolean;
+  gesperrt_am?: string | null;
+  sperrgrund?: string | null;
 }
 
 function makeSupabaseFor(opts: {
@@ -183,6 +185,36 @@ describe("POST /api/bestellungen/[id]/freigeben", () => {
     const { POST } = await import("../route");
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_UUID }) });
     expect(res.status).toBe(400);
+  });
+
+  // 11.10.2026 — Sperre (lib/sperre.ts): die Rechnung beim Anwalt darf
+  // niemand freigeben, auch nicht der Admin, auch nicht per RPC-Umweg.
+  it("423 wenn Rechnung gesperrt — RPC wird nicht gerufen", async () => {
+    mockGetProfil.mockResolvedValue({ kuerzel: "MH", name: "Mohammed", rolle: "admin", user_id: "u1", email: "it@x" });
+    const sb = makeSupabaseFor({
+      bestellung: {
+        id: VALID_UUID, bestellungsart: "material", besteller_kuerzel: "CR", status: "vollstaendig",
+        gesperrt_am: "2026-10-11T08:00:00Z", sperrgrund: "Rechnung beim Anwalt",
+      },
+    });
+    mockCreateClient.mockReturnValue(sb);
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_UUID }) });
+    expect(res.status).toBe(423);
+    expect((await res.json()).error).toContain("Rechnung beim Anwalt");
+    expect(sb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("423 wenn die Datenbank-Funktion 'gesperrt' meldet (Race: Sperre kam dazwischen)", async () => {
+    mockGetProfil.mockResolvedValue({ kuerzel: "MT", name: "Marlon", rolle: "besteller", user_id: "u1", email: "mt@x" });
+    mockCreateClient.mockReturnValue(makeSupabaseFor({
+      bestellung: { id: VALID_UUID, bestellungsart: "material", besteller_kuerzel: "MT", status: "vollstaendig" },
+      rpcReturn: { data: { success: false, error: "gesperrt", sperrgrund: "doppelt" }, error: null },
+    }));
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: VALID_UUID }) });
+    expect(res.status).toBe(423);
+    expect((await res.json()).error).toContain("doppelt");
   });
 
   it("409 wenn RPC 'bereits_freigegeben' liefert (Race-Path)", async () => {

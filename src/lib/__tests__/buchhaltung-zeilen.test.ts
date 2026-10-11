@@ -31,6 +31,9 @@ function rechnung(over: Partial<RechnungMitBestellung> = {}): RechnungMitBestell
       kundennummer: "K1",
       projekt_referenz: null,
       ist_gutschrift: null,
+      gesperrt_am: null,
+      gesperrt_von: null,
+      sperrgrund: null,
       freigaben: [{ freigegeben_von_name: "Carsten", freigegeben_am: "2026-10-02T10:00:00Z" }],
     },
     ...over,
@@ -80,6 +83,24 @@ describe("buchhaltungZeilen", () => {
       }),
     ]);
     expect(zwei.freigegeben_von).toBe("Neu");
+  });
+
+  it("reicht die Sperre der Bestellung an die Zeile durch (11.10.2026)", () => {
+    const [frei] = buchhaltungZeilen([rechnung()]);
+    expect(frei.gesperrt_am).toBeNull();
+    const [z] = buchhaltungZeilen([
+      rechnung({
+        bestellungen: {
+          ...rechnung().bestellungen!,
+          gesperrt_am: "2026-10-11T08:00:00Z",
+          gesperrt_von: "NJ",
+          sperrgrund: "Rechnung beim Anwalt",
+        },
+      }),
+    ]);
+    expect(z.gesperrt_am).toBe("2026-10-11T08:00:00Z");
+    expect(z.gesperrt_von).toBe("NJ");
+    expect(z.sperrgrund).toBe("Rechnung beim Anwalt");
   });
 
   it("laesst Belege ohne Bestellung aus und sortiert nach Freigabe absteigend", () => {

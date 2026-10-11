@@ -153,6 +153,10 @@ export type Bestellung = {
   bezahlt_von?: string | null;
   bezahlt_bereits?: boolean | null;
   zahlungsmethode?: string | null;
+  // 11.10.2026 — Rechnung gesperrt mit Grund (lib/sperre.ts).
+  gesperrt_am?: string | null;
+  gesperrt_von?: string | null;
+  sperrgrund?: string | null;
 };
 
 export type ProjektStats = {

@@ -33,7 +33,7 @@ export default async function BuchhaltungPage() {
     supabase
       .from("dokumente")
       .select(
-        "id, bestellung_id, gesamtbetrag, faelligkeitsdatum, bezahlt_am, bezahlt_von, archiviert_am, bestellnummer_erkannt, storage_pfad, created_at, bezahlt_bereits, zahlungsmethode, bestellungen!inner(bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, betrag, waehrung, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, freigaben(freigegeben_von_name, freigegeben_am))",
+        "id, bestellung_id, gesamtbetrag, faelligkeitsdatum, bezahlt_am, bezahlt_von, archiviert_am, bestellnummer_erkannt, storage_pfad, created_at, bezahlt_bereits, zahlungsmethode, bestellungen!inner(bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, betrag, waehrung, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, mahnung_am, mahnung_count, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, gesperrt_am, gesperrt_von, sperrgrund, freigaben(freigegeben_von_name, freigegeben_am))",
       )
       .eq("typ", "rechnung")
       // Archivierte Rechnungen gehören ins Archiv, nicht in die Buchhaltung.

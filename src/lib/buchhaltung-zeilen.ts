@@ -39,6 +39,10 @@ export interface RechnungMitBestellung {
     kundennummer: string | null;
     projekt_referenz: string | null;
     ist_gutschrift: boolean | null;
+    // 11.10.2026 — Sperre (lib/sperre.ts): Buchhaltung sieht sie und zahlt nicht.
+    gesperrt_am: string | null;
+    gesperrt_von: string | null;
+    sperrgrund: string | null;
     freigaben: Array<{ freigegeben_von_name: string | null; freigegeben_am: string | null }> | null;
   } | null;
 }
@@ -82,6 +86,9 @@ export function buchhaltungZeilen(rechnungen: ReadonlyArray<RechnungMitBestellun
       ist_gutschrift: b.ist_gutschrift || false,
       bezahlt_bereits: r.bezahlt_bereits ?? null,
       zahlungsmethode: r.zahlungsmethode ?? null,
+      gesperrt_am: b.gesperrt_am ?? null,
+      gesperrt_von: b.gesperrt_von ?? null,
+      sperrgrund: b.sperrgrund ?? null,
     });
   }
   return zeilen.sort((a, b) => (b.freigegeben_am ?? "").localeCompare(a.freigegeben_am ?? ""));

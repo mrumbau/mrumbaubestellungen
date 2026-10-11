@@ -257,6 +257,8 @@ export type Database = {
           bezahlt_von: string | null
           created_at: string
           faelligkeitsdatum: string | null
+          gesperrt_am: string | null
+          gesperrt_von: string | null
           haendler_id: string | null
           haendler_name: string | null
           hat_aufmass: boolean | null
@@ -285,6 +287,7 @@ export type Database = {
           projekt_vorschlag_methode: string | null
           reply_token: string | null
           reply_token_used_at: string | null
+          sperrgrund: string | null
           status: string
           subunternehmer_id: string | null
           tracking_nummer: string | null
@@ -314,6 +317,8 @@ export type Database = {
           bezahlt_von?: string | null
           created_at?: string
           faelligkeitsdatum?: string | null
+          gesperrt_am?: string | null
+          gesperrt_von?: string | null
           haendler_id?: string | null
           haendler_name?: string | null
           hat_aufmass?: boolean | null
@@ -342,6 +347,7 @@ export type Database = {
           projekt_vorschlag_methode?: string | null
           reply_token?: string | null
           reply_token_used_at?: string | null
+          sperrgrund?: string | null
           status?: string
           subunternehmer_id?: string | null
           tracking_nummer?: string | null
@@ -371,6 +377,8 @@ export type Database = {
           bezahlt_von?: string | null
           created_at?: string
           faelligkeitsdatum?: string | null
+          gesperrt_am?: string | null
+          gesperrt_von?: string | null
           haendler_id?: string | null
           haendler_name?: string | null
           hat_aufmass?: boolean | null
@@ -399,6 +407,7 @@ export type Database = {
           projekt_vorschlag_methode?: string | null
           reply_token?: string | null
           reply_token_used_at?: string | null
+          sperrgrund?: string | null
           status?: string
           subunternehmer_id?: string | null
           tracking_nummer?: string | null

@@ -5,6 +5,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
+import { istGesperrt, sperrFehler } from "@/lib/sperre";
 
 import { istVerwaltung } from "@/lib/rollen";
 // POST /api/bestellungen/[id]/freigeben – Rechnung freigeben
@@ -69,6 +70,11 @@ export async function POST(
       );
     }
 
+    // 11.10.2026 — gesperrte Rechnung: keine Freigabe (lib/sperre.ts).
+    if (istGesperrt(bestellung)) {
+      return NextResponse.json({ error: sperrFehler(bestellung) }, { status: 423 });
+    }
+
     // Atomare Freigabe via RPC: Status-Update + Freigabe-Insert in einer Transaktion.
     // Unique Constraint auf freigaben(bestellung_id) verhindert Duplikate bei Doppelklick.
     const { data: rpcResult, error: rpcError } = await supabase.rpc("freigeben_bestellung", {
@@ -84,10 +90,13 @@ export async function POST(
     }
 
     // RPC-Return ist Json — wir wissen das Shape (success, error, freigabe_id, duplicate)
-    const r = rpcResult as { success?: boolean; error?: string; freigabe_id?: string; duplicate?: boolean } | null;
+    const r = rpcResult as { success?: boolean; error?: string; sperrgrund?: string | null; freigabe_id?: string; duplicate?: boolean } | null;
     if (r?.success === false) {
       if (r.error === "bereits_freigegeben") {
         return NextResponse.json({ error: "Bestellung wurde bereits freigegeben" }, { status: 409 });
+      }
+      if (r.error === "gesperrt") {
+        return NextResponse.json({ error: sperrFehler({ gesperrt_am: "x", sperrgrund: r.sperrgrund ?? null }) }, { status: 423 });
       }
       logError("/api/bestellungen/[id]/freigeben", "Freigabe-RPC Fehler", r);
       return NextResponse.json({ error: "Freigabe fehlgeschlagen" }, { status: 500 });

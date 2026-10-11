@@ -10,7 +10,9 @@ import {
   IconArrowLeft,
   IconBuilding,
   IconAlertCircle,
+  IconLock,
 } from "@/components/ui/icons";
+import { sperrText } from "@/lib/sperre";
 import { OwnerStatement, type BestellerOption } from "./owner-statement";
 import type { Bestellung, ProjektOption } from "./types";
 import {
@@ -126,6 +128,20 @@ export function DetailHeader({
         padding="none"
         className={hasMahnung ? "mb-5" : "mb-5"}
       >
+        {/* 11.10.2026 — Sperre (lib/sperre.ts) ist das lauteste Element:
+            wer den Vorgang oeffnet, sieht zuerst, dass hier nichts bezahlt
+            oder freigegeben wird, und warum. */}
+        {bestellung.gesperrt_am && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 border-b border-error/30 bg-error-bg px-6 py-2 text-meta text-error"
+          >
+            <IconLock className="h-4 w-4 shrink-0" />
+            <span className="font-semibold uppercase tracking-[0.14em] text-eyebrow">
+              {sperrText(bestellung)}
+            </span>
+          </div>
+        )}
         {/* Mahnung-Banner (Stufe 1, full-width): Drei-Sprachen-Disziplin v2.
             Verdrängt Status visuell — nie zwei laute Elemente nebeneinander. */}
         {hasMahnung && (

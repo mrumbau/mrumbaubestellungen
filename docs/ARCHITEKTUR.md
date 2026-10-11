@@ -109,6 +109,16 @@ Request). Das Workspace-Layout ruft nur diese Funktion; die ganze Liste lädt al
 Die Kopfzahlen des Eingangs liefert `eingang_zaehler(p_ordner)` in einem Aufruf; der Index `idx_dokumente_mail_zwilling`
 hält den Zwillings-Abgleich der Sicht schnell (Migration `2026_10_10_eingang_zaehler_und_index.sql`).
 
+## Rechnung sperren (`lib/sperre.ts`)
+
+Eine strittige Rechnung (beim Anwalt, doppelt, falsch) wird gesperrt statt verworfen: der Vorgang bleibt mit allen
+Belegen stehen, aber Freigabe und Bezahlt-Markierung sind blockiert — in den API-Routen, in der Server-Action, per
+Mail-Antwort und zuletzt in `freigeben_bestellung()` selbst (Migration `2026_10_11_rechnung_sperren.sql`).
+Die Sperre liegt quer zum Status (`gesperrt_am`, `gesperrt_von`, `sperrgrund` auf `bestellungen`), der Grund ist
+Pflicht. Sperren darf, wer freigeben dürfte, plus die Buchhaltung; aufheben nur die Verwaltung oder der Urheber.
+Route `POST`/`DELETE /api/bestellungen/[id]/sperren`; HTTP 423 heißt „gesperrt“. Sichtbar als rotes „Gesperrt“ in
+Liste, Buchhaltung, Dashboard und Detailkopf, Grund im Tooltip; jede Sperre und Aufhebung steht im Kommentar-Strom.
+
 ## Datenbank — die Objekte, die man kennen muss
 
 | Objekt | Zweck |
@@ -136,7 +146,7 @@ Betriebsnotiz: Das Supabase-MCP-Werkzeug hängt bei Funktionskörpern mit nackte
 | Seite | Datei | Zweck |
 | --- | --- | --- |
 | Bestellungen (Pool / In Arbeit / Archiv) | `app/(dashboard)/bestellungen/(workspace)/*` → `components/bestellungen-tabelle.tsx`, `pool-inbox.tsx` | tägliche Arbeit |
-| Bestelldetail | `app/(dashboard)/bestellungen/[id]/_components/*` | Belege, Freigabe (`approval-panel.tsx`); unter jedem Beleg steht, warum er hier hängt |
+| Bestelldetail | `app/(dashboard)/bestellungen/[id]/_components/*` | Belege, Freigabe und Sperre (`approval-panel.tsx`); unter jedem Beleg steht, warum er hier hängt |
 | Listenhinweis „Zuordnung prüfen“ | `lib/zuordnung-begruendung.ts` → `zuordnungsHinweis()` | ein Beleg hängt nur über ähnliche Nummer, Querverweis oder Händler am Vorgang |
 | Eingang | `app/(dashboard)/eingang/*` | Kontrolle des Rechnungsordners: abhaken, erneut verarbeiten, einer Bestellung zuordnen (Replay mit `bestellung_id`). Ein schon vorhandener Beleg zählt beim Replay wie gespeichert, sonst entstünde ein zweiter Beleg ohne PDF aus dem Mailtext |
 | Buchhaltung | `components/buchhaltung-client.tsx` | Bezahlt markieren, DATEV |

@@ -33,6 +33,7 @@ interface BulkBestellung {
   bestellungsart: string;
   hat_rechnung: boolean;
   ist_gutschrift?: boolean;
+  gesperrt_am?: string | null;
 }
 
 function makeSupabase(opts: {
@@ -72,6 +73,27 @@ describe("POST /api/bestellungen/bulk-freigeben", () => {
     mockGetProfil.mockReset();
     mockCheckCsrf.mockReset().mockReturnValue(true);
     mockCreateClient.mockReset();
+  });
+
+  // 11.10.2026 — Sperre (lib/sperre.ts): gesperrte Rechnung bleibt liegen,
+  // die anderen gehen durch.
+  it("gesperrte Rechnung landet in `gesperrt`, RPC nur fuer die freie", async () => {
+    mockGetProfil.mockResolvedValue(TEST_PROFIL.admin);
+    const sb = makeSupabase({
+      bestellungen: [
+        { id: ID_A, status: "vollstaendig", besteller_kuerzel: "MT", bestellungsart: "material", hat_rechnung: true, gesperrt_am: "2026-10-11T08:00:00Z" },
+        { id: ID_B, status: "vollstaendig", besteller_kuerzel: "MT", bestellungsart: "material", hat_rechnung: true, gesperrt_am: null },
+      ],
+    });
+    mockCreateClient.mockReturnValue(sb);
+    const { POST } = await import("../route");
+    const res = await POST(makeRequest({ ids: [ID_A, ID_B] }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.gesperrt).toEqual([ID_A]);
+    expect(json.freigegeben).toEqual([ID_B]);
+    expect(sb.rpc).toHaveBeenCalledTimes(1);
+    expect(sb.rpc).toHaveBeenCalledWith("freigeben_bestellung", expect.objectContaining({ p_bestellung_id: ID_B }));
   });
 
   it("403 bei CSRF-Fail", async () => {

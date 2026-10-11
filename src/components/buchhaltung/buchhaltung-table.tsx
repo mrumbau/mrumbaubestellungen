@@ -11,6 +11,9 @@
 import { formatDatum, formatBetrag } from "@/lib/formatters";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
+import { SperreBadge } from "@/components/ui/cells/sperre-badge";
+import { IconLock } from "@/components/ui/icons";
+import { sperrText } from "@/lib/sperre";
 import { type BuchhaltungRow, isFaelligBald, isUeberfaellig } from "./types";
 import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
 
@@ -126,7 +129,10 @@ export function BuchhaltungTable({
                       type="checkbox"
                       checked={selectedIds.has(r.id)}
                       onChange={() => onToggleSelect(r.id)}
-                      className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer"
+                      // 11.10.2026 — gesperrte Rechnungen gehen nicht in den Sammel-Bezahlt-Lauf.
+                      disabled={tab === "offen" && !!r.gesperrt_am}
+                      title={tab === "offen" && r.gesperrt_am ? sperrText(r) : undefined}
+                      className="w-4 h-4 rounded border-line-strong text-brand focus:ring-brand/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                     />
                   </td>
                 )}
@@ -197,6 +203,8 @@ export function BuchhaltungTable({
                       bezahltBereits={r.bezahlt_bereits ?? null}
                       zahlungsmethode={r.zahlungsmethode ?? null}
                     />
+                    {/* 11.10.2026 — Sperre mit Grund im Tooltip (lib/sperre.ts). */}
+                    <SperreBadge bestellung={r} />
                   </span>
                 </td>
                 <td className="px-4 py-3.5 text-center">
@@ -318,6 +326,15 @@ export function BuchhaltungTable({
                         </div>
                       )}
                     </div>
+                  ) : r.gesperrt_am ? (
+                    // 11.10.2026 — gesperrt: kein Haken, Schloss mit Grund.
+                    <span
+                      className="inline-flex items-center justify-center w-6 h-6 text-error"
+                      title={sperrText(r)}
+                      aria-label={sperrText(r)}
+                    >
+                      <IconLock className="w-4 h-4" />
+                    </span>
                   ) : kannBezahlen ? (
                     <button
                       type="button"

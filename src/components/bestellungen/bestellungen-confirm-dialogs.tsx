@@ -49,8 +49,9 @@ export function BestellungenConfirmDialogs({
   bestellungen,
   selected,
 }: BestellungenConfirmDialogsProps) {
+  // 11.10.2026 — gesperrte Rechnungen (lib/sperre.ts) zaehlen als uebersprungen.
   const freigabeFaehig = bestellungen.filter(
-    (b) => selected.has(b.id) && b.hat_rechnung && b.status !== "freigegeben",
+    (b) => selected.has(b.id) && b.hat_rechnung && b.status !== "freigegeben" && !b.gesperrt_am,
   ).length;
   const skipped = selected.size - freigabeFaehig;
 
@@ -147,7 +148,7 @@ export function BestellungenConfirmDialogs({
       >
         <p className="text-body-sm text-foreground-muted">
           {skipped > 0
-            ? `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt. ${skipped} ausgewählte Bestellung${skipped === 1 ? "" : "en"} überspringen wir — keine Rechnung oder bereits freigegeben.`
+            ? `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt. ${skipped} ausgewählte Bestellung${skipped === 1 ? "" : "en"} überspringen wir — keine Rechnung, bereits freigegeben oder gesperrt.`
             : `${freigabeFaehig} Rechnung${freigabeFaehig === 1 ? "" : "en"} werden an die Buchhaltung übermittelt.`}
         </p>
       </Modal>

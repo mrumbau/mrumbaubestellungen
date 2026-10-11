@@ -261,3 +261,13 @@ export function IconAlertTriangle(props: IconProps) {
     </svg>
   );
 }
+
+/** 11.10.2026 — Rechnung gesperrt (lib/sperre.ts). */
+export function IconLock(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1" />
+      <path d="M5.5 7V5a2.5 2.5 0 015 0v2" />
+    </svg>
+  );
+}

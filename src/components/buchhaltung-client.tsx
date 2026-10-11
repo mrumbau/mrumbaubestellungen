@@ -312,7 +312,11 @@ export function BuchhaltungClient({
         const parts: string[] = [];
         if (marked.length > 0) parts.push(`${marked.length} bezahlt`);
         if (alreadyPaid.length > 0) parts.push(`${alreadyPaid.length} schon bezahlt`);
-        if (skipped.length > 0) parts.push(`${skipped.length} übersprungen`);
+        // 11.10.2026 — gesperrte Rechnungen (lib/sperre.ts) extra nennen.
+        const gesperrtN = skipped.filter((s) => s.reason === "gesperrt").length;
+        const sonstN = skipped.length - gesperrtN;
+        if (gesperrtN > 0) parts.push(`${gesperrtN} gesperrt`);
+        if (sonstN > 0) parts.push(`${sonstN} übersprungen`);
         if (errors.length > 0) parts.push(`${errors.length} Fehler`);
         setBezahltError(parts.join(" · "));
       }

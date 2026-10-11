@@ -82,7 +82,7 @@ export default async function DashboardPage({
     supabase.from("benutzer_rollen").select("dashboard_config").eq("user_id", profil.user_id).maybeSingle(),
     kpiQuery,
     eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").order("created_at", { ascending: false }).limit(5)),
-    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at").eq("status", "vollstaendig").order("created_at", { ascending: false }).limit(10)),
+    eigene(supabase.from("bestellungen").select("id, bestellnummer, haendler_name, besteller_kuerzel, besteller_name, betrag, waehrung, status, bestellungsart, created_at, gesperrt_am, gesperrt_von, sperrgrund").eq("status", "vollstaendig").order("created_at", { ascending: false }).limit(10)),
     supabase.from("projekte").select("id, name, farbe, budget, status").in("status", ["aktiv", "pausiert"]).order("name"),
     eigene(supabase.from("bestellungen").select("projekt_id, betrag, status").not("projekt_id", "is", null)),
     supabase.from("abo_anbieter").select("id, name, intervall, erwarteter_betrag, naechste_rechnung, vertragsende, kuendigungsfrist_tage, letzter_betrag"),

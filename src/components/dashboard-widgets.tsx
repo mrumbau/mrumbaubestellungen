@@ -8,6 +8,7 @@ import { DashboardKIZusammenfassung } from "@/components/dashboard-ki";
 import { displayBestellnummer } from "@/lib/bestellung-utils";
 import { haendlerDisplay } from "@/lib/haendler-display";
 import { BestellerCell } from "@/components/ui/cells/besteller-cell";
+import { SperreBadge } from "@/components/ui/cells/sperre-badge";
 import { DashboardPriorisierung } from "@/components/dashboard-priorisierung";
 // 22.05.2026 — "Zu prüfen"-Widgets (DashboardUnzugeordnet, DashboardNeueHaendler,
 // DashboardKiVorschlaege, DashboardNeueKunden, DashboardNeueSubunternehmer) sind
@@ -36,6 +37,10 @@ interface BestellungItem {
   // 02.06.2026 (Pool Phase 1) — Pipeline-Vorschlag-Provenance, optional.
   vorschlag_kuerzel?: string | null;
   vorschlag_konfidenz?: number | null;
+  // 11.10.2026 — Sperre (lib/sperre.ts): kein Schnell-Freigeben.
+  gesperrt_am?: string | null;
+  gesperrt_von?: string | null;
+  sperrgrund?: string | null;
 }
 
 interface TopProjekt {
@@ -912,11 +917,15 @@ export function DashboardWidgets(props: DashboardWidgetsProps) {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <QuickAction
-                            bestellungId={b.id}
-                            status={b.status}
-                            onSuccess={manualRefresh}
-                          />
+                          {b.gesperrt_am ? (
+                            <SperreBadge bestellung={b} />
+                          ) : (
+                            <QuickAction
+                              bestellungId={b.id}
+                              status={b.status}
+                              onSuccess={manualRefresh}
+                            />
+                          )}
                           <span className={`status-tag ${s.bg} ${s.text}`}>
                             <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm" style={{ background: s.color }} />
                             <s.Icon className="w-3 h-3 mr-1 shrink-0" aria-hidden="true" />
