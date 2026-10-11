@@ -49,7 +49,7 @@ export const HARD_CAP = 500;
 // 10.10.2026 — zuordnung:ki_roh_daten->_zuordnung: wie der Beleg an die
 // Bestellung kam (lib/zuordnung-begruendung.ts), fuer den Listenhinweis.
 const BESTELLUNG_SELECT =
-  "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, bezahlt_am, bezahlt_von, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, vorausbezahlt, updated_at, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, bezahlt_bereits, zahlungsmethode, typ, zuordnung:ki_roh_daten->_zuordnung)";
+  "id, bestellnummer, auftragsnummer, lieferscheinnummer, haendler_name, haendler_id, besteller_kuerzel, besteller_name, vorschlag_kuerzel, vorschlag_konfidenz, zuordnung_methode, betrag, waehrung, status, bestellungsart, hat_bestellbestaetigung, hat_lieferschein, hat_rechnung, hat_versandbestaetigung, projekt_id, projekt_name, mahnung_am, mahnung_count, bezahlt_am, bezahlt_von, created_at, bestelldatum, faelligkeitsdatum, kundennummer, projekt_referenz, ist_gutschrift, vorausbezahlt, gesperrt_am, gesperrt_von, sperrgrund, updated_at, dokumente(bestellnummer_erkannt, auftragsnummer, lieferscheinnummer, bezahlt_bereits, zahlungsmethode, typ, zuordnung:ki_roh_daten->_zuordnung)";
 
 export interface LaneLoadParams {
   lane: Lane;

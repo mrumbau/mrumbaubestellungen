@@ -72,6 +72,10 @@ export function useBestelldetail({
   const [showVerwerfenDialog, setShowVerwerfenDialog] = useState(false);
   const [verwerfenLoading, setVerwerfenLoading] = useState(false);
 
+  // 11.10.2026 — Sperre (lib/sperre.ts)
+  const [showSperreDialog, setShowSperreDialog] = useState(false);
+  const [sperreLoading, setSperreLoading] = useState(false);
+
   // Bestellungsart
   const [bestellungsartLoading, setBestellungsartLoading] = useState(false);
   const [aktuelleArt, setAktuelleArt] = useState<Bestellungsart>(
@@ -416,6 +420,56 @@ export function useBestelldetail({
     }
   }, [bestellungId, router]);
 
+  // ─── Sperre ─────────────────────────────────────────────
+  // Nach der eigenen Aktion wird ausdruecklich nachgeladen (siehe
+  // use-bestellungen-actions.ts: Realtime ist fuer die Aenderungen anderer).
+
+  const handleSperren = useCallback(
+    async (grund: string): Promise<boolean> => {
+      setSperreLoading(true);
+      try {
+        const res = await fetch(`/api/bestellungen/${bestellungId}/sperren`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ grund }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          setActionError(data?.error || "Sperre konnte nicht gesetzt werden");
+          return false;
+        }
+        setActionError(null);
+        setShowSperreDialog(false);
+        router.refresh();
+        return true;
+      } catch {
+        setActionError("Netzwerkfehler beim Sperren");
+        return false;
+      } finally {
+        setSperreLoading(false);
+      }
+    },
+    [bestellungId, router],
+  );
+
+  const handleEntsperren = useCallback(async () => {
+    setSperreLoading(true);
+    try {
+      const res = await fetch(`/api/bestellungen/${bestellungId}/sperren`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setActionError(data?.error || "Sperre konnte nicht aufgehoben werden");
+        return;
+      }
+      setActionError(null);
+      router.refresh();
+    } catch {
+      setActionError("Netzwerkfehler beim Aufheben der Sperre");
+    } finally {
+      setSperreLoading(false);
+    }
+  }, [bestellungId, router]);
+
   // ─── Mahnung quittieren ─────────────────────────────────
 
   const handleMahnungQuittieren = useCallback(async () => {
@@ -517,6 +571,13 @@ export function useBestelldetail({
     setShowVerwerfenDialog,
     verwerfenLoading,
     handleVerwerfen,
+
+    // Sperre
+    showSperreDialog,
+    setShowSperreDialog,
+    sperreLoading,
+    handleSperren,
+    handleEntsperren,
 
     // Mahnung
     handleMahnungQuittieren,

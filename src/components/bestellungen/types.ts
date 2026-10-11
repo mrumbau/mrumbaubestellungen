@@ -67,6 +67,11 @@ export interface Bestellung {
   // gleicher Haendler) zugeordnet wurde, als Text. Die Liste zeigt dann
   // "Zuordnung pruefen", damit man weiss, welche Vorgaenge man aufmachen muss.
   zuordnung_hinweis?: string | null;
+  // 11.10.2026 — Rechnung gesperrt mit Grund (lib/sperre.ts). Blockiert
+  // Freigabe und Bezahlt-Markierung, bleibt aber in ihrer Liste stehen.
+  gesperrt_am?: string | null;
+  gesperrt_von?: string | null;
+  sperrgrund?: string | null;
 }
 
 export interface ProjektOption {

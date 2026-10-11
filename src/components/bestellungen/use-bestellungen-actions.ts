@@ -133,6 +133,15 @@ export function useBestellungenActions({
         });
         return;
       }
+      // 11.10.2026 — 423: Rechnung gesperrt (lib/sperre.ts). Liste nachladen,
+      // damit das Sperr-Kennzeichen sichtbar wird, falls es gerade neu ist.
+      if (res.status === 423) {
+        router.refresh();
+        toast.error("Rechnung gesperrt", {
+          description: data?.error ?? "Erst die Sperre im Vorgang aufheben, dann freigeben.",
+        });
+        return;
+      }
       toast.error("Freigabe fehlgeschlagen", {
         description: data?.error ?? `Server antwortete mit Status ${res.status}.`,
       });
@@ -228,12 +237,14 @@ export function useBestellungenActions({
       const alreadyN = (data.already_freigegeben ?? []).length;
       const noRechnungN = (data.no_rechnung ?? []).length;
       const noPermissionN = (data.no_permission ?? []).length;
+      const gesperrtN = (data.gesperrt ?? []).length;
       const errorsN = (data.errors ?? []).length;
       const parts: string[] = [];
       if (freigegebenN > 0) parts.push(`${freigegebenN} freigegeben`);
       if (alreadyN > 0) parts.push(`${alreadyN} bereits freigegeben`);
       if (noRechnungN > 0) parts.push(`${noRechnungN} ohne Rechnung`);
       if (noPermissionN > 0) parts.push(`${noPermissionN} ohne Berechtigung`);
+      if (gesperrtN > 0) parts.push(`${gesperrtN} gesperrt`);
       if (errorsN > 0) parts.push(`${errorsN} Fehler`);
 
       setShowFreigebenDialog(false);
@@ -262,7 +273,7 @@ export function useBestellungenActions({
       // statt pauschal "teilweise erfolgreich". Wenn 0 freigegeben +
       // alle als "bereits freigegeben" zurückkommen → kein Fehler-Gefühl
       // sondern info-Toast (Race mit anderem Tab/User).
-      const problemsN = errorsN + noRechnungN + noPermissionN;
+      const problemsN = errorsN + noRechnungN + noPermissionN + gesperrtN;
       if (freigegebenN > 0 && problemsN > 0) {
         toast.warning("Bulk-Freigabe teilweise erfolgreich", {
           description: parts.join(" · "),
@@ -278,6 +289,10 @@ export function useBestellungenActions({
       } else if (freigegebenN === 0 && noRechnungN > 0) {
         toast.error("Rechnung fehlt", {
           description: `${noRechnungN} ${noRechnungN === 1 ? "Bestellung hat" : "Bestellungen haben"} noch keine Rechnung. Erst Rechnung-PDF zuordnen, dann freigeben.`,
+        });
+      } else if (freigegebenN === 0 && gesperrtN > 0) {
+        toast.error("Rechnung gesperrt", {
+          description: `${gesperrtN} ${gesperrtN === 1 ? "Rechnung ist" : "Rechnungen sind"} gesperrt. Grund steht im Vorgang — erst Sperre aufheben, dann freigeben.`,
         });
       } else if (freigegebenN === 0 && errorsN > 0) {
         toast.error("Server-Fehler bei Freigabe", {

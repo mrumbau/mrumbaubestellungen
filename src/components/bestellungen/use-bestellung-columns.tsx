@@ -29,9 +29,11 @@ import { BestellerCell } from "@/components/ui/cells/besteller-cell";
 import { DokumenteCell } from "@/components/ui/cells/dokumente-cell";
 import { StatusCell } from "@/components/ui/cells/status-cell";
 import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
+import { SperreBadge } from "@/components/ui/cells/sperre-badge";
 import { BetragCell } from "@/components/ui/cells/betrag-cell";
 import { Badge, type DataTableColumn } from "@/components/ui";
-import { IconCheck, IconAlertCircle } from "@/components/ui/icons";
+import { IconCheck, IconAlertCircle, IconLock } from "@/components/ui/icons";
+import { sperrText } from "@/lib/sperre";
 import type { Bestellung } from "./types";
 import { shouldShowMahnung, mahnungStufeLabel } from "@/lib/mahnung-display";
 import { ZuordnenRowTrigger } from "./zuordnen-row-trigger";
@@ -239,6 +241,8 @@ export function useBestellungColumns({
               bezahltBereits={b.bezahlt_bereits}
               zahlungsmethode={b.zahlungsmethode}
             />
+            {/* 11.10.2026 — Sperre mit Grund im Tooltip (lib/sperre.ts). */}
+            <SperreBadge bestellung={b} />
           </div>
         ),
       },
@@ -266,6 +270,18 @@ export function useBestellungColumns({
         width: 56,
         align: "right",
         render: (b) => {
+          // 11.10.2026 — gesperrt: statt Haken ein Schloss, Grund im Tooltip.
+          if (b.gesperrt_am) {
+            return (
+              <span
+                className="inline-flex items-center justify-center w-8 h-8 text-error"
+                title={sperrText(b)}
+                aria-label={sperrText(b)}
+              >
+                <IconLock className="w-4 h-4" />
+              </span>
+            );
+          }
           const kannFreigeben = b.status !== "freigegeben" && b.hat_rechnung;
           if (!kannFreigeben) {
             return <span className="text-line-strong text-[12px]">–</span>;

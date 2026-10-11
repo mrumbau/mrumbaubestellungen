@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const { data: dokus, error: loadError } = await serviceClient
       .from("dokumente")
       .select(
-        "id, typ, storage_pfad, bezahlt_am, gesamtbetrag, bestellnummer_erkannt, bestellung_id, bestellung:bestellungen!inner(id, status, bestellnummer, haendler_name, betrag)",
+        "id, typ, storage_pfad, bezahlt_am, gesamtbetrag, bestellnummer_erkannt, bestellung_id, bestellung:bestellungen!inner(id, status, bestellnummer, haendler_name, betrag, gesperrt_am)",
       )
       .in("id", ids);
 
@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
         bestellnummer: string | null;
         haendler_name: string | null;
         betrag: number | null;
+        gesperrt_am: string | null;
       } | null;
       if (!bestellung) {
         result.skipped.push({ id, reason: "bestellung_fehlt" });
@@ -128,6 +129,11 @@ export async function POST(request: NextRequest) {
       }
       if (bestellung.status !== "freigegeben") {
         result.skipped.push({ id, reason: "nicht_freigegeben" });
+        continue;
+      }
+      // 11.10.2026 — gesperrte Rechnung wird nicht bezahlt (lib/sperre.ts).
+      if (bestellung.gesperrt_am) {
+        result.skipped.push({ id, reason: "gesperrt" });
         continue;
       }
       if (doku.bezahlt_am) {

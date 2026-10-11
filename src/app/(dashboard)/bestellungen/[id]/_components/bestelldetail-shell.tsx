@@ -5,7 +5,9 @@ import type { BenutzerProfil } from "@/lib/auth";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
+import { bereinigeSperrgrund, SPERRGRUND_MAX, SPERRGRUND_MIN } from "@/lib/sperre";
 import { useIsDesktop } from "@/lib/hooks/use-is-desktop";
 import { useBestelldetail } from "./use-bestelldetail";
 import { DocumentPanel } from "./document-panel";
@@ -87,6 +89,10 @@ export function BestelldetailShell({
   const [mobileSection, setMobileSection] = useState<"dokumente" | "details" | "aktionen">(
     "dokumente",
   );
+  // 11.10.2026 — Grund fuer die Sperre; der Dialog gibt erst frei, wenn er
+  // nach lib/sperre.ts als Grund durchgeht.
+  const [sperrGrund, setSperrGrund] = useState("");
+  const sperrGrundOk = bereinigeSperrgrund(sperrGrund) !== null;
 
   // 22.05.2026 (Perf Stufe 2.7) — Tailwind hidden/md:hidden mountete vorher
   // BEIDE Layout-Subtrees (Desktop + Mobile) gleichzeitig. Folge: DocumentPanel
@@ -175,6 +181,9 @@ export function BestelldetailShell({
               onMahnungQuittieren={bd.handleMahnungQuittieren}
               bezahltBereits={bezahltBereits}
               zahlungsmethode={zahlungsmethode}
+              onOpenSperreDialog={() => bd.setShowSperreDialog(true)}
+              onEntsperren={bd.handleEntsperren}
+              sperreLoading={bd.sperreLoading}
             />
           </SidebarBlock>
 
@@ -342,6 +351,9 @@ export function BestelldetailShell({
                 onMahnungQuittieren={bd.handleMahnungQuittieren}
                 bezahltBereits={bezahltBereits}
                 zahlungsmethode={zahlungsmethode}
+                onOpenSperreDialog={() => bd.setShowSperreDialog(true)}
+                onEntsperren={bd.handleEntsperren}
+                sperreLoading={bd.sperreLoading}
                 variant="mobile"
               />
             </SidebarBlock>
@@ -438,6 +450,50 @@ export function BestelldetailShell({
         <p className="text-body-sm text-foreground-muted">
           Die Bestellung wird komplett aus dem System entfernt — mit allen Belegen, Mahnungen und Kommentaren. Das kann nicht rückgängig gemacht werden.
         </p>
+      </Modal>
+      {/* 11.10.2026 — Rechnung sperren: Grund ist Pflicht (lib/sperre.ts). */}
+      <Modal
+        open={bd.showSperreDialog}
+        onClose={() => bd.setShowSperreDialog(false)}
+        size="sm"
+        title="Rechnung sperren"
+        variant="destructive"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => bd.setShowSperreDialog(false)}
+              disabled={bd.sperreLoading}
+              data-modal-cancel
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => bd.handleSperren(sperrGrund)}
+              loading={bd.sperreLoading}
+              disabled={!sperrGrundOk || bd.sperreLoading}
+            >
+              Sperren
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-body-sm text-foreground-muted mb-3">
+          Der Vorgang bleibt mit allen Belegen stehen. Solange die Sperre gilt, gibt es keine Freigabe und keine Zahlung.
+          Aufheben kann sie nur, wer sie gesetzt hat, oder die Geschäftsführung.
+        </p>
+        <Textarea
+          label="Grund"
+          required
+          rows={3}
+          maxLength={SPERRGRUND_MAX}
+          value={sperrGrund}
+          onChange={(e) => setSperrGrund(e.target.value)}
+          placeholder="z. B. Rechnung liegt beim Anwalt"
+          hint={`Mindestens ${SPERRGRUND_MIN} Zeichen — steht sichtbar am Vorgang.`}
+          autoFocus
+        />
       </Modal>
     </>
   );

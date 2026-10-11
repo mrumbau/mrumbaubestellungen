@@ -13,6 +13,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getBenutzerProfil } from "@/lib/auth";
 import { isValidUUID } from "@/lib/validation";
 import { logError } from "@/lib/logger";
+import { istGesperrt, sperrFehler } from "@/lib/sperre";
 
 import { istVerwaltung } from "@/lib/rollen";
 type FreigabenResult = { success: true } | { success: false; error: string; code?: number };
@@ -67,6 +68,11 @@ export async function freigebenBestellung(
     };
   }
 
+  // 11.10.2026 — gesperrte Rechnung: keine Freigabe (lib/sperre.ts).
+  if (istGesperrt(bestellung)) {
+    return { success: false, error: sperrFehler(bestellung), code: 423 };
+  }
+
   const { data: rpcResult, error: rpcError } = await supabase.rpc("freigeben_bestellung", {
     p_bestellung_id: bestellungId,
     p_kuerzel: profil.kuerzel,
@@ -80,11 +86,14 @@ export async function freigebenBestellung(
   }
 
   const r = rpcResult as
-    | { success?: boolean; error?: string; freigabe_id?: string; duplicate?: boolean }
+    | { success?: boolean; error?: string; sperrgrund?: string | null; freigabe_id?: string; duplicate?: boolean }
     | null;
   if (r?.success === false) {
     if (r.error === "bereits_freigegeben") {
       return { success: false, error: "Bestellung wurde bereits freigegeben", code: 409 };
+    }
+    if (r.error === "gesperrt") {
+      return { success: false, error: sperrFehler({ gesperrt_am: "x", sperrgrund: r.sperrgrund ?? null }), code: 423 };
     }
     logError("action:freigebenBestellung", "Freigabe-RPC Fehler", r);
     return { success: false, error: "Freigabe fehlgeschlagen", code: 500 };

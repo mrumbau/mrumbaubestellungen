@@ -245,7 +245,7 @@ export async function applyReplyAction(
   // 3. Bestellung laden für Action-Validation
   const { data: bestellung } = await supabase
     .from("bestellungen")
-    .select("id, status, hat_rechnung, bezahlt_am, besteller_kuerzel, bestellungsart")
+    .select("id, status, hat_rechnung, bezahlt_am, besteller_kuerzel, bestellungsart, gesperrt_am")
     .eq("id", bestellungId)
     .maybeSingle();
 
@@ -268,6 +268,10 @@ export async function applyReplyAction(
     }
     if (bestellung.status === "freigegeben") {
       return { success: true, skipped: true, reason: "bereits_freigegeben" };
+    }
+    // 11.10.2026 — gesperrte Rechnung: auch per Mail-Antwort keine Freigabe.
+    if (bestellung.gesperrt_am) {
+      return { success: false, skipped: true, reason: "gesperrt" };
     }
 
     // Nutze die existierende RPC, die auch Audit-Logs schreibt
@@ -292,6 +296,9 @@ export async function applyReplyAction(
   if (action === "bezahlt") {
     if (bestellung.status !== "freigegeben") {
       return { success: false, skipped: true, reason: "nicht_freigegeben" };
+    }
+    if (bestellung.gesperrt_am) {
+      return { success: false, skipped: true, reason: "gesperrt" };
     }
     if (bestellung.bezahlt_am) {
       return { success: true, skipped: true, reason: "bereits_bezahlt" };

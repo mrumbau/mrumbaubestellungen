@@ -8,6 +8,7 @@ import { logError, logInfo } from "@/lib/logger";
 import { requireRoles } from "@/lib/auth";
 import { sendeRechnungAnDatev, stempelPdfMitDatev } from "@/lib/email";
 import { angemeldeterNutzer } from "@/lib/auth-claims";
+import { istGesperrt, sperrFehler } from "@/lib/sperre";
 
 // POST /api/dokumente/[id]/bezahlt — Rechnungs-Dokument als bezahlt markieren.
 //
@@ -57,7 +58,7 @@ export async function POST(
     const { data: doku } = await serviceClient
       .from("dokumente")
       .select(
-        "id, typ, storage_pfad, bezahlt_am, gesamtbetrag, bestellnummer_erkannt, bestellung_id, bestellung:bestellungen!inner(id, status, bestellnummer, haendler_name, betrag)",
+        "id, typ, storage_pfad, bezahlt_am, gesamtbetrag, bestellnummer_erkannt, bestellung_id, bestellung:bestellungen!inner(id, status, bestellnummer, haendler_name, betrag, gesperrt_am, sperrgrund)",
       )
       .eq("id", dokumentId)
       .maybeSingle();
@@ -74,12 +75,19 @@ export async function POST(
       bestellnummer: string | null;
       haendler_name: string | null;
       betrag: number | null;
+      gesperrt_am: string | null;
+      sperrgrund: string | null;
     } | null;
     if (!bestellung) {
       return NextResponse.json({ error: ERRORS.NICHT_GEFUNDEN }, { status: 404 });
     }
     if (bestellung.status !== "freigegeben") {
       return NextResponse.json({ error: "Nur freigegebene Rechnungen können als bezahlt markiert werden" }, { status: 400 });
+    }
+    // 11.10.2026 — gesperrte Rechnung wird nicht bezahlt (lib/sperre.ts).
+    // Zuruecksetzen (bezahlt=false) bleibt erlaubt.
+    if (bezahlt && istGesperrt(bestellung)) {
+      return NextResponse.json({ error: sperrFehler(bestellung) }, { status: 423 });
     }
 
     // Idempotenz: schon bezahlt + bezahlt=true → ohne erneuten Update zurückgeben

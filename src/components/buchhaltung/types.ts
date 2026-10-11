@@ -36,6 +36,11 @@ export interface BuchhaltungRow {
   // erscheint blaues PayPal-P (oder grüner Check für andere Methoden).
   bezahlt_bereits?: boolean | null;
   zahlungsmethode?: string | null;
+  // 11.10.2026 — Rechnung gesperrt mit Grund (lib/sperre.ts): rotes Kennzeichen,
+  // kein Bezahlt-Haken.
+  gesperrt_am?: string | null;
+  gesperrt_von?: string | null;
+  sperrgrund?: string | null;
 }
 
 export function isFaelligBald(datum: string | null) {

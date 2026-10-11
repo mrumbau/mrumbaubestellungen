@@ -4,10 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/cn";
-import { IconCheck, IconTrash } from "@/components/ui/icons";
+import { IconCheck, IconLock, IconTrash } from "@/components/ui/icons";
 import { PayPalBadge } from "@/components/ui/cells/paypal-badge";
 import type { Bestellung, Freigabe } from "./types";
 import type { BenutzerProfil } from "@/lib/auth";
+import { darfEntsperren, darfSperren, istGesperrt } from "@/lib/sperre";
 
 import { istVerwaltung } from "@/lib/rollen";
 /**
@@ -42,6 +43,9 @@ export function ApprovalPanel({
   onMahnungQuittieren,
   bezahltBereits,
   zahlungsmethode,
+  onOpenSperreDialog,
+  onEntsperren,
+  sperreLoading = false,
   variant = "sidebar",
 }: {
   bestellung: Bestellung;
@@ -59,9 +63,20 @@ export function ApprovalPanel({
   bezahltBereits?: boolean | null;
   /** 03.06.2026 — Aggregiert aus dokumente[] vom Shell. */
   zahlungsmethode?: string | null;
+  /** 11.10.2026 — Rechnung sperren mit Grund (lib/sperre.ts). */
+  onOpenSperreDialog?: () => void;
+  onEntsperren?: () => void;
+  sperreLoading?: boolean;
   variant?: "sidebar" | "mobile" | "mobile-bar";
 }) {
   const istGutschrift = bestellung.ist_gutschrift === true;
+  // 11.10.2026 — Sperre: blockiert Freigabe (und in der Buchhaltung die
+  // Zahlung), bleibt aber sichtbar. Wer sie setzen oder aufheben darf,
+  // entscheidet lib/sperre.ts — hier nur die Anzeige.
+  const gesperrt = istGesperrt(bestellung);
+  const kannSperren =
+    !!onOpenSperreDialog && !gesperrt && !bestellung.bezahlt_am && darfSperren(profil, bestellung);
+  const kannEntsperren = !!onEntsperren && gesperrt && darfEntsperren(profil, bestellung);
   // 21.09.2026 — Vorausbezahlt (Amazon Business, PayPal-Shops) braucht wie
   // eine Gutschrift keine Freigabe: das Geld ist weg, es gibt nichts mehr
   // freizugeben. Die Bestellung bleibt trotzdem sichtbar — kontrolliert
@@ -71,7 +86,7 @@ export function ApprovalPanel({
 
   // Mobile bottom bar — only Freigabe CTA, no other controls
   if (variant === "mobile-bar") {
-    if (ohneFreigabe) return null;
+    if (ohneFreigabe || gesperrt) return null;
     if (!kannFreigeben || freigabe || !hatRechnung) return null;
     return (
       <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-surface/95 backdrop-blur-sm border-t border-line z-50 safe-area-bottom">
@@ -149,8 +164,41 @@ export function ApprovalPanel({
         </Card>
       )}
 
+      {/* 11.10.2026 — Sperre: steht ueber allem, mit Urheber, Datum, Grund.
+          Der Freigabe-CTA erscheint darunter nicht, solange sie gilt. */}
+      {gesperrt && (
+        <Card padding="md" className="bg-error-bg border-error/30">
+          <div className="flex items-center gap-2">
+            <IconLock className="h-4 w-4 text-error" />
+            <p className="font-headline text-body-sm text-error">Rechnung gesperrt</p>
+          </div>
+          <p className="text-meta text-error/80 mt-1.5 ml-6">
+            Von {bestellung.gesperrt_von ?? "?"} am{" "}
+            {bestellung.gesperrt_am ? new Date(bestellung.gesperrt_am).toLocaleString("de-DE") : "–"}
+          </p>
+          {bestellung.sperrgrund && (
+            <p className="text-meta text-foreground mt-1 ml-6 italic">{bestellung.sperrgrund}</p>
+          )}
+          <p className="text-meta text-error/80 mt-1.5 ml-6">
+            Keine Freigabe, keine Zahlung, bis die Sperre aufgehoben ist.
+          </p>
+          {kannEntsperren && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3 ml-6"
+              onClick={onEntsperren}
+              loading={sperreLoading}
+              disabled={sperreLoading}
+            >
+              Sperre aufheben
+            </Button>
+          )}
+        </Card>
+      )}
+
       {/* Primary CTA — Freigeben ODER bereits-freigegeben-State ODER helper */}
-      {!ohneFreigabe && freigabe ? (
+      {gesperrt ? null : !ohneFreigabe && freigabe ? (
         <Card padding="md" className="bg-success-bg border-success-border">
           <div className="flex items-center gap-2">
             <IconCheck className="h-4 w-4 text-success" />
@@ -220,12 +268,35 @@ export function ApprovalPanel({
         </button>
       )}
 
+      {/* 11.10.2026 — Rechnung sperren: Ghost wie Verwerfen, aber die
+          sanftere Bremse. Der Vorgang bleibt, nur das Geld steht still. */}
+      {kannSperren && (
+        <>
+          <div className="industrial-line my-1" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={onOpenSperreDialog}
+            disabled={sperreLoading}
+            className={cn(
+              "w-full inline-flex items-center justify-center gap-1.5 py-2 text-meta font-medium rounded-md",
+              "text-foreground-subtle bg-transparent border border-transparent",
+              "hover:text-error hover:bg-error-bg transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]",
+            )}
+          >
+            <IconLock className="h-3.5 w-3.5" />
+            Rechnung sperren
+          </button>
+        </>
+      )}
+
       {/* Ghost/Destructive — Bestellung verwerfen. Durch industrial-line
           vom Rest getrennt. Ghost-Style mit hover:error Affordance.
           Modal (variant="destructive") ist die echte Sicherheits-Brücke. */}
       {showVerwerfen && (
         <>
-          <div className="industrial-line my-1" aria-hidden="true" />
+          {!kannSperren && <div className="industrial-line my-1" aria-hidden="true" />}
           <button
             type="button"
             onClick={onOpenVerwerfenDialog}

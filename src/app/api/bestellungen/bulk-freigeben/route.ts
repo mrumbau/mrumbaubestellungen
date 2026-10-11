@@ -8,7 +8,7 @@
  *   - freigeben_bestellung-RPC (atomar, schreibt freigaben-Row + status-Update + Audit-Event)
  *   - Audit-Kommentar im kommentare-Stream
  *
- * Response: { success, total, freigegeben, already_freigegeben, no_rechnung, no_permission, errors }
+ * Response: { success, total, freigegeben, already_freigegeben, no_rechnung, no_permission, gesperrt, errors }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +18,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { requireAuth } from "@/lib/require-auth";
+import { istGesperrt } from "@/lib/sperre";
 
 import { istVerwaltung } from "@/lib/rollen";
 const ROUTE_TAG = "/api/bestellungen/bulk-freigeben";
@@ -37,6 +38,8 @@ interface BulkFreigabeResult {
   no_rechnung: string[];
   no_permission: string[];
   not_found: string[];
+  /** 11.10.2026 — gesperrte Rechnungen (lib/sperre.ts) werden uebersprungen. */
+  gesperrt: string[];
   errors: { id: string; reason: string }[];
 }
 
@@ -69,13 +72,14 @@ export async function POST(request: NextRequest) {
       no_rechnung: [],
       no_permission: [],
       not_found: [],
+      gesperrt: [],
       errors: [],
     };
 
     // Alle Bestellungen in einem Round-Trip laden
     const { data: bestellungen, error: loadError } = await supabase
       .from("bestellungen")
-      .select("id, status, besteller_kuerzel, bestellungsart, hat_rechnung, ist_gutschrift")
+      .select("id, status, besteller_kuerzel, bestellungsart, hat_rechnung, ist_gutschrift, gesperrt_am, sperrgrund")
       .in("id", ids);
 
     if (loadError) {
@@ -127,6 +131,11 @@ export async function POST(request: NextRequest) {
         result.no_rechnung.push(id);
         continue;
       }
+      // 11.10.2026 — gesperrte Rechnung bleibt liegen (lib/sperre.ts).
+      if (istGesperrt(b)) {
+        result.gesperrt.push(id);
+        continue;
+      }
 
       // Atomare Freigabe via RPC
       const { data: rpcResult, error: rpcError } = await supabase.rpc(
@@ -148,6 +157,10 @@ export async function POST(request: NextRequest) {
       if (r?.success === false) {
         if (r.error === "bereits_freigegeben") {
           result.already_freigegeben.push(id);
+          continue;
+        }
+        if (r.error === "gesperrt") {
+          result.gesperrt.push(id);
           continue;
         }
         logError(ROUTE_TAG, `RPC-Result-Fehler für ${id}`, r);
@@ -185,6 +198,7 @@ export async function POST(request: NextRequest) {
       no_rechnung: result.no_rechnung.length,
       no_permission: result.no_permission.length,
       not_found: result.not_found.length,
+      gesperrt: result.gesperrt.length,
       errors: result.errors.length,
     });
 
