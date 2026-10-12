@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fuehreAbgleichDurch, type DokumentAnalyse } from "@/lib/openai";
 import { logError, logInfo } from "@/lib/logger";
+import { leseToleranz, TOLERANZ_SCHLUESSEL, wendeToleranzAn } from "@/lib/toleranz";
 
 export async function tryAbgleich(
   supabase: SupabaseClient,
@@ -51,7 +52,15 @@ export async function tryAbgleich(
 
     if (!ls || !re) return { ranAbgleich: false };
 
-    const ergebnis = await fuehreAbgleichDurch(bb, ls, re);
+    // 11.10.2026 — Toleranz aus den Firmen-Einstellungen (lib/toleranz.ts):
+    // kleine Betragsunterschiede sind keine Abweichung.
+    const { data: einstellungen } = await supabase
+      .from("firma_einstellungen")
+      .select("schluessel, wert")
+      .in("schluessel", [...TOLERANZ_SCHLUESSEL]);
+    const toleranz = leseToleranz(einstellungen);
+
+    const ergebnis = wendeToleranzAn(await fuehreAbgleichDurch(bb, ls, re, toleranz), toleranz);
     await supabase.from("abgleiche").insert({
       bestellung_id: bestellungId,
       status: ergebnis.status,

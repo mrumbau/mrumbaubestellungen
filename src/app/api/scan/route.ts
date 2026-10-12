@@ -8,6 +8,7 @@ import { ERRORS } from "@/lib/errors";
 import { logError, logInfo } from "@/lib/logger";
 import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit";
 import { updateBestellungStatus } from "@/lib/bestellung-utils";
+import { leseToleranz, TOLERANZ_SCHLUESSEL, wendeToleranzAn } from "@/lib/toleranz";
 
 import { istVerwaltung } from "@/lib/rollen";
 import { angemeldeterNutzer } from "@/lib/auth-claims";
@@ -302,7 +303,14 @@ export async function POST(request: NextRequest) {
           (d) => d.typ === "rechnung"
         )?.ki_roh_daten;
 
-        const abgleich = await fuehreAbgleichDurch(bb, ls, re);
+        // 11.10.2026 — Toleranz aus den Firmen-Einstellungen (lib/toleranz.ts),
+        // wie in pipeline/abgleich.ts: kleine Betragsunterschiede sind ok.
+        const { data: einstellungen } = await supabase
+          .from("firma_einstellungen")
+          .select("schluessel, wert")
+          .in("schluessel", [...TOLERANZ_SCHLUESSEL]);
+        const toleranz = leseToleranz(einstellungen);
+        const abgleich = wendeToleranzAn(await fuehreAbgleichDurch(bb, ls, re, toleranz), toleranz);
 
         // Vorherige Abgleiche löschen (es soll nur einen pro Bestellung geben)
         await supabase.from("abgleiche").delete().eq("bestellung_id", bestellung_id);

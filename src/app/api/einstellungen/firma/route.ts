@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireAuth } from "@/lib/require-auth";
+import { parseBetrag, TOLERANZ_BETRAG_MAX, TOLERANZ_PROZENT_MAX, TOLERANZ_SCHLUESSEL } from "@/lib/toleranz";
 
 // GET /api/einstellungen/firma – Alle Firma-Einstellungen laden
 export async function GET() {
@@ -48,14 +49,29 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Schlüssel erforderlich" }, { status: 400 });
     }
 
-    const erlaubteSchluessel = ["buero_adresse", "konfidenz_direkt", "konfidenz_vorschlag"];
+    const erlaubteSchluessel = ["buero_adresse", "konfidenz_direkt", "konfidenz_vorschlag", ...TOLERANZ_SCHLUESSEL];
     if (!erlaubteSchluessel.includes(schluessel)) {
       return NextResponse.json({ error: "Unbekannter Schlüssel" }, { status: 400 });
     }
 
+    // 11.10.2026 — Toleranz (lib/toleranz.ts): Zahl im erlaubten Bereich,
+    // sonst 400 statt stillem Standard.
+    let wertText = String(wert ?? "");
+    if (schluessel === "toleranz_prozent" || schluessel === "toleranz_betrag") {
+      const max = schluessel === "toleranz_prozent" ? TOLERANZ_PROZENT_MAX : TOLERANZ_BETRAG_MAX;
+      const zahl = parseBetrag(wertText);
+      if (zahl === null || zahl < 0 || zahl > max) {
+        return NextResponse.json(
+          { error: `${schluessel === "toleranz_prozent" ? "Prozent" : "Betrag"} muss zwischen 0 und ${max} liegen` },
+          { status: 400 },
+        );
+      }
+      wertText = String(zahl);
+    }
+
     const { error } = await supabase
       .from("firma_einstellungen")
-      .upsert({ schluessel, wert: String(wert ?? "") }, { onConflict: "schluessel" });
+      .upsert({ schluessel, wert: wertText }, { onConflict: "schluessel" });
 
     if (error) {
       return NextResponse.json({ error: "Speichern fehlgeschlagen" }, { status: 500 });

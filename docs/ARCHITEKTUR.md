@@ -119,6 +119,14 @@ Pflicht. Sperren darf, wer freigeben dürfte, plus die Buchhaltung; aufheben nur
 Route `POST`/`DELETE /api/bestellungen/[id]/sperren`; HTTP 423 heißt „gesperrt“. Sichtbar als rotes „Gesperrt“ in
 Liste, Buchhaltung, Dashboard und Detailkopf, Grund im Tooltip; jede Sperre und Aufhebung steht im Kommentar-Strom.
 
+## Toleranz beim Abgleich (`lib/toleranz.ts`)
+
+Der KI-Abgleich (`pipeline/abgleich.ts`, `api/scan`) vergleicht Lieferschein, Rechnung und, wenn da, Bestellbestätigung.
+Ein Betragsunterschied unter `toleranz_prozent` Prozent **oder** unter `toleranz_betrag` Euro (Standard 2 % / 5 €,
+Einstellungen → System) ist keine Abweichung: die Toleranz steht als Hinweis im Prompt und wird danach deterministisch
+auf das Ergebnis angewendet (`wendeToleranzAn()`). Tolerierte Unterschiede stehen in der Zusammenfassung, Mengen und
+Nummern bekommen nie eine Toleranz. Abos haben weiterhin ihre eigene Toleranz je Anbieter (`abo_anbieter.toleranz_prozent`).
+
 ## Datenbank — die Objekte, die man kennen muss
 
 | Objekt | Zweck |

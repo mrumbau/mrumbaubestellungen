@@ -7,6 +7,7 @@
 import type OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { logError, logInfo } from "@/lib/logger";
+import { toleranzText, type Toleranz } from "@/lib/toleranz";
 import { openai, withRetry, chatCompletion, safeParseGptJson, modelDisallowsCustomTemperature } from "./client";
 import {
   ANALYSE_PROMPT,
@@ -169,8 +170,14 @@ function makeUnknownDokumentAnalyse(parseError: boolean): DokumentAnalyse {
 export async function fuehreAbgleichDurch(
   bestellbestaetigung: DokumentAnalyse | null,
   lieferschein: DokumentAnalyse | null,
-  rechnung: DokumentAnalyse | null
+  rechnung: DokumentAnalyse | null,
+  // 11.10.2026 — Toleranz (lib/toleranz.ts): im Prompt als Hinweis, danach
+  // wendet der Aufrufer sie deterministisch auf das Ergebnis an.
+  toleranz?: Toleranz,
 ): Promise<AbgleichErgebnis> {
+  const toleranzHinweis = toleranz
+    ? `\nBetragsunterschiede bis ${toleranzText(toleranz)} (Rundung, Skonto, Fracht) sind in Ordnung und KEINE Abweichung. Mengen- und Artikelunterschiede sind immer eine Abweichung.`
+    : "";
   try {
     // chat.completions.parse hat dieselbe Param-Auto-Migration nötig wie .create:
     // gpt-5/o-Modelle akzeptieren keine custom temperature und kein max_tokens.
@@ -187,7 +194,7 @@ Vergleiche die vorliegenden Dokumente einer Bestellung und prüfe ob alles über
 
 Pflicht-Dokumente sind Lieferschein und Rechnung.
 Bestellbestätigung ist OPTIONAL — wenn null, prüfe nur LS↔RG.
-Wenn alle drei vorhanden sind, prüfe alle drei gegenseitig.
+Wenn alle drei vorhanden sind, prüfe alle drei gegenseitig.${toleranzHinweis}
 
 Gib das Ergebnis als JSON-Objekt zurück:
 - status: "ok" wenn keine Abweichungen, sonst "abweichung"
