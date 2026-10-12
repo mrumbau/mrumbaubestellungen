@@ -127,6 +127,15 @@ Einstellungen → System) ist keine Abweichung: die Toleranz steht als Hinweis i
 auf das Ergebnis angewendet (`wendeToleranzAn()`). Tolerierte Unterschiede stehen in der Zusammenfassung, Mengen und
 Nummern bekommen nie eine Toleranz. Abos haben weiterhin ihre eigene Toleranz je Anbieter (`abo_anbieter.toleranz_prozent`).
 
+## Zahlungslauf (`lib/zahlungslauf.ts`)
+
+Bezahlt wird in Läufen an festen Zahltagen (`firma_einstellungen.zahlungslauf_tage`, Standard `20`, auch `10,20`).
+Der Reiter „Zahlungslauf“ in der Buchhaltung zeigt, was am nächsten Zahltag überwiesen werden muss: jede freigegebene,
+unbezahlte, nicht gesperrte Rechnung, die vor dem **übernächsten** Zahltag fällig wird (sonst wäre sie beim nächsten Lauf
+überfällig); Rechnungen ohne Fälligkeit sind zur Sicherheit dabei, Gutschriften nie. Die Summenkarte springt in den Reiter;
+„Als bezahlt“ und der CSV-Export arbeiten auf der Auswahl. Skonto-Fristen kennt das System noch nicht (die KI liest sie
+nicht aus) — das wäre der nächste Schritt, damit der Lauf auch „Skonto bis“ zeigen kann.
+
 ## Datenbank — die Objekte, die man kennen muss
 
 | Objekt | Zweck |

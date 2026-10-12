@@ -37,12 +37,15 @@ export interface BuchhaltungTableProps {
    * aus der "offen"-Liste in "bezahlt" verschiebt.
    */
   successFlashIds?: Set<string>;
+  /** 12.10.2026 — eigener Leer-Text, z. B. fuer den Zahlungslauf. */
+  leerText?: string;
 }
 
 export function BuchhaltungTable({
   paginatedRows,
   aktiveRows,
   tab,
+  leerText,
   selectionMode,
   selectedIds,
   gefiltert,
@@ -110,9 +113,9 @@ export function BuchhaltungTable({
                 className="px-4 py-12 text-center text-foreground-subtle"
               >
                 {aktiveRows.length === 0
-                  ? tab === "offen"
+                  ? leerText ?? (tab === "offen"
                     ? "Keine offenen Rechnungen."
-                    : "Noch keine bezahlten Rechnungen."
+                    : "Noch keine bezahlten Rechnungen.")
                   : "Keine Rechnungen gefunden."}
               </td>
             </tr>

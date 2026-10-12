@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { SystemOverviewClient } from "./system-overview-client";
 import { leseToleranz } from "@/lib/toleranz";
+import { leseZahltage, ZAHLUNGSLAUF_SCHLUESSEL } from "@/lib/zahlungslauf";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export default async function SystemOverviewPage() {
         // 11.10.2026 — Toleranz beim Abgleich (lib/toleranz.ts)
         toleranzProzent: String(leseToleranz(firmaMap).prozent),
         toleranzBetrag: String(leseToleranz(firmaMap).betrag),
+        // 12.10.2026 — Zahltage des Zahlungslaufs (lib/zahlungslauf.ts)
+        zahltage: leseZahltage(firmaMap[ZAHLUNGSLAUF_SCHLUESSEL]).join(","),
       }}
       crossDuplikate={
         (crossDuplikate as Array<{

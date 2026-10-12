@@ -41,6 +41,8 @@ export function SystemOverviewClient({
     /** 11.10.2026 — Toleranz beim Abgleich (lib/toleranz.ts). */
     toleranzProzent: string;
     toleranzBetrag: string;
+    /** 12.10.2026 — Zahltage des Zahlungslaufs, z. B. "20" oder "10,20". */
+    zahltage: string;
   };
   crossDuplikate?: CrossDuplikat[];
 }) {
@@ -80,6 +82,7 @@ export function SystemOverviewClient({
   const [konfidenzVorschlag, setKonfidenzVorschlag] = useState(firma.konfidenzVorschlag);
   const [toleranzProzent, setToleranzProzent] = useState(firma.toleranzProzent);
   const [toleranzBetrag, setToleranzBetrag] = useState(firma.toleranzBetrag);
+  const [zahltage, setZahltage] = useState(firma.zahltage);
   const [firmaLoading, setFirmaLoading] = useState(false);
 
   async function saveFirma() {
@@ -91,6 +94,7 @@ export function SystemOverviewClient({
         { schluessel: "konfidenz_vorschlag", wert: konfidenzVorschlag },
         { schluessel: "toleranz_prozent", wert: toleranzProzent },
         { schluessel: "toleranz_betrag", wert: toleranzBetrag },
+        { schluessel: "zahlungslauf_tage", wert: zahltage.trim() },
       ];
       for (const s of settings) {
         const res = await fetch("/api/einstellungen/firma", {
@@ -251,6 +255,17 @@ export function SystemOverviewClient({
             onChange={(e) => setToleranzBetrag(e.target.value)}
             className="font-mono-amount"
             hint="… oder bis zu diesem Eurobetrag. Es reicht, wenn eines von beiden zutrifft. Standard: 5"
+          />
+          {/* 12.10.2026 — Zahltage fuer den Zahlungslauf in der Buchhaltung
+              (lib/zahlungslauf.ts). */}
+          <Input
+            label="Zahltage (Zahlungslauf)"
+            placeholder="20"
+            value={zahltage}
+            onChange={(e) => setZahltage(e.target.value)}
+            className="font-mono-amount"
+            hint="Tag(e) im Monat, an denen überwiesen wird — z. B. 20 oder 10,20. Die Buchhaltung zeigt, was bis zum nächsten Zahltag raus muss."
+            wrapperClassName="md:col-span-2"
           />
         </div>
         <div className="mt-4 pt-4 border-t border-line-subtle">
