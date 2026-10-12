@@ -21,6 +21,9 @@ export interface BuchhaltungSummaryCardsProps {
   bezahlteCount: number;
   naechsteFaelligDatum: string | null;
   summeMonat: number;
+  /** 12.10.2026 — naechster Zahlungslauf (lib/zahlungslauf.ts). */
+  zahlungslauf?: { datum: string; anzahl: number; summe: number; ueberfaellig: number };
+  onZahlungslauf?: () => void;
 }
 
 const EUR = new Intl.NumberFormat("de-DE", {
@@ -35,6 +38,8 @@ export function BuchhaltungSummaryCards({
   bezahlteCount,
   naechsteFaelligDatum,
   summeMonat,
+  zahlungslauf,
+  onZahlungslauf,
 }: BuchhaltungSummaryCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -67,24 +72,55 @@ export function BuchhaltungSummaryCards({
           {bezahlteCount} Rechnung{bezahlteCount !== 1 ? "en" : ""}
         </p>
       </div>
-      <div
-        className="card card-hover p-5 relative overflow-hidden"
-        style={{ borderTop: "3px solid var(--feedback-warning)" }}
-      >
+      {zahlungslauf ? (
+        // 12.10.2026 — Der Zahlungslauf ersetzt "Naechste Faellig": die
+        // Frage ist nicht, wann die naechste Rechnung faellig ist, sondern
+        // was am Zahltag ueberwiesen wird. Klick springt in den Reiter.
+        <button
+          type="button"
+          onClick={onZahlungslauf}
+          className="card card-hover p-5 relative overflow-hidden text-left focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus-ring)]"
+          style={{ borderTop: "3px solid var(--feedback-warning)" }}
+          title="Zum Zahlungslauf"
+        >
+          <div
+            className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]"
+            style={{ background: "linear-gradient(180deg, var(--feedback-warning), transparent)" }}
+          />
+          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
+            Zahlungslauf {formatDatum(zahlungslauf.datum)}
+          </p>
+          <p className="font-mono-amount text-h2 font-bold text-foreground mt-2 relative">
+            {EUR.format(zahlungslauf.summe)}
+          </p>
+          <p className="text-[12px] text-foreground-subtle mt-1 relative">
+            {zahlungslauf.anzahl} Rechnung{zahlungslauf.anzahl !== 1 ? "en" : ""}
+            {zahlungslauf.ueberfaellig > 0 && (
+              <span className="text-error font-semibold"> · {zahlungslauf.ueberfaellig} überfällig</span>
+            )}
+            {naechsteFaelligDatum && ` · nächste Fälligkeit ${formatDatum(naechsteFaelligDatum)}`}
+          </p>
+        </button>
+      ) : (
         <div
-          className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]"
-          style={{ background: "linear-gradient(180deg, var(--feedback-warning), transparent)" }}
-        />
-        <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
-          Nächste Fällig
-        </p>
-        <p className="font-mono-amount text-h2 font-bold text-foreground mt-2 relative">
-          {naechsteFaelligDatum ? formatDatum(naechsteFaelligDatum) : "–"}
-        </p>
-        <p className="text-[12px] text-foreground-subtle mt-1 relative">
-          Monat: {EUR.format(summeMonat)}
-        </p>
-      </div>
+          className="card card-hover p-5 relative overflow-hidden"
+          style={{ borderTop: "3px solid var(--feedback-warning)" }}
+        >
+          <div
+            className="absolute top-0 left-0 right-0 h-8 opacity-[0.06]"
+            style={{ background: "linear-gradient(180deg, var(--feedback-warning), transparent)" }}
+          />
+          <p className="text-[10px] font-semibold text-foreground-subtle tracking-widest uppercase relative">
+            Nächste Fällig
+          </p>
+          <p className="font-mono-amount text-h2 font-bold text-foreground mt-2 relative">
+            {naechsteFaelligDatum ? formatDatum(naechsteFaelligDatum) : "–"}
+          </p>
+          <p className="text-[12px] text-foreground-subtle mt-1 relative">
+            Monat: {EUR.format(summeMonat)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

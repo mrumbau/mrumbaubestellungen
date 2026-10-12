@@ -3,6 +3,7 @@ import { getBenutzerProfil } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BuchhaltungClient } from "@/components/buchhaltung-client";
 import { buchhaltungZeilen, type RechnungMitBestellung } from "@/lib/buchhaltung-zeilen";
+import { leseZahltage, ZAHLUNGSLAUF_SCHLUESSEL } from "@/lib/zahlungslauf";
 
 // 15.05.2026 (Cold-Start-Fix): Edge-Runtime → ~0ms cold-start statt Lambda-Container.
 export const runtime = "edge";
@@ -29,7 +30,7 @@ export default async function BuchhaltungPage() {
   //
   // Eine Bestellung OHNE Rechnungs-Beleg (nur aus dem Mailtext erkannt)
   // erscheint hier bewusst nicht — die Buchhaltung saehe sonst Phantome.
-  const [{ data: rechnungen, error: rechnungenFehler }, { data: projekte }] = await Promise.all([
+  const [{ data: rechnungen, error: rechnungenFehler }, { data: projekte }, { data: zahltageRaw }] = await Promise.all([
     supabase
       .from("dokumente")
       .select(
@@ -46,6 +47,12 @@ export default async function BuchhaltungPage() {
       .select("id, name")
       .in("status", ["aktiv", "pausiert", "abgeschlossen"])
       .order("name"),
+    // 12.10.2026 — Zahltage fuer den Zahlungslauf (lib/zahlungslauf.ts).
+    supabase
+      .from("firma_einstellungen")
+      .select("wert")
+      .eq("schluessel", ZAHLUNGSLAUF_SCHLUESSEL)
+      .maybeSingle(),
   ]);
   if (rechnungenFehler) {
     throw new Error(`Buchhaltung: Rechnungen nicht geladen — ${rechnungenFehler.message}`);
@@ -63,6 +70,7 @@ export default async function BuchhaltungPage() {
       rolle={profil.rolle}
       reachedCap={reachedCap}
       hardCap={HARD_CAP}
+      zahltage={leseZahltage(zahltageRaw?.wert)}
     />
   );
 }

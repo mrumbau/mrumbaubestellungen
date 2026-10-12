@@ -9,6 +9,7 @@ import { BuchhaltungSummaryCards } from "@/components/buchhaltung/summary-cards"
 import { BuchhaltungTable } from "@/components/buchhaltung/buchhaltung-table";
 import { PageHeader } from "@/components/ui/page-header";
 import type { BuchhaltungRow } from "@/components/buchhaltung/types";
+import { ZAHLTAGE_DEFAULT, zahlungslauf } from "@/lib/zahlungslauf";
 
 import { istVerwaltung } from "@/lib/rollen";
 // BuchhaltungRow + isFaelligBald + isUeberfaellig sind nach
@@ -25,12 +26,15 @@ export function BuchhaltungClient({
   rolle,
   reachedCap = false,
   hardCap = 500,
+  zahltage = ZAHLTAGE_DEFAULT,
 }: {
   rows: BuchhaltungRow[];
   projekte?: ProjektOption[];
   rolle: Rolle;
   reachedCap?: boolean;
   hardCap?: number;
+  /** 12.10.2026 — Tage im Monat, an denen ueberwiesen wird (lib/zahlungslauf.ts). */
+  zahltage?: readonly number[];
 }) {
   // 07.05.2026 — Client-side Pagination.
   // Vorher: Server-range(0,19) + Client-Tab/Filter → Filter sah nur 20er-Slice,
@@ -39,7 +43,9 @@ export function BuchhaltungClient({
   // arbeiten auf der Gesamt-Menge.
   const PAGE_SIZE = 20;
   const [suche, setSuche] = useState("");
-  const [tab, setTab] = useState<"offen" | "bezahlt">("offen");
+  // 12.10.2026 — dritter Reiter "Zahlungslauf": was am naechsten Zahltag
+  // ueberwiesen werden muss (lib/zahlungslauf.ts).
+  const [tab, setTab] = useState<"offen" | "zahlungslauf" | "bezahlt">("offen");
   const [bezahltLoading, setBezahltLoading] = useState<string | null>(null);
   const [bezahltError, setBezahltError] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -74,7 +80,12 @@ export function BuchhaltungClient({
 
   const offeneRows = localRows.filter((r) => !r.bezahlt_am);
   const bezahlteRows = localRows.filter((r) => !!r.bezahlt_am && !r.archiviert_am);
-  const aktiveRows = tab === "offen" ? offeneRows : bezahlteRows;
+  const lauf = zahlungslauf(offeneRows, zahltage);
+  const aktiveRows = tab === "offen" ? offeneRows : tab === "zahlungslauf" ? lauf.zeilen : bezahlteRows;
+  // Die Tabelle kennt nur "offen" und "bezahlt"; der Zahlungslauf ist eine
+  // Teilmenge von "offen" mit denselben Spalten und Aktionen.
+  const tabelleTab = tab === "bezahlt" ? "bezahlt" : "offen";
+  const laufDatum = lauf.lauf.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 
   const gefiltert = aktiveRows.filter((r) => {
     if (artFilter !== "alle" && (r.bestellungsart || "material") !== artFilter) return false;
@@ -384,6 +395,13 @@ export function BuchhaltungClient({
         bezahlteCount={bezahlteRows.length}
         naechsteFaelligDatum={naechsteFaellig?.faelligkeitsdatum ?? null}
         summeMonat={summeMonat}
+        zahlungslauf={{
+          datum: lauf.lauf.toISOString(),
+          anzahl: lauf.zeilen.length,
+          summe: lauf.summe,
+          ueberfaellig: lauf.ueberfaellig,
+        }}
+        onZahlungslauf={() => { setTab("zahlungslauf"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
       />
 
       {/* Industrial-Line zwischen Summary-Snapshot und Tabs+Tabelle.
@@ -407,6 +425,24 @@ export function BuchhaltungClient({
                 tab === "offen" ? "bg-brand text-white" : "bg-line text-foreground-muted"
               }`}>
                 {offeneRows.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => { setTab("zahlungslauf"); setSuche(""); setSelectedIds(new Set()); setSelectionMode(false); }}
+            className={`flex items-center gap-2 px-4 py-2 text-body-sm font-medium rounded-md transition-[background-color,color,box-shadow] duration-150 ease-out ${
+              tab === "zahlungslauf"
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-foreground-muted hover:text-foreground"
+            }`}
+            title={`Was am ${laufDatum} überwiesen werden muss: fällig vor dem nächsten Zahltag, nicht gesperrt, keine Gutschrift.`}
+          >
+            Zahlungslauf {laufDatum}
+            {lauf.zeilen.length > 0 && (
+              <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full ${
+                tab === "zahlungslauf" ? "bg-warning text-white" : "bg-line text-foreground-muted"
+              }`}>
+                {lauf.zeilen.length}
               </span>
             )}
           </button>
@@ -458,7 +494,7 @@ export function BuchhaltungClient({
               type="button"
               onClick={() => setSelectionMode(true)}
               className="p-2.5 text-foreground-subtle hover:text-brand hover:bg-brand/[0.06] rounded-lg border border-line transition-colors shrink-0"
-              title={tab === "offen" ? "Auswahl-Modus (Bulk-Bezahlt)" : "Auswahl-Modus (Archivieren)"}
+              title={tab !== "bezahlt" ? "Auswahl-Modus (Bulk-Bezahlt)" : "Auswahl-Modus (Archivieren)"}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -469,10 +505,22 @@ export function BuchhaltungClient({
       </div>
 
       {/* Tabelle — eigene Komponente */}
+      {tab === "zahlungslauf" && (
+        <p className="text-meta text-foreground-muted">
+          Zahltag {laufDatum}, nächster {lauf.naechsterLauf.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}.
+          Drin ist alles, was vorher fällig wird
+          {lauf.ohneFaelligkeit > 0 && ` (${lauf.ohneFaelligkeit} ohne Fälligkeitsdatum, zur Sicherheit mit dabei)`}
+          {lauf.ueberfaellig > 0 && `, davon ${lauf.ueberfaellig} schon überfällig`}.
+          Gesperrte Rechnungen und Gutschriften fehlen bewusst.
+        </p>
+      )}
+
+      {/* Tabelle — eigene Komponente */}
       <BuchhaltungTable
         paginatedRows={paginatedRows}
         aktiveRows={aktiveRows}
-        tab={tab}
+        tab={tabelleTab}
+        leerText={tab === "zahlungslauf" ? `Nichts für den Zahlungslauf am ${laufDatum}.` : undefined}
         selectionMode={selectionMode}
         selectedIds={selectedIds}
         gefiltert={gefiltert}
@@ -503,7 +551,7 @@ export function BuchhaltungClient({
               >
                 Abbrechen
               </button>
-              {selectedIds.size > 0 && tab === "offen" && (
+              {selectedIds.size > 0 && tab !== "bezahlt" && (
                 <button
                   type="button"
                   onClick={() => bulkBezahltMarkieren(Array.from(selectedIds))}
@@ -538,7 +586,7 @@ export function BuchhaltungClient({
       {/* Summenzeile + Paginierung */}
       <div className="mt-4 flex items-center justify-between text-body-sm">
         <span className="text-foreground-subtle">
-          {gefiltert.length} {tab === "offen" ? "offen" : "bezahlt"}
+          {gefiltert.length} {tab === "offen" ? "offen" : tab === "zahlungslauf" ? `im Zahlungslauf ${laufDatum}` : "bezahlt"}
           {gefiltert.length > 0 && (
             <span className="ml-2 font-mono-amount font-semibold text-foreground">
               Summe: {new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(

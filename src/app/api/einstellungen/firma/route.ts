@@ -4,6 +4,7 @@ import { checkCsrf } from "@/lib/csrf";
 import { ERRORS } from "@/lib/errors";
 import { requireAuth } from "@/lib/require-auth";
 import { parseBetrag, TOLERANZ_BETRAG_MAX, TOLERANZ_PROZENT_MAX, TOLERANZ_SCHLUESSEL } from "@/lib/toleranz";
+import { leseZahltage, ZAHLUNGSLAUF_SCHLUESSEL } from "@/lib/zahlungslauf";
 
 // GET /api/einstellungen/firma – Alle Firma-Einstellungen laden
 export async function GET() {
@@ -49,7 +50,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Schlüssel erforderlich" }, { status: 400 });
     }
 
-    const erlaubteSchluessel = ["buero_adresse", "konfidenz_direkt", "konfidenz_vorschlag", ...TOLERANZ_SCHLUESSEL];
+    const erlaubteSchluessel = ["buero_adresse", "konfidenz_direkt", "konfidenz_vorschlag", ...TOLERANZ_SCHLUESSEL, ZAHLUNGSLAUF_SCHLUESSEL];
     if (!erlaubteSchluessel.includes(schluessel)) {
       return NextResponse.json({ error: "Unbekannter Schlüssel" }, { status: 400 });
     }
@@ -67,6 +68,18 @@ export async function PUT(request: NextRequest) {
         );
       }
       wertText = String(zahl);
+    }
+    // 12.10.2026 — Zahltage (lib/zahlungslauf.ts): "20" oder "10,20", nur 1 bis 28.
+    if (schluessel === ZAHLUNGSLAUF_SCHLUESSEL) {
+      const tage = wertText.split(/[,;\s]+/).filter(Boolean);
+      const gelesen = leseZahltage(wertText);
+      if (tage.length === 0 || gelesen.length !== tage.length) {
+        return NextResponse.json(
+          { error: "Zahltage: Tage im Monat von 1 bis 28, durch Komma getrennt (z. B. 20 oder 10,20)" },
+          { status: 400 },
+        );
+      }
+      wertText = gelesen.join(",");
     }
 
     const { error } = await supabase
