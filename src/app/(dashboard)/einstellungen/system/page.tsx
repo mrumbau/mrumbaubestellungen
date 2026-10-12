@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { SystemOverviewClient } from "./system-overview-client";
+import { leseToleranz } from "@/lib/toleranz";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,9 @@ export default async function SystemOverviewPage() {
         bueroAdresse: firmaMap["buero_adresse"] ?? "",
         konfidenzDirekt: firmaMap["konfidenz_direkt"] ?? "0.85",
         konfidenzVorschlag: firmaMap["konfidenz_vorschlag"] ?? "0.60",
+        // 11.10.2026 — Toleranz beim Abgleich (lib/toleranz.ts)
+        toleranzProzent: String(leseToleranz(firmaMap).prozent),
+        toleranzBetrag: String(leseToleranz(firmaMap).betrag),
       }}
       crossDuplikate={
         (crossDuplikate as Array<{

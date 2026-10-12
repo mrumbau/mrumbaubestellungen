@@ -34,7 +34,14 @@ export function SystemOverviewClient({
   firma,
   crossDuplikate = [],
 }: {
-  firma: { bueroAdresse: string; konfidenzDirekt: string; konfidenzVorschlag: string };
+  firma: {
+    bueroAdresse: string;
+    konfidenzDirekt: string;
+    konfidenzVorschlag: string;
+    /** 11.10.2026 — Toleranz beim Abgleich (lib/toleranz.ts). */
+    toleranzProzent: string;
+    toleranzBetrag: string;
+  };
   crossDuplikate?: CrossDuplikat[];
 }) {
   const { toast } = useToast();
@@ -71,6 +78,8 @@ export function SystemOverviewClient({
   const [bueroAdresse, setBueroAdresse] = useState(firma.bueroAdresse);
   const [konfidenzDirekt, setKonfidenzDirekt] = useState(firma.konfidenzDirekt);
   const [konfidenzVorschlag, setKonfidenzVorschlag] = useState(firma.konfidenzVorschlag);
+  const [toleranzProzent, setToleranzProzent] = useState(firma.toleranzProzent);
+  const [toleranzBetrag, setToleranzBetrag] = useState(firma.toleranzBetrag);
   const [firmaLoading, setFirmaLoading] = useState(false);
 
   async function saveFirma() {
@@ -80,6 +89,8 @@ export function SystemOverviewClient({
         { schluessel: "buero_adresse", wert: bueroAdresse.trim() },
         { schluessel: "konfidenz_direkt", wert: konfidenzDirekt },
         { schluessel: "konfidenz_vorschlag", wert: konfidenzVorschlag },
+        { schluessel: "toleranz_prozent", wert: toleranzProzent },
+        { schluessel: "toleranz_betrag", wert: toleranzBetrag },
       ];
       for (const s of settings) {
         const res = await fetch("/api/einstellungen/firma", {
@@ -214,6 +225,32 @@ export function SystemOverviewClient({
             onChange={(e) => setKonfidenzVorschlag(e.target.value)}
             className="font-mono-amount"
             hint="Ab diesem Wert wird ein Vorschlag angezeigt. Standard: 0.60"
+          />
+          {/* 11.10.2026 — Toleranz beim Abgleich Rechnung ↔ Lieferschein ↔
+              Bestellung (lib/toleranz.ts). Prozent ODER Betrag reicht. */}
+          <Input
+            label="Toleranz Betrag (%)"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={50}
+            step={0.5}
+            value={toleranzProzent}
+            onChange={(e) => setToleranzProzent(e.target.value)}
+            className="font-mono-amount"
+            hint="Betragsunterschiede bis zu diesem Prozentsatz gelten beim Abgleich als in Ordnung. Standard: 2"
+          />
+          <Input
+            label="Toleranz Betrag (€)"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={1000}
+            step={0.5}
+            value={toleranzBetrag}
+            onChange={(e) => setToleranzBetrag(e.target.value)}
+            className="font-mono-amount"
+            hint="… oder bis zu diesem Eurobetrag. Es reicht, wenn eines von beiden zutrifft. Standard: 5"
           />
         </div>
         <div className="mt-4 pt-4 border-t border-line-subtle">
